@@ -203,6 +203,12 @@ export default {
           // Validate continue path
           const validatedContinuePath = sanitizeContinuePath(continue_path);
 
+          // Debug logging to see what's being stored
+          console.log("🔍 Magic Link Request Debug:");
+          console.log("  Original continue_path:", continue_path);
+          console.log("  Sanitized continue_path:", validatedContinuePath);
+          console.log("  Email:", email);
+
           // Generate secure token
           const token = generateToken();
           const tokenHash = await hashToken(token);
