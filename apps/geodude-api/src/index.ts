@@ -352,7 +352,11 @@ export default {
         log("direct_redirect", { pid: pid, dest: dest.toString(), org_id, project_id });
         return attach(addCorsHeaders(resp));
       } catch (e: any) {
-        log("direct_redirect_error", { pid, error: e.message, stack: e.stack });
+        // Extract pid from path for error logging
+        const pathParts = url.pathname.split("/").filter(Boolean);
+        const errorPid = pathParts.length >= 2 ? pathParts[pathParts.length - 1] : "unknown";
+        
+        log("direct_redirect_error", { pid: errorPid, error: e.message, stack: e.stack });
         const response = new Response(`redirect error: ${e?.message ?? ""}`, { status: 500 });
         return attach(addCorsHeaders(response));
       }
