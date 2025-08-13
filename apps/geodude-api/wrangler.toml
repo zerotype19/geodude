@@ -20,13 +20,6 @@ database_id = "5d63faff-5415-48d6-aec1-f39e6456aab8"
 binding = "AI_CAPTURES"
 bucket_name = "geodude-ai-captures"
 
-# KV (pid -> canonical URL)
-[[kv_namespaces]]
-binding = "DEST_MAP"
-id = "6b21fea06a194549a3fe650020e63f24"
-# If you have a distinct preview_id, put it here. Using the same ID is OK to start.
-preview_id = "6b21fea06a194549a3fe650020e63f24"
-
 # ----- IMPORTANT: Production Environment Variables -----
 # ALL production environment variables MUST be set in Cloudflare Dashboard
 # DO NOT add any [env.production.vars] section here
