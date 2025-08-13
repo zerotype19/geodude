@@ -10,6 +10,7 @@ type Env = {
   CANONICAL_BASE: string;
   RESEND_API_KEY?: string;
   APP_BASE_URL?: string;
+  AI_FEED_SIGNING_KEY: string;
 };
 
 // Helper function to add CORS headers with credentials support
@@ -425,16 +426,16 @@ export default {
           org,
           prj,
           src: body.src,
-          model: body.model ?? null,
+          model: body.model || undefined,
           pid: body.pid,
-          geo: body.geo ?? null,
+          geo: body.geo || undefined,
           exp: Math.floor(Date.now() / 1000) + ttl * 60
         } : {
           v: 1,
           src: body.src,
-          model: body.model ?? null,
+          model: body.model || undefined,
           pid: body.pid,
-          geo: body.geo ?? null,
+          geo: body.geo || undefined,
           exp: Math.floor(Date.now() / 1000) + ttl * 60
         };
         const token = await hmacSign(tokenPayload, env.HMAC_KEY);
@@ -800,9 +801,11 @@ export default {
         const response = Response.json({ ok: true, project: { id: projectId, name: body.name, slug: body.slug } });
         const origin = req.headers.get("origin");
         const allowed = ["optiview.ai"];
-        if (origin && allowed.some(a => origin.endsNow let me find the set - current endpoint:
-          <｜tool▁calls▁begin｜> <｜tool▁call▁begin｜>
-        read_file
+        if (origin && allowed.some(a => origin.endsWith(a))) {
+          response.headers.set("Access-Control-Allow-Origin", origin);
+          response.headers.set("Vary", "Origin");
+          response.headers.set("Access-Control-Allow-Credentials", "true");
+        }
         return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
