@@ -861,6 +861,95 @@ export default {
         }
       }
 
+      // 6.3.9) Install Verification API
+      if (url.pathname === "/api/events/last-seen" && req.method === "GET") {
+        try {
+          const { property_id } = Object.fromEntries(url.searchParams);
+          if (!property_id) {
+            const response = new Response(JSON.stringify({
+              error: "Missing property_id parameter"
+            }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // TODO: Add session authentication here
+          // For now, we'll proceed without user validation
+
+          // Get the most recent event timestamp and counts for this property within last 15 minutes
+          const cutoffTime = Date.now() - (15 * 60 * 1000); // 15 minutes ago
+          
+          const lastSeenResult = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              ie.occurred_at,
+              ie.metadata,
+              COUNT(*) as events_15m,
+              SUM(CASE WHEN ie.metadata->>'$.ai_class' = 'direct_human' THEN 1 ELSE 0 END) as direct_human,
+              SUM(CASE WHEN ie.metadata->>'$.ai_class' = 'human_via_ai' THEN 1 ELSE 0 END) as human_via_ai,
+              SUM(CASE WHEN ie.metadata->>'$.ai_class' = 'ai_agent_crawl' THEN 1 ELSE 0 END) as ai_agent_crawl,
+              SUM(CASE WHEN ie.metadata->>'$.ai_class' = 'unknown_ai_like' THEN 1 ELSE 0 END) as unknown_ai_like
+            FROM interaction_events ie
+            JOIN properties p ON ie.content_id IN (
+              SELECT id FROM content_assets WHERE property_id = p.id
+            )
+            WHERE p.id = ? AND ie.occurred_at >= ?
+            GROUP BY ie.metadata->>'$.ai_class'
+          `).bind(property_id, cutoffTime).all<any>();
+
+          // Get the most recent event timestamp
+          const lastEventResult = await env.OPTIVIEW_DB.prepare(`
+            SELECT MAX(ie.occurred_at) as last_event_ts
+            FROM interaction_events ie
+            JOIN properties p ON ie.content_id IN (
+              SELECT id FROM content_assets WHERE property_id = p.id
+            )
+            WHERE p.id = ?
+          `).bind(property_id).first<any>();
+
+          // Aggregate the counts
+          let totalEvents = 0;
+          const byClass: Record<string, number> = {
+            direct_human: 0,
+            human_via_ai: 0,
+            ai_agent_crawl: 0,
+            unknown_ai_like: 0
+          };
+
+          if (lastSeenResult.results.length > 0) {
+            lastSeenResult.results.forEach((row: any) => {
+              totalEvents += row.events_15m || 0;
+              if (row.direct_human) byClass.direct_human = row.direct_human;
+              if (row.human_via_ai) byClass.human_via_ai = row.human_via_ai;
+              if (row.ai_agent_crawl) byClass.ai_agent_crawl = row.ai_agent_crawl;
+              if (row.unknown_ai_like) byClass.unknown_ai_like = row.unknown_ai_like;
+            });
+          }
+
+          const lastEventTs = lastEventResult?.last_event_ts || null;
+
+          const verificationData = {
+            property_id: parseInt(property_id),
+            events_15m: totalEvents,
+            by_class_15m: byClass,
+            last_event_ts: lastEventTs ? new Date(lastEventTs).toISOString() : null
+          };
+
+          const response = new Response(JSON.stringify(verificationData), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "public, max-age=10" // 10 second cache for real-time data
+            }
+          });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        } catch (e: any) {
+          log("install_verification_error", { error: e.message, stack: e.stack });
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        }
+      }
+
       // 6.4) Referrals API (with schema validation)
       if (url.pathname === "/api/referrals" && req.method === "POST") {
         try {
