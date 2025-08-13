@@ -44,9 +44,11 @@ export default function Admin() {
       
       if (response.ok) {
         const data = await response.json();
-        setKvMappings(data.mappings || []);
+        console.log("KV API response:", data); // Debug logging
+        // API returns { items: [...] } not { mappings: [...] }
+        setKvMappings(data.items || []);
       } else {
-        console.error("Failed to load KV mappings");
+        console.error("Failed to load KV mappings:", response.status, response.statusText);
       }
     } catch (error) {
       console.error("Error loading KV mappings:", error);
