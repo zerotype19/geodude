@@ -20,3 +20,6 @@ vars = { CSP_MODE = "production" }
 
 [env.development]
 vars = { CSP_MODE = "development" }
+
+[env.dev]
+vars = { CSP_MODE = "development" }
