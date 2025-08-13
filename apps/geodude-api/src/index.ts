@@ -204,121 +204,118 @@ export default {
       }
     }
 
-    // 2.5) Direct PID redirector: /p/:pid (for testing without tokens)
+    // 2.5) Direct PID redirector: /p/:pid (project-scoped, public)
     if (url.pathname.startsWith("/p/")) {
-      const pid = url.pathname.split("/").pop()!;
+      const pathParts = url.pathname.split("/").filter(Boolean);
+      
       try {
-        log("direct_redirect_start", { pid });
-        
-        // Try to find the PID in multiple contexts
+        let project_id = null;
+        let org_id = null;
+        let pid = null;
         let destUrl = null;
-        let org_id = "org_system";
-        let project_id = "prj_system";
         
-        // Strategy 1: Try system org/project first (for public PIDs)
-        const systemKey = `${org_id}:${project_id}:${pid}`;
-        log("direct_redirect_debug", { step: "trying_system", key: systemKey });
-        destUrl = await env.DEST_MAP.get(systemKey);
-        log("direct_redirect_debug", { step: "system_result", found: !!destUrl, url: destUrl });
-        
-        // Strategy 2: If not found in system, try to get from user's current context via cookie
-        if (!destUrl) {
-          try {
-            log("direct_redirect_debug", { step: "trying_session" });
-            const sessionId = req.headers.get("cookie")?.match(/geodude_ses=([^;]+)/)?.[1];
-            log("direct_redirect_debug", { step: "session_cookie", found: !!sessionId, sessionId: sessionId ? "present" : "missing" });
+        // Parse the path: /p/@handle/pid or /p/pid (with host-based project resolution)
+        if (pathParts.length === 3 && pathParts[1].startsWith("@")) {
+          // Format: /p/@handle/pid
+          const handle = pathParts[1].substring(1);
+          pid = pathParts[2];
+          
+          log("direct_redirect_start", { format: "handle_scoped", handle, pid });
+          
+          // Look up project by handle
+          const project = await env.GEO_DB.prepare(
+            "SELECT id, org_id FROM project WHERE public_handle = ? LIMIT 1"
+          ).bind(handle).first<any>();
+          
+          if (!project) {
+            log("direct_redirect_debug", { step: "handle_not_found", handle });
+            const response = new Response(`Project handle not found: ${handle}`, { status: 404 });
+            return attach(addCorsHeaders(response));
+          }
+          
+          project_id = project.id;
+          org_id = project.org_id;
+          
+          log("direct_redirect_debug", { step: "handle_resolved", handle, project_id, org_id });
+          
+        } else if (pathParts.length === 2) {
+          // Format: /p/pid (host-based project resolution)
+          pid = pathParts[1];
+          
+          log("direct_redirect_start", { format: "host_scoped", pid, host: req.headers.get("host") });
+          
+          // Try to resolve project by host (custom domain)
+          const host = req.headers.get("host");
+          if (host && host !== "api.optiview.ai") {
+            // Look up project by custom host
+            const customHost = await env.GEO_DB.prepare(
+              "SELECT project_id FROM custom_hosts WHERE host = ? LIMIT 1"
+            ).bind(host).first<any>();
             
-            if (sessionId) {
-              // Look up the actual session data from the database
-              // Try to get current_org_id and current_project_id from session table
-              let sessionData = await env.GEO_DB.prepare(
-                "SELECT current_org_id, current_project_id FROM session WHERE id = ? LIMIT 1"
-              ).bind(sessionId).first<any>();
+            if (customHost) {
+              project_id = customHost.project_id;
               
-              log("direct_redirect_debug", { step: "session_lookup", found: !!sessionData, org_id: sessionData?.current_org_id, project_id: sessionData?.current_project_id });
+              // Get org_id for this project
+              const project = await env.GEO_DB.prepare(
+                "SELECT org_id FROM project WHERE id = ? LIMIT 1"
+              ).bind(project_id).first<any>();
               
-              // If current context not found, try to get from user's default org/project
-              if (!sessionData?.current_org_id || !sessionData?.current_project_id) {
-                log("direct_redirect_debug", { step: "fallback_to_user_default" });
-                const userSession = await env.GEO_DB.prepare(
-                  "SELECT user_id FROM session WHERE id = ? LIMIT 1"
-                ).bind(sessionId).first<any>();
-                
-                if (userSession?.user_id) {
-                  // Get user's first org/project as fallback
-                  const userOrg = await env.GEO_DB.prepare(
-                    "SELECT org_id FROM org_member WHERE user_id = ? LIMIT 1"
-                  ).bind(userSession.user_id).first<any>();
-                  
-                  if (userOrg?.org_id) {
-                    const userProject = await env.GEO_DB.prepare(
-                      "SELECT id FROM project WHERE org_id = ? LIMIT 1"
-                    ).bind(userOrg.org_id).first<any>();
-                    
-                    if (userProject?.id) {
-                      sessionData = {
-                        current_org_id: userOrg.org_id,
-                        current_project_id: userProject.id
-                      };
-                      log("direct_redirect_debug", { step: "user_default_found", org_id: sessionData.current_org_id, project_id: sessionData.current_project_id });
-                    }
-                  }
-                }
+              if (project) {
+                org_id = project.org_id;
+                log("direct_redirect_debug", { step: "host_resolved", host, project_id, org_id });
               }
-              
-              if (sessionData?.current_org_id && sessionData?.current_project_id) {
-                const userKey = `${sessionData.current_org_id}:${sessionData.current_project_id}:${pid}`;
-                log("direct_redirect_debug", { step: "trying_user_context", key: userKey });
-                destUrl = await env.DEST_MAP.get(userKey);
-                log("direct_redirect_debug", { step: "user_context_result", found: !!destUrl, url: destUrl });
-                
-                if (destUrl) {
-                  org_id = sessionData.current_org_id;
-                  project_id = sessionData.current_project_id;
-                }
-              }
+            } else {
+              log("direct_redirect_debug", { step: "host_not_found", host });
             }
-          } catch (e) {
-            log("direct_redirect_debug", { step: "session_error", error: e.message });
-            // Ignore session parsing errors, fall back to system
           }
+          
+          // If no custom host found, reject (no global search)
+          if (!project_id) {
+            log("direct_redirect_debug", { step: "no_project_context", host, suggestion: "use /p/@handle/pid or custom domain" });
+            const response = new Response(`PID resolution requires project context. Use /p/@handle/${pid} or set up a custom domain.`, { status: 404 });
+            return attach(addCorsHeaders(response));
+          }
+        } else {
+          // Invalid path format
+          log("direct_redirect_debug", { step: "invalid_path", path: url.pathname });
+          const response = new Response(`Invalid path format. Use /p/@handle/pid or /p/pid with custom domain.`, { status: 400 });
+          return attach(addCorsHeaders(response));
         }
         
-        // Strategy 3: If still not found, search ALL orgs/projects for this PID (public access)
-        if (!destUrl) {
-          log("direct_redirect_debug", { step: "trying_global_search" });
+        // Now resolve the PID within the specific project
+        if (project_id && org_id && pid) {
+          // Look up PID in pid_map table (source of truth)
+          const pidMapping = await env.GEO_DB.prepare(
+            "SELECT url FROM pid_map WHERE project_id = ? AND pid = ? LIMIT 1"
+          ).bind(project_id, pid).first<any>();
           
-          // Get all KV keys and search for any that end with this PID
-          const allKeys = await env.DEST_MAP.list({ limit: 1000 });
-          const matchingKeys = allKeys.keys?.filter(k => k.name.endsWith(`:${pid}`)) || [];
-          
-          log("direct_redirect_debug", { step: "global_search", totalKeys: allKeys.keys?.length || 0, matchingKeys: matchingKeys.length, matches: matchingKeys.map(k => k.name) });
-          
-          if (matchingKeys.length > 0) {
-            // Use the first match found (you could implement priority logic here)
-            const firstMatch = matchingKeys[0];
-            const keyParts = firstMatch.name.split(':');
-            if (keyParts.length >= 3) {
-              org_id = keyParts[0];
-              project_id = keyParts[1];
-              destUrl = await env.DEST_MAP.get(firstMatch.name);
-              log("direct_redirect_debug", { step: "global_search_success", key: firstMatch.name, org_id, project_id, url: destUrl });
-            }
+          if (pidMapping) {
+            destUrl = pidMapping.url;
+            log("direct_redirect_debug", { step: "pid_found", project_id, org_id, pid, url: destUrl });
+          } else {
+            // Fallback to KV for backward compatibility
+            const kvKey = `${org_id}:${project_id}:${pid}`;
+            log("direct_redirect_debug", { step: "trying_kv_fallback", key: kvKey });
+            destUrl = await env.DEST_MAP.get(kvKey);
+            log("direct_redirect_debug", { step: "kv_fallback_result", found: !!destUrl });
           }
         }
         
         if (!destUrl) {
-          log("direct_redirect_debug", { step: "not_found", pid, org_id, project_id });
-          const response = new Response(`PID not found: ${pid}`, { status: 404 });
+          log("direct_redirect_debug", { step: "not_found", pid, project_id, org_id });
+          const response = new Response(`PID not found: ${pid} in project ${project_id}`, { status: 404 });
           return attach(addCorsHeaders(response));
         }
 
-        log("direct_redirect_debug", { step: "found", pid, org_id, project_id, destUrl });
+        log("direct_redirect_debug", { step: "found", pid, project_id, org_id, destUrl });
 
-        // session + ai_ref cookies
+        // Create redirect response (no session cookies for public endpoints)
         const headers = new Headers();
-        const sid = getOrSetSession(req, headers);
-        headers.append("Set-Cookie", `ai_ref=1; Path=/; Max-Age=${14 * 86400}; SameSite=Lax`);
+        
+        // Set proper cache headers for public redirects
+        headers.append("Cache-Control", "no-store, no-cache, must-revalidate");
+        headers.append("Pragma", "no-cache");
+        headers.append("Expires", "0");
 
         // append UTMs
         const dest = new URL(destUrl);
@@ -335,18 +332,20 @@ export default {
           ip: req.headers.get("cf-connecting-ip"),
           asn: (req as any).cf?.asn ? String((req as any).cf.asn) : null,
           dest: dest.toString(),
-          session_id: sid,
+          session_id: null, // No session for public endpoints
           org_id: org_id,
           project_id: project_id
         };
         ctx.waitUntil(insertClick(env.GEO_DB, clickData));
 
-        // Create redirect response with headers
+        // Create redirect response with proper headers
         const resp = new Response(null, {
-          status: 302,
+          status: 302, // Temporary redirect, not permanent
           headers: {
             "Location": dest.toString(),
-            ...Object.fromEntries(headers.entries())
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
           }
         });
 
@@ -1376,6 +1375,191 @@ export default {
         const response = new Response(e.message || "error", { status: 500 });
         return addCorsHeaders(response);
       }
+    }
+
+    // 4) Admin endpoints (session required)
+    if (url.pathname.startsWith("/admin/")) {
+      const sid = getOrSetSession(req, headers);
+      if (!sid) {
+        const response = new Response("unauthorized", { status: 401 });
+        return attach(addCorsHeaders(response));
+      }
+
+      // Get user's current context
+      const sessionData = await env.GEO_DB.prepare(
+        "SELECT current_org_id, current_project_id FROM session WHERE id = ? LIMIT 1"
+      ).bind(sid).first<any>();
+
+      if (!sessionData?.current_org_id || !sessionData?.current_project_id) {
+        const response = new Response("no project context", { status: 400 });
+        return attach(addCorsHeaders(response));
+      }
+
+      const { current_org_id, current_project_id } = sessionData;
+
+      // 4.1) GET /admin/kv (list KV entries for current project)
+      if (url.pathname === "/admin/kv" && req.method === "GET") {
+        try {
+          const prefix = `${current_org_id}:${current_project_id}:`;
+          const list = await env.DEST_MAP.list({ prefix, limit: 1000 });
+          
+          const entries = await Promise.all(
+            list.keys?.map(async (k) => {
+              const url = await env.DEST_MAP.get(k.name);
+              const pid = k.name.split(":").pop();
+              return { pid, url, key: k.name };
+            }) || []
+          );
+
+          const response = new Response(JSON.stringify({ entries, prefix }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return attach(addCorsHeaders(response));
+        } catch (e: any) {
+          const response = new Response(`KV list error: ${e?.message ?? ""}`, { status: 500 });
+          return attach(addCorsHeaders(response));
+        }
+      }
+
+      // 4.2) PUT /admin/kv (set KV entry + sync to pid_map)
+      if (url.pathname === "/admin/kv" && req.method === "PUT") {
+        try {
+          const { pid, url: destUrl } = await req.json();
+          if (!pid || !destUrl) {
+            const response = new Response("missing pid or url", { status: 400 });
+            return attach(addCorsHeaders(response));
+          }
+
+          const key = `${current_org_id}:${current_project_id}:${pid}`;
+          
+          // Set in KV (for backward compatibility)
+          await env.DEST_MAP.put(key, destUrl);
+          
+          // Sync to pid_map table (source of truth)
+          await env.GEO_DB.prepare(`
+            INSERT INTO pid_map (project_id, pid, url, updated_ts) 
+            VALUES (?, ?, ?, unixepoch())
+            ON CONFLICT(project_id, pid) DO UPDATE SET 
+              url = excluded.url, 
+              updated_ts = unixepoch()
+          `).bind(current_project_id, pid, destUrl).run();
+
+          log("admin_kv_set", { pid, url: destUrl, key, project_id: current_project_id });
+          
+          const response = new Response("ok", { status: 200 });
+          return attach(addCorsHeaders(response));
+        } catch (e: any) {
+          log("admin_kv_error", { error: e.message, stack: e.stack });
+          const response = new Response(`KV set error: ${e?.message ?? ""}`, { status: 500 });
+          return attach(addCorsHeaders(response));
+        }
+      }
+
+      // 4.3) POST /admin/project/handle (set project public handle)
+      if (url.pathname === "/admin/project/handle" && req.method === "POST") {
+        try {
+          const { handle } = await req.json();
+          if (!handle || !/^[a-z0-9-]{3,50}$/.test(handle)) {
+            const response = new Response("invalid handle format (use lowercase, numbers, hyphens, 3-50 chars)", { status: 400 });
+            return attach(addCorsHeaders(response));
+          }
+
+          // Check if handle is already taken
+          const existing = await env.GEO_DB.prepare(
+            "SELECT id FROM project WHERE public_handle = ? AND id != ? LIMIT 1"
+          ).bind(handle, current_project_id).first<any>();
+
+          if (existing) {
+            const response = new Response("handle already taken", { status: 409 });
+            return attach(addCorsHeaders(response));
+          }
+
+          // Set the handle
+          await env.GEO_DB.prepare(
+            "UPDATE project SET public_handle = ? WHERE id = ?"
+          ).bind(handle, current_project_id).run();
+
+          log("admin_project_handle_set", { handle, project_id: current_project_id });
+          
+          const response = new Response("ok", { status: 200 });
+          return attach(addCorsHeaders(response));
+        } catch (e: any) {
+          log("admin_project_handle_error", { error: e.message, stack: e.stack });
+          const response = new Response(`handle set error: ${e?.message ?? ""}`, { status: 500 });
+          return attach(addCorsHeaders(response));
+        }
+      }
+
+      // 4.4) POST /admin/custom-hosts (set custom domain for project)
+      if (url.pathname === "/admin/custom-hosts" && req.method === "POST") {
+        try {
+          const { host } = await req.json();
+          if (!host || !host.includes(".")) {
+            const response = new Response("invalid host format", { status: 400 });
+            return attach(addCorsHeaders(response));
+          }
+
+          // Check if host is already taken
+          const existing = await env.GEO_DB.prepare(
+            "SELECT project_id FROM custom_hosts WHERE host = ? LIMIT 1"
+          ).bind(host).first<any>();
+
+          if (existing && existing.project_id !== current_project_id) {
+            const response = new Response("host already taken by another project", { status: 409 });
+            return attach(addCorsHeaders(response));
+          }
+
+          // Set the custom host
+          await env.GEO_DB.prepare(`
+            INSERT INTO custom_hosts (host, project_id) 
+            VALUES (?, ?)
+            ON CONFLICT(host) DO UPDATE SET project_id = excluded.project_id
+          `).bind(host, current_project_id).run();
+
+          log("admin_custom_host_set", { host, project_id: current_project_id });
+          
+          const response = new Response("ok", { status: 200 });
+          return attach(addCorsHeaders(response));
+        } catch (e: any) {
+          log("admin_custom_host_error", { error: e.message, stack: e.stack });
+          const response = new Response(`custom host set error: ${e?.message ?? ""}`, { status: 500 });
+          return attach(addCorsHeaders(response));
+        }
+      }
+
+      // 4.5) GET /admin/project/info (get project details including handles)
+      if (url.pathname === "/admin/project/info" && req.method === "GET") {
+        try {
+          const project = await env.GEO_DB.prepare(`
+            SELECT p.id, p.name, p.public_handle, 
+                   COUNT(pm.pid) as pid_count,
+                   GROUP_CONCAT(ch.host) as custom_hosts
+            FROM project p
+            LEFT JOIN pid_map pm ON p.id = pm.project_id
+            LEFT JOIN custom_hosts ch ON p.id = ch.project_id
+            WHERE p.id = ?
+            GROUP BY p.id
+          `).bind(current_project_id).first<any>();
+
+          if (!project) {
+            const response = new Response("project not found", { status: 404 });
+            return attach(addCorsHeaders(response));
+          }
+
+          const response = new Response(JSON.stringify(project), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return attach(addCorsHeaders(response));
+        } catch (e: any) {
+          log("admin_project_info_error", { error: e.message, stack: e.stack });
+          const response = new Response(`project info error: ${e?.message ?? ""}`, { status: 500 });
+          return attach(addCorsHeaders(response));
+        }
+      }
+
+      // Unknown admin endpoint
+      const response = new Response("unknown admin endpoint", { status: 404 });
+      return attach(addCorsHeaders(response));
     }
 
     const response = new Response("not found", { status: 404 });
