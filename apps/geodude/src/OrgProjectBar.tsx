@@ -17,16 +17,16 @@ export default function OrgProjectBar({ onChanged }: { onChanged?: () => void })
 
   async function setCurrent() {
     if (!org || !prj) return;
-    
+
     const r = await fetch(`${API_BASE}/me/set-current`, {
-      ...FETCH_OPTS, 
+      ...FETCH_OPTS,
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ org_id: org, project_id: prj })
     });
-    
+
     if (r.ok) {
-      await refresh(); 
+      await refresh();
       onChanged?.();
     }
   }
@@ -40,26 +40,26 @@ export default function OrgProjectBar({ onChanged }: { onChanged?: () => void })
   }
 
   if (!me?.user) return null;
-  
+
   return (
     <div className="flex gap-3 items-center mb-6 py-4 border-b border-gray-200">
       <span className="font-medium text-slate-700">{me.user.email}</span>
-      
-      <select 
-        value={org} 
+
+      <select
+        value={org}
         onChange={e => setOrg(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
       >
         <option value="">Select Organization</option>
         {(me.orgs || []).map(o => (
           <option key={o.id} value={o.id}>{o.name}</option>
         ))}
       </select>
-      
-      <select 
-        value={prj} 
+
+      <select
+        value={prj}
         onChange={e => setPrj(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed bg-white text-gray-900"
         disabled={!org}
       >
         <option value="">Select Project</option>
@@ -70,16 +70,18 @@ export default function OrgProjectBar({ onChanged }: { onChanged?: () => void })
           ))
         }
       </select>
-      
-      <button 
+
+
+
+      <button
         onClick={setCurrent}
         disabled={!org || !prj}
         className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
       >
         Switch
       </button>
-      
-      <button 
+
+      <button
         onClick={logout}
         className="px-3 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
       >

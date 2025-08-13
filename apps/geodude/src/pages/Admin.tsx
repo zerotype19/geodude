@@ -46,7 +46,7 @@ export default function Admin() {
 
         <div className="grid md:grid-cols-2 gap-6">
           <Card title="KV Admin">
-            <div className="space-y-4">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Admin Token (INGEST_API_KEY)
@@ -56,13 +56,17 @@ export default function Admin() {
                   value={adminToken}
                   onChange={(e) => setAdminToken(e.target.value)}
                   placeholder="Bearer token"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  style={{ backgroundColor: 'white', color: '#374151' }}
                 />
               </div>
-              <button className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+              <button 
+                type="submit"
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
                 Access KV
               </button>
-            </div>
+            </form>
           </Card>
 
           <Card title="Token Lab">
@@ -76,7 +80,8 @@ export default function Admin() {
                   value={tokenData.adminToken}
                   onChange={(e) => setTokenData({...tokenData, adminToken: e.target.value})}
                   placeholder="Bearer token"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  style={{ backgroundColor: 'white', color: '#374151' }}
                 />
               </div>
               
@@ -87,7 +92,8 @@ export default function Admin() {
                 <select
                   value={tokenData.src}
                   onChange={(e) => setTokenData({...tokenData, src: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  style={{ backgroundColor: 'white', color: '#374151' }}
                 >
                   <option value="chatgpt">chatgpt</option>
                   <option value="perplexity">perplexity</option>
@@ -105,7 +111,8 @@ export default function Admin() {
                   value={tokenData.model}
                   onChange={(e) => setTokenData({...tokenData, model: e.target.value})}
                   placeholder="gpt-4, claude-3, etc."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  style={{ backgroundColor: 'white', color: '#374151' }}
                 />
               </div>
 

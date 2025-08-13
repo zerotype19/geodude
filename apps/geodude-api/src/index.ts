@@ -537,7 +537,7 @@ export default {
         ORDER BY c.ts DESC
         LIMIT ?1
       `).bind(limit).all<any>();
-      
+
       const response = Response.json({ items: rows.results ?? [] });
       return addCorsForCredentials(response, req);
     }
@@ -548,7 +548,7 @@ export default {
       // TODO: Namespace by org/project when multi-tenant scoping is implemented
       const mapped = await env.DEST_MAP.get(pid);
       if (!mapped) return new Response("Unknown PID", { status: 404 });
-      
+
       const dest = new URL(mapped);
       if (!dest.searchParams.has("utm_source")) {
         dest.searchParams.set("utm_source", "ai_unknown");
@@ -767,7 +767,7 @@ export default {
         ).bind(session.user_id).all<any>();
 
         const projects = await env.GEO_DB.prepare(
-          `SELECT p.id, p.name, p.slug, p.domain FROM project p
+          `SELECT p.id, p.name, p.slug, p.domain, p.org_id FROM project p
            JOIN org_member om ON p.org_id = om.org_id
            WHERE om.user_id = ?1`
         ).bind(session.user_id).all<any>();

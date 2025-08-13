@@ -3,5 +3,44 @@
 @tailwind utilities;
 
 :root { 
-  color-scheme: light dark; 
+  color-scheme: light; 
+}
+
+/* Force light theme for form elements - MORE AGGRESSIVE */
+input, select, textarea, input[type="password"], input[type="text"], input[type="email"], input[type="number"], input[type="url"] {
+  background-color: white !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+input::placeholder, select::placeholder, textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Ensure buttons have proper styling */
+button {
+  background-color: inherit;
+  color: inherit;
+}
+
+/* Override any dark theme inheritance */
+* {
+  color-scheme: light;
+}
+
+/* Force all form elements to be light */
+form input, form select, form textarea {
+  background-color: white !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+
+/* Specific override for password fields */
+input[type="password"] {
+  background-color: white !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
 }
