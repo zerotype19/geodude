@@ -117,9 +117,9 @@ async function warmFingerprintCache(env: Env) {
     ]);
     
     fingerprintCache = {
-      ua_patterns: uaPatterns || [],
-      heuristics: heuristics || { referer_contains: [], headers: [] },
-      sources_index: sourcesIndex || {},
+      ua_patterns: (uaPatterns as any[]) || [],
+      heuristics: (heuristics as any) || { referer_contains: [], headers: [] },
+      sources_index: (sourcesIndex as any) || {},
       last_updated: now
     };
     
@@ -136,9 +136,9 @@ async function warmFingerprintCache(env: Env) {
     
     // Use fallback data if KV is unavailable
     fingerprintCache = {
-      ua_patterns: [],
-      heuristics: { referer_contains: [], headers: [] },
-      sources_index: {},
+      ua_patterns: [] as any[],
+      heuristics: { referer_contains: [], headers: [] } as any,
+      sources_index: {} as any,
       last_updated: now
     };
   }

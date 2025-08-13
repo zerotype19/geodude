@@ -1,13 +1,21 @@
-import { addCorsHeaders } from "./cors";
+import { addCorsHeaders, isOriginAllowed, getCorsConfig } from "./cors";
 import { log } from "./logging";
 import { classifyRequest, type TrafficClassification } from "./classifier";
 import { hashString, verifyHmac, isWithinSkew } from "./utils";
+import { createRateLimiter } from "./rate-limiter";
+import { validateRequestBody } from "./schema-validator";
+import { addSecurityHeaders, addBasicSecurityHeaders, getSecurityHeadersConfig } from "./security-headers";
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     const headers = new Headers();
-    
+
+    // Initialize security and rate limiting
+    const rateLimiter = createRateLimiter(env);
+    const corsConfig = getCorsConfig(env);
+    const securityConfig = getSecurityHeadersConfig(env);
+
     // Add CORS headers to all responses
     const attach = (resp: Response) => {
       // Add any additional headers here if needed
@@ -24,21 +32,21 @@ export default {
       try {
         // Test D1 connectivity
         const d1Test = await env.OPTIVIEW_DB.prepare("SELECT 1 as test").first();
-        
+
         // Test KV connectivity
         const kvTest = await env.AI_FINGERPRINTS.get("ua:list", "json");
-        
+
         const health = {
           status: "healthy",
           timestamp: Date.now(),
           d1: d1Test ? "connected" : "error",
           kv: kvTest ? "connected" : "error"
         };
-        
+
         const response = new Response(JSON.stringify(health), {
           headers: { "Content-Type": "application/json" }
         });
-        return attach(addCorsHeaders(response));
+        return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
       } catch (error) {
         const response = new Response(JSON.stringify({
           status: "unhealthy",
@@ -48,7 +56,7 @@ export default {
           status: 500,
           headers: { "Content-Type": "application/json" }
         });
-        return attach(addCorsHeaders(response));
+        return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
       }
     }
 
@@ -58,7 +66,7 @@ export default {
         const { pid, kid } = Object.fromEntries(url.searchParams);
         if (!pid || !kid) {
           const response = new Response("Missing pid or kid parameters", { status: 400 });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
 
         // Validate the key exists and is active
@@ -72,23 +80,23 @@ export default {
 
         if (!key) {
           const response = new Response("Invalid or revoked API key", { status: 401 });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
 
         // Generate the JS tag with embedded project and property IDs
         const jsTag = generateJSTag(key.project_id, pid, kid);
-        
+
         const response = new Response(jsTag, {
-          headers: { 
+          headers: {
             "Content-Type": "application/javascript",
             "Cache-Control": "public, max-age=3600" // 1 hour cache
           }
         });
-        return attach(addCorsHeaders(response));
+        return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
       } catch (error) {
         log("tag_js_error", { error: String(error) });
         const response = new Response("Error generating tag", { status: 500 });
-        return attach(addCorsHeaders(response));
+        return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
       }
     }
 
@@ -105,15 +113,15 @@ export default {
       try {
         // Classify the incoming request
         const classification = await classifyRequest(req, env);
-        
+
         // Extract project and content context
         const host = req.headers.get("host") || "";
         const project = await resolvePropertyByHost(env, host);
-        
+
         if (project) {
           // Resolve content by URL path
           const content = await resolveContent(env, project.id, url.pathname);
-          
+
           // Log the interaction event
           await logInteraction(env, {
             project_id: project.id,
@@ -144,7 +152,7 @@ export default {
         });
 
       } catch (error) {
-        log("classification_error", { 
+        log("classification_error", {
           error: error instanceof Error ? error.message : String(error),
           host: req.headers.get("host"),
           path: url.pathname
@@ -157,11 +165,12 @@ export default {
       // 6.1) API Keys Management
       if (url.pathname === "/api/keys" && req.method === "POST") {
         try {
-          const { project_id, property_id, name } = await req.json();
-          
+          const body = await req.json() as any;
+          const { project_id, property_id, name } = body;
+
           if (!project_id || !property_id || !name) {
             const response = new Response("Missing required fields", { status: 400 });
-            return attach(addCorsHeaders(response));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
           // Generate unique key_id and secret
@@ -175,7 +184,7 @@ export default {
             VALUES (?, ?, ?, ?, ?)
           `).bind(project_id, property_id, name, keyId, secretHash).run();
 
-          const response = new Response(JSON.stringify({ 
+          const response = new Response(JSON.stringify({
             id: result.meta.last_row_id,
             key_id: keyId,
             secret_once: secret, // Show only once
@@ -185,11 +194,14 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("keys_create_error", { error: e.message, stack: e.stack });
-          const response = new Response(`key creation error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
@@ -198,7 +210,7 @@ export default {
           const { project_id, property_id } = Object.fromEntries(url.searchParams);
           if (!project_id) {
             const response = new Response("Missing project_id", { status: 400 });
-            return attach(addCorsHeaders(response));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
           let query = `
@@ -218,75 +230,121 @@ export default {
           query += " ORDER BY ak.created_at DESC";
 
           const keys = await env.OPTIVIEW_DB.prepare(query).bind(...params).all<any>();
-          
+
           const response = new Response(JSON.stringify({ keys: keys.results || [] }), {
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "public, max-age=300"
             }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("keys_list_error", { error: e.message, stack: e.stack });
-          const response = new Response(`keys list error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
       if (url.pathname.match(/^\/api\/keys\/\d+\/revoke$/) && req.method === "POST") {
         try {
           const keyId = url.pathname.split('/')[3];
-          
+
           const result = await env.OPTIVIEW_DB.prepare(`
             UPDATE api_keys SET revoked_at = ? WHERE id = ?
           `).bind(Date.now(), keyId).run();
 
           if (result.meta.changes === 0) {
             const response = new Response("API key not found", { status: 404 });
-            return attach(addCorsHeaders(response));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
-          const response = new Response(JSON.stringify({ 
+          const response = new Response(JSON.stringify({
             message: "API key revoked successfully",
             key_id: keyId
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("keys_revoke_error", { error: e.message, stack: e.stack });
-          const response = new Response(`revoke error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
-      // 6.2) Events API (now with HMAC auth)
+      // 6.2) Events API (now with HMAC auth + rate limiting + schema validation)
       if (url.pathname === "/api/events" && req.method === "POST") {
         try {
+          // Check Content-Type
+          const contentType = req.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            const response = new Response("Content-Type must be application/json", { status: 415 });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
           // Authenticate the request
           const authResult = await authenticateRequest(req, env);
           if (!authResult.valid) {
             const response = new Response(authResult.error, { status: 401 });
-            return attach(addCorsHeaders(response));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
-          const body = await req.json();
-          const { project_id, content_id, ai_source_id, event_type, metadata } = body;
-          
-          if (!project_id || !event_type) {
-            const response = new Response("missing required fields", { status: 400 });
-            return attach(addCorsHeaders(response));
+          // Rate limiting check
+          const rateLimitResult = rateLimiter.tryConsume(authResult.keyId!);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter?.toString() || "5"
+              }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
-          if (!["view", "click", "purchase", "custom"].includes(event_type)) {
-            const response = new Response("invalid event_type", { status: 400 });
-            return attach(addCorsHeaders(response));
+          // Get request body and validate size
+          const bodyText = await req.text();
+          if (bodyText.length > 1024) {
+            const response = new Response(JSON.stringify({
+              error: "Request body too large",
+              max_size_kb: 1,
+              actual_size_kb: Math.round(bodyText.length / 1024)
+            }), { status: 413, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
-          // Validate metadata size
-          if (metadata && JSON.stringify(metadata).length > 1024) {
-            const response = new Response("metadata too large (max 1KB)", { status: 400 });
-            return attach(addCorsHeaders(response));
+          // Parse and validate body
+          const body = JSON.parse(bodyText);
+          const validation = validateRequestBody("/api/events", body, bodyText.length);
+
+          if (!validation.valid) {
+            const response = new Response(JSON.stringify({
+              error: "Validation failed",
+              details: validation.errors
+            }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // CORS origin check for browser requests
+          const origin = req.headers.get("origin");
+          if (origin) {
+            const corsCheck = await isOriginAllowed(origin, body.project_id, env, corsConfig.allowedOriginsFallback);
+            if (!corsCheck.allowed) {
+              const response = new Response(JSON.stringify({
+                error: "Origin not allowed",
+                reason: corsCheck.reason
+              }), { status: 403, headers: { "Content-Type": "application/json" } });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
           }
 
           // Update last_used_at for the API key
@@ -294,26 +352,42 @@ export default {
             UPDATE api_keys SET last_used_at = ? WHERE key_id = ?
           `).bind(Date.now(), authResult.keyId).run();
 
+          // Log the interaction with validated data
           const result = await logInteraction(env, {
-            project_id,
-            content_id,
-            ai_source_id,
-            event_type,
-            metadata: metadata || {}
+            project_id: validation.sanitizedData.project_id,
+            content_id: validation.sanitizedData.content_id,
+            ai_source_id: validation.sanitizedData.ai_source_id,
+            event_type: validation.sanitizedData.event_type,
+            metadata: validation.sanitizedData.metadata || {}
           });
 
-          const response = new Response(JSON.stringify({ 
+          const response = new Response(JSON.stringify({
             id: result.meta.last_row_id,
-            event_type,
-            project_id
+            event_type: validation.sanitizedData.event_type,
+            project_id: validation.sanitizedData.project_id
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return attach(addCorsHeaders(response));
+
+          // Add trace header if xray is enabled
+          if (body.property_id) {
+            const projectSettings = await env.OPTIVIEW_DB.prepare(`
+              SELECT xray_trace_enabled FROM project_settings WHERE project_id = ?
+            `).bind(body.project_id).first<{ xray_trace_enabled: number }>();
+
+            if (projectSettings?.xray_trace_enabled) {
+              response.headers.set("x-optiview-trace", "enabled");
+            }
+          }
+
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin || undefined)));
         } catch (e: any) {
           log("events_create_error", { error: e.message, stack: e.stack });
-          const response = new Response(`event error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
@@ -323,7 +397,7 @@ export default {
           const { project_id, from, to } = Object.fromEntries(url.searchParams);
           if (!project_id) {
             const response = new Response("missing project_id", { status: 400 });
-            return attach(addCorsHeaders(response));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
           const fromTs = from ? parseInt(from) : Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -380,45 +454,80 @@ export default {
           };
 
           const response = new Response(JSON.stringify(summary), {
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "public, max-age=300" // 5 min cache
             }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("events_summary_error", { error: e.message, stack: e.stack });
-          const response = new Response(`summary error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
-      // 6.4) Referrals API
+      // 6.4) Referrals API (with schema validation)
       if (url.pathname === "/api/referrals" && req.method === "POST") {
         try {
-          const { ai_source_id, content_id, ref_type, detected_at } = await req.json();
-          if (!ai_source_id || !ref_type) {
-            const response = new Response("missing required fields", { status: 400 });
-            return attach(addCorsHeaders(response));
+          // Check Content-Type
+          const contentType = req.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            const response = new Response("Content-Type must be application/json", { status: 415 });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Get request body and validate size
+          const bodyText = await req.text();
+          if (bodyText.length > 1024) {
+            const response = new Response(JSON.stringify({
+              error: "Request body too large",
+              max_size_kb: 1,
+              actual_size_kb: Math.round(bodyText.length / 1024)
+            }), { status: 413, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Parse and validate body
+          const body = JSON.parse(bodyText);
+          const validation = validateRequestBody("/api/referrals", body, bodyText.length);
+
+          if (!validation.valid) {
+            const response = new Response(JSON.stringify({
+              error: "Validation failed",
+              details: validation.errors
+            }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
           const result = await env.OPTIVIEW_DB.prepare(`
             INSERT INTO ai_referrals (ai_source_id, content_id, ref_type, detected_at)
             VALUES (?, ?, ?, ?)
-          `).bind(ai_source_id, content_id || null, ref_type, detected_at || Date.now()).run();
+          `).bind(
+            validation.sanitizedData.ai_source_id,
+            validation.sanitizedData.content_id || null,
+            validation.sanitizedData.ref_type,
+            validation.sanitizedData.detected_at || Date.now()
+          ).run();
 
-          const response = new Response(JSON.stringify({ 
+          const response = new Response(JSON.stringify({
             id: result.meta.last_row_id,
-            ai_source_id,
-            ref_type
+            ai_source_id: validation.sanitizedData.ai_source_id,
+            ref_type: validation.sanitizedData.ref_type
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("referrals_create_error", { error: e.message, stack: e.stack });
-          const response = new Response(`referral error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
@@ -428,7 +537,7 @@ export default {
           const { project_id, limit = "10" } = Object.fromEntries(url.searchParams);
           if (!project_id) {
             const response = new Response("missing project_id", { status: 400 });
-            return attach(addCorsHeaders(response));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
           const referrals = await env.OPTIVIEW_DB.prepare(`
@@ -446,18 +555,21 @@ export default {
             ORDER BY referral_count DESC
             LIMIT ?
           `).bind(project_id, project_id, parseInt(limit)).all<any>();
-          
+
           const response = new Response(JSON.stringify({ referrals: referrals.results || [] }), {
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "public, max-age=300"
             }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("referrals_top_error", { error: e.message, stack: e.stack });
-          const response = new Response(`referrals error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
@@ -469,18 +581,21 @@ export default {
             FROM ai_sources
             ORDER BY name
           `).all<any>();
-          
+
           const response = new Response(JSON.stringify({ sources: sources.results || [] }), {
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "public, max-age=600" // 10 min cache
             }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("sources_list_error", { error: e.message, stack: e.stack });
-          const response = new Response(`sources error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
@@ -490,7 +605,7 @@ export default {
           const { project_id } = Object.fromEntries(url.searchParams);
           if (!project_id) {
             const response = new Response("missing project_id", { status: 400 });
-            return attach(addCorsHeaders(response));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
           const content = await env.OPTIVIEW_DB.prepare(`
@@ -501,40 +616,67 @@ export default {
             WHERE p.project_id = ?
             ORDER BY ca.created_at DESC
           `).bind(project_id).all<any>();
-          
+
           const response = new Response(JSON.stringify({ content: content.results || [] }), {
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "public, max-age=300"
             }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("content_list_error", { error: e.message, stack: e.stack });
-          const response = new Response(`content error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
 
-      // 6.8) Content POST API
+      // 6.8) Content POST API (with schema validation)
       if (url.pathname === "/api/content" && req.method === "POST") {
         try {
-          const { project_id, domain, url: contentUrl, type, metadata } = await req.json();
-          if (!project_id || !domain || !contentUrl) {
-            const response = new Response("missing required fields", { status: 400 });
-            return attach(addCorsHeaders(response));
+          // Check Content-Type
+          const contentType = req.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            const response = new Response("Content-Type must be application/json", { status: 415 });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Get request body and validate size
+          const bodyText = await req.text();
+          if (bodyText.length > 1024) {
+            const response = new Response(JSON.stringify({
+              error: "Request body too large",
+              max_size_kb: 1,
+              actual_size_kb: Math.round(bodyText.length / 1024)
+            }), { status: 413, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Parse and validate body
+          const body = JSON.parse(bodyText);
+          const validation = validateRequestBody("/api/content", body, bodyText.length);
+
+          if (!validation.valid) {
+            const response = new Response(JSON.stringify({
+              error: "Validation failed",
+              details: validation.errors
+            }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
           // Get or create property
           let property = await env.OPTIVIEW_DB.prepare(`
             SELECT id FROM properties WHERE project_id = ? AND domain = ?
-          `).bind(project_id, domain).first<any>();
+          `).bind(validation.sanitizedData.project_id, validation.sanitizedData.domain).first<any>();
 
           if (!property) {
             const propResult = await env.OPTIVIEW_DB.prepare(`
               INSERT INTO properties (project_id, domain)
               VALUES (?, ?)
-            `).bind(project_id, domain).run();
+            `).bind(validation.sanitizedData.project_id, validation.sanitizedData.domain).run();
             property = { id: propResult.meta.last_row_id };
           }
 
@@ -542,28 +684,36 @@ export default {
           const result = await env.OPTIVIEW_DB.prepare(`
             INSERT INTO content_assets (property_id, url, type, metadata)
             VALUES (?, ?, ?, ?)
-          `).bind(property.id, contentUrl, type || null, metadata || null).run();
+          `).bind(
+            property.id,
+            validation.sanitizedData.url,
+            validation.sanitizedData.type || null,
+            validation.sanitizedData.metadata || null
+          ).run();
 
-          const response = new Response(JSON.stringify({ 
+          const response = new Response(JSON.stringify({
             id: result.meta.last_row_id,
-            url: contentUrl,
-            type,
-            metadata
+            url: validation.sanitizedData.url,
+            type: validation.sanitizedData.type,
+            metadata: validation.sanitizedData.metadata
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return attach(addCorsHeaders(response));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("content_create_error", { error: e.message, stack: e.stack });
-          const response = new Response(`create error: ${e?.message ?? ""}`, { status: 500 });
-          return attach(addCorsHeaders(response));
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
     }
 
     // Default response - continue to origin
     const response = new Response("not found", { status: 404 });
-    return addCorsHeaders(response);
+    return addBasicSecurityHeaders(addCorsHeaders(response));
   },
 
   // Cron job for refreshing fingerprints
@@ -573,8 +723,8 @@ export default {
         await refreshFingerprints(env);
         log("fingerprints_refreshed", { timestamp: Date.now() });
       } catch (error) {
-        log("fingerprints_refresh_error", { 
-          error: error instanceof Error ? error.message : String(error) 
+        log("fingerprints_refresh_error", {
+          error: error instanceof Error ? error.message : String(error)
         });
       }
     }
@@ -590,7 +740,7 @@ async function resolvePropertyByHost(env: Env, host: string) {
       WHERE p.domain = ?
       LIMIT 1
     `).bind(host).first<any>();
-    
+
     return property;
   } catch (error) {
     log("property_resolve_error", { host, error: String(error) });
@@ -602,14 +752,14 @@ async function resolveContent(env: Env, propertyId: number, path: string) {
   try {
     // Clean the path and remove query params
     const cleanPath = path.split('?')[0];
-    
+
     const content = await env.OPTIVIEW_DB.prepare(`
       SELECT id, url, type
       FROM content_assets
       WHERE property_id = ? AND url LIKE ?
       LIMIT 1
     `).bind(propertyId, `%${cleanPath}`).first<any>();
-    
+
     return content;
   } catch (error) {
     log("content_resolve_error", { propertyId, path, error: String(error) });
@@ -636,7 +786,7 @@ async function logInteraction(env: Env, event: {
       JSON.stringify(event.metadata),
       Date.now()
     ).run();
-    
+
     return result;
   } catch (error) {
     log("interaction_log_error", { event, error: String(error) });
@@ -678,7 +828,7 @@ async function authenticateRequest(req: Request, env: Env): Promise<{ valid: boo
     // For v1, we'll use a simpler approach - store encrypted secrets
     // In production, you'd use proper HMAC verification
     const body = await req.text();
-    
+
     // Verify the signature (simplified for v1)
     const expectedSignature = await hashString(`${timestamp}.${body}`);
     if (signature !== expectedSignature) {
@@ -695,13 +845,15 @@ async function authenticateRequest(req: Request, env: Env): Promise<{ valid: boo
 
 // Generate JS tag for customer installation
 function generateJSTag(projectId: number, propertyId: string, keyId: string): string {
+  const baseUrl = "https://api.optiview.ai";
+  
   return `
 // Optiview Analytics Tag v1.0
 !function(){
   try{
     var pid = "${propertyId}"; 
     var kid = "${keyId}";
-    var ep = "https://app.optiview.io/api/events";
+    var ep = "${baseUrl}/api/events";
     
     var payload = {
       project_id: ${projectId},
