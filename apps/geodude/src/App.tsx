@@ -138,22 +138,25 @@ export default function App() {
   const { me, loading } = useAuth();
   const [o, setO] = useState<Overview | null>(null);
 
-  // Authentication gate
+  // ✅ IMPORTANT: All hooks must be called before any conditional returns
+  useEffect(() => {
+    // Only fetch overview when authenticated and onboarded
+    if (me?.user && me?.current) {
+      const overviewUrl = API_BASE.endsWith('/')
+        ? `${API_BASE}overview`
+        : `${API_BASE}/overview`;
+
+      fetch(overviewUrl, FETCH_OPTS)
+        .then(r => r.json())
+        .then(setO)
+        .catch(() => setO(null));
+    }
+  }, [me?.user, me?.current]);
+
+  // Authentication gate - AFTER all hooks
   if (loading) return <main style={{ padding: 24 }}>Loading…</main>;
   if (!me?.user) return <main style={{ padding: 24 }}><a href="/login">Sign in</a></main>;
   if (!me.current) return <main style={{ padding: 24 }}><a href="/onboard">Start onboarding</a></main>;
-
-  useEffect(() => {
-    // Use environment variable from Cloudflare Pages, fallback to local dev
-    const overviewUrl = API_BASE.endsWith('/')
-      ? `${API_BASE}overview`
-      : `${API_BASE}/overview`;
-
-    fetch(overviewUrl, FETCH_OPTS)
-      .then(r => r.json())
-      .then(setO)
-      .catch(() => setO(null));
-  }, []);
 
   return (
     <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
