@@ -43,3 +43,4 @@ wrangler deploy
 # Create local D1 database
 wrangler d1 execute geodude-db --local --file ../../migrations/d1/001_init.sql
 ```
+# Trigger deployment
