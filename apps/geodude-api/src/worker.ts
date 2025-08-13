@@ -2621,7 +2621,8 @@ export default {
       // Fallback response for any unmatched routes
       const fallbackResponse = new Response("Not Found", { status: 404 });
       return addBasicSecurityHeaders(addCorsHeaders(fallbackResponse, origin));
-    } catch (error) {
+    }
+  } catch (error) {
       log("worker_fatal_error", { error: String(error), stack: error instanceof Error ? error.stack : undefined });
       const response = new Response(JSON.stringify({ error: "Internal server error" }), {
         status: 500,
