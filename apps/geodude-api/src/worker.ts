@@ -2047,85 +2047,84 @@ export default {
               return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
             }
           }
-        }
 
-        // 7.6) Invite Routes
-        if (url.pathname.startsWith("/onboarding/invites") && req.method === "POST") {
-          try {
-            // Require authentication
-            const { user } = await requireAuth(req, env);
+          // 7.6) Invite Routes
+          if (url.pathname.startsWith("/onboarding/invites") && req.method === "POST") {
+            try {
+              // Require authentication
+              const { user } = await requireAuth(req, env);
 
-            // Check Content-Type
-            const contentType = req.headers.get("content-type") as string;
-            if (!contentType || !contentType.includes("application/json")) {
-              const response = new Response("Content-Type must be application/json", { status: 415 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
+              // Check Content-Type
+              const contentType = req.headers.get("content-type") as string;
+              if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
 
-            const body = await req.json() as { email: string; role?: string; org_id: number };
-            const { email, role = 'member', org_id } = body;
+              const body = await req.json() as { email: string; role?: string; org_id: number };
+              const { email, role = 'member', org_id } = body;
 
-            if (!email || !org_id) {
-              const response = new Response(JSON.stringify({ error: "Email and org_id are required" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-              });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
+              if (!email || !org_id) {
+                const response = new Response(JSON.stringify({ error: "Email and org_id are required" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
 
-            // Normalize and validate email
-            const normalizedEmail = normalizeEmail(email);
-            if (!normalizedEmail) {
-              const response = new Response(JSON.stringify({ error: "Invalid email format" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-              });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
+              // Normalize and validate email
+              const normalizedEmail = normalizeEmail(email);
+              if (!normalizedEmail) {
+                const response = new Response(JSON.stringify({ error: "Invalid email format" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
 
-            // Validate role
-            if (!['owner', 'member'].includes(role)) {
-              const response = new Response(JSON.stringify({ error: "Invalid role" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-              });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
+              // Validate role
+              if (!['owner', 'member'].includes(role)) {
+                const response = new Response(JSON.stringify({ error: "Invalid role" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
 
-            // Check if user is member of the org
-            const userMembership = await env.OPTIVIEW_DB.prepare(`
+              // Check if user is member of the org
+              const userMembership = await env.OPTIVIEW_DB.prepare(`
               SELECT role FROM org_members WHERE org_id = ? AND user_id = ?
             `).bind(org_id, user.id).first<any>();
 
-            if (!userMembership) {
-              const response = new Response(JSON.stringify({ error: "Not a member of this organization" }), {
-                status: 403,
-                headers: { "Content-Type": "application/json" }
-              });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
+              if (!userMembership) {
+                const response = new Response(JSON.stringify({ error: "Not a member of this organization" }), {
+                  status: 403,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
 
-            // Check permissions: owners can invite owners, members can only invite members
-            if (role === 'owner' && userMembership.role !== 'owner') {
-              const response = new Response(JSON.stringify({ error: "Only owners can invite other owners" }), {
-                status: 403,
-                headers: { "Content-Type": "application/json" }
-              });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
+              // Check permissions: owners can invite owners, members can only invite members
+              if (role === 'owner' && userMembership.role !== 'owner') {
+                const response = new Response(JSON.stringify({ error: "Only owners can invite other owners" }), {
+                  status: 403,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
 
-            // Check for existing pending invite
-            const existingInvite = await env.OPTIVIEW_DB.prepare(`
+              // Check for existing pending invite
+              const existingInvite = await env.OPTIVIEW_DB.prepare(`
               SELECT * FROM invites WHERE org_id = ? AND email = ? AND accepted_at IS NULL
             `).bind(org_id, normalizedEmail).first<any>();
 
-            if (existingInvite) {
-              // Update existing invite instead of creating new one
-              const token = generateMagicLinkToken(); // Reuse magic link token generation
-              const tokenHash = await hashSensitiveData(token);
-              const expiresAt = new Date(Date.now() + parseInt(env.INVITE_EXP_DAYS || "7") * 24 * 60 * 60 * 1000);
+              if (existingInvite) {
+                // Update existing invite instead of creating new one
+                const token = generateMagicLinkToken(); // Reuse magic link token generation
+                const tokenHash = await hashSensitiveData(token);
+                const expiresAt = new Date(Date.now() + parseInt(env.INVITE_EXP_DAYS || "7") * 24 * 60 * 60 * 1000);
 
-              await env.OPTIVIEW_DB.prepare(`
+                await env.OPTIVIEW_DB.prepare(`
                 UPDATE invites SET 
                   token_hash = ?, 
                   expires_at = ?, 
@@ -2133,6 +2132,53 @@ export default {
                   invited_by_user_id = ?
                 WHERE id = ?
               `).bind(tokenHash, expiresAt.toISOString(), role, user.id, existingInvite.id).run();
+
+                // Send email
+                const emailService = EmailService.fromEnv(env);
+                const inviteUrl = `${env.PUBLIC_APP_URL || 'http://localhost:3000'}/invite/accept?token=${token}`;
+
+                const htmlContent = emailService.generateInviteEmailHTML(
+                  normalizedEmail,
+                  inviteUrl,
+                  user.email,
+                  'Your Organization', // TODO: Get actual org name
+                  role,
+                  parseInt(env.INVITE_EXP_DAYS || "7")
+                );
+                const textContent = emailService.generateInviteEmailText(
+                  normalizedEmail,
+                  inviteUrl,
+                  user.email,
+                  'Your Organization', // TODO: Get actual org name
+                  role,
+                  parseInt(env.INVITE_EXP_DAYS || "7")
+                );
+
+                await emailService.sendEmail({
+                  to: normalizedEmail,
+                  subject: "You're invited to join Optiview",
+                  html: htmlContent,
+                  text: textContent
+                });
+
+                const response = new Response(JSON.stringify({
+                  ok: true,
+                  message: "Invitation updated and sent"
+                }), {
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Create new invite
+              const token = generateMagicLinkToken();
+              const tokenHash = await hashSensitiveData(token);
+              const expiresAt = new Date(Date.now() + parseInt(env.INVITE_EXP_DAYS || "7") * 24 * 60 * 60 * 1000);
+
+              await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO invites (org_id, email, token_hash, role, invited_by_user_id, expires_at)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `).bind(org_id, normalizedEmail, tokenHash, role, user.id, expiresAt.toISOString()).run();
 
               // Send email
               const emailService = EmailService.fromEnv(env);
@@ -2164,152 +2210,106 @@ export default {
 
               const response = new Response(JSON.stringify({
                 ok: true,
-                message: "Invitation updated and sent"
+                message: "Invitation sent successfully"
               }), {
                 headers: { "Content-Type": "application/json" }
               });
               return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
 
-            // Create new invite
-            const token = generateMagicLinkToken();
-            const tokenHash = await hashSensitiveData(token);
-            const expiresAt = new Date(Date.now() + parseInt(env.INVITE_EXP_DAYS || "7") * 24 * 60 * 60 * 1000);
-
-            await env.OPTIVIEW_DB.prepare(`
-              INSERT INTO invites (org_id, email, token_hash, role, invited_by_user_id, expires_at)
-              VALUES (?, ?, ?, ?, ?, ?)
-            `).bind(org_id, normalizedEmail, tokenHash, role, user.id, expiresAt.toISOString()).run();
-
-            // Send email
-            const emailService = EmailService.fromEnv(env);
-            const inviteUrl = `${env.PUBLIC_APP_URL || 'http://localhost:3000'}/invite/accept?token=${token}`;
-
-            const htmlContent = emailService.generateInviteEmailHTML(
-              normalizedEmail,
-              inviteUrl,
-              user.email,
-              'Your Organization', // TODO: Get actual org name
-              role,
-              parseInt(env.INVITE_EXP_DAYS || "7")
-            );
-            const textContent = emailService.generateInviteEmailText(
-              normalizedEmail,
-              inviteUrl,
-              user.email,
-              'Your Organization', // TODO: Get actual org name
-              role,
-              parseInt(env.INVITE_EXP_DAYS || "7")
-            );
-
-            await emailService.sendEmail({
-              to: normalizedEmail,
-              subject: "You're invited to join Optiview",
-              html: htmlContent,
-              text: textContent
-            });
-
-            const response = new Response(JSON.stringify({
-              ok: true,
-              message: "Invitation sent successfully"
-            }), {
-              headers: { "Content-Type": "application/json" }
-            });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-
-          } catch (e: any) {
-            log("invite_error", { error: e.message, stack: e.stack });
-            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-          }
-        }
-
-        // 7.7) Accept Invite
-        if (url.pathname === "/invite/accept" && req.method === "GET") {
-          try {
-            const urlObj = new URL(req.url);
-            const token = urlObj.searchParams.get('token');
-
-            if (!token) {
-              const response = new Response(JSON.stringify({ error: "Token is required" }), {
-                status: 400,
+            } catch (e: any) {
+              log("invite_error", { error: e.message, stack: e.stack });
+              const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
                 headers: { "Content-Type": "application/json" }
               });
               return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
             }
+          }
 
-            // Find the invite
-            const tokenHash = await hashSensitiveData(token);
-            const invite = await env.OPTIVIEW_DB.prepare(`
+          // 7.7) Accept Invite
+          if (url.pathname === "/invite/accept" && req.method === "GET") {
+            try {
+              const urlObj = new URL(req.url);
+              const token = urlObj.searchParams.get('token');
+
+              if (!token) {
+                const response = new Response(JSON.stringify({ error: "Token is required" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Find the invite
+              const tokenHash = await hashSensitiveData(token);
+              const invite = await env.OPTIVIEW_DB.prepare(`
               SELECT * FROM invites 
               WHERE token_hash = ? AND accepted_at IS NULL
               ORDER BY created_at DESC 
               LIMIT 1
             `).bind(tokenHash).first<any>();
 
-            if (!invite) {
-              const response = new Response(JSON.stringify({ error: "Invalid or expired invitation" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-              });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
+              if (!invite) {
+                const response = new Response(JSON.stringify({ error: "Invalid or expired invitation" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
 
-            // Check if invite is expired
-            if (new Date(invite.expires_at) < new Date()) {
-              const response = new Response(JSON.stringify({ error: "Invitation has expired" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" }
-              });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
-            }
+              // Check if invite is expired
+              if (new Date(invite.expires_at) < new Date()) {
+                const response = new Response(JSON.stringify({ error: "Invitation has expired" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
 
-            // Mark as accepted
-            await env.OPTIVIEW_DB.prepare(`
+              // Mark as accepted
+              await env.OPTIVIEW_DB.prepare(`
               UPDATE invites SET accepted_at = datetime('now') WHERE id = ?
             `).bind(invite.id).run();
 
-            // Get or create user
-            const user = await getOrCreateUser(env, invite.email);
+              // Get or create user
+              const user = await getOrCreateUser(env, invite.email);
 
-            // Add user to organization
-            await env.OPTIVIEW_DB.prepare(`
+              // Add user to organization
+              await env.OPTIVIEW_DB.prepare(`
               INSERT OR IGNORE INTO org_members (org_id, user_id, role)
               VALUES (?, ?, ?)
             `).bind(invite.org_id, user.id, invite.role).run();
 
-            // Create session
-            const sessionId = await createSession(env, user.id, req, parseInt(env.SESSION_TTL_HOURS || "720"));
+              // Create session
+              const sessionId = await createSession(env, user.id, req, parseInt(env.SESSION_TTL_HOURS || "720"));
 
-            // Set session cookie and redirect
-            const response = new Response(JSON.stringify({
-              ok: true,
-              redirect_to: '/onboarding' // Always redirect to onboarding for new users
-            }), {
-              headers: { "Content-Type": "application/json" }
-            });
+              // Set session cookie and redirect
+              const response = new Response(JSON.stringify({
+                ok: true,
+                redirect_to: '/onboarding' // Always redirect to onboarding for new users
+              }), {
+                headers: { "Content-Type": "application/json" }
+              });
 
-            setSessionCookie(response, sessionId, parseInt(env.SESSION_TTL_HOURS || "720") * 3600);
+              setSessionCookie(response, sessionId, parseInt(env.SESSION_TTL_HOURS || "720") * 3600);
 
-            // Log successful invite acceptance
-            log("invite_accepted", {
-              email_hash: await hashSensitiveData(invite.email),
-              user_id: user.id,
-              org_id: invite.org_id
-            });
+              // Log successful invite acceptance
+              log("invite_accepted", {
+                email_hash: await hashSensitiveData(invite.email),
+                user_id: user.id,
+                org_id: invite.org_id
+              });
 
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
 
-          } catch (e: any) {
-            log("invite_acceptance_error", { error: e.message, stack: e.stack });
-            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            } catch (e: any) {
+              log("invite_acceptance_error", { error: e.message, stack: e.stack });
+              const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
           }
         }
 
@@ -2938,6 +2938,5 @@ type Env = {
   MAGIC_LINK_RPM_PER_IP?: string;
   MAGIC_LINK_RPD_PER_EMAIL?: string;
   INVITE_EXP_DAYS?: string;
-  PUBLIC_APP_URL?: string;
   [key: string]: any; // Allow indexing with string keys
 };
