@@ -40,6 +40,15 @@ export default {
       const url = new URL(req.url);
       const headers = new Headers();
 
+      // Extract origin for CORS
+      const origin = req.headers.get("origin");
+
+      // Handle CORS preflight requests
+      if (req.method === "OPTIONS") {
+        const response = new Response(null, { status: 204 });
+        return addCorsHeaders(response, origin);
+      }
+
       // Initialize security and rate limiting
       const rateLimiter = createRateLimiter(env);
       const corsConfig = getCorsConfig(env);
@@ -68,7 +77,8 @@ export default {
 
       // 1) Health check
       if (url.pathname === "/health") {
-        return new Response("ok", { status: 200 });
+        const response = new Response("ok", { status: 200 });
+        return addCorsHeaders(response, origin);
       }
 
       // 2) Admin health check (enhanced with metrics)
@@ -120,7 +130,7 @@ export default {
           const response = new Response(JSON.stringify(health), {
             headers: { "Content-Type": "application/json" }
           });
-          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (error) {
           const response = new Response(JSON.stringify({
             status: "unhealthy",
@@ -130,7 +140,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         }
       }
 
@@ -192,7 +202,7 @@ export default {
           const host = req.headers.get("host") || "";
           const project = await resolvePropertyByHost(env, host);
 
-          if (project) {
+          if (project && classification) {
             // Resolve content by URL path
             const content = await resolveContent(env, project.id, url.pathname);
 
@@ -205,25 +215,29 @@ export default {
               metadata: {
                 ua: await hashString(req.headers.get("user-agent") || ""),
                 ref: await hashString(req.headers.get("referer") || ""),
-                class: classification.traffic_class,
-                confidence: classification.confidence,
-                source: classification.source_name,
+                class: classification.traffic_class || "unknown",
+                confidence: classification.confidence || 0,
+                source: classification.source_name || null,
                 ip: await hashString(req.headers.get("cf-connecting-ip") || ""),
                 latency_ms: 0 // Will be measured in production
               }
             });
 
             // Add trace header for debugging
-            headers.append("x-optiview-trace", classification.traffic_class);
+            if (classification.traffic_class) {
+              headers.append("x-optiview-trace", classification.traffic_class);
+            }
           }
 
-          log("traffic_classified", {
-            traffic_class: classification.traffic_class,
-            source: classification.source_name,
-            confidence: classification.confidence,
-            host,
-            path: url.pathname
-          });
+          if (classification) {
+            log("traffic_classified", {
+              traffic_class: classification.traffic_class || "unknown",
+              source: classification.source_name || null,
+              confidence: classification.confidence || 0,
+              host,
+              path: url.pathname
+            });
+          }
 
         } catch (error) {
           log("classification_error", {
@@ -244,7 +258,7 @@ export default {
 
             if (!project_id || !property_id || !name) {
               const response = new Response("Missing required fields", { status: 400 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Generate unique key_id and secret
@@ -268,14 +282,14 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("keys_create_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -284,7 +298,7 @@ export default {
             const { project_id, property_id } = Object.fromEntries(url.searchParams);
             if (!project_id) {
               const response = new Response("Missing project_id", { status: 400 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             let query = `
@@ -311,14 +325,14 @@ export default {
                 "Cache-Control": "public, max-age=300"
               }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("keys_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -364,7 +378,7 @@ export default {
               const response = new Response("Content-Type must be application/json", { status: 415 });
               response.headers.set("x-optiview-request-id", requestId);
               recordMetrics(undefined, undefined, Date.now() - startTime, false, ErrorCode.CONTENT_TYPE_INVALID);
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Authenticate the request
@@ -377,7 +391,7 @@ export default {
                 authResult.error?.includes("timestamp") ? ErrorCode.REPLAY :
                   ErrorCode.UNKNOWN;
               recordMetrics(undefined, undefined, Date.now() - startTime, false, errorCode);
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Track grace authentication usage
@@ -402,7 +416,7 @@ export default {
               });
               response.headers.set("x-optiview-request-id", requestId);
               recordMetrics(authResult.keyId, undefined, Date.now() - startTime, false, ErrorCode.RATE_LIMITED);
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Get request body and validate size
@@ -413,7 +427,7 @@ export default {
                 max_size_kb: 1,
                 actual_size_kb: Math.round(bodyText.length / 1024)
               }), { status: 413, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Parse and validate body
@@ -425,7 +439,7 @@ export default {
                 error: "Validation failed",
                 details: validation.errors
               }), { status: 400, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // CORS origin check for browser requests
@@ -439,7 +453,7 @@ export default {
                 }), { status: 403, headers: { "Content-Type": "application/json" } });
                 response.headers.set("x-optiview-request-id", requestId);
                 recordMetrics(authResult.keyId, body.project_id, Date.now() - startTime, false, ErrorCode.ORIGIN_DENIED);
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
             }
 
@@ -503,7 +517,49 @@ export default {
             }), { status: 500, headers: { "Content-Type": "application/json" } });
             response.headers.set("x-optiview-request-id", requestId);
             recordMetrics(undefined, undefined, Date.now() - startTime, false, ErrorCode.UNKNOWN);
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+          }
+        }
+
+        // 6.2.5) Events List API
+        if (url.pathname === "/api/events" && req.method === "GET") {
+          try {
+            const { project_id, limit = "100", offset = "0" } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+              const response = new Response("Missing project_id", { status: 400 });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const limitNum = Math.min(parseInt(limit), 1000); // Cap at 1000
+            const offsetNum = parseInt(offset);
+
+            const events = await env.OPTIVIEW_DB.prepare(`
+              SELECT 
+                id, event_type, occurred_at, metadata,
+                content_id, ai_source_id
+              FROM interaction_events
+              WHERE project_id = ?
+              ORDER BY occurred_at DESC
+              LIMIT ? OFFSET ?
+            `).bind(project_id, limitNum, offsetNum).all<any>();
+
+            const response = new Response(JSON.stringify({ 
+              events: events.results || [],
+              total: events.results?.length || 0
+            }), {
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "public, max-age=60" // 1 min cache
+              }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+          } catch (e: any) {
+            log("events_list_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+              error: "Internal server error",
+              message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -513,7 +569,7 @@ export default {
             const { project_id, from, to } = Object.fromEntries(url.searchParams);
             if (!project_id) {
               const response = new Response("missing project_id", { status: 400 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             const fromTs = from ? parseInt(from) : Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -529,11 +585,11 @@ export default {
             // Get breakdown by traffic class
             const classBreakdown = await env.OPTIVIEW_DB.prepare(`
             SELECT 
-              JSON_EXTRACT(metadata, '$.class') as traffic_class,
+              metadata as traffic_class,
               COUNT(*) as count
             FROM interaction_events
             WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
-            GROUP BY JSON_EXTRACT(metadata, '$.class')
+            GROUP BY metadata
             ORDER BY count DESC
           `).bind(project_id, fromTs, toTs).all<any>();
 
@@ -555,10 +611,10 @@ export default {
             SELECT 
               CAST(occurred_at / 86400000) * 86400000 as day,
               COUNT(*) as count,
-              JSON_EXTRACT(metadata, '$.class') as traffic_class
+              metadata as traffic_class
             FROM interaction_events
             WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
-            GROUP BY day, JSON_EXTRACT(metadata, '$.class')
+            GROUP BY day, metadata
             ORDER BY day
           `).bind(project_id, fromTs, toTs).all<any>();
 
@@ -575,14 +631,14 @@ export default {
                 "Cache-Control": "public, max-age=300" // 5 min cache
               }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("events_summary_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -2559,19 +2615,19 @@ export default {
 
         // Default response - continue to origin
         const response = new Response("not found", { status: 404 });
-        return addBasicSecurityHeaders(addCorsHeaders(response));
+        return addBasicSecurityHeaders(addCorsHeaders(response, origin));
       }
 
       // Fallback response for any unmatched routes
       const fallbackResponse = new Response("Not Found", { status: 404 });
-      return addBasicSecurityHeaders(addCorsHeaders(fallbackResponse));
+      return addBasicSecurityHeaders(addCorsHeaders(fallbackResponse, origin));
     } catch (error) {
       log("worker_fatal_error", { error: String(error), stack: error instanceof Error ? error.stack : undefined });
       const response = new Response(JSON.stringify({ error: "Internal server error" }), {
         status: 500,
         headers: { "Content-Type": "application/json" }
       });
-      return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+      return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
     }
   },
 
