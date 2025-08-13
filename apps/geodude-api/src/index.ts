@@ -24,7 +24,11 @@ export default {
 
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
-      return addCorsHeaders(new Response(null, { status: 204 }));
+      const response = new Response(null, { status: 204 });
+      response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      response.headers.set('Access-Control-Allow-Origin', '*');
+      return response;
     }
 
     // 1) Health
