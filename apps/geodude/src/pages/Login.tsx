@@ -9,6 +9,7 @@ interface LoginState {
   loading: boolean;
   error: string;
   success: string;
+  authMethod: 'otp' | 'magic-link';
 }
 
 export default function Login() {
@@ -18,7 +19,8 @@ export default function Login() {
     step: 'request',
     loading: false,
     error: '',
-    success: ''
+    success: '',
+    authMethod: 'otp'
   });
 
   const navigate = useNavigate();
@@ -28,34 +30,63 @@ export default function Login() {
     setState(prev => ({ ...prev, loading: true, error: '', success: '' }));
 
     try {
-      const response = await fetch('/api/auth/request-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: state.email }),
-      });
+      if (state.authMethod === 'otp') {
+        const response = await fetch('/api/auth/request-code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: state.email }),
+        });
 
-      if (response.ok) {
-        setState(prev => ({ 
-          ...prev, 
-          step: 'verify', 
-          loading: false, 
-          success: 'Check your email for a login code!' 
-        }));
+        if (response.ok) {
+          setState(prev => ({
+            ...prev,
+            step: 'verify',
+            loading: false,
+            success: 'Check your email for a login code!'
+          }));
+        } else {
+          const data = await response.json();
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: data.error || 'Failed to send code'
+          }));
+        }
       } else {
-        const data = await response.json();
-        setState(prev => ({ 
-          ...prev, 
-          loading: false, 
-          error: data.error || 'Failed to send code' 
-        }));
+        // Magic link flow
+        const response = await fetch('/api/auth/request-link', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: state.email,
+            continue_path: '/onboarding'
+          }),
+        });
+
+        if (response.ok) {
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            success: 'Check your email for a magic link to sign in!'
+          }));
+        } else {
+          const data = await response.json();
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: data.error || 'Failed to send magic link'
+          }));
+        }
       }
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        error: 'Network error. Please try again.' 
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Network error. Please try again.'
       }));
     }
   };
@@ -70,36 +101,36 @@ export default function Login() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          email: state.email, 
-          code: state.code 
+        body: JSON.stringify({
+          email: state.email,
+          code: state.code
         }),
       });
 
       if (response.ok) {
-        setState(prev => ({ 
-          ...prev, 
-          loading: false, 
-          success: 'Login successful! Redirecting...' 
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          success: 'Login successful! Redirecting...'
         }));
-        
+
         // Redirect to dashboard after successful login
         setTimeout(() => {
           navigate('/events');
         }, 1500);
       } else {
         const data = await response.json();
-        setState(prev => ({ 
-          ...prev, 
-          loading: false, 
-          error: data.error || 'Invalid code' 
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: data.error || 'Invalid code'
         }));
       }
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        error: 'Network error. Please try again.' 
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Network error. Please try again.'
       }));
     }
   };
@@ -217,6 +248,32 @@ export default function Login() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <Card className="px-4 py-8 sm:px-10">
+          {/* Auth Method Tabs */}
+          <div className="mb-6">
+            <div className="flex rounded-lg bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => setState(prev => ({ ...prev, authMethod: 'otp', step: 'request', error: '', success: '' }))}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${state.authMethod === 'otp'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
+              >
+                Login Code
+              </button>
+              <button
+                type="button"
+                onClick={() => setState(prev => ({ ...prev, authMethod: 'magic-link', step: 'request', error: '', success: '' }))}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${state.authMethod === 'magic-link'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
+              >
+                Magic Link
+              </button>
+            </div>
+          </div>
+
           {state.error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
               <div className="flex">
@@ -258,7 +315,7 @@ export default function Login() {
                 disabled={state.loading || !isEmailValid(state.email)}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {state.loading ? 'Sending...' : 'Send Login Code'}
+                {state.loading ? 'Sending...' : state.authMethod === 'otp' ? 'Send Login Code' : 'Send Magic Link'}
               </button>
             </div>
           </form>

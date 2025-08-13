@@ -174,6 +174,148 @@ This email was sent to ${email}
   }
 
   /**
+   * Generate Magic Link email HTML content
+   */
+  generateMagicLinkEmailHTML(email: string, magicLinkUrl: string, expiresInMinutes: number = 15): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in to Optiview</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .button { display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
+        .expires { text-align: center; color: #6b7280; font-size: 14px; margin: 20px 0; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Sign in to Optiview</h1>
+        </div>
+        
+        <p>Hi there!</p>
+        
+        <p>Click the button below to sign in to your Optiview account:</p>
+        
+        <div style="text-align: center;">
+            <a href="${magicLinkUrl}" class="button">Sign in</a>
+        </div>
+        
+        <div class="expires">
+            ⏰ This link expires in ${expiresInMinutes} minutes
+        </div>
+        
+        <p><strong>Security note:</strong> This link is for you only. If you didn't request this, you can safely ignore this email.</p>
+        
+        <div class="footer">
+            <p>This email was sent to ${email}</p>
+            <p>&copy; ${new Date().getFullYear()} Optiview. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Generate Magic Link email text content
+   */
+  generateMagicLinkEmailText(email: string, magicLinkUrl: string, expiresInMinutes: number = 15): string {
+    return `Sign in to Optiview
+
+Hi there!
+
+Click the link below to sign in to your Optiview account:
+
+${magicLinkUrl}
+
+This link expires in ${expiresInMinutes} minutes.
+
+Security note: This link is for you only. If you didn't request this, you can safely ignore this email.
+
+This email was sent to ${email}
+
+© ${new Date().getFullYear()} Optiview. All rights reserved.`;
+  }
+
+  /**
+   * Generate Invite email HTML content
+   */
+  generateInviteEmailHTML(email: string, inviteUrl: string, inviterName: string, orgName: string, role: string, expiresInDays: number = 7): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You're invited to join Optiview</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .button { display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
+        .expires { text-align: center; color: #6b7280; font-size: 14px; margin: 20px 0; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👥 You're invited to join Optiview</h1>
+        </div>
+        
+        <p>Hi there!</p>
+        
+        <p><strong>${inviterName}</strong> has invited you to join <strong>${orgName}</strong> on Optiview as a <strong>${role}</strong>.</p>
+        
+        <div style="text-align: center;">
+            <a href="${inviteUrl}" class="button">Accept Invitation</a>
+        </div>
+        
+        <div class="expires">
+            ⏰ This invitation expires in ${expiresInDays} days
+        </div>
+        
+        <p>Optiview helps teams understand their website traffic and user behavior with privacy-first analytics.</p>
+        
+        <div class="footer">
+            <p>This email was sent to ${email}</p>
+            <p>&copy; ${new Date().getFullYear()} Optiview. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Generate Invite email text content
+   */
+  generateInviteEmailText(email: string, inviteUrl: string, inviterName: string, orgName: string, role: string, expiresInDays: number = 7): string {
+    return `You're invited to join Optiview
+
+Hi there!
+
+${inviterName} has invited you to join ${orgName} on Optiview as a ${role}.
+
+Click the link below to accept the invitation:
+
+${inviteUrl}
+
+This invitation expires in ${expiresInDays} days.
+
+Optiview helps teams understand their website traffic and user behavior with privacy-first analytics.
+
+This email was sent to ${email}
+
+© ${new Date().getFullYear()} Optiview. All rights reserved.`;
+  }
+
+  /**
    * Create email service from environment variables
    */
   static fromEnv(env: any): EmailService {
@@ -182,7 +324,7 @@ This email was sent to ${email}
       smtpPort: env.SMTP_PORT ? parseInt(env.SMTP_PORT) : undefined,
       smtpUser: env.SMTP_USER,
       smtpPass: env.SMTP_PASS,
-      fromEmail: env.EMAIL_FROM || 'noreply@optiview.ai',
+      fromEmail: env.EMAIL_FROM || 'support@optiview.ai',
       devMode: !env.SMTP_HOST || env.DEV_MAIL_ECHO === 'true'
     };
 

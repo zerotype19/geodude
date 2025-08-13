@@ -11,12 +11,14 @@ import Docs from "./pages/Docs";
 import Login from "./pages/Login";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import Onboarding from "./pages/Onboarding";
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/" element={<Events />} />
         <Route path="/sources" element={<Sources />} />
         <Route path="/content" element={<Content />} />

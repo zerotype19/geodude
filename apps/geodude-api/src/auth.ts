@@ -166,3 +166,40 @@ export function getClientIP(req: Request): string {
 export function getUserAgent(req: Request): string {
   return req.headers.get('user-agent') || 'unknown';
 }
+
+/**
+ * Generate magic link token (24 bytes, base64url encoded)
+ */
+export function generateMagicLinkToken(): string {
+  // Generate 24-byte random token, base64url encoded (no padding)
+  const randomBytes = new Uint8Array(24);
+  crypto.getRandomValues(randomBytes);
+  
+  // Convert to base64url (no padding)
+  const base64 = btoa(String.fromCharCode(...randomBytes));
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/**
+ * Generate magic link expiration time
+ */
+export function generateMagicLinkExpiry(expiryMinutes: number = 15): Date {
+  return new Date(Date.now() + expiryMinutes * 60 * 1000);
+}
+
+/**
+ * Validate continue path for magic links
+ */
+export function validateContinuePath(path: string): string {
+  // Must be internal path starting with /
+  if (!path || !path.startsWith('/')) {
+    return '/onboarding';
+  }
+  
+  // Prevent any scheme/host injection
+  if (path.includes('://') || path.includes('//')) {
+    return '/onboarding';
+  }
+  
+  return path;
+}
