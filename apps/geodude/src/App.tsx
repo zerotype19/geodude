@@ -4,9 +4,15 @@ type Overview = { clicks: number; conversions: number; crawler_visits: number; c
 
 export default function App() {
   const [o, setO] = useState<Overview | null>(null);
+
   useEffect(() => {
-    // When running locally, geodude-api defaults to :8787
-    fetch("http://127.0.0.1:8787/overview").then(r => r.json()).then(setO).catch(() => setO(null));
+    // Use environment variable from Cloudflare Pages, fallback to local dev
+    const apiUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8787";
+
+    fetch(`${apiUrl}/overview`)
+      .then(r => r.json())
+      .then(setO)
+      .catch(() => setO(null));
   }, []);
 
   return (
