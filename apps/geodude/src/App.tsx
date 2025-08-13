@@ -3,6 +3,8 @@ import { API_BASE, ENABLE_ADMIN, FETCH_OPTS } from "./config";
 import { useAuth } from "./useAuth";
 import OrgProjectBar from "./OrgProjectBar";
 import TokenLab from "./TokenLab";
+import Shell from "./components/Shell";
+import { Card } from "./components/ui/Card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line } from "recharts";
 
 type Overview = { clicks: number; conversions: number; crawler_visits: number; citations: number };
@@ -26,45 +28,50 @@ function Charts() {
   const bySrc = useFetch<{ rows: { src: string; cnt: number }[] }>(`/metrics/clicks_by_src`, []);
   const topPids = useFetch<{ rows: { pid: string; cnt: number }[] }>(`/metrics/top_pids?limit=10`, []);
   const ts = useFetch<{ rows: { ts: number; cnt: number }[] }>(`/metrics/clicks_timeseries`, []);
+  
   return (
-    <section style={{ marginTop: 24 }}>
-      <h2>Analytics</h2>
-      <div style={{ display: "grid", gap: 24, gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))" }}>
-        <div style={{ height: 260 }}>
-          <h3>Clicks by Source</h3>
-          <ResponsiveContainer>
-            <BarChart data={(bySrc?.rows || []).map(r => ({ name: r.src, cnt: r.cnt }))}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="name" /><YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="cnt" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div style={{ height: 260 }}>
-          <h3>Top PIDs</h3>
-          <ResponsiveContainer>
-            <BarChart data={(topPids?.rows || []).map(r => ({ name: r.pid || "(none)", cnt: r.cnt }))}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="name" /><YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="cnt" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div style={{ height: 260 }}>
-          <h3>Clicks Over Time</h3>
-          <ResponsiveContainer>
-            <LineChart data={ts?.rows || []}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="ts" tickFormatter={(v) => new Date(v).toLocaleDateString()} />
-              <YAxis allowDecimals={false} />
-              <Line type="monotone" dataKey="cnt" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+    <div className="grid gap-6 mb-8">
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card title="Clicks by Source">
+          <div className="h-64">
+            <ResponsiveContainer>
+              <BarChart data={(bySrc?.rows || []).map(r => ({ name: r.src, cnt: r.cnt }))}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="name" /><YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="cnt" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+        
+        <Card title="Top PIDs">
+          <div className="h-64">
+            <ResponsiveContainer>
+              <BarChart data={(topPids?.rows || []).map(r => ({ name: r.pid || "(none)", cnt: r.cnt }))}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="name" /><YAxis allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="cnt" fill="#10b981" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+        
+        <Card title="Clicks Over Time">
+          <div className="h-64">
+            <ResponsiveContainer>
+              <LineChart data={ts?.rows || []}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="ts" tickFormatter={(v) => new Date(v).toLocaleDateString()} />
+                <YAxis allowDecimals={false} />
+                <Line type="monotone" dataKey="cnt" stroke="#8b5cf6" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -158,25 +165,42 @@ export default function App() {
   if (!me?.user) return <main style={{ padding: 24 }}><a href="/login">Sign in</a></main>;
   if (!me.current) return <main style={{ padding: 24 }}><a href="/onboard">Start onboarding</a></main>;
 
-  return (
-    <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
+    return (
+    <Shell>
       <OrgProjectBar onChanged={() => location.reload()} />
-      <h1>geodude</h1>
-      <p>Cloudflare Pages UI scaffold. Hooked to geodude-api.</p>
-      <div style={{ marginTop: 16 }}>
-        <h2>Overview</h2>
-        {!o ? <p>Loading…</p> : (
-          <ul>
-            <li>Clicks: {o.clicks}</li>
-            <li>Conversions: {o.conversions}</li>
-            <li>Crawler Visits: {o.crawler_visits}</li>
-            <li>Citations: {o.citations}</li>
-          </ul>
-        )}
+      <h1 className="text-3xl font-bold mb-4">Optiview Dashboard</h1>
+      <p className="text-slate-600 mb-6">AI Referral Intelligence Platform</p>
+      
+      <div className="grid gap-6 mb-8">
+        <Card title="Overview">
+          {!o ? (
+            <p className="text-slate-500">Loading…</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{o.clicks}</div>
+                <div className="text-sm text-slate-500">Clicks</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{o.conversions}</div>
+                <div className="text-sm text-slate-500">Conversions</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{o.crawler_visits}</div>
+                <div className="text-sm text-slate-500">Crawler Visits</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">{o.citations}</div>
+                <div className="text-sm text-slate-500">Citations</div>
+              </div>
+            </div>
+          )}
+        </Card>
       </div>
+      
       <Charts />
       <KvAdmin />
       {ENABLE_ADMIN ? <TokenLab /> : null}
-    </main>
+    </Shell>
   );
 }
