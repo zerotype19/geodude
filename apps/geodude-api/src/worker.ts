@@ -606,16 +606,16 @@ export default {
             LIMIT 5
           `).bind(project_id, fromTs, toTs).all<any>();
 
-            // Get timeseries data
+            // Get timeseries data - simplified for D1 compatibility
             const timeseries = await env.OPTIVIEW_DB.prepare(`
             SELECT 
-              CAST(occurred_at / 86400000) * 86400000 as day,
+              occurred_at as day,
               COUNT(*) as count,
               metadata as traffic_class
             FROM interaction_events
             WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
-            GROUP BY day, metadata
-            ORDER BY day
+            GROUP BY metadata
+            ORDER BY occurred_at
           `).bind(project_id, fromTs, toTs).all<any>();
 
             const summary = {
