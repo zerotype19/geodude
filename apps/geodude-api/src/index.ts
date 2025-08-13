@@ -231,21 +231,51 @@ export default {
             
             if (sessionId) {
               // Look up the actual session data from the database
-              const sessionData = await env.GEO_DB.prepare(
-                "SELECT org_id, project_id FROM session WHERE id = ? LIMIT 1"
+              // Try to get current_org_id and current_project_id from session table
+              let sessionData = await env.GEO_DB.prepare(
+                "SELECT current_org_id, current_project_id FROM session WHERE id = ? LIMIT 1"
               ).bind(sessionId).first<any>();
               
-              log("direct_redirect_debug", { step: "session_lookup", found: !!sessionData, org_id: sessionData?.org_id, project_id: sessionData?.project_id });
+              log("direct_redirect_debug", { step: "session_lookup", found: !!sessionData, org_id: sessionData?.current_org_id, project_id: sessionData?.current_project_id });
               
-              if (sessionData?.org_id && sessionData?.project_id) {
-                const userKey = `${sessionData.org_id}:${sessionData.project_id}:${pid}`;
+              // If current context not found, try to get from user's default org/project
+              if (!sessionData?.current_org_id || !sessionData?.current_project_id) {
+                log("direct_redirect_debug", { step: "fallback_to_user_default" });
+                const userSession = await env.GEO_DB.prepare(
+                  "SELECT user_id FROM session WHERE id = ? LIMIT 1"
+                ).bind(sessionId).first<any>();
+                
+                if (userSession?.user_id) {
+                  // Get user's first org/project as fallback
+                  const userOrg = await env.GEO_DB.prepare(
+                    "SELECT org_id FROM org_member WHERE user_id = ? LIMIT 1"
+                  ).bind(userSession.user_id).first<any>();
+                  
+                  if (userOrg?.org_id) {
+                    const userProject = await env.GEO_DB.prepare(
+                      "SELECT id FROM project WHERE org_id = ? LIMIT 1"
+                    ).bind(userOrg.org_id).first<any>();
+                    
+                    if (userProject?.id) {
+                      sessionData = {
+                        current_org_id: userOrg.org_id,
+                        current_project_id: userProject.id
+                      };
+                      log("direct_redirect_debug", { step: "user_default_found", org_id: sessionData.current_org_id, project_id: sessionData.current_project_id });
+                    }
+                  }
+                }
+              }
+              
+              if (sessionData?.current_org_id && sessionData?.current_project_id) {
+                const userKey = `${sessionData.current_org_id}:${sessionData.current_project_id}:${pid}`;
                 log("direct_redirect_debug", { step: "trying_user_context", key: userKey });
                 destUrl = await env.DEST_MAP.get(userKey);
                 log("direct_redirect_debug", { step: "user_context_result", found: !!destUrl, url: destUrl });
                 
                 if (destUrl) {
-                  org_id = sessionData.org_id;
-                  project_id = sessionData.project_id;
+                  org_id = sessionData.current_org_id;
+                  project_id = sessionData.current_project_id;
                 }
               }
             }
