@@ -86,8 +86,8 @@ export default {
 
       // 3) API Keys endpoint
       if (url.pathname === "/api/keys" && request.method === "GET") {
-        // Return empty array directly if that's what frontend expects
-        const response = new Response(JSON.stringify([]), {
+        // Return the structure the frontend expects: { keys: [] }
+        const response = new Response(JSON.stringify({ keys: [] }), {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response);
