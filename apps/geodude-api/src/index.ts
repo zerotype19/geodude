@@ -209,20 +209,19 @@ export default {
       const pid = url.pathname.split("/").pop()!;
       try {
         log("direct_redirect_start", { pid });
-
-        // Try to find the PID in different org/project contexts
-        // First try the system org/project, then try to infer from the request
+        
+        // Try to find the PID in multiple contexts
         let destUrl = null;
         let org_id = "org_system";
         let project_id = "prj_system";
-
-        // Try system org/project first
+        
+        // Strategy 1: Try system org/project first (for public PIDs)
         const systemKey = `${org_id}:${project_id}:${pid}`;
         log("direct_redirect_debug", { step: "trying_system", key: systemKey });
         destUrl = await env.DEST_MAP.get(systemKey);
         log("direct_redirect_debug", { step: "system_result", found: !!destUrl, url: destUrl });
-
-        // If not found in system, try to get from user's current context via cookie
+        
+        // Strategy 2: If not found in system, try to get from user's current context via cookie
         if (!destUrl) {
           try {
             log("direct_redirect_debug", { step: "trying_session" });
@@ -284,7 +283,30 @@ export default {
             // Ignore session parsing errors, fall back to system
           }
         }
-
+        
+        // Strategy 3: If still not found, search ALL orgs/projects for this PID (public access)
+        if (!destUrl) {
+          log("direct_redirect_debug", { step: "trying_global_search" });
+          
+          // Get all KV keys and search for any that end with this PID
+          const allKeys = await env.DEST_MAP.list({ limit: 1000 });
+          const matchingKeys = allKeys.keys?.filter(k => k.name.endsWith(`:${pid}`)) || [];
+          
+          log("direct_redirect_debug", { step: "global_search", totalKeys: allKeys.keys?.length || 0, matchingKeys: matchingKeys.length, matches: matchingKeys.map(k => k.name) });
+          
+          if (matchingKeys.length > 0) {
+            // Use the first match found (you could implement priority logic here)
+            const firstMatch = matchingKeys[0];
+            const keyParts = firstMatch.name.split(':');
+            if (keyParts.length >= 3) {
+              org_id = keyParts[0];
+              project_id = keyParts[1];
+              destUrl = await env.DEST_MAP.get(firstMatch.name);
+              log("direct_redirect_debug", { step: "global_search_success", key: firstMatch.name, org_id, project_id, url: destUrl });
+            }
+          }
+        }
+        
         if (!destUrl) {
           log("direct_redirect_debug", { step: "not_found", pid, org_id, project_id });
           const response = new Response(`PID not found: ${pid}`, { status: 404 });
