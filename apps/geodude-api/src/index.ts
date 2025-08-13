@@ -441,23 +441,35 @@ export default {
         const org_id = url.searchParams.get("org_id") || "org_system";
         const project_id = url.searchParams.get("project_id") || "prj_system";
 
+        log("admin_kv_get", { org_id, project_id, isAdminKey });
+
         if (!isAdminKey) {
           // 2) fallback to session-based auth
           await requireOrgMember(env, req, org_id);
         }
 
         const prefix = `${org_id}:${project_id}:`;
+        log("admin_kv_get", { prefix });
 
         const list = await env.DEST_MAP.list({ prefix, limit: 1000 });
+        log("admin_kv_get", { keysFound: list.keys?.length || 0, keys: list.keys?.map(k => k.name) || [] });
+
         const rows = await Promise.all(
           (list.keys || []).map(async k => {
             const pid = k.name.replace(prefix, ""); // Remove prefix for display
-            return { pid, url: await env.DEST_MAP.get(k.name) };
+            const url = await env.DEST_MAP.get(k.name);
+            log("admin_kv_get", { key: k.name, pid, url });
+            return { pid, url };
           })
         );
+
+        log("admin_kv_get", { finalRows: rows.length, rows });
+
         const response = Response.json({ items: rows, org_id, project_id });
+        log("admin_kv_get", { responseStatus: response.status, responseBody: { items: rows.length, org_id, project_id } });
         return addCorsHeaders(response);
       } catch (e: any) {
+        log("admin_kv_get_error", { error: e.message, stack: e.stack });
         const response = new Response(e.message || "error", { status: e.message === "unauthorized" ? 401 : 500 });
         return addCorsHeaders(response);
       }
