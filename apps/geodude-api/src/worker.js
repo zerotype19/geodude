@@ -4,6 +4,9 @@ export default {
       const url = new URL(request.url);
       const origin = request.headers.get("origin");
 
+      // Debug logging
+      console.log(`[${new Date().toISOString()}] ${request.method} ${url.pathname}`);
+
       // Handle CORS preflight requests
       if (request.method === "OPTIONS") {
         const response = new Response(null, { status: 204 });
@@ -113,6 +116,30 @@ export default {
           top_sources: [], 
           timeseries: [] 
         }), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 8) Properties endpoint (might be missing)
+      if (url.pathname === "/api/properties" && request.method === "GET") {
+        const response = new Response(JSON.stringify([]), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 9) Projects endpoint (might be missing)
+      if (url.pathname === "/api/projects" && request.method === "GET") {
+        const response = new Response(JSON.stringify([]), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 10) Organizations endpoint (might be missing)
+      if (url.pathname === "/api/organizations" && request.method === "GET") {
+        const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response);
