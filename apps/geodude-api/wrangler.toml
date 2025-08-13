@@ -1,5 +1,5 @@
 name = "optiview"
-main = "src/worker.ts"
+main = "src/worker.js"
 compatibility_date = "2025-08-01"
 
 [[d1_databases]]

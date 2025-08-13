@@ -1,0 +1,72 @@
+export default {
+  async fetch(request, env, ctx) {
+    try {
+      const url = new URL(request.url);
+      const origin = request.headers.get("origin");
+
+      // Handle CORS preflight requests
+      if (request.method === "OPTIONS") {
+        const response = new Response(null, { status: 204 });
+        response.headers.set("Access-Control-Allow-Origin", origin || "*");
+        response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        return response;
+      }
+
+      // Helper function to add CORS headers
+      const addCorsHeaders = (response) => {
+        response.headers.set("Access-Control-Allow-Origin", origin || "*");
+        response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        return response;
+      };
+
+      // 1) Health check
+      if (url.pathname === "/health") {
+        const response = new Response("ok", { status: 200 });
+        return addCorsHeaders(response);
+      }
+
+      // 2) Simple auth endpoint for testing
+      if (url.pathname === "/auth/request-code" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { email } = body;
+
+          if (!email) {
+            const response = new Response(JSON.stringify({ error: "Email is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // For now, just return success
+          const response = new Response(JSON.stringify({ ok: true }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        } catch (e) {
+          const response = new Response(JSON.stringify({ ok: true }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+      }
+
+      // 3) Fallback response for any unmatched routes
+      const fallbackResponse = new Response("Not Found", { status: 404 });
+      return addCorsHeaders(fallbackResponse);
+
+    } catch (error) {
+      console.error("Worker error:", error);
+      
+      const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+      
+      return response;
+    }
+  }
+};
