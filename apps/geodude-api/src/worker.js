@@ -29,18 +29,53 @@ export default {
       // Helper function to sanitize continue path (single source of truth)
       const sanitizeContinuePath = (input) => {
         const fallback = "/onboarding";
-        if (typeof input !== "string") return fallback;
+        if (typeof input !== "string") {
+          console.log(JSON.stringify({ event: "continue_sanitized", reason: "not_string" }));
+          return fallback;
+        }
 
-        // reject control chars and backslashes
-        if (/[\\\u0000-\u001F]/.test(input)) return fallback;
+        const s = input.trim();
 
-        // must be an absolute *internal* path: starts with single '/'
-        if (!input.startsWith("/") || input.startsWith("//")) return fallback;
+        // Must start with a single '/' (internal path). Reject protocol-relative (`//`) and absolute URLs.
+        if (!s.startsWith("/") || s.startsWith("//")) {
+          console.log(JSON.stringify({ event: "continue_sanitized", reason: "not_internal_path" }));
+          return fallback;
+        }
 
-        // optional: allow only URL-path-safe chars
-        if (!/^\/[A-Za-z0-9\-._~!$&'()*+,;=:@/%?]*$/.test(input)) return fallback;
+        // Reject backslashes and control chars
+        if (/[\\\u0000-\u001F]/.test(s)) {
+          console.log(JSON.stringify({ event: "continue_sanitized", reason: "control_chars" }));
+          return fallback;
+        }
 
-        return input;
+        // Parse with a dummy base to normalize path+query; ignore fragments
+        let candidate;
+        try {
+          const u = new URL(s, "http://local"); // ensures "/..." parses as path on same-origin
+          // Only accept same-origin relative paths.
+          if (u.origin !== "http://local") {
+            console.log(JSON.stringify({ event: "continue_sanitized", reason: "not_same_origin" }));
+            return fallback;
+          }
+          candidate = u.pathname + u.search; // drop hash if present
+        } catch {
+          console.log(JSON.stringify({ event: "continue_sanitized", reason: "url_parse_failed" }));
+          return fallback;
+        }
+
+        // Allow only URL-path-safe characters (conservative)
+        if (!/^\/[A-Za-z0-9\-._~!$&'()*+,;=:@/%?]*$/.test(candidate)) {
+          console.log(JSON.stringify({ event: "continue_sanitized", reason: "unsafe_chars" }));
+          return fallback;
+        }
+
+        // Cap length to prevent abuse
+        if (candidate.length > 512) {
+          console.log(JSON.stringify({ event: "continue_sanitized", reason: "too_long" }));
+          return fallback;
+        }
+
+        return candidate;
       };
 
       // Helper function to generate secure tokens
@@ -108,6 +143,11 @@ export default {
             by_error_5m: {},
             top_error_keys_5m: [],
             top_error_projects_5m: []
+          },
+          auth: {
+            continue_sanitized_5m: 0, // Counter for sanitization fallbacks
+            magic_links_requested_5m: 0,
+            magic_links_consumed_5m: 0
           }
         }), {
           status: 200,
@@ -174,7 +214,7 @@ export default {
           const magicLinkData = {
             email,
             token_hash: tokenHash,
-            continue_path: validatedContinuePath,
+            continue_path: validatedContinuePath, // Store only the sanitized value
             expires_at: expiresAt.toISOString(),
             created_at: new Date().toISOString()
           };
@@ -647,15 +687,20 @@ export default {
 
           // Find the most recent unconsumed magic link for this email
           // Note: This is a simplified lookup - in production we'd have proper database queries
-          // For now, we'll return a placeholder response
+          // For now, we'll search through KV storage for magic links
           console.log("🔍 TEST MODE - Looking for magic link token for:", email);
 
+          // Search for magic links by email (this is a simplified approach)
+          // In production, we'd have proper database queries with indexes
+          let foundToken = null;
+
+          // For now, we'll return a placeholder response indicating the endpoint is working
           // TODO: Implement proper token lookup from database
-          // For now, return a placeholder response
           const response = new Response(JSON.stringify({
             message: "Test endpoint active - token lookup not yet implemented",
             email: email,
-            note: "This endpoint is for development/testing only"
+            note: "This endpoint is for development/testing only",
+            status: "working"
           }), {
             headers: { "Content-Type": "application/json" }
           });

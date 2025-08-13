@@ -5,6 +5,9 @@
 MAGIC_LINK_RPD_PER_EMAIL=50
 MAGIC_LINK_RPM_PER_IP=10
 
+# Test mode (enable dev test endpoints)
+TEST_MODE=1
+
 # Other settings
 MAGIC_LINK_EXP_MIN=15
 INVITE_EXP_DAYS=7
