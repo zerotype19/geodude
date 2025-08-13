@@ -1,4 +1,4 @@
-# geodude
+# Optiview
 
 A monorepo for AI-powered link tracking and analytics, built on Cloudflare's edge platform.
 

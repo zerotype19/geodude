@@ -42,9 +42,9 @@ export default {
     if (req.method === 'OPTIONS') {
       const origin = req.headers.get("origin");
       const allowed = [
-        "geodude.pages.dev",
+        "optiview.ai",
         // add any preview hostnames if you use branch previews
-        // "<your-prod-domain>"  // when you add a custom domain
+        // "staging.optiview.ai"  // if you add staging environments
       ];
       return new Response(null, { status: 204, headers: cors(origin, allowed) });
     }
@@ -336,7 +336,7 @@ export default {
 
     if (url.pathname === "/ai/corpus.ndjson" && req.method === "GET") {
       const body = [
-        JSON.stringify({ type: "entity", id: "site", canonical: "https://geodude.pages.dev" }),
+        JSON.stringify({ type: "entity", id: "site", canonical: "https://optiview.ai" }),
         JSON.stringify({ type: "fact", entity: "site", property: "product", value: "geodude" })
       ].join("\n") + "\n";
       const h = new Headers({ "content-type": "application/x-ndjson" });
@@ -348,7 +348,7 @@ export default {
 
     if (url.pathname === "/ai/faqs.ndjson" && req.method === "GET") {
       const body = [
-        JSON.stringify({ type: "faq", q: "What is geodude?", a: "AI referral tracking and GEO toolkit.", canonical: "https://geodude.pages.dev" })
+        JSON.stringify({ type: "faq", q: "What is geodude?", a: "AI referral tracking and GEO toolkit.", canonical: "https://optiview.ai" })
       ].join("\n") + "\n";
       const h = new Headers({ "content-type": "application/x-ndjson" });
       const signature = await sign(body, env.AI_FEED_SIGNING_KEY);
@@ -553,13 +553,13 @@ export default {
           console.log("Magic link email would be sent:", { email, token });
         } else {
           // Dev mode: log the link
-          const baseUrl = env.APP_BASE_URL || "https://geodude.pages.dev";
+          const baseUrl = env.APP_BASE_URL || "https://optiview.ai";
           console.log(`Magic link for ${email}: ${baseUrl}/auth/magic?token=${token}`);
         }
 
         const response = Response.json({ ok: true, message: "Magic link sent" });
         const origin = req.headers.get("origin");
-        const allowed = ["geodude.pages.dev"];
+        const allowed = ["optiview.ai"];
         if (origin && allowed.some(a => origin.endsWith(a))) {
           response.headers.set("Access-Control-Allow-Origin", origin);
           response.headers.set("Vary", "Origin");
@@ -625,7 +625,7 @@ export default {
         const response = Response.json({ ok: true, user: { id: userId, email: magicLink.email } });
         response.headers.set("Set-Cookie", `geodude_ses=${sessionId}; HttpOnly; Secure; SameSite=None; Max-Age=${30 * 24 * 60 * 60}; Path=/`);
         const origin = req.headers.get("origin");
-        const allowed = ["geodude.pages.dev"];
+        const allowed = ["optiview.ai"];
         if (origin && allowed.some(a => origin.endsWith(a))) {
           response.headers.set("Access-Control-Allow-Origin", origin);
           response.headers.set("Vary", "Origin");
@@ -642,7 +642,7 @@ export default {
       const response = Response.json({ ok: true });
       response.headers.set("Set-Cookie", "geodude_ses=; HttpOnly; Secure; SameSite=None; Max-Age=0; Path=/");
       const origin = req.headers.get("origin");
-      const allowed = ["geodude.pages.dev"];
+      const allowed = ["optiview.ai"];
       if (origin && allowed.some(a => origin.endsWith(a))) {
         response.headers.set("Access-Control-Allow-Origin", origin);
         response.headers.set("Vary", "Origin");
@@ -702,7 +702,7 @@ export default {
           } : null
         });
         const origin = req.headers.get("origin");
-        const allowed = ["geodude.pages.dev"];
+        const allowed = ["optiview.ai"];
         if (origin && allowed.some(a => origin.endsWith(a))) {
           response.headers.set("Access-Control-Allow-Origin", origin);
           response.headers.set("Vary", "Origin");
@@ -753,7 +753,7 @@ export default {
 
         const response = Response.json({ ok: true, org: { id: orgId, name: body.name } });
         const origin = req.headers.get("origin");
-        const allowed = ["geodude.pages.dev"];
+        const allowed = ["optiview.ai"];
         if (origin && allowed.some(a => origin.endsWith(a))) {
           response.headers.set("Access-Control-Allow-Origin", origin);
           response.headers.set("Vary", "Origin");
@@ -799,12 +799,10 @@ export default {
 
         const response = Response.json({ ok: true, project: { id: projectId, name: body.name, slug: body.slug } });
         const origin = req.headers.get("origin");
-        const allowed = ["geodude.pages.dev"];
-        if (origin && allowed.some(a => origin.endsWith(a))) {
-          response.headers.set("Access-Control-Allow-Origin", origin);
-          response.headers.set("Vary", "Origin");
-          response.headers.set("Access-Control-Allow-Credentials", "true");
-        }
+        const allowed = ["optiview.ai"];
+        if (origin && allowed.some(a => origin.endsNow let me find the set - current endpoint:
+          <｜tool▁calls▁begin｜> <｜tool▁call▁begin｜>
+        read_file
         return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
@@ -855,7 +853,7 @@ export default {
 
         const response = Response.json({ ok: true });
         const origin = req.headers.get("origin");
-        const allowed = ["geodude.pages.dev"];
+        const allowed = ["optiview.ai"];
         if (origin && allowed.some(a => origin.endsWith(a))) {
           response.headers.set("Access-Control-Allow-Origin", origin);
           response.headers.set("Vary", "Origin");
