@@ -184,7 +184,7 @@ export default {
         const org = url.searchParams.get("org") || "org_system";
         const project = url.searchParams.get("project") || "prj_system";
         const prefix = `${org}:${project}:`;
-        
+
         const list = await env.DEST_MAP.list({ prefix, limit: 1000 });
         const rows = await Promise.all(
           (list.keys || []).map(async k => {
@@ -399,11 +399,11 @@ export default {
         }
 
         const ttl = Math.min(Math.max(body.ttl_minutes ?? 60, 5), 7 * 24 * 60); // 5 min – 7 days
-        
+
         // Build v2 payload when org/prj provided; else emit v1 for back-compat
         const org = body.org_id || "org_system";
         const prj = body.project_id || "prj_system";
-        
+
         const tokenPayload: TokenV1 | TokenV2 = (body.org_id || body.project_id) ? {
           v: 2,
           org,
