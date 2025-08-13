@@ -208,12 +208,36 @@ export default {
     if (url.pathname.startsWith("/p/")) {
       const pid = url.pathname.split("/").pop()!;
       try {
-        // For direct PID access, we'll use the system org/project as default
-        const org_id = "org_system";
-        const project_id = "prj_system";
-        const kvKey = `${org_id}:${project_id}:${pid}`;
+        // Try to find the PID in different org/project contexts
+        // First try the system org/project, then try to infer from the request
+        let destUrl = null;
+        let org_id = "org_system";
+        let project_id = "prj_system";
         
-        const destUrl = await env.DEST_MAP.get(kvKey);
+        // Try system org/project first
+        const systemKey = `${org_id}:${project_id}:${pid}`;
+        destUrl = await env.DEST_MAP.get(systemKey);
+        
+        // If not found in system, try to get from user's current context via cookie
+        if (!destUrl) {
+          try {
+            const session = await getCookie(req, "geodude_ses");
+            if (session) {
+              const sessionData = JSON.parse(session);
+              if (sessionData.org_id && sessionData.project_id) {
+                const userKey = `${sessionData.org_id}:${sessionData.project_id}:${pid}`;
+                destUrl = await env.DEST_MAP.get(userKey);
+                if (destUrl) {
+                  org_id = sessionData.org_id;
+                  project_id = sessionData.project_id;
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore session parsing errors, fall back to system
+          }
+        }
+        
         if (!destUrl) {
           const response = new Response(`PID not found: ${pid}`, { status: 404 });
           return attach(addCorsHeaders(response));
@@ -254,7 +278,7 @@ export default {
           }
         });
 
-        log("direct_redirect", { pid: pid, dest: dest.toString() });
+        log("direct_redirect", { pid: pid, dest: dest.toString(), org_id, project_id });
         return attach(addCorsHeaders(resp));
       } catch (e: any) {
         const response = new Response(`redirect error: ${e?.message ?? ""}`, { status: 500 });
