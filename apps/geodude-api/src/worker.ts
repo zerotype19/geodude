@@ -593,15 +593,14 @@ export default {
             ORDER BY count DESC
           `).bind(project_id, fromTs, toTs).all<any>();
 
-            // Get top AI sources
+            // Get top AI sources - simplified to avoid JOIN issues
             const topSources = await env.OPTIVIEW_DB.prepare(`
             SELECT 
-              ais.name,
+              ai_source_id,
               COUNT(*) as count
-            FROM interaction_events ie
-            JOIN ai_sources ais ON ie.ai_source_id = ais.id
-            WHERE ie.project_id = ? AND ie.occurred_at BETWEEN ? AND ?
-            GROUP BY ais.name
+            FROM interaction_events
+            WHERE project_id = ? AND occurred_at BETWEEN ? AND ? AND ai_source_id IS NOT NULL
+            GROUP BY ai_source_id
             ORDER BY count DESC
             LIMIT 5
           `).bind(project_id, fromTs, toTs).all<any>();
