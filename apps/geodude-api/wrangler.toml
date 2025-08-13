@@ -30,5 +30,5 @@ preview_id = "6b21fea06a194549a3fe650020e63f24"
 # Dev environment removed - using production environment variables directly
 
 # ----- Production env -----
-[env.production.vars]
-CANONICAL_BASE = "https://<your-prod-domain>"
+# Production environment variables are set in Cloudflare Dashboard
+# DO NOT override them here to prevent accidental deletion
