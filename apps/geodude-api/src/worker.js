@@ -10,6 +10,7 @@ export default {
         response.headers.set("Access-Control-Allow-Origin", origin || "*");
         response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        response.headers.set("Access-Control-Allow-Credentials", "true");
         return response;
       }
 
@@ -18,6 +19,7 @@ export default {
         response.headers.set("Access-Control-Allow-Origin", origin || "*");
         response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        response.headers.set("Access-Control-Allow-Credentials", "true");
         return response;
       };
 
@@ -54,7 +56,66 @@ export default {
         }
       }
 
-      // 3) Fallback response for any unmatched routes
+      // 3) API Keys endpoint
+      if (url.pathname === "/api/keys" && request.method === "GET") {
+        const response = new Response(JSON.stringify({ keys: [] }), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      if (url.pathname === "/api/keys" && request.method === "POST") {
+        const response = new Response(JSON.stringify({ 
+          id: 1, 
+          key_id: "key_test123", 
+          secret_once: "secret_test123",
+          name: "Test Key",
+          project_id: 1,
+          property_id: 1
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 4) Content endpoint
+      if (url.pathname === "/api/content" && request.method === "GET") {
+        const response = new Response(JSON.stringify({ content: [] }), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 5) Sources endpoint
+      if (url.pathname === "/api/sources" && request.method === "GET") {
+        const response = new Response(JSON.stringify({ sources: [] }), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 6) Events endpoint
+      if (url.pathname === "/api/events" && request.method === "GET") {
+        const response = new Response(JSON.stringify({ events: [], total: 0 }), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 7) Events summary endpoint
+      if (url.pathname === "/api/events/summary" && request.method === "GET") {
+        const response = new Response(JSON.stringify({ 
+          total: 0, 
+          breakdown: [], 
+          top_sources: [], 
+          timeseries: [] 
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 8) Fallback response for any unmatched routes
       const fallbackResponse = new Response("Not Found", { status: 404 });
       return addCorsHeaders(fallbackResponse);
 
