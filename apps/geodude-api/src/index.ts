@@ -54,6 +54,21 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(req.url);
 
+    // Health check endpoints
+    if (url.pathname === "/health" && req.method === "GET") {
+      return new Response("OK", { status: 200 });
+    }
+
+    if (url.pathname === "/ready" && req.method === "GET") {
+      try {
+        // Basic DB connectivity check
+        await env.GEO_DB.prepare("SELECT 1").first();
+        return new Response("OK", { status: 200 });
+      } catch (e) {
+        return new Response("Service Unavailable", { status: 503 });
+      }
+    }
+
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
       const origin = req.headers.get("origin");
@@ -510,6 +525,39 @@ export default {
       return addCorsHeaders(response);
     }
 
+    // Citations API - recent AI citations
+    if (url.pathname === "/citations/recent" && req.method === "GET") {
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 200);
+      // TODO: Filter by current org/project when session context is available
+      const rows = await env.GEO_DB.prepare(`
+        SELECT c.id, c.ts, c.surface, c.query, c.url, c.rank, c.confidence,
+               cap.model_variant, cap.persona
+        FROM ai_citation_event c
+        LEFT JOIN ai_surface_capture cap ON cap.id = c.capture_id
+        ORDER BY c.ts DESC
+        LIMIT ?1
+      `).bind(limit).all<any>();
+      
+      const response = Response.json({ items: rows.results ?? [] });
+      return addCorsForCredentials(response, req);
+    }
+
+    // Tokenless shortlinks for creators - /p/:pid
+    if (url.pathname.startsWith("/p/") && req.method === "GET") {
+      const pid = url.pathname.split("/").pop()!;
+      // TODO: Namespace by org/project when multi-tenant scoping is implemented
+      const mapped = await env.DEST_MAP.get(pid);
+      if (!mapped) return new Response("Unknown PID", { status: 404 });
+      
+      const dest = new URL(mapped);
+      if (!dest.searchParams.has("utm_source")) {
+        dest.searchParams.set("utm_source", "ai_unknown");
+        dest.searchParams.set("utm_medium", "ai_recommendation");
+        dest.searchParams.set("utm_campaign", pid);
+      }
+      return Response.redirect(dest.toString(), 302);
+    }
+
     // CSV exports (easy BI pulls)
     function csv(rows: any[]) {
       if (!rows.length) return "id,ts\n";
@@ -639,7 +687,15 @@ export default {
         ).bind(Date.now(), userId).run();
 
         const response = Response.json({ ok: true, user: { id: userId, email: magicLink.email } });
-        response.headers.set("Set-Cookie", `geodude_ses=${sessionId}; HttpOnly; Secure; SameSite=None; Max-Age=${30 * 24 * 60 * 60}; Path=/`);
+        const cookieAttrs = [
+          "Path=/",
+          "Max-Age=" + (30 * 24 * 60 * 60),
+          "HttpOnly",
+          "Secure",
+          "SameSite=Lax",
+          "Domain=.optiview.ai"
+        ].join("; ");
+        response.headers.set("Set-Cookie", `geodude_ses=${sessionId}; ${cookieAttrs}`);
         const origin = req.headers.get("origin");
         const allowed = ["optiview.ai"];
         if (origin && allowed.some(a => origin.endsWith(a))) {
@@ -656,7 +712,15 @@ export default {
 
     if (url.pathname === "/auth/logout" && req.method === "POST") {
       const response = Response.json({ ok: true });
-      response.headers.set("Set-Cookie", "geodude_ses=; HttpOnly; Secure; SameSite=None; Max-Age=0; Path=/");
+      const cookieAttrs = [
+        "Path=/",
+        "Max-Age=0",
+        "HttpOnly",
+        "Secure",
+        "SameSite=Lax",
+        "Domain=.optiview.ai"
+      ].join("; ");
+      response.headers.set("Set-Cookie", `geodude_ses=; ${cookieAttrs}`);
       const origin = req.headers.get("origin");
       const allowed = ["optiview.ai"];
       if (origin && allowed.some(a => origin.endsWith(a))) {

@@ -19,31 +19,31 @@ export default function Onboard() {
     try {
       // Create organization
       const r1 = await fetch(`${API_BASE}/org`, {
-        ...FETCH_OPTS, 
+        ...FETCH_OPTS,
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: orgName })
       });
-      
+
       if (!r1.ok) {
         throw new Error("Failed to create organization");
       }
-      
+
       const org = await r1.json(); // { id, name }
 
       // Create project
       const r2 = await fetch(`${API_BASE}/project`, {
-        ...FETCH_OPTS, 
+        ...FETCH_OPTS,
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ 
-          org_id: org.org.id, 
-          name: projectName, 
+        body: JSON.stringify({
+          org_id: org.org.id,
+          name: projectName,
           slug,
           domain: projectDomain || null
         })
       });
-      
+
       if (!r2.ok) {
         throw new Error("Failed to create project");
       }
@@ -52,12 +52,12 @@ export default function Onboard() {
 
       // Set current context server-side
       await fetch(`${API_BASE}/me/set-current`, {
-        ...FETCH_OPTS, 
+        ...FETCH_OPTS,
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ 
-          org_id: org.org.id, 
-          project_id: prj.project.id 
+        body: JSON.stringify({
+          org_id: org.org.id,
+          project_id: prj.project.id
         })
       });
 
@@ -73,67 +73,67 @@ export default function Onboard() {
     <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
       <h1>Welcome to Optiview</h1>
       <p>Let's get you set up with your first organization and project.</p>
-      
+
       <form onSubmit={submit} style={{ display: "grid", gap: 16, maxWidth: 480, marginTop: 24 }}>
         <div>
           <label htmlFor="orgName">Organization name</label>
-          <input 
+          <input
             id="orgName"
-            placeholder="Your Company Inc." 
-            value={orgName} 
-            onChange={e => setOrgName(e.target.value)} 
-            required 
+            placeholder="Your Company Inc."
+            value={orgName}
+            onChange={e => setOrgName(e.target.value)}
+            required
             style={{ width: "100%", padding: 8, marginTop: 4 }}
           />
         </div>
-        
+
         <div>
           <label htmlFor="projectName">Project name</label>
-          <input 
+          <input
             id="projectName"
-            placeholder="Main Website" 
-            value={projectName} 
-            onChange={e => setProjectName(e.target.value)} 
-            required 
+            placeholder="Main Website"
+            value={projectName}
+            onChange={e => setProjectName(e.target.value)}
+            required
             style={{ width: "100%", padding: 8, marginTop: 4 }}
           />
           <small>Human-readable name for your project</small>
         </div>
-        
+
         <div>
           <label htmlFor="projectDomain">Project domain</label>
-          <input 
+          <input
             id="projectDomain"
             type="url"
-            placeholder="https://example.com" 
-            value={projectDomain} 
-            onChange={e => setProjectDomain(e.target.value)} 
+            placeholder="https://example.com"
+            value={projectDomain}
+            onChange={e => setProjectDomain(e.target.value)}
             style={{ width: "100%", padding: 8, marginTop: 4 }}
           />
           <small>Your website URL (optional)</small>
         </div>
-        
+
         <div>
           <label htmlFor="slug">Project slug</label>
-          <input 
+          <input
             id="slug"
-            placeholder="main-site" 
-            value={slug} 
-            onChange={e => setSlug(e.target.value)} 
-            required 
+            placeholder="main-site"
+            value={slug}
+            onChange={e => setSlug(e.target.value)}
+            required
             style={{ width: "100%", padding: 8, marginTop: 4 }}
           />
           <small>This will be used in your tracking URLs (e.g., main-site)</small>
         </div>
-        
-        <button 
-          type="submit" 
+
+        <button
+          type="submit"
           disabled={loading}
-          style={{ 
-            padding: 12, 
-            backgroundColor: "#0070f3", 
-            color: "white", 
-            border: "none", 
+          style={{
+            padding: 12,
+            backgroundColor: "#0070f3",
+            color: "white",
+            border: "none",
             borderRadius: 4,
             cursor: loading ? "not-allowed" : "pointer",
             opacity: loading ? 0.7 : 1
@@ -141,7 +141,7 @@ export default function Onboard() {
         >
           {loading ? "Creating..." : "Create Organization & Project"}
         </button>
-        
+
         {error && <p style={{ color: "red" }}>{error}</p>}
       </form>
     </main>
