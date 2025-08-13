@@ -24,6 +24,7 @@ export default function ApiKeys() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rotationModal, setRotationModal] = useState<{ isOpen: boolean; keyId: number; keyName: string } | null>(null);
+  const [newKey, setNewKey] = useState({ domain: "", name: "" });
 
   useEffect(() => {
     loadKeys();
@@ -40,9 +41,42 @@ export default function ApiKeys() {
       }
       
       const data = await response.json();
-      setKeys(data);
+      setKeys(data.keys || []); // Extract the keys array from the response
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load API keys");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createApiKey() {
+    if (!newKey.domain || !newKey.name) return;
+    
+    try {
+      setLoading(true);
+      
+      const response = await fetch(`${API_BASE}/api/keys`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: 1, // Default project ID for now
+          property_id: 1, // Default property ID for now
+          name: newKey.name,
+          domain: newKey.domain
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        alert(`API Key created! Key ID: ${data.key_id}\nSecret: ${data.secret_once}\n\n⚠️ Store this secret securely - it won't be shown again!`);
+        setNewKey({ domain: "", name: "" });
+        await loadKeys();
+      } else {
+        console.error("Failed to create API key");
+      }
+    } catch (error) {
+      console.error("Error creating API key:", error);
     } finally {
       setLoading(false);
     }
@@ -170,7 +204,48 @@ export default function ApiKeys() {
         {keys.length === 0 ? (
           <Card title="No API Keys">
             <div className="text-center py-8">
-              <p className="text-gray-500">No API keys found. Create your first key to start collecting data.</p>
+              <p className="text-gray-500 mb-6">No API keys found. Create your first key to start collecting data.</p>
+              
+              {/* Create API Key Form */}
+              <div className="max-w-md mx-auto">
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="property-domain" className="block text-sm font-medium text-gray-700 mb-1">
+                      Property Domain
+                    </label>
+                    <input
+                      id="property-domain"
+                      type="text"
+                      placeholder="example.com"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={newKey.domain || ""}
+                      onChange={(e) => setNewKey({ ...newKey, domain: e.target.value })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="key-name" className="block text-sm font-medium text-gray-700 mb-1">
+                      Key Name
+                    </label>
+                    <input
+                      id="key-name"
+                      type="text"
+                      placeholder="Production Key"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      value={newKey.name || ""}
+                      onChange={(e) => setNewKey({ ...newKey, name: e.target.value })}
+                    />
+                  </div>
+                  
+                  <button
+                    onClick={createApiKey}
+                    disabled={!newKey.domain || !newKey.name}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                  >
+                    Create API Key
+                  </button>
+                </div>
+              </div>
             </div>
           </Card>
         ) : (
