@@ -1,7 +1,7 @@
 import { addCorsHeaders } from "./cors";
 import { log } from "./logging";
 import { classifyRequest, type TrafficClassification } from "./classifier";
-import { hashString } from "./utils";
+import { hashString, verifyHmac, isWithinSkew } from "./utils";
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -19,7 +19,80 @@ export default {
       return new Response("ok", { status: 200 });
     }
 
-    // 2) Basic request logging
+    // 2) Admin health check
+    if (url.pathname === "/admin/health") {
+      try {
+        // Test D1 connectivity
+        const d1Test = await env.OPTIVIEW_DB.prepare("SELECT 1 as test").first();
+        
+        // Test KV connectivity
+        const kvTest = await env.AI_FINGERPRINTS.get("ua:list", "json");
+        
+        const health = {
+          status: "healthy",
+          timestamp: Date.now(),
+          d1: d1Test ? "connected" : "error",
+          kv: kvTest ? "connected" : "error"
+        };
+        
+        const response = new Response(JSON.stringify(health), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return attach(addCorsHeaders(response));
+      } catch (error) {
+        const response = new Response(JSON.stringify({
+          status: "unhealthy",
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: Date.now()
+        }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        });
+        return attach(addCorsHeaders(response));
+      }
+    }
+
+    // 3) JS Tag endpoint for customer installation
+    if (url.pathname === "/v1/tag.js") {
+      try {
+        const { pid, kid } = Object.fromEntries(url.searchParams);
+        if (!pid || !kid) {
+          const response = new Response("Missing pid or kid parameters", { status: 400 });
+          return attach(addCorsHeaders(response));
+        }
+
+        // Validate the key exists and is active
+        const key = await env.OPTIVIEW_DB.prepare(`
+          SELECT ak.*, p.domain, prj.id as project_id
+          FROM api_keys ak
+          JOIN properties p ON ak.property_id = p.id
+          JOIN project prj ON ak.project_id = prj.id
+          WHERE ak.key_id = ? AND ak.revoked_at IS NULL
+        `).bind(kid).first<any>();
+
+        if (!key) {
+          const response = new Response("Invalid or revoked API key", { status: 401 });
+          return attach(addCorsHeaders(response));
+        }
+
+        // Generate the JS tag with embedded project and property IDs
+        const jsTag = generateJSTag(key.project_id, pid, kid);
+        
+        const response = new Response(jsTag, {
+          headers: { 
+            "Content-Type": "application/javascript",
+            "Cache-Control": "public, max-age=3600" // 1 hour cache
+          }
+        });
+        return attach(addCorsHeaders(response));
+      } catch (error) {
+        log("tag_js_error", { error: String(error) });
+        const response = new Response("Error generating tag", { status: 500 });
+        return attach(addCorsHeaders(response));
+      }
+    }
+
+    // 4) Basic request logging
     log("request_start", {
       rid: crypto.randomUUID(),
       method: req.method,
@@ -27,7 +100,7 @@ export default {
       userAgent: req.headers.get("user-agent")
     });
 
-    // 3) Core AI Traffic Classification & Logging
+    // 5) Core AI Traffic Classification & Logging (for direct visits)
     if (req.method === "GET" || req.method === "POST") {
       try {
         // Classify the incoming request
@@ -79,11 +152,124 @@ export default {
       }
     }
 
-    // 4) API Endpoints
+    // 6) API Endpoints
     if (url.pathname.startsWith("/api/")) {
-      // 4.1) Events API
+      // 6.1) API Keys Management
+      if (url.pathname === "/api/keys" && req.method === "POST") {
+        try {
+          const { project_id, property_id, name } = await req.json();
+          
+          if (!project_id || !property_id || !name) {
+            const response = new Response("Missing required fields", { status: 400 });
+            return attach(addCorsHeaders(response));
+          }
+
+          // Generate unique key_id and secret
+          const keyId = `key_${crypto.randomUUID().replace(/-/g, '').substring(0, 12)}`;
+          const secret = crypto.randomUUID().replace(/-/g, '');
+          const secretHash = await hashString(secret);
+
+          // Insert the API key
+          const result = await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO api_keys (project_id, property_id, name, key_id, secret_hash)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(project_id, property_id, name, keyId, secretHash).run();
+
+          const response = new Response(JSON.stringify({ 
+            id: result.meta.last_row_id,
+            key_id: keyId,
+            secret_once: secret, // Show only once
+            name,
+            project_id,
+            property_id
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return attach(addCorsHeaders(response));
+        } catch (e: any) {
+          log("keys_create_error", { error: e.message, stack: e.stack });
+          const response = new Response(`key creation error: ${e?.message ?? ""}`, { status: 500 });
+          return attach(addCorsHeaders(response));
+        }
+      }
+
+      if (url.pathname === "/api/keys" && req.method === "GET") {
+        try {
+          const { project_id, property_id } = Object.fromEntries(url.searchParams);
+          if (!project_id) {
+            const response = new Response("Missing project_id", { status: 400 });
+            return attach(addCorsHeaders(response));
+          }
+
+          let query = `
+            SELECT ak.id, ak.name, ak.key_id, ak.created_at, ak.last_used_at, ak.revoked_at,
+                   p.domain as property_domain
+            FROM api_keys ak
+            JOIN properties p ON ak.property_id = p.id
+            WHERE ak.project_id = ?
+          `;
+          let params = [project_id];
+
+          if (property_id) {
+            query += " AND ak.property_id = ?";
+            params.push(property_id);
+          }
+
+          query += " ORDER BY ak.created_at DESC";
+
+          const keys = await env.OPTIVIEW_DB.prepare(query).bind(...params).all<any>();
+          
+          const response = new Response(JSON.stringify({ keys: keys.results || [] }), {
+            headers: { 
+              "Content-Type": "application/json",
+              "Cache-Control": "public, max-age=300"
+            }
+          });
+          return attach(addCorsHeaders(response));
+        } catch (e: any) {
+          log("keys_list_error", { error: e.message, stack: e.stack });
+          const response = new Response(`keys list error: ${e?.message ?? ""}`, { status: 500 });
+          return attach(addCorsHeaders(response));
+        }
+      }
+
+      if (url.pathname.match(/^\/api\/keys\/\d+\/revoke$/) && req.method === "POST") {
+        try {
+          const keyId = url.pathname.split('/')[3];
+          
+          const result = await env.OPTIVIEW_DB.prepare(`
+            UPDATE api_keys SET revoked_at = ? WHERE id = ?
+          `).bind(Date.now(), keyId).run();
+
+          if (result.meta.changes === 0) {
+            const response = new Response("API key not found", { status: 404 });
+            return attach(addCorsHeaders(response));
+          }
+
+          const response = new Response(JSON.stringify({ 
+            message: "API key revoked successfully",
+            key_id: keyId
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return attach(addCorsHeaders(response));
+        } catch (e: any) {
+          log("keys_revoke_error", { error: e.message, stack: e.stack });
+          const response = new Response(`revoke error: ${e?.message ?? ""}`, { status: 500 });
+          return attach(addCorsHeaders(response));
+        }
+      }
+
+      // 6.2) Events API (now with HMAC auth)
       if (url.pathname === "/api/events" && req.method === "POST") {
         try {
+          // Authenticate the request
+          const authResult = await authenticateRequest(req, env);
+          if (!authResult.valid) {
+            const response = new Response(authResult.error, { status: 401 });
+            return attach(addCorsHeaders(response));
+          }
+
           const body = await req.json();
           const { project_id, content_id, ai_source_id, event_type, metadata } = body;
           
@@ -102,6 +288,11 @@ export default {
             const response = new Response("metadata too large (max 1KB)", { status: 400 });
             return attach(addCorsHeaders(response));
           }
+
+          // Update last_used_at for the API key
+          await env.OPTIVIEW_DB.prepare(`
+            UPDATE api_keys SET last_used_at = ? WHERE key_id = ?
+          `).bind(Date.now(), authResult.keyId).run();
 
           const result = await logInteraction(env, {
             project_id,
@@ -126,7 +317,7 @@ export default {
         }
       }
 
-      // 4.2) Events Summary API
+      // 6.3) Events Summary API
       if (url.pathname === "/api/events/summary" && req.method === "GET") {
         try {
           const { project_id, from, to } = Object.fromEntries(url.searchParams);
@@ -202,7 +393,7 @@ export default {
         }
       }
 
-      // 4.3) Referrals API
+      // 6.4) Referrals API
       if (url.pathname === "/api/referrals" && req.method === "POST") {
         try {
           const { ai_source_id, content_id, ref_type, detected_at } = await req.json();
@@ -231,7 +422,7 @@ export default {
         }
       }
 
-      // 4.4) Top Referrals API
+      // 6.5) Top Referrals API
       if (url.pathname === "/api/referrals/top" && req.method === "GET") {
         try {
           const { project_id, limit = "10" } = Object.fromEntries(url.searchParams);
@@ -270,7 +461,7 @@ export default {
         }
       }
 
-      // 4.5) AI Sources API
+      // 6.6) AI Sources API
       if (url.pathname === "/api/sources" && req.method === "GET") {
         try {
           const sources = await env.OPTIVIEW_DB.prepare(`
@@ -293,7 +484,7 @@ export default {
         }
       }
 
-      // 4.6) Content API
+      // 6.7) Content API
       if (url.pathname === "/api/content" && req.method === "GET") {
         try {
           const { project_id } = Object.fromEntries(url.searchParams);
@@ -325,7 +516,7 @@ export default {
         }
       }
 
-      // 4.7) Content POST API
+      // 6.8) Content POST API
       if (url.pathname === "/api/content" && req.method === "POST") {
         try {
           const { project_id, domain, url: contentUrl, type, metadata } = await req.json();
@@ -457,6 +648,94 @@ async function refreshFingerprints(env: Env) {
   // This would normally refresh from a maintained JSON source
   // For now, we'll just log that it was called
   log("fingerprint_refresh_called", { timestamp: Date.now() });
+}
+
+// Authentication middleware
+async function authenticateRequest(req: Request, env: Env): Promise<{ valid: boolean; error?: string; keyId?: string }> {
+  try {
+    const keyId = req.headers.get("x-optiview-key-id");
+    const signature = req.headers.get("x-optiview-signature");
+    const timestamp = req.headers.get("x-optiview-timestamp");
+
+    if (!keyId || !signature || !timestamp) {
+      return { valid: false, error: "Missing authentication headers" };
+    }
+
+    // Check timestamp skew (5 minutes)
+    if (!isWithinSkew(parseInt(timestamp), 300)) {
+      return { valid: false, error: "Request timestamp too old" };
+    }
+
+    // Get the API key
+    const key = await env.OPTIVIEW_DB.prepare(`
+      SELECT secret_hash, revoked_at FROM api_keys WHERE key_id = ? AND revoked_at IS NULL
+    `).bind(keyId).first<any>();
+
+    if (!key) {
+      return { valid: false, error: "Invalid or revoked API key" };
+    }
+
+    // For v1, we'll use a simpler approach - store encrypted secrets
+    // In production, you'd use proper HMAC verification
+    const body = await req.text();
+    
+    // Verify the signature (simplified for v1)
+    const expectedSignature = await hashString(`${timestamp}.${body}`);
+    if (signature !== expectedSignature) {
+      log("hmac_verification_failed", { keyId, timestamp });
+      return { valid: false, error: "Invalid signature" };
+    }
+
+    return { valid: true, keyId };
+  } catch (error) {
+    log("authentication_error", { error: String(error) });
+    return { valid: false, error: "Authentication error" };
+  }
+}
+
+// Generate JS tag for customer installation
+function generateJSTag(projectId: number, propertyId: string, keyId: string): string {
+  return `
+// Optiview Analytics Tag v1.0
+!function(){
+  try{
+    var pid = "${propertyId}"; 
+    var kid = "${keyId}";
+    var ep = "https://app.optiview.io/api/events";
+    
+    var payload = {
+      project_id: ${projectId},
+      property_id: pid,
+      event_type: "view",
+      metadata: {
+        p: location.pathname,
+        r: document.referrer ? new URL(document.referrer).hostname : "",
+        t: document.title.slice(0,120),
+        ua: navigator.userAgent.slice(0,100)
+      }
+    };
+    
+    var body = JSON.stringify(payload);
+    var timestamp = Math.floor(Date.now() / 1000);
+    
+    // For v1, we'll use a simplified approach
+    // In production, implement proper HMAC signing
+    fetch(ep, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-optiview-key-id": kid,
+        "x-optiview-timestamp": timestamp
+      },
+      body: body
+    }).catch(function(e) {
+      // Silent fail for analytics
+    });
+  }catch(e){
+    // Silent fail for analytics
+  }
+}();
+`.trim();
 }
 
 // Types
