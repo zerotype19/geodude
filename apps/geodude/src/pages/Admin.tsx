@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { API_BASE, FETCH_OPTS } from "../config";
+import { useAuth } from "../useAuth";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 
 export default function Admin() {
+  const { me } = useAuth();
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [adminToken, setAdminToken] = useState("");
   const [tokenData, setTokenData] = useState({
     adminToken: "",
@@ -18,11 +21,30 @@ export default function Admin() {
 
   async function generateToken() {
     try {
+      // Prepare headers - use Bearer token if provided, otherwise use session
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (showAdvanced && adminToken) {
+        headers["authorization"] = `Bearer ${adminToken}`;
+      }
+
+      // Prepare body - include org/project context for session auth
+      const body = { ...tokenData };
+      if (!showAdvanced || !adminToken) {
+        // Session auth: must include org/project context
+        if (me?.current?.org_id && me?.current?.project_id) {
+          body.org_id = me.current.org_id;
+          body.project_id = me.current.project_id;
+        } else {
+          console.error("No current org/project context");
+          return;
+        }
+      }
+
       const response = await fetch(`${API_BASE}/admin/token`, {
-        ...FETCH_OPTS,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tokenData)
+        credentials: "include",
+        headers,
+        body: JSON.stringify(body)
       });
 
       if (response.ok) {
@@ -46,6 +68,16 @@ export default function Admin() {
 
         <div className="grid md:grid-cols-2 gap-6">
           <Card title="KV Admin">
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                {showAdvanced ? "Hide Advanced" : "Show Advanced"} → Use Bearer Token
+              </button>
+            </div>
+            
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
               {/* Hidden username field for accessibility */}
               <input
@@ -55,19 +87,23 @@ export default function Admin() {
                 style={{ display: 'none' }}
                 aria-hidden="true"
               />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Admin Token (INGEST_API_KEY)
-                </label>
-                <input
-                  type="password"
-                  value={adminToken}
-                  onChange={(e) => setAdminToken(e.target.value)}
-                  placeholder="Bearer token"
-                  autoComplete="new-password"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                />
-              </div>
+              
+              {showAdvanced && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Admin Token (INGEST_API_KEY)
+                  </label>
+                  <input
+                    type="password"
+                    value={adminToken}
+                    onChange={(e) => setAdminToken(e.target.value)}
+                    placeholder="Bearer token"
+                    autoComplete="new-password"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  />
+                </div>
+              )}
+              
               <button
                 type="submit"
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -78,28 +114,41 @@ export default function Admin() {
           </Card>
 
           <Card title="Token Lab">
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                {showAdvanced ? "Hide Advanced" : "Show Advanced"} → Use Bearer Token
+              </button>
+            </div>
+            
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
               {/* Hidden username field for accessibility */}
               <input
                 type="text"
-                name="username"
+                name="text"
                 autoComplete="username"
                 style={{ display: 'none' }}
                 aria-hidden="true"
               />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Admin Token (once)
-                </label>
-                <input
-                  type="password"
-                  value={tokenData.adminToken}
-                  onChange={(e) => setTokenData({ ...tokenData, adminToken: e.target.value })}
-                  placeholder="Bearer token"
-                  autoComplete="new-password"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                />
-              </div>
+              
+              {showAdvanced && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Admin Token (once)
+                  </label>
+                  <input
+                    type="password"
+                    value={tokenData.adminToken}
+                    onChange={(e) => setTokenData({ ...tokenData, adminToken: e.target.value })}
+                    placeholder="Bearer token"
+                    autoComplete="new-password"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">

@@ -5,6 +5,8 @@ import OrgProjectBar from "./OrgProjectBar";
 import Shell from "./components/Shell";
 import { Card } from "./components/ui/Card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line } from "recharts";
+import { useDateRange, q } from "./dateRange";
+import RangePicker from "./components/RangePicker";
 
 type Overview = { clicks: number; conversions: number; crawler_visits: number; citations: number };
 
@@ -12,14 +14,14 @@ type Overview = { clicks: number; conversions: number; crawler_visits: number; c
 
 function useFetch<T>(path: string, deps: any[] = []) {
   const [data, setData] = useState<T | null>(null);
-  useEffect(() => { fetch(`${API_BASE}${path}`).then(r => r.json()).then(setData as any).catch(() => setData(null)); }, deps);
+  useEffect(() => { fetch(path).then(r => r.json()).then(setData as any).catch(() => setData(null)); }, deps);
   return data;
 }
 
-function Charts() {
-  const bySrc = useFetch<{ rows: { src: string; cnt: number }[] }>(`/metrics/clicks_by_src`, []);
-  const topPids = useFetch<{ rows: { pid: string; cnt: number }[] }>(`/metrics/top_pids?limit=10`, []);
-  const ts = useFetch<{ rows: { ts: number; cnt: number }[] }>(`/metrics/clicks_timeseries`, []);
+function Charts({ range }: { range: { from: number; to: number } }) {
+  const bySrc = useFetch<{ rows: { src: string; cnt: number }[] }>(q("/metrics/clicks_by_src", range, API_BASE), [range]);
+  const topPids = useFetch<{ rows: { pid: string; cnt: number }[] }>(q("/metrics/top_pids?limit=10", range, API_BASE), [range]);
+  const ts = useFetch<{ rows: { ts: number; cnt: number }[] }>(q("/metrics/clicks_timeseries", range, API_BASE), [range]);
 
   return (
     <div className="grid gap-6 mb-8">
@@ -79,62 +81,85 @@ function Charts() {
 
 export default function App() {
   const { me, loading } = useAuth();
+  const { range, setRange } = useDateRange();
   const [o, setO] = useState<Overview | null>(null);
 
   // ✅ IMPORTANT: All hooks must be called before any conditional returns
   useEffect(() => {
     // Only fetch overview when authenticated and onboarded
     if (me?.user && me?.current) {
-      const overviewUrl = API_BASE.endsWith('/')
-        ? `${API_BASE}overview`
-        : `${API_BASE}/overview`;
+      const overviewUrl = q("/overview", range, API_BASE);
 
       fetch(overviewUrl, FETCH_OPTS)
         .then(r => r.json())
         .then(setO)
         .catch(() => setO(null));
     }
-  }, [me?.user, me?.current]);
+  }, [me?.user, me?.current, range]);
 
   // Authentication gate - AFTER all hooks
   if (loading) return <main style={{ padding: 24 }}>Loading…</main>;
   if (!me?.user) return <main style={{ padding: 24 }}><a href="/login">Sign in</a></main>;
   if (!me.current) return <main style={{ padding: 24 }}><a href="/onboard">Start onboarding</a></main>;
 
-  return (
-    <Shell>
-      <OrgProjectBar onChanged={() => location.reload()} />
-      <h1 className="text-3xl font-bold mb-4">Optiview Dashboard</h1>
-      <p className="text-slate-600 mb-6">AI Referral Intelligence Platform</p>
-
-      <div className="grid gap-6 mb-8">
-        <Card title="Overview">
-          {!o ? (
-            <p className="text-slate-500">Loading…</p>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{o.clicks}</div>
-                <div className="text-sm text-slate-500">Clicks</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{o.conversions}</div>
-                <div className="text-sm text-slate-500">Conversions</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{o.crawler_visits}</div>
-                <div className="text-sm text-slate-500">Crawler Visits</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{o.citations}</div>
-                <div className="text-sm text-slate-500">Citations</div>
-              </div>
+        return (
+        <Shell>
+          <OrgProjectBar onChanged={() => location.reload()} />
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Optiview Dashboard</h1>
+              <p className="text-slate-600">AI Referral Intelligence Platform</p>
             </div>
-          )}
-        </Card>
-      </div>
+            <RangePicker value={range} onChange={setRange} />
+          </div>
 
-      <Charts />
-    </Shell>
-  );
+          <div className="grid gap-6 mb-8">
+            <Card title="Overview">
+              {!o ? (
+                <p className="text-slate-500">Loading…</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{o.clicks}</div>
+                    <div className="text-sm text-slate-500">Clicks</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">{o.conversions}</div>
+                    <div className="text-sm text-slate-500">Conversions</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">{o.crawler_visits}</div>
+                    <div className="text-sm text-slate-500">Crawler Visits</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">{o.citations}</div>
+                    <div className="text-sm text-slate-500">Citations</div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <Charts range={range} />
+          
+          <div className="flex gap-4">
+            <a
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+              href={`${API_BASE}/export/clicks.csv?from=${range.from}&to=${range.to}`}
+              target="_blank" 
+              rel="noreferrer"
+            >
+              Download Clicks CSV
+            </a>
+            <a
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              href={`${API_BASE}/export/conversions.csv?from=${range.from}&to=${range.to}`}
+              target="_blank" 
+              rel="noreferrer"
+            >
+              Download Conversions CSV
+            </a>
+          </div>
+        </Shell>
+      );
 }
