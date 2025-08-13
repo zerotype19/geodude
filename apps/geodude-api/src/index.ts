@@ -558,7 +558,14 @@ export default {
         }
 
         const response = Response.json({ ok: true, message: "Magic link sent" });
-        return addCorsHeaders(response);
+        const origin = req.headers.get("origin");
+        const allowed = ["geodude.pages.dev"];
+        if (origin && allowed.some(a => origin.endsWith(a))) {
+          response.headers.set("Access-Control-Allow-Origin", origin);
+          response.headers.set("Vary", "Origin");
+          response.headers.set("Access-Control-Allow-Credentials", "true");
+        }
+        return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
         return addCorsHeaders(response);
@@ -617,7 +624,14 @@ export default {
 
         const response = Response.json({ ok: true, user: { id: userId, email: magicLink.email } });
         response.headers.set("Set-Cookie", `geodude_ses=${sessionId}; HttpOnly; Secure; SameSite=None; Max-Age=${30 * 24 * 60 * 60}; Path=/`);
-        return addCorsHeaders(response);
+        const origin = req.headers.get("origin");
+        const allowed = ["geodude.pages.dev"];
+        if (origin && allowed.some(a => origin.endsWith(a))) {
+          response.headers.set("Access-Control-Allow-Origin", origin);
+          response.headers.set("Vary", "Origin");
+          response.headers.set("Access-Control-Allow-Credentials", "true");
+        }
+        return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
         return addCorsHeaders(response);
@@ -627,7 +641,14 @@ export default {
     if (url.pathname === "/auth/logout" && req.method === "POST") {
       const response = Response.json({ ok: true });
       response.headers.set("Set-Cookie", "geodude_ses=; HttpOnly; Secure; SameSite=None; Max-Age=0; Path=/");
-      return addCorsHeaders(response);
+      const origin = req.headers.get("origin");
+      const allowed = ["geodude.pages.dev"];
+      if (origin && allowed.some(a => origin.endsWith(a))) {
+        response.headers.set("Access-Control-Allow-Origin", origin);
+        response.headers.set("Vary", "Origin");
+        response.headers.set("Access-Control-Allow-Credentials", "true");
+      }
+      return response;
     }
 
     // User management endpoints
@@ -680,7 +701,14 @@ export default {
             project_id: session.current_project_id
           } : null
         });
-        return addCorsHeaders(response);
+        const origin = req.headers.get("origin");
+        const allowed = ["geodude.pages.dev"];
+        if (origin && allowed.some(a => origin.endsWith(a))) {
+          response.headers.set("Access-Control-Allow-Origin", origin);
+          response.headers.set("Vary", "Origin");
+          response.headers.set("Access-Control-Allow-Credentials", "true");
+        }
+        return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
         return addCorsHeaders(response);
@@ -724,7 +752,14 @@ export default {
         ).bind(orgId, session.user_id, "admin").run();
 
         const response = Response.json({ ok: true, org: { id: orgId, name: body.name } });
-        return addCorsHeaders(response);
+        const origin = req.headers.get("origin");
+        const allowed = ["geodude.pages.dev"];
+        if (origin && allowed.some(a => origin.endsWith(a))) {
+          response.headers.set("Access-Control-Allow-Origin", origin);
+          response.headers.set("Vary", "Origin");
+          response.headers.set("Access-Control-Allow-Credentials", "true");
+        }
+        return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
         return addCorsHeaders(response);
@@ -763,7 +798,14 @@ export default {
         ).bind(projectId, body.org_id, body.name, body.slug, body.domain || null, Date.now()).run();
 
         const response = Response.json({ ok: true, project: { id: projectId, name: body.name, slug: body.slug } });
-        return addCorsHeaders(response);
+        const origin = req.headers.get("origin");
+        const allowed = ["geodude.pages.dev"];
+        if (origin && allowed.some(a => origin.endsWith(a))) {
+          response.headers.set("Access-Control-Allow-Origin", origin);
+          response.headers.set("Vary", "Origin");
+          response.headers.set("Access-Control-Allow-Credentials", "true");
+        }
+        return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
         return addCorsHeaders(response);
@@ -812,7 +854,14 @@ export default {
         ).bind(body.org_id, body.project_id, sessionId).run();
 
         const response = Response.json({ ok: true });
-        return addCorsHeaders(response);
+        const origin = req.headers.get("origin");
+        const allowed = ["geodude.pages.dev"];
+        if (origin && allowed.some(a => origin.endsWith(a))) {
+          response.headers.set("Access-Control-Allow-Origin", origin);
+          response.headers.set("Vary", "Origin");
+          response.headers.set("Access-Control-Allow-Credentials", "true");
+        }
+        return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
         return addCorsHeaders(response);
