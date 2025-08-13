@@ -13,11 +13,13 @@
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "cf:publish": "pnpm -r --filter geodude-api run publish && pnpm -r --filter geodude run publish",
-    "token:gen": "tsx scripts/token-gen.ts"
+    "token:gen": "tsx scripts/token-gen.ts",
+    "ai:capture": "tsx scripts/playwright/capture.ts"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
     "wrangler": "^3.78.0",
-    "tsx": "^4.20.4"
+    "tsx": "^4.20.4",
+    "playwright": "^1.50.0"
   }
 }

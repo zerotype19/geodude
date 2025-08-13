@@ -1,8 +1,28 @@
-name: AI Capture (placeholder)
+name: AI Capture v0
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"  # daily 03:00 UTC
+
 jobs:
-  noop:
+  capture:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Will implement Playwright capture later."
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm i -g pnpm
+      - run: pnpm i
+      - run: npx playwright install --with-deps
+      - run: node scripts/playwright/capture.ts
+      - name: Post NDJSON to geodude-api
+        env:
+          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
+          API_BASE: https://geodude-api.kevin-mcgovern.workers.dev
+        run: |
+          for f in out/*.ndjson; do
+            echo "posting $f"
+            curl -s -X POST "$API_BASE/ingest/ai-citations" \
+              -H "authorization: Bearer $INGEST_API_KEY" \
+              --data-binary "@$f" || exit 1
+          done
