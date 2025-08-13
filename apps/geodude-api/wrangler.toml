@@ -10,3 +10,7 @@ database_id = "TBD"
 [[kv_namespaces]]
 binding = "AI_FINGERPRINTS"
 id = "TBD"
+
+[triggers]
+# Uncomment to enable after testing
+# crons = ["*/30 * * * *"]
