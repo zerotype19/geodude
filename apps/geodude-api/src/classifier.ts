@@ -10,9 +10,14 @@ export interface TrafficClassification {
 
 // In-memory cache for rules manifest (5 min TTL)
 let rulesCache: {
-  manifest: any;
+  manifest: {
+    version: number;
+    ua_list?: any[];
+    heuristics?: any;
+  };
   last_updated: number;
   version: number;
+  heuristics?: any;
 } | null = null;
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -104,7 +109,11 @@ async function warmRulesCache(env: Env) {
 
   try {
     // Load rules manifest from KV
-    const manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
+    const manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json") as {
+      version: number;
+      ua_list?: any[];
+      heuristics?: any;
+    } | null;
 
     // Check if cache is still valid and version hasn't changed
     if (rulesCache &&

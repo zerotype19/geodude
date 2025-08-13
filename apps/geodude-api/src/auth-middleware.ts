@@ -59,7 +59,26 @@ export async function requireAuth(req: Request, env: Env): Promise<{ user: User;
     log("session_cleanup_error", { error: String(error) });
   }
 
-  return { user, session };
+  // Extract user data from the joined query result
+  const user: User = {
+    id: session.id,
+    email: session.email,
+    is_admin: session.is_admin,
+    created_at: session.created_at
+  };
+
+  // Extract session data
+  const sessionData: Session = {
+    id: session.id,
+    user_id: session.user_id,
+    session_id: session.session_id,
+    created_at: session.created_at,
+    expires_at: session.expires_at,
+    ip_hash: session.ip_hash,
+    ua_hash: session.ua_hash
+  };
+
+  return { user, session: sessionData };
 }
 
 /**
