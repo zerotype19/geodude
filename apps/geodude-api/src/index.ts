@@ -12,10 +12,24 @@ type Env = {
   APP_BASE_URL?: string;
 };
 
-// Helper function to add CORS headers
+// Helper function to add CORS headers with credentials support
+function cors(origin: string | null, allowed: string[]) {
+  const h = new Headers();
+  if (origin && allowed.some(a => origin.endsWith(a))) {
+    h.set("Access-Control-Allow-Origin", origin); // echo exact origin
+    h.set("Vary", "Origin");
+    h.set("Access-Control-Allow-Credentials", "true");
+  }
+  h.set("Access-Control-Allow-Headers", "content-type, authorization");
+  h.set("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT, OPTIONS");
+  h.set("Access-Control-Max-Age", "86400");
+  return h;
+}
+
 function addCorsHeaders(response: Response): Response {
+  // For backward compatibility, keep the old function
   response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   return response;
 }
@@ -26,11 +40,13 @@ export default {
 
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
-      const response = new Response(null, { status: 204 });
-      response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-      response.headers.set('Access-Control-Allow-Origin', '*');
-      return response;
+      const origin = req.headers.get("origin");
+      const allowed = [
+        "geodude.pages.dev",
+        // add any preview hostnames if you use branch previews
+        // "<your-prod-domain>"  // when you add a custom domain
+      ];
+      return new Response(null, { status: 204, headers: cors(origin, allowed) });
     }
 
     // 1) Health
@@ -600,7 +616,7 @@ export default {
         ).bind(Date.now(), userId).run();
 
         const response = Response.json({ ok: true, user: { id: userId, email: magicLink.email } });
-        response.headers.set("Set-Cookie", `geodude_ses=${sessionId}; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}; Path=/`);
+        response.headers.set("Set-Cookie", `geodude_ses=${sessionId}; HttpOnly; Secure; SameSite=None; Max-Age=${30 * 24 * 60 * 60}; Path=/`);
         return addCorsHeaders(response);
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
@@ -610,7 +626,7 @@ export default {
 
     if (url.pathname === "/auth/logout" && req.method === "POST") {
       const response = Response.json({ ok: true });
-      response.headers.set("Set-Cookie", "geodude_ses=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/");
+      response.headers.set("Set-Cookie", "geodude_ses=; HttpOnly; Secure; SameSite=None; Max-Age=0; Path=/");
       return addCorsHeaders(response);
     }
 
@@ -625,7 +641,7 @@ export default {
 
         // Get session and user
         const session = await env.GEO_DB.prepare(
-          `SELECT user_id, expires_ts FROM session WHERE id = ?1 AND expires_ts > ?2`
+          `SELECT user_id, expires_ts, current_org_id, current_project_id FROM session WHERE id = ?1 AND expires_ts > ?2`
         ).bind(sessionId, Date.now()).first<any>();
 
         if (!session) {
@@ -658,7 +674,11 @@ export default {
         const response = Response.json({
           user,
           orgs: orgs.results || [],
-          projects: projects.results || []
+          projects: projects.results || [],
+          current: session.current_org_id && session.current_project_id ? {
+            org_id: session.current_org_id,
+            project_id: session.current_project_id
+          } : null
         });
         return addCorsHeaders(response);
       } catch (e: any) {
@@ -743,6 +763,55 @@ export default {
         ).bind(projectId, body.org_id, body.name, body.slug, body.domain || null, Date.now()).run();
 
         const response = Response.json({ ok: true, project: { id: projectId, name: body.name, slug: body.slug } });
+        return addCorsHeaders(response);
+      } catch (e: any) {
+        const response = new Response(e.message || "error", { status: 500 });
+        return addCorsHeaders(response);
+      }
+    }
+
+    // Set current org/project context
+    if (url.pathname === "/me/set-current" && req.method === "POST") {
+      try {
+        const sessionId = req.headers.get("cookie")?.match(/geodude_ses=([^;]+)/)?.[1];
+        if (!sessionId) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        const body = await json<{ org_id: string; project_id: string }>(req);
+        if (!body?.org_id || !body?.project_id) {
+          const response = new Response("org_id and project_id required", { status: 400 });
+          return addCorsHeaders(response);
+        }
+
+        // Verify user is member of org
+        const session = await env.GEO_DB.prepare(
+          `SELECT user_id FROM session WHERE id = ?1 AND expires_ts > ?2`
+        ).bind(sessionId, Date.now()).first<any>();
+
+        if (!session) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        const membership = await env.GEO_DB.prepare(
+          `SELECT user_id FROM org_member WHERE org_id = ?1 AND user_id = ?2`
+        ).bind(body.org_id, session.user_id).first<any>();
+
+        if (!membership) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        // Store current context in session (we'll add a current_context column)
+        // For now, we'll use a simple approach and store it in the session table
+        // In production, you might want a separate table for this
+        await env.GEO_DB.prepare(
+          `UPDATE session SET current_org_id = ?1, current_project_id = ?2 WHERE id = ?3`
+        ).bind(body.org_id, body.project_id, sessionId).run();
+
+        const response = Response.json({ ok: true });
         return addCorsHeaders(response);
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });

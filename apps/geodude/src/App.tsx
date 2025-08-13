@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { API_BASE, ENABLE_ADMIN } from "./config";
+import { API_BASE, ENABLE_ADMIN, FETCH_OPTS } from "./config";
+import { useAuth } from "./useAuth";
+import OrgProjectBar from "./OrgProjectBar";
 import TokenLab from "./TokenLab";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line } from "recharts";
 
@@ -133,7 +135,13 @@ function KvAdmin() {
 }
 
 export default function App() {
+  const { me, loading } = useAuth();
   const [o, setO] = useState<Overview | null>(null);
+
+  // Authentication gate
+  if (loading) return <main style={{ padding: 24 }}>Loading…</main>;
+  if (!me?.user) return <main style={{ padding: 24 }}><a href="/login">Sign in</a></main>;
+  if (!me.current) return <main style={{ padding: 24 }}><a href="/onboard">Start onboarding</a></main>;
 
   useEffect(() => {
     // Use environment variable from Cloudflare Pages, fallback to local dev
@@ -141,7 +149,7 @@ export default function App() {
       ? `${API_BASE}overview`
       : `${API_BASE}/overview`;
 
-    fetch(overviewUrl)
+    fetch(overviewUrl, FETCH_OPTS)
       .then(r => r.json())
       .then(setO)
       .catch(() => setO(null));
@@ -149,6 +157,7 @@ export default function App() {
 
   return (
     <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
+      <OrgProjectBar onChanged={() => location.reload()} />
       <h1>geodude</h1>
       <p>Cloudflare Pages UI scaffold. Hooked to geodude-api.</p>
       <div style={{ marginTop: 16 }}>
