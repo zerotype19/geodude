@@ -27,9 +27,24 @@ function cors(origin: string | null, allowed: string[]) {
   return h;
 }
 
+// Universal CORS function for all responses (replaces addCorsHeaders)
+function addCorsForCredentials(response: Response, req: Request): Response {
+  const origin = req.headers.get("origin");
+  const allowed = ["optiview.ai"];
+  if (origin && allowed.some(a => origin.endsWith(a))) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Vary", "Origin");
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+  }
+  return response;
+}
+
 function addCorsHeaders(response: Response): Response {
-  // For backward compatibility, keep the old function
-  response.headers.set('Access-Control-Allow-Origin', '*');
+  // This function is deprecated - use cors() instead for credentialed requests
+  // Since we're using credentials, we need to handle CORS properly
+  // For now, we'll use a global approach that works with credentials
+  response.headers.set('Access-Control-Allow-Origin', 'https://optiview.ai');
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   return response;
@@ -668,7 +683,7 @@ export default {
 
         if (!session) {
           const response = new Response("unauthorized", { status: 401 });
-          return addCorsHeaders(response);
+          return addCorsForCredentials(response, req);
         }
 
         const user = await env.GEO_DB.prepare(
@@ -677,7 +692,7 @@ export default {
 
         if (!user) {
           const response = new Response("user not found", { status: 404 });
-          return addCorsHeaders(response);
+          return addCorsForCredentials(response, req);
         }
 
         // Get user's orgs and projects
