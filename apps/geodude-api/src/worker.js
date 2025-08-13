@@ -174,6 +174,50 @@ export default {
       // 13) Any other /api/ endpoint that might be missing
       if (url.pathname.startsWith("/api/") && request.method === "GET") {
         console.log(`[DEBUG] Missing API endpoint: ${url.pathname}`);
+        
+        // Handle dynamic routes with IDs
+        if (url.pathname.match(/^\/api\/projects\/\d+\/settings$/)) {
+          // Project settings endpoint
+          const response = new Response(JSON.stringify({
+            id: 1,
+            project_id: url.pathname.split('/')[3], // Extract the ID
+            data_retention_days: 90,
+            ai_detection_enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+        
+        if (url.pathname.match(/^\/api\/projects\/\d+$/)) {
+          // Single project endpoint
+          const response = new Response(JSON.stringify({
+            id: url.pathname.split('/')[3], // Extract the ID
+            name: "Test Project",
+            description: "A test project",
+            created_at: new Date().toISOString()
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+        
+        if (url.pathname.match(/^\/api\/properties\/\d+$/)) {
+          // Single property endpoint
+          const response = new Response(JSON.stringify({
+            id: url.pathname.split('/')[3], // Extract the ID
+            domain: "example.com",
+            project_id: 1,
+            created_at: new Date().toISOString()
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+        
+        // Default fallback for any other API endpoint
         const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
