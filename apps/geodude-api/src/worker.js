@@ -58,7 +58,8 @@ export default {
 
       // 3) API Keys endpoint
       if (url.pathname === "/api/keys" && request.method === "GET") {
-        const response = new Response(JSON.stringify({ keys: [] }), {
+        // Return empty array directly if that's what frontend expects
+        const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response);
@@ -80,7 +81,8 @@ export default {
 
       // 4) Content endpoint
       if (url.pathname === "/api/content" && request.method === "GET") {
-        const response = new Response(JSON.stringify({ content: [] }), {
+        // Return empty array directly if that's what frontend expects
+        const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response);
@@ -88,7 +90,8 @@ export default {
 
       // 5) Sources endpoint
       if (url.pathname === "/api/sources" && request.method === "GET") {
-        const response = new Response(JSON.stringify({ sources: [] }), {
+        // Return empty array directly if that's what frontend expects
+        const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response);
