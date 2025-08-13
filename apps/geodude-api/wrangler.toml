@@ -1,4 +1,4 @@
-name = "optiview-api"
+name = "geodude-api"
 main = "src/index.ts"
 compatibility_date = "2025-08-12"
 logpush = false
