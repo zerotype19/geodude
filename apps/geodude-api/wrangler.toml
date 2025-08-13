@@ -1,34 +1,12 @@
-name = "geodude-api"
-main = "src/index.ts"
-compatibility_date = "2025-08-12"
-logpush = false
+name = "optiview"
+main = "src/worker.ts"
+compatibility_date = "2025-08-01"
 
-# ----- Local defaults (used by `wrangler dev`) -----
-[vars]
-# Local development settings - these will NOT override production env vars
-# CANONICAL_BASE = "http://127.0.0.1:8788"  # Local dev only
-
-# ----- Bindings -----
-# D1
 [[d1_databases]]
-binding = "GEO_DB"
-database_name = "geodude-db"
-database_id = "5d63faff-5415-48d6-aec1-f39e6456aab8"
+binding = "OPTIVIEW_DB"
+database_name = "optiview_db"
+database_id = "TBD"
 
-# R2 (for Playwright artifacts later)
-[[r2_buckets]]
-binding = "AI_CAPTURES"
-bucket_name = "geodude-ai-captures"
-
-# ----- IMPORTANT: Production Environment Variables -----
-# ALL production environment variables MUST be set in Cloudflare Dashboard
-# DO NOT add any [env.production.vars] section here
-# This prevents accidental overwriting of production settings
-# 
-# Required production env vars (set in Dashboard):
-# - CANONICAL_BASE = "https://optiview.ai"
-# - HMAC_KEY = "your-hmac-secret"
-# - INGEST_API_KEY = "your-ingest-key"
-# - AI_FEED_SIGNING_KEY = "your-signing-key"
-# - RESEND_API_KEY = "your-resend-key" (optional)
-# - APP_BASE_URL = "https://optiview.ai"
+[[kv_namespaces]]
+binding = "AI_FINGERPRINTS"
+id = "TBD"

@@ -8,11 +8,17 @@
     "scripts/*"
   ],
   "scripts": {
-    "build": "pnpm -r run build",
-    "dev": "pnpm -r run dev",
-    "lint": "pnpm -r run lint",
-    "typecheck": "pnpm -r run typecheck",
-    "cf:publish": "pnpm -r --filter geodude-api run publish && pnpm -r --filter geodude run publish",
+    "dev": "concurrently \"pnpm run dev:api\" \"pnpm run dev:ui\"",
+    "dev:api": "cd apps/geodude-api && wrangler dev",
+    "dev:ui": "cd apps/geodude && wrangler pages dev",
+    "build": "pnpm run build:api && pnpm run build:ui",
+    "build:api": "cd apps/geodude-api && wrangler deploy --dry-run",
+    "build:ui": "cd apps/geodude && wrangler pages deploy --dry-run",
+    "cf:publish": "pnpm run cf:publish:api && pnpm run cf:publish:ui",
+    "cf:publish:api": "cd apps/geodude-api && wrangler deploy",
+    "cf:publish:ui": "cd apps/geodude && wrangler pages deploy",
+    "db:reset": "cd apps/geodude-api && wrangler d1 execute optiview_db --remote --file=./migrations/0001_initial_ai_visibility.sql",
+    "typecheck": "tsc --noEmit",
     "token:gen": "tsx scripts/token-gen.ts",
     "ai:capture": "tsx scripts/playwright/capture.ts"
   },
