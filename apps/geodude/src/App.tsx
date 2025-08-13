@@ -6,6 +6,7 @@ import Settings from "./pages/Settings";
 import Install from "./pages/Install";
 import AdminHealth from "./pages/AdminHealth";
 import ApiKeys from "./pages/ApiKeys";
+import DataPolicy from "./pages/DataPolicy";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/admin/health" element={<AdminHealth />} />
         <Route path="/api-keys" element={<ApiKeys />} />
+        <Route path="/data-policy" element={<DataPolicy />} />
       </Routes>
     </Router>
   );

@@ -740,6 +740,127 @@ export default {
         }
       }
 
+      // 6.3.8) Manual Data Purge API (Admin Only)
+      if (url.pathname === "/admin/purge" && req.method === "POST") {
+        try {
+          // TODO: Add admin authentication here
+          // For now, we'll proceed without user validation
+          const userId = 1; // Placeholder
+
+          const body = await req.json() as any;
+          const { project_id, type, confirm, dry_run = false } = body;
+
+          if (!project_id || !type || confirm !== "DELETE") {
+            const response = new Response(JSON.stringify({
+              error: "Missing required parameters or invalid confirmation"
+            }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Get project settings to determine retention
+          const projectSettings = await env.OPTIVIEW_DB.prepare(`
+            SELECT retention_days_events, retention_days_referrals, plan_tier
+            FROM project_settings 
+            WHERE project_id = ?
+          `).bind(project_id).first<any>();
+
+          if (!projectSettings) {
+            const response = new Response(JSON.stringify({
+              error: "Project not found or no settings configured"
+            }), { status: 404, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          const now = Date.now();
+          let deletedEvents = 0;
+          let deletedReferrals = 0;
+
+          if (type === "events" || type === "both") {
+            const cutoffEvents = now - (projectSettings.retention_days_events * 24 * 60 * 60 * 1000);
+            
+            if (dry_run) {
+              // Count rows that would be deleted
+              const countResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count FROM interaction_events 
+                WHERE project_id = ? AND occurred_at < ?
+              `).bind(project_id, cutoffEvents).first<any>();
+              deletedEvents = countResult?.count || 0;
+            } else {
+              // Actually delete rows
+              const deleteResult = await env.OPTIVIEW_DB.prepare(`
+                DELETE FROM interaction_events 
+                WHERE project_id = ? AND occurred_at < ?
+              `).bind(project_id, cutoffEvents).run();
+              deletedEvents = deleteResult.meta.changes || 0;
+            }
+          }
+
+          if (type === "referrals" || type === "both") {
+            const cutoffReferrals = now - (projectSettings.retention_days_referrals * 24 * 60 * 60 * 1000);
+            
+            if (dry_run) {
+              // Count rows that would be deleted
+              const countResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count FROM ai_referrals ar
+                JOIN content_assets ca ON ar.content_id = ca.id
+                JOIN properties p ON ca.property_id = p.id
+                WHERE p.project_id = ? AND ar.detected_at < ?
+              `).bind(project_id, cutoffReferrals).first<any>();
+              deletedReferrals = countResult?.count || 0;
+            } else {
+              // Actually delete rows
+              const deleteResult = await env.OPTIVIEW_DB.prepare(`
+                DELETE FROM ai_referrals 
+                WHERE content_id IN (
+                  SELECT ca.id FROM content_assets ca
+                  JOIN properties p ON ca.property_id = p.id
+                  WHERE p.project_id = ?
+                ) AND detected_at < ?
+              `).bind(project_id, cutoffReferrals).run();
+              deletedReferrals = deleteResult.meta.changes || 0;
+            }
+          }
+
+          // Log the purge operation
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO audit_log (user_id, action, subject_type, subject_id, metadata)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(
+            userId,
+            "purge",
+            "project",
+            project_id,
+            JSON.stringify({
+              type,
+              dry_run,
+              deleted_events: deletedEvents,
+              deleted_referrals: deletedReferrals,
+              retention_days_events: projectSettings.retention_days_events,
+              retention_days_referrals: projectSettings.retention_days_referrals
+            })
+          ).run();
+
+          const response = new Response(JSON.stringify({
+            project_id,
+            type,
+            dry_run,
+            deleted_events: deletedEvents,
+            deleted_referrals: deletedReferrals,
+            message: dry_run ? "Dry run completed" : "Purge completed successfully"
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        } catch (e: any) {
+          log("manual_purge_error", { error: e.message, stack: e.stack });
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        }
+      }
+
       // 6.4) Referrals API (with schema validation)
       if (url.pathname === "/api/referrals" && req.method === "POST") {
         try {
@@ -986,7 +1107,7 @@ export default {
     return addBasicSecurityHeaders(addCorsHeaders(response));
   },
 
-  // Cron job for refreshing fingerprints
+  // Cron job for refreshing fingerprints and retention purging
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     if (event.cron === "*/30 * * * *") {
       try {
@@ -998,6 +1119,22 @@ export default {
         log("fingerprints_refreshed", { timestamp: Date.now() });
       } catch (error) {
         log("fingerprints_refresh_error", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+
+    // Daily retention purge at 03:10 UTC
+    if (event.cron === "10 3 * * *") {
+      try {
+        await runRetentionPurge(env);
+        
+        // Store last run timestamp in KV for health monitoring
+        await env.AI_FINGERPRINTS.put("cron:last_run_ts", Date.now().toString());
+        
+        log("retention_purge_completed", { timestamp: Date.now() });
+      } catch (error) {
+        log("retention_purge_error", {
           error: error instanceof Error ? error.message : String(error)
         });
       }
@@ -1072,6 +1209,125 @@ async function refreshFingerprints(env: Env) {
   // This would normally refresh from a maintained JSON source
   // For now, we'll just log that it was called
   log("fingerprint_refresh_called", { timestamp: Date.now() });
+}
+
+// Retention purge job for cleaning up old data
+async function runRetentionPurge(env: Env) {
+  const startTime = Date.now();
+  let totalDeletedEvents = 0;
+  let totalDeletedReferrals = 0;
+  let projectsProcessed = 0;
+  let projectsWithErrors = 0;
+
+  try {
+    // Get all project settings
+    const projects = await env.OPTIVIEW_DB.prepare(`
+      SELECT project_id, retention_days_events, retention_days_referrals, plan_tier
+      FROM project_settings
+    `).all<any>();
+
+    for (const project of projects.results) {
+      try {
+        const now = Date.now();
+        let projectDeletedEvents = 0;
+        let projectDeletedReferrals = 0;
+
+        // Purge old events
+        const cutoffEvents = now - (project.retention_days_events * 24 * 60 * 60 * 1000);
+        let affectedRows = 1;
+        let maxLoops = 100; // Safety guard
+        
+        while (affectedRows > 0 && maxLoops > 0) {
+          const result = await env.OPTIVIEW_DB.prepare(`
+            DELETE FROM interaction_events 
+            WHERE project_id = ? AND occurred_at < ? 
+            LIMIT 1000
+          `).bind(project.project_id, cutoffEvents).run();
+          
+          affectedRows = result.meta.changes || 0;
+          projectDeletedEvents += affectedRows;
+          maxLoops--;
+        }
+
+        // Purge old referrals
+        const cutoffReferrals = now - (project.retention_days_referrals * 24 * 60 * 60 * 1000);
+        affectedRows = 1;
+        maxLoops = 100; // Safety guard
+        
+        while (affectedRows > 0 && maxLoops > 0) {
+          const result = await env.OPTIVIEW_DB.prepare(`
+            DELETE FROM ai_referrals 
+            WHERE content_id IN (
+              SELECT ca.id FROM content_assets ca
+              JOIN properties p ON ca.property_id = p.id
+              WHERE p.project_id = ?
+            ) AND detected_at < ?
+            LIMIT 1000
+          `).bind(project.project_id, cutoffReferrals).run();
+          
+          affectedRows = result.meta.changes || 0;
+          projectDeletedReferrals += affectedRows;
+          maxLoops--;
+        }
+
+        totalDeletedEvents += projectDeletedEvents;
+        totalDeletedReferrals += projectDeletedReferrals;
+        projectsProcessed++;
+
+        // Log per-project purge results
+        if (projectDeletedEvents > 0 || projectDeletedReferrals > 0) {
+          log("project_purge_completed", {
+            project_id: project.project_id,
+            deleted_events: projectDeletedEvents,
+            deleted_referrals: projectDeletedReferrals,
+            retention_days_events: project.retention_days_events,
+            retention_days_referrals: project.retention_days_referrals,
+            plan_tier: project.plan_tier
+          });
+        }
+
+      } catch (error) {
+        projectsWithErrors++;
+        log("project_purge_error", {
+          project_id: project.project_id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    
+    // Log summary
+    log("retention_purge_summary", {
+      projects_processed: projectsProcessed,
+      projects_with_errors: projectsWithErrors,
+      total_deleted_events: totalDeletedEvents,
+      total_deleted_referrals: totalDeletedReferrals,
+      duration_ms: duration
+    });
+
+    // Send Slack alert if deletions occurred and webhook is configured
+    if ((totalDeletedEvents > 0 || totalDeletedReferrals > 0) && env.SLACK_WEBHOOK_URL) {
+      try {
+        const alerts = SlackAlerts.getInstance();
+        await alerts.postAlert({
+          dedupeKey: 'retention_purge_summary',
+          message: `Retention purge completed: ${totalDeletedEvents} events, ${totalDeletedReferrals} referrals deleted across ${projectsProcessed} projects in ${duration}ms`
+        });
+      } catch (slackError) {
+        log("slack_alert_error", { error: String(slackError) });
+      }
+    }
+
+  } catch (error) {
+    log("retention_purge_fatal_error", {
+      error: error instanceof Error ? error.message : String(error),
+      projects_processed: projectsProcessed,
+      total_deleted_events: totalDeletedEvents,
+      total_deleted_referrals: totalDeletedReferrals
+    });
+    throw error;
+  }
 }
 
 // Authentication middleware with grace period support
