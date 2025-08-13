@@ -150,7 +150,7 @@ export default {
           const { pid, kid } = Object.fromEntries(url.searchParams);
           if (!pid || !kid) {
             const response = new Response("Missing pid or kid parameters", { status: 400 });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
 
           // Validate the key exists and is active
@@ -164,7 +164,7 @@ export default {
 
           if (!key) {
             const response = new Response("Invalid or revoked API key", { status: 401 });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
 
           // Generate the JS tag with embedded project and property IDs
@@ -176,11 +176,11 @@ export default {
               "Cache-Control": "public, max-age=3600" // 1 hour cache
             }
           });
-          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (error) {
           log("tag_js_error", { error: String(error) });
           const response = new Response("Error generating tag", { status: 500 });
-          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         }
       }
 
@@ -346,7 +346,7 @@ export default {
 
             if (result.meta.changes === 0) {
               const response = new Response("API key not found", { status: 404 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             const response = new Response(JSON.stringify({
@@ -355,14 +355,14 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("keys_revoke_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -650,7 +650,7 @@ export default {
               const response = new Response(JSON.stringify({
                 error: "Missing project_id parameter"
               }), { status: 400, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // For v1, return global error summary since project-specific metrics aren't fully implemented yet
@@ -671,14 +671,14 @@ export default {
                 "Cache-Control": "public, max-age=60" // 1 min cache for error data
               }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("error_summary_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -706,7 +706,7 @@ export default {
               const response = new Response(JSON.stringify({
                 error: "API key not found or already revoked"
               }), { status: 404, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Generate new secret
@@ -758,14 +758,14 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("key_rotation_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -791,7 +791,7 @@ export default {
               const response = new Response(JSON.stringify({
                 error: "API key not found or already revoked"
               }), { status: 404, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Revoke the key
@@ -822,14 +822,14 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("key_revoke_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -846,7 +846,7 @@ export default {
               const response = new Response(JSON.stringify({
                 error: "Missing required parameters or invalid confirmation"
               }), { status: 400, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Get project settings to determine retention
@@ -860,7 +860,7 @@ export default {
               const response = new Response(JSON.stringify({
                 error: "Project not found or no settings configured"
               }), { status: 404, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             const now = Date.now();
@@ -942,14 +942,14 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("manual_purge_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -961,7 +961,7 @@ export default {
               const response = new Response(JSON.stringify({
                 error: "Missing property_id parameter"
               }), { status: 400, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Require authentication
@@ -1031,14 +1031,14 @@ export default {
                 "Cache-Control": "public, max-age=10" // 10 second cache for real-time data
               }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("install_verification_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -1049,7 +1049,7 @@ export default {
             const contentType = req.headers.get("content-type");
             if (!contentType || !contentType.includes("application/json")) {
               const response = new Response("Content-Type must be application/json", { status: 415 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Get request body and validate size
@@ -1060,7 +1060,7 @@ export default {
                 max_size_kb: 1,
                 actual_size_kb: Math.round(bodyText.length / 1024)
               }), { status: 413, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Parse and validate body
@@ -1072,7 +1072,7 @@ export default {
                 error: "Validation failed",
                 details: validation.errors
               }), { status: 400, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             const result = await env.OPTIVIEW_DB.prepare(`
@@ -1092,14 +1092,14 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("referrals_create_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -1109,7 +1109,7 @@ export default {
             const { project_id, limit = "10" } = Object.fromEntries(url.searchParams);
             if (!project_id) {
               const response = new Response("missing project_id", { status: 400 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             const referrals = await env.OPTIVIEW_DB.prepare(`
@@ -1134,14 +1134,14 @@ export default {
                 "Cache-Control": "public, max-age=300"
               }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("referrals_top_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -1160,14 +1160,14 @@ export default {
                 "Cache-Control": "public, max-age=600" // 10 min cache
               }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("sources_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -1177,7 +1177,7 @@ export default {
             const { project_id } = Object.fromEntries(url.searchParams);
             if (!project_id) {
               const response = new Response("missing project_id", { status: 400 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             const content = await env.OPTIVIEW_DB.prepare(`
@@ -1195,14 +1195,14 @@ export default {
                 "Cache-Control": "public, max-age=300"
               }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("content_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -1213,7 +1213,7 @@ export default {
             const contentType = req.headers.get("content-type");
             if (!contentType || !contentType.includes("application/json")) {
               const response = new Response("Content-Type must be application/json", { status: 415 });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Get request body and validate size
@@ -1224,7 +1224,7 @@ export default {
                 max_size_kb: 1,
                 actual_size_kb: Math.round(bodyText.length / 1024)
               }), { status: 413, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Parse and validate body
@@ -1236,7 +1236,7 @@ export default {
                 error: "Validation failed",
                 details: validation.errors
               }), { status: 400, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Get or create property
@@ -1271,14 +1271,14 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("content_create_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
               error: "Internal server error",
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -1304,14 +1304,14 @@ export default {
                 }
               });
               response.headers.set("x-optiview-request-id", crypto.randomUUID());
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             const { project_id, from, to, cursor, limit = "10000" } = Object.fromEntries(url.searchParams);
             if (!project_id) {
               const response = new Response("Missing project_id parameter", { status: 400 });
               response.headers.set("x-optiview-request-id", crypto.randomUUID());
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Validate project access
@@ -1325,7 +1325,7 @@ export default {
             if (!project) {
               const response = new Response("Project not found", { status: 404 });
               response.headers.set("x-optiview-request-id", crypto.randomUUID());
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Parse date range
@@ -1342,7 +1342,7 @@ export default {
               } catch (e) {
                 const response = new Response("Invalid cursor format", { status: 400 });
                 response.headers.set("x-optiview-request-id", crypto.randomUUID());
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
             }
 
@@ -1382,7 +1382,7 @@ export default {
                   "Content-Disposition": `attachment; filename="optiview_events_${new Date(fromTs).toISOString().split('T')[0]}-${new Date(toTs).toISOString().split('T')[0]}.csv"`
                 }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Generate next cursor
@@ -1416,7 +1416,7 @@ export default {
               }
             });
 
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("events_export_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
@@ -1424,7 +1424,7 @@ export default {
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
             response.headers.set("x-optiview-request-id", crypto.randomUUID());
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -1450,14 +1450,14 @@ export default {
                 }
               });
               response.headers.set("x-optiview-request-id", crypto.randomUUID());
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             const { project_id, from, to, cursor, limit = "10000" } = Object.fromEntries(url.searchParams);
             if (!project_id) {
               const response = new Response("Missing project_id parameter", { status: 400 });
               response.headers.set("x-optiview-request-id", crypto.randomUUID());
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Validate project access
@@ -1471,7 +1471,7 @@ export default {
             if (!project) {
               const response = new Response("Project not found", { status: 404 });
               response.headers.set("x-optiview-request-id", crypto.randomUUID());
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Parse date range
@@ -1488,7 +1488,7 @@ export default {
               } catch (e) {
                 const response = new Response("Invalid cursor format", { status: 400 });
                 response.headers.set("x-optiview-request-id", crypto.randomUUID());
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
             }
 
@@ -1527,7 +1527,7 @@ export default {
                   "Content-Disposition": `attachment; filename="optiview_referrals_${new Date(fromTs).toISOString().split('T')[0]}-${new Date(toTs).toISOString().split('T')[0]}.csv"`
                 }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
             // Generate next cursor
@@ -1560,7 +1560,7 @@ export default {
               }
             });
 
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           } catch (e: any) {
             log("referrals_export_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
@@ -1568,7 +1568,7 @@ export default {
               message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
             response.headers.set("x-optiview-request-id", crypto.randomUUID());
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
 
@@ -1581,7 +1581,7 @@ export default {
               const contentType = req.headers.get("content-type") as string;
               if (!contentType || !contentType.includes("application/json")) {
                 const response = new Response("Content-Type must be application/json", { status: 415 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               const body = await req.json() as { email: string };
@@ -1592,7 +1592,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Normalize and validate email
@@ -1602,7 +1602,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Rate limiting by IP
@@ -1625,7 +1625,7 @@ export default {
                     "Retry-After": rateLimitResult.retryAfter?.toString() || "60"
                   }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Rate limiting by email per day
@@ -1647,7 +1647,7 @@ export default {
                     "Retry-After": emailRateLimitResult.retryAfter?.toString() || "86400"
                   }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Get or create user
@@ -1656,7 +1656,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // @ts-ignore - normalizedEmail is checked above
@@ -1700,14 +1700,14 @@ export default {
               const response = new Response(JSON.stringify({ ok: true }), {
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               log("otp_request_error", { error: e.message, stack: e.stack });
               const response = new Response(JSON.stringify({ ok: true }), { // Still no user enumeration
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -1718,7 +1718,7 @@ export default {
               const contentType = req.headers.get("content-type");
               if (!contentType || !contentType.includes("application/json")) {
                 const response = new Response("Content-Type must be application/json", { status: 415 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               const body = await req.json() as { email: string; code: string };
@@ -1729,7 +1729,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Normalize email
@@ -1739,7 +1739,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Find the latest unconsumed code for this email
@@ -1755,7 +1755,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check if code is expired
@@ -1764,7 +1764,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check if code is locked
@@ -1773,7 +1773,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Verify code hash
@@ -1795,7 +1795,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Code is valid - mark as consumed
@@ -1823,7 +1823,7 @@ export default {
                 user_id: user.id
               });
 
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               log("otp_verification_error", { error: e.message, stack: e.stack });
@@ -1831,7 +1831,7 @@ export default {
                 status: 500,
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -1842,7 +1842,7 @@ export default {
               const contentType = req.headers.get("content-type") as string;
               if (!contentType || !contentType.includes("application/json")) {
                 const response = new Response("Content-Type must be application/json", { status: 415 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               const body = await req.json() as { email: string; continue_path?: string };
@@ -1853,7 +1853,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Normalize and validate email
@@ -1863,7 +1863,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Validate continue path
@@ -1889,7 +1889,7 @@ export default {
                     "Retry-After": rateLimitResult.retryAfter?.toString() || "60"
                   }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Rate limiting by email per day
@@ -1911,7 +1911,7 @@ export default {
                     "Retry-After": emailRateLimitResult.retryAfter?.toString() || "86400"
                   }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Get or create user
@@ -1954,14 +1954,14 @@ export default {
               const response = new Response(JSON.stringify({ ok: true }), {
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               log("magic_link_request_error", { error: e.message, stack: e.stack });
               const response = new Response(JSON.stringify({ ok: true }), { // Still no user enumeration
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -1977,7 +1977,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Find the magic link
@@ -1994,7 +1994,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check if link is expired
@@ -2003,7 +2003,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Mark as consumed
@@ -2042,7 +2042,7 @@ export default {
                 error: undefined
               });
 
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               log("magic_link_consumption_error", { error: e.message, stack: e.stack });
@@ -2050,7 +2050,7 @@ export default {
                 status: 500,
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -2070,7 +2070,7 @@ export default {
               });
 
               clearSessionCookie(response);
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               log("logout_error", { error: e.message, stack: e.stack });
@@ -2078,7 +2078,7 @@ export default {
                 status: 500,
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -2095,14 +2095,14 @@ export default {
                 headers: { "Content-Type": "application/json" }
               });
 
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               const response = new Response(JSON.stringify({ error: "Unauthorized" }), {
                 status: 401,
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -2116,7 +2116,7 @@ export default {
               const contentType = req.headers.get("content-type") as string;
               if (!contentType || !contentType.includes("application/json")) {
                 const response = new Response("Content-Type must be application/json", { status: 415 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               const body = await req.json() as { email: string; role?: string; org_id: number };
@@ -2127,7 +2127,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Normalize and validate email
@@ -2137,7 +2137,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Validate role
@@ -2146,7 +2146,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check if user is member of the org
@@ -2159,7 +2159,7 @@ export default {
                   status: 403,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check permissions: owners can invite owners, members can only invite members
@@ -2168,7 +2168,7 @@ export default {
                   status: 403,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check for existing pending invite
@@ -2225,7 +2225,7 @@ export default {
                 }), {
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Create new invite
@@ -2272,7 +2272,7 @@ export default {
               }), {
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               log("invite_error", { error: e.message, stack: e.stack });
@@ -2280,7 +2280,7 @@ export default {
                 status: 500,
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -2295,7 +2295,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Find the invite
@@ -2312,7 +2312,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check if invite is expired
@@ -2321,7 +2321,7 @@ export default {
                   status: 400,
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Mark as accepted
@@ -2358,7 +2358,7 @@ export default {
                 org_id: invite.org_id
               });
 
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               log("invite_acceptance_error", { error: e.message, stack: e.stack });
@@ -2366,7 +2366,7 @@ export default {
                 status: 500,
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
         }
@@ -2392,7 +2392,7 @@ export default {
                     "Retry-After": rateLimitResult.retryAfter?.toString() || "3600"
                   }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check if ADMIN_BOOTSTRAP_EMAIL is configured
@@ -2401,7 +2401,7 @@ export default {
                 const response = new Response(JSON.stringify({
                   error: "Bootstrap not configured"
                 }), { status: 403, headers: { "Content-Type": "application/json" } });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Attempt to bootstrap admin
@@ -2410,7 +2410,7 @@ export default {
                 const response = new Response(JSON.stringify({
                   error: "Admin already exists"
                 }), { status: 409, headers: { "Content-Type": "application/json" } });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               const response = new Response(JSON.stringify({
@@ -2423,7 +2423,7 @@ export default {
               }), {
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               log("admin_bootstrap_error", { error: e.message, stack: e.stack });
@@ -2431,7 +2431,7 @@ export default {
                 error: "Internal server error",
                 message: e.message
               }), { status: 500, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -2463,20 +2463,20 @@ export default {
                 const response = new Response(JSON.stringify(defaultManifest), {
                   headers: { "Content-Type": "application/json" }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               const response = new Response(JSON.stringify(manifest), {
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             } catch (e: any) {
               log("admin_rules_get_error", { error: e.message, stack: e.stack });
               const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
               }), { status: 500, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -2501,14 +2501,14 @@ export default {
                     "Retry-After": rateLimitResult.retryAfter?.toString() || "60"
                   }
                 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               // Check Content-Type
               const contentType = req.headers.get("content-type");
               if (!contentType || !contentType.includes("application/json")) {
                 const response = new Response("Content-Type must be application/json", { status: 415 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
               }
 
               const body = await req.json() as any;
@@ -2552,14 +2552,14 @@ export default {
               const response = new Response(JSON.stringify(mergedManifest), {
                 headers: { "Content-Type": "application/json" }
               });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             } catch (e: any) {
               log("admin_rules_post_error", { error: e.message, stack: e.stack });
               const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
               }), { status: 500, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
 
@@ -2601,14 +2601,14 @@ export default {
                 headers: { "Content-Type": "application/json" }
               });
 
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
 
             } catch (e: any) {
               const response = new Response(JSON.stringify({
                 error: "Unauthorized",
                 message: e.message
               }), { status: 401, headers: { "Content-Type": "application/json" } });
-              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
           }
         }
