@@ -7,6 +7,7 @@ interface ApiKey {
   id: number;
   name: string;
   key_id: string;
+  property_id: number;
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
