@@ -1570,9 +1570,10 @@ export default {
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
           }
         }
+      }
 
-        // 7) Authentication Routes
-        if (url.pathname.startsWith("/auth/")) {
+      // 7) Authentication Routes
+      if (url.pathname.startsWith("/auth/")) {
           // 7.1) Request OTP Code
           if (url.pathname === "/auth/request-code" && req.method === "POST") {
             try {
