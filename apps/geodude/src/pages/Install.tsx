@@ -90,11 +90,8 @@ function InstallVerificationBanner({ properties, apiKeys }: InstallVerificationB
   }
 
   async function verifyAllProperties() {
-    const activeProperties = properties.filter(property => 
-      apiKeys.some(key => key.property_id === property.id && !key.revoked_at)
-    );
-
-    for (const property of activeProperties) {
+    // Since we're not managing API keys here, verify all properties
+    for (const property of properties) {
       await verifyProperty(property.id);
     }
   }
@@ -182,9 +179,12 @@ function InstallVerificationBanner({ properties, apiKeys }: InstallVerificationB
 
       {/* Property Verification Status */}
       <div className="space-y-3">
-        {properties
-          .filter(property => apiKeys.some(key => key.property_id === property.id && !key.revoked_at))
-          .map(property => {
+        {properties.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>No properties found. Create a property first to start tracking.</p>
+          </div>
+        ) : (
+          properties.map(property => {
             const status = getVerificationStatus(property.id);
             const lastEventText = getLastEventText(property.id);
             const data = verificationData[property.id];
@@ -235,7 +235,8 @@ function InstallVerificationBanner({ properties, apiKeys }: InstallVerificationB
                 )}
               </div>
             );
-          })}
+          })
+        )}
       </div>
     </div>
   );
@@ -249,7 +250,7 @@ function TroubleshootingGuide({ properties, apiKeys }: TroubleshootingGuideProps
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   }
 
-  function getTestCurl(propertyId: number, keyId: string) {
+  function getTestCurl(propertyId: number) {
     const timestamp = Math.floor(Date.now() / 1000);
     const body = JSON.stringify({
       project_id: 1, // Placeholder - should come from user context
@@ -266,7 +267,7 @@ body='${body}'
 sig=$(echo -n "\${ts}.\${body}" | openssl dgst -sha256 -hmac "<SECRET>" -binary | base64)
 curl -X POST ${API_BASE}/api/events \\
   -H "content-type: application/json" \\
-  -H "x-optiview-key-id: ${keyId}" \\
+  -H "x-optiview-key-id: <YOUR_KEY_ID>" \\
   -H "x-optiview-timestamp: \$ts" \\
   -H "x-optiview-signature: \$sig" \\
   --data "\$body"`;
@@ -297,23 +298,22 @@ curl -X POST ${API_BASE}/api/events \\
               <p className="text-sm text-gray-700">
                 View your page source and confirm the Optiview script tag is present in the &lt;head&gt; section.
               </p>
-              {properties.length > 0 && apiKeys.length > 0 && (
+              {properties.length > 0 ? (
                 <div className="bg-gray-50 p-3 rounded-md">
                   <div className="text-xs font-mono text-gray-700">
-                    {properties.map(property => {
-                      const key = apiKeys.find(k => k.property_id === property.id && !k.revoked_at);
-                      if (!key) return null;
-                      
-                      return (
-                        <div key={property.id} className="mb-2">
-                          <div className="text-gray-500 mb-1">{property.domain}:</div>
-                          <div className="text-gray-800">
-                            &lt;script async src="{API_BASE}/v1/tag.js?pid={property.id}&amp;kid={key.key_id}"&gt;&lt;/script&gt;
-                          </div>
+                    {properties.map(property => (
+                      <div key={property.id} className="mb-2">
+                        <div className="text-gray-500 mb-1">{property.domain}:</div>
+                        <div className="text-gray-800">
+                          &lt;script async src="{API_BASE}/v1/tag.js?pid={property.id}"&gt;&lt;/script&gt;
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
                   </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 italic">
+                  Create a property first to see installation snippets.
                 </div>
               )}
             </div>
@@ -440,27 +440,16 @@ curl -X POST ${API_BASE}/api/events \\
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
               <p className="text-sm text-gray-700">
-                If you rotated keys, update your tag to use the latest key ID. The secret is only needed for server-side requests.
+                Create and manage your API keys on the dedicated API Keys page.
               </p>
-              {properties.length > 0 && apiKeys.length > 0 && (
-                <div className="bg-gray-50 p-3 rounded-md">
-                  <div className="text-sm text-gray-700">
-                    <strong>Active API Keys:</strong>
-                    <ul className="mt-1 space-y-1">
-                      {properties.map(property => {
-                        const key = apiKeys.find(k => k.property_id === property.id && !k.revoked_at);
-                        if (!key) return null;
-                        
-                        return (
-                          <li key={property.id} className="text-gray-600">
-                            {property.domain}: {key.key_id}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
+              <div className="bg-blue-50 p-3 rounded-md">
+                <div className="text-sm text-blue-800">
+                  <strong>Next step:</strong> 
+                  <a href="/api-keys" className="text-blue-600 hover:text-blue-800 underline ml-1">
+                    Go to API Keys page
+                  </a>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         )}
@@ -483,35 +472,33 @@ curl -X POST ${API_BASE}/api/events \\
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
               <p className="text-sm text-gray-700">
-                Test your API key and secret with this cURL command. Replace &lt;SECRET&gt; with your actual secret.
+                Test your API key and secret with this cURL command. First create an API key on the API Keys page.
               </p>
-              {properties.length > 0 && apiKeys.length > 0 && (
+              {properties.length > 0 ? (
                 <div className="space-y-3">
-                  {properties.map(property => {
-                    const key = apiKeys.find(k => k.property_id === property.id && !k.revoked_at);
-                    if (!key) return null;
-                    
-                    return (
-                      <div key={property.id} className="bg-gray-900 text-green-400 p-3 rounded-md">
-                        <div className="text-xs text-gray-400 mb-2">{property.domain}:</div>
-                        <pre className="text-xs overflow-x-auto whitespace-pre-wrap">
-                          {getTestCurl(property.id, key.key_id)}
-                        </pre>
-                        <button
-                          onClick={() => navigator.clipboard.writeText(getTestCurl(property.id, key.key_id))}
-                          className="mt-2 text-xs text-blue-400 hover:text-blue-400 underline"
-                        >
-                          Copy to clipboard
-                        </button>
+                  {properties.map(property => (
+                    <div key={property.id} className="bg-gray-900 text-green-400 p-3 rounded-md">
+                      <div className="text-xs text-gray-400 mb-2">{property.domain}:</div>
+                      <div className="text-xs text-yellow-400 mb-2">
+                        ⚠️ Create an API key first to get the key_id and secret
                       </div>
-                    );
-                  })}
+                      <pre className="text-xs overflow-x-auto whitespace-pre-wrap">
+                        {getTestCurl(property.id)}
+                      </pre>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 italic">
+                  Create a property first to see test commands.
                 </div>
               )}
-              <div className="bg-yellow-50 p-3 rounded-md">
-                <div className="text-sm text-yellow-800">
-                  <strong>Note:</strong> The secret is only shown when you first create or rotate a key. 
-                  If you can't see it, rotate your key to get a new secret.
+              <div className="bg-blue-50 p-3 rounded-md">
+                <div className="text-sm text-blue-800">
+                  <strong>Next step:</strong> 
+                  <a href="/api-keys" className="text-blue-600 hover:text-blue-800 underline">
+                    Create API keys on the API Keys page
+                  </a>
                 </div>
               </div>
             </div>
@@ -553,13 +540,6 @@ curl -X POST ${API_BASE}/api/events \\
 
 export default function Install() {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [newKey, setNewKey] = useState({ 
-    project_id: "1", 
-    property_id: "", 
-    name: "" 
-  });
   const [newProperty, setNewProperty] = useState({ 
     project_id: "1", 
     domain: "" 
@@ -567,7 +547,6 @@ export default function Install() {
 
   useEffect(() => {
     loadProperties();
-    loadApiKeys();
   }, []);
 
   async function loadProperties() {
@@ -587,63 +566,6 @@ export default function Install() {
       }
     } catch (error) {
       console.error("Error loading properties:", error);
-    }
-  }
-
-  async function loadApiKeys() {
-    try {
-      const response = await fetch(`${API_BASE}/api/keys?project_id=1`, FETCH_OPTS);
-      if (response.ok) {
-        const data = await response.json();
-        setApiKeys(data.keys || []);
-      }
-    } catch (error) {
-      console.error("Error loading API keys:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function createApiKey() {
-    if (!newKey.project_id || !newKey.property_id || !newKey.name) return;
-    
-    try {
-      const response = await fetch(`${API_BASE}/api/keys`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newKey)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        alert(`API Key created! Key ID: ${data.key_id}\nSecret: ${data.secret_once}\n\n⚠️ Store this secret securely - it won't be shown again!`);
-        setNewKey({ project_id: "1", property_id: "", name: "" });
-        await loadApiKeys();
-      } else {
-        console.error("Failed to create API key");
-      }
-    } catch (error) {
-      console.error("Error creating API key:", error);
-    }
-  }
-
-  async function revokeApiKey(keyId: string) {
-    if (!confirm("Are you sure you want to revoke this API key? This action cannot be undone.")) return;
-    
-    try {
-      const response = await fetch(`${API_BASE}/api/keys/${keyId}/revoke`, {
-        method: "POST",
-        credentials: "include"
-      });
-      
-      if (response.ok) {
-        await loadApiKeys();
-      } else {
-        console.error("Failed to revoke API key");
-      }
-    } catch (error) {
-      console.error("Error revoking API key:", error);
     }
   }
 
@@ -674,15 +596,15 @@ export default function Install() {
     }
   }
 
-  function getInstallationSnippet(propertyId: string, keyId: string) {
-    return `<script async src="https://app.optiview.io/v1/tag.js?pid=${propertyId}&kid=${keyId}"></script>`;
+  function getInstallationSnippet(propertyId: string) {
+    return `<script async src="https://app.optiview.io/v1/tag.js?pid=${propertyId}"></script>`;
   }
 
-  function getGtmTemplate(propertyId: string, keyId: string) {
+  function getGtmTemplate(propertyId: string) {
     return `{
   "name": "Optiview Analytics",
   "type": "html",
-  "code": "<script async src=\\"https://app.optiview.io/v1/tag.js?pid=${propertyId}&kid=${keyId}\\"></script>"
+  "code": "<script async src=\\"https://app.optiview.io/v1/tag.js?pid=${propertyId}\\"></script>"
 }`;
   }
 
@@ -731,71 +653,17 @@ export default function Install() {
         {/* API Keys Management */}
         <Card title="API Keys">
           <div className="space-y-4">
-            <div className="grid md:grid-cols-3 gap-4">
-              <select
-                value={newKey.property_id}
-                onChange={(e) => setNewKey({ ...newKey, property_id: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            <div className="text-center py-8">
+              <p className="text-gray-500 mb-4">
+                Create and manage your API keys on the dedicated API Keys page.
+              </p>
+              <a
+                href="/api-keys"
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
-                <option value="">Select Property</option>
-                {properties.map((property) => (
-                  <option key={property.id} value={property.id}>
-                    {property.domain}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={newKey.name}
-                onChange={(e) => setNewKey({ ...newKey, name: e.target.value })}
-                placeholder="Key name (e.g., Production)"
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <button
-                onClick={createApiKey}
-                disabled={!newKey.property_id || !newKey.name}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-              >
-                Create API Key
-              </button>
+                Manage API Keys
+              </a>
             </div>
-            
-            {loading ? (
-              <div className="text-center py-4 text-gray-500">Loading API keys...</div>
-            ) : apiKeys.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">No API keys found. Create your first key above.</div>
-            ) : (
-              <div className="space-y-3">
-                <h4 className="font-medium text-slate-700">Your API Keys:</h4>
-                {apiKeys.map((key) => (
-                  <div key={key.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{key.name}</span>
-                        {key.revoked_at && (
-                          <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Revoked</span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <span className="font-mono">{key.key_id}</span> • {key.property_domain}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Created: {new Date(key.created_at).toLocaleDateString()}
-                        {key.last_used_at && ` • Last used: ${new Date(key.last_used_at).toLocaleDateString()}`}
-                      </div>
-                    </div>
-                    {!key.revoked_at && (
-                      <button
-                        onClick={() => revokeApiKey(key.key_id)}
-                        className="px-3 py-1 text-sm text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                      >
-                        Revoke
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </Card>
 
@@ -807,31 +675,26 @@ export default function Install() {
               <p className="text-sm text-gray-600 mb-3">
                 Add this script tag to your website's &lt;head&gt; section. It will automatically track page views and AI traffic.
               </p>
-              {properties.length > 0 && apiKeys.length > 0 ? (
+              {properties.length > 0 ? (
                 <div className="space-y-3">
-                  {properties.map((property) => {
-                    const key = apiKeys.find(k => k.property_id === property.id && !k.revoked_at);
-                    if (!key) return null;
-                    
-                    return (
-                      <div key={property.id} className="space-y-2">
-                        <div className="text-sm font-medium text-slate-600">{property.domain}:</div>
-                        <div className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
-                          {getInstallationSnippet(property.id.toString(), key.key_id)}
-                        </div>
-                        <button
-                          onClick={() => navigator.clipboard.writeText(getInstallationSnippet(property.id.toString(), key.key_id))}
-                          className="text-xs text-blue-600 hover:text-blue-800 focus:outline-none"
-                        >
-                          Copy to clipboard
-                        </button>
+                  {properties.map((property) => (
+                    <div key={property.id} className="space-y-2">
+                      <div className="text-sm font-medium text-slate-600">{property.domain}:</div>
+                      <div className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
+                        {getInstallationSnippet(property.id.toString())}
                       </div>
-                    );
-                  })}
+                      <button
+                        onClick={() => navigator.clipboard.writeText(getInstallationSnippet(property.id.toString()))}
+                        className="text-xs text-blue-600 hover:text-blue-800 focus:outline-none"
+                      >
+                        Copy to clipboard
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-sm text-gray-500 italic">
-                  Create a property and API key first to see installation snippets.
+                  Create a property first to see installation snippets.
                 </div>
               )}
             </div>
@@ -841,31 +704,26 @@ export default function Install() {
               <p className="text-sm text-gray-600 mb-3">
                 If you use GTM, create a new HTML tag with this template:
               </p>
-              {properties.length > 0 && apiKeys.length > 0 ? (
+              {properties.length > 0 ? (
                 <div className="space-y-3">
-                  {properties.map((property) => {
-                    const key = apiKeys.find(k => k.property_id === property.id && !k.revoked_at);
-                    if (!key) return null;
-                    
-                    return (
-                      <div key={property.id} className="space-y-2">
-                        <div className="text-sm font-medium text-slate-600">{property.domain}:</div>
-                        <div className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
-                          {getGtmTemplate(property.id.toString(), key.key_id)}
-                        </div>
-                        <button
-                          onClick={() => navigator.clipboard.writeText(getGtmTemplate(property.id.toString(), key.key_id))}
-                          className="text-xs text-blue-600 hover:text-blue-800 focus:outline-none"
-                        >
-                          Copy to clipboard
-                        </button>
+                  {properties.map((property) => (
+                    <div key={property.id} className="space-y-2">
+                      <div className="text-sm font-medium text-slate-600">{property.domain}:</div>
+                      <div className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
+                        {getGtmTemplate(property.id.toString())}
                       </div>
-                    );
-                  })}
+                      <button
+                        onClick={() => navigator.clipboard.writeText(getGtmTemplate(property.id.toString()))}
+                        className="text-xs text-blue-600 hover:text-blue-800 focus:outline-none"
+                      >
+                        Copy to clipboard
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-sm text-gray-500 italic">
-                  Create a property and API key first to see GTM templates.
+                  Create a property first to see GTM templates.
                 </div>
               )}
             </div>
@@ -911,11 +769,11 @@ export default function Install() {
         </Card>
 
         {/* Installation Verification Banner */}
-        {properties.length > 0 && apiKeys.length > 0 && (
+        {properties.length > 0 && (
           <Card title="Installation Status">
             <InstallVerificationBanner 
               properties={properties}
-              apiKeys={apiKeys}
+              apiKeys={[]} // Pass an empty array as apiKeys is removed
             />
           </Card>
         )}
@@ -924,7 +782,7 @@ export default function Install() {
         <Card title="Troubleshooting">
           <TroubleshootingGuide 
             properties={properties}
-            apiKeys={apiKeys}
+            apiKeys={[]} // Pass an empty array as apiKeys is removed
           />
         </Card>
       </div>
