@@ -32,6 +32,19 @@ export default {
         return addCorsHeaders(response);
       }
 
+      // 1.5) Admin health check
+      if (url.pathname === "/admin/health") {
+        const response = new Response(JSON.stringify({
+          status: "healthy",
+          timestamp: new Date().toISOString(),
+          version: "1.0.0"
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
       // 2) Simple auth endpoint for testing
       if (url.pathname === "/auth/request-code" && request.method === "POST") {
         try {
