@@ -200,7 +200,65 @@ export default {
         return attach(addCorsHeaders(resp));
       } catch (e: any) {
         const response = new Response(`bad token or dest: ${e?.message ?? ""}`, { status: 400 });
-        return addCorsHeaders(response);
+        return attach(addCorsHeaders(response));
+      }
+    }
+
+    // 2.5) Direct PID redirector: /p/:pid (for testing without tokens)
+    if (url.pathname.startsWith("/p/")) {
+      const pid = url.pathname.split("/").pop()!;
+      try {
+        // For direct PID access, we'll use the system org/project as default
+        const org_id = "org_system";
+        const project_id = "prj_system";
+        const kvKey = `${org_id}:${project_id}:${pid}`;
+        
+        const destUrl = await env.DEST_MAP.get(kvKey);
+        if (!destUrl) {
+          const response = new Response(`PID not found: ${pid}`, { status: 404 });
+          return attach(addCorsHeaders(response));
+        }
+
+        // session + ai_ref cookies
+        const headers = new Headers();
+        const sid = getOrSetSession(req, headers);
+        headers.append("Set-Cookie", `ai_ref=1; Path=/; Max-Age=${14 * 86400}; SameSite=Lax`);
+
+        // append UTMs
+        const dest = new URL(destUrl);
+        ensureUTMs(dest, "direct", pid);
+
+        // background click logging (faster redirects)
+        const clickData = {
+          ts: Date.now(),
+          src: "direct",
+          model: null,
+          pid: pid,
+          geo: null,
+          ua: req.headers.get("user-agent"),
+          ip: req.headers.get("cf-connecting-ip"),
+          asn: (req as any).cf?.asn ? String((req as any).cf.asn) : null,
+          dest: dest.toString(),
+          session_id: sid,
+          org_id: org_id,
+          project_id: project_id
+        };
+        ctx.waitUntil(insertClick(env.GEO_DB, clickData));
+
+        // Create redirect response with headers
+        const resp = new Response(null, {
+          status: 302,
+          headers: {
+            "Location": dest.toString(),
+            ...Object.fromEntries(headers.entries())
+          }
+        });
+
+        log("direct_redirect", { pid: pid, dest: dest.toString() });
+        return attach(addCorsHeaders(resp));
+      } catch (e: any) {
+        const response = new Response(`redirect error: ${e?.message ?? ""}`, { status: 500 });
+        return attach(addCorsHeaders(response));
       }
     }
 
