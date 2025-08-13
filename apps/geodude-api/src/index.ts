@@ -11,7 +11,7 @@ function getCookie(req: Request, name: string) {
 function b64url(buf: ArrayBuffer) {
   const uint8Array = new Uint8Array(buf);
   const b = String.fromCharCode(...Array.from(uint8Array));
-  return btoa(b).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  return btoa(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 async function sha256b64url(s: string) {
@@ -21,14 +21,14 @@ async function sha256b64url(s: string) {
 }
 
 function rawKey(): string {
-  const a = new Uint8Array(24); 
+  const a = new Uint8Array(24);
   crypto.getRandomValues(a);
   return "ok_" + b64url(a.buffer); // ok_ = optiview key
 }
 
 function authzBearer(req: Request) {
   const a = req.headers.get("authorization") || "";
-  const m = a.match(/^Bearer\s+(.+)$/i); 
+  const m = a.match(/^Bearer\s+(.+)$/i);
   return m?.[1] || null;
 }
 
@@ -44,11 +44,11 @@ async function sessionUserId(env: Env, req: Request) {
 
 async function requireOrgMember(env: Env, req: Request, org_id: string) {
   const uid = await sessionUserId(env, req);
-  if (!uid) throw new Response("unauthorized", { status: 401 });
+  if (!uid) throw new Error("unauthorized");
   const ok = await env.GEO_DB.prepare(
     "SELECT 1 FROM org_member WHERE org_id=?1 AND user_id=?2 LIMIT 1"
   ).bind(org_id, uid).first<any>();
-  if (!ok) throw new Response("forbidden", { status: 403 });
+  if (!ok) throw new Error("forbidden");
   return { user_id: uid };
 }
 
@@ -104,36 +104,35 @@ function addCorsHeaders(response: Response): Response {
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const rid = crypto.randomUUID();
-    
-    function attach(obsResp: Response) { 
-      obsResp.headers.set("x-request-id", rid); 
-      return obsResp; 
+
+    function attach(obsResp: Response) {
+      obsResp.headers.set("x-request-id", rid);
+      return obsResp;
     }
-    
+
     function log(event: string, extra: Record<string, any> = {}) {
       console.log(JSON.stringify({ rid, event, ...extra }));
     }
-    
-    log("request_start", { 
-      method: req.method, 
-      path: req.url, 
-      userAgent: req.headers.get("user-agent")?.substring(0, 100) 
+
+    log("request_start", {
+      method: req.method,
+      path: req.url,
+      userAgent: req.headers.get("user-agent")?.substring(0, 100)
     });
-    
+
     const url = new URL(req.url);
 
-    // Health check endpoints
-    if (url.pathname === "/health" && req.method === "GET") {
-      return new Response("OK", { status: 200 });
-    }
+
 
     if (url.pathname === "/ready" && req.method === "GET") {
       try {
         // Basic DB connectivity check
         await env.GEO_DB.prepare("SELECT 1").first();
-        return new Response("OK", { status: 200 });
+        log("ready_check", { status: "ok" });
+        return attach(new Response("OK", { status: 200 }));
       } catch (e) {
-        return new Response("Service Unavailable", { status: 503 });
+        log("ready_check", { status: "error", error: e instanceof Error ? e.message : String(e) });
+        return attach(new Response("Service Unavailable", { status: 503 }));
       }
     }
 
@@ -151,7 +150,8 @@ export default {
     // 1) Health
     if (url.pathname === "/health") {
       const response = new Response("ok", { status: 200 });
-      return addCorsHeaders(response);
+      log("health_check", { status: "ok" });
+      return attach(addCorsHeaders(response));
     }
 
     // 2) Tokenized redirector: /r/:token
@@ -195,7 +195,7 @@ export default {
             ...Object.fromEntries(headers.entries())
           }
         });
-        
+
         log("redirect", { pid: payload.pid, dest: dest.toString(), src: payload.src, model: payload.model });
         return attach(addCorsHeaders(resp));
       } catch (e: any) {
@@ -285,7 +285,7 @@ export default {
         crawler_visits: crawls?.c ?? 0,
         citations: cites?.c ?? 0
       });
-      
+
       log("overview", { clicks: clicks?.c ?? 0, conversions: convs?.c ?? 0, crawler_visits: crawls?.c ?? 0, citations: cites?.c ?? 0 });
       return attach(addCorsHeaders(response));
     }
@@ -374,7 +374,7 @@ export default {
         const pid = url.searchParams.get("pid");
         const org_id = url.searchParams.get("org_id") || "org_system";
         const project_id = url.searchParams.get("project_id") || "prj_system";
-        
+
         if (!pid) {
           const response = new Response("bad request", { status: 400 });
           return addCorsHeaders(response);
@@ -685,7 +685,7 @@ export default {
           const response = new Response("bad request", { status: 400 });
           return addCorsHeaders(response);
         }
-        
+
         // look up org of project
         const prj = await env.GEO_DB.prepare(
           "SELECT org_id FROM project WHERE id=?1"
@@ -694,17 +694,17 @@ export default {
           const response = new Response("not found", { status: 404 });
           return addCorsHeaders(response);
         }
-        
+
         await requireOrgMember(env, req, prj.org_id);
 
         const raw = rawKey();
         const hash = await sha256b64url(raw);
         const id = "key_" + crypto.randomUUID();
-        
+
         await env.GEO_DB.prepare(
           "INSERT INTO api_key(id, project_id, name, hash, created_ts) VALUES (?1, ?2, ?3, ?4, ?5)"
         ).bind(id, project_id, name, hash, Date.now()).run();
-        
+
         const response = Response.json({ id, name, project_id, raw }, { status: 201 }); // show raw once
         return addCorsHeaders(response);
       } catch (e: any) {
@@ -722,13 +722,13 @@ export default {
           const response = new Response("not found", { status: 404 });
           return addCorsHeaders(response);
         }
-        
+
         await requireOrgMember(env, req, prj.org_id);
 
         const rows = await env.GEO_DB.prepare(
           "SELECT id, name, created_ts, last_used_ts, revoked_ts FROM api_key WHERE project_id=?1 ORDER BY created_ts DESC"
         ).bind(project_id).all<any>();
-        
+
         const response = Response.json({ items: rows.results ?? [] });
         return addCorsHeaders(response);
       } catch (e: any) {
@@ -748,15 +748,15 @@ export default {
           const response = new Response("not found", { status: 404 });
           return addCorsHeaders(response);
         }
-        
+
         const prj = await env.GEO_DB.prepare(
           "SELECT org_id FROM project WHERE id=?1"
         ).bind(keyRow.project_id).first<any>();
-        
+
         await requireOrgMember(env, req, prj.org_id);
-        
+
         await env.GEO_DB.prepare("UPDATE api_key SET revoked_ts=?1 WHERE id=?2").bind(Date.now(), id).run();
-        
+
         const response = Response.json({ ok: true });
         return addCorsHeaders(response);
       } catch (e: any) {
@@ -774,12 +774,12 @@ export default {
           const response = new Response("missing auth", { status: 401 });
           return addCorsHeaders(response);
         }
-        
+
         const hash = await sha256b64url(raw);
         const key = await env.GEO_DB.prepare(
           "SELECT project_id, revoked_ts FROM api_key WHERE hash=?1 LIMIT 1"
         ).bind(hash).first<any>();
-        
+
         if (!key || key.revoked_ts) {
           const response = new Response("forbidden", { status: 403 });
           return addCorsHeaders(response);
@@ -802,7 +802,7 @@ export default {
         ).bind(Date.now(), (body as any).session_id ?? null, String(type), Number(value_cents ?? 0), JSON.stringify(meta ?? {}), prj.org_id, key.project_id).run();
 
         await env.GEO_DB.prepare("UPDATE api_key SET last_used_ts=?1 WHERE hash=?2").bind(Date.now(), hash).run();
-        
+
         const response = Response.json({ ok: true });
         return addCorsHeaders(response);
       } catch (e: any) {
