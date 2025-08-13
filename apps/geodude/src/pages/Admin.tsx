@@ -24,7 +24,7 @@ export default function Admin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tokenData)
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setGeneratedToken(data.token);
@@ -56,11 +56,11 @@ export default function Admin() {
                   value={adminToken}
                   onChange={(e) => setAdminToken(e.target.value)}
                   placeholder="Bearer token"
+                  autoComplete="new-password"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  style={{ backgroundColor: 'white', color: '#374151' }}
                 />
               </div>
-              <button 
+              <button
                 type="submit"
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
@@ -78,22 +78,21 @@ export default function Admin() {
                 <input
                   type="password"
                   value={tokenData.adminToken}
-                  onChange={(e) => setTokenData({...tokenData, adminToken: e.target.value})}
+                  onChange={(e) => setTokenData({ ...tokenData, adminToken: e.target.value })}
                   placeholder="Bearer token"
+                  autoComplete="new-password"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  style={{ backgroundColor: 'white', color: '#374151' }}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Source
                 </label>
                 <select
                   value={tokenData.src}
-                  onChange={(e) => setTokenData({...tokenData, src: e.target.value})}
+                  onChange={(e) => setTokenData({ ...tokenData, src: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  style={{ backgroundColor: 'white', color: '#374151' }}
                 >
                   <option value="chatgpt">chatgpt</option>
                   <option value="perplexity">perplexity</option>
@@ -109,10 +108,10 @@ export default function Admin() {
                 <input
                   type="text"
                   value={tokenData.model}
-                  onChange={(e) => setTokenData({...tokenData, model: e.target.value})}
+                  onChange={(e) => setTokenData({ ...tokenData, model: e.target.value })}
                   placeholder="gpt-4, claude-3, etc."
+                  autoComplete="off"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  style={{ backgroundColor: 'white', color: '#374151' }}
                 />
               </div>
 
@@ -123,9 +122,10 @@ export default function Admin() {
                 <input
                   type="text"
                   value={tokenData.pid}
-                  onChange={(e) => setTokenData({...tokenData, pid: e.target.value})}
+                  onChange={(e) => setTokenData({ ...tokenData, pid: e.target.value })}
                   placeholder="pricing_faq_us"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                 />
               </div>
 
@@ -136,9 +136,10 @@ export default function Admin() {
                 <input
                   type="text"
                   value={tokenData.geo}
-                  onChange={(e) => setTokenData({...tokenData, geo: e.target.value})}
+                  onChange={(e) => setTokenData({ ...tokenData, geo: e.target.value })}
                   placeholder="us, eu, asia"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                 />
               </div>
 
@@ -149,8 +150,9 @@ export default function Admin() {
                 <input
                   type="number"
                   value={tokenData.ttl}
-                  onChange={(e) => setTokenData({...tokenData, ttl: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  onChange={(e) => setTokenData({ ...tokenData, ttl: e.target.value })}
+                  autoComplete="off"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                 />
               </div>
 
