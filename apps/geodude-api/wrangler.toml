@@ -6,7 +6,7 @@ logpush = false
 # ----- Local defaults (used by `wrangler dev`) -----
 [vars]
 # Local Pages dev usually runs on 127.0.0.1:8788
-CANONICAL_BASE = "http://127.0.0.1:8788"
+# CANONICAL_BASE = "http://127.0.0.1:8788"  # Commented out to avoid overriding production env vars
 
 # ----- Bindings -----
 # D1
@@ -29,7 +29,7 @@ preview_id = "6b21fea06a194549a3fe650020e63f24"
 
 # ----- Cloudflare "dev/staging" env -----
 [env.dev.vars]
-CANONICAL_BASE = "https://geodude.pages.dev"
+# CANONICAL_BASE = "https://geodude.pages.dev"  # Using production env var instead
 
 # ----- Production env -----
 [env.production.vars]

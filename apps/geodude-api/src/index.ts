@@ -303,7 +303,8 @@ export default {
             JSON.stringify({ type:"fact", entity:"site", property:"product", value:"geodude" })
           ].join("\n") + "\n";
           const h = new Headers({ "content-type":"application/x-ndjson" });
-          h.set("X-AI-Signature", await sign(body, env.AI_FEED_SIGNING_KEY));
+          const signature = await sign(body, env.AI_FEED_SIGNING_KEY);
+          h.set("X-AI-Signature", signature);
           const response = new Response(body, { headers: h });
           return addCorsHeaders(response);
         }
@@ -313,7 +314,8 @@ export default {
             JSON.stringify({ type:"faq", q:"What is geodude?", a:"AI referral tracking and GEO toolkit.", canonical:"https://geodude.pages.dev" })
           ].join("\n") + "\n";
           const h = new Headers({ "content-type":"application/x-ndjson" });
-          h.set("X-AI-Signature", await sign(body, env.AI_FEED_SIGNING_KEY));
+          const signature = await sign(body, env.AI_FEED_SIGNING_KEY);
+          h.set("X-AI-Signature", signature);
           const response = new Response(body, { headers: h });
           return addCorsHeaders(response);
         }
