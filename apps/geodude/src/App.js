@@ -5,7 +5,8 @@ import Content from "./pages/Content";
 import Events from "./pages/Events";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
+import AdminHealth from "./pages/AdminHealth";
 function App() {
-    return (_jsx(Router, { children: _jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Events, {}) }), _jsx(Route, { path: "/sources", element: _jsx(Sources, {}) }), _jsx(Route, { path: "/content", element: _jsx(Content, {}) }), _jsx(Route, { path: "/events", element: _jsx(Events, {}) }), _jsx(Route, { path: "/install", element: _jsx(Install, {}) }), _jsx(Route, { path: "/settings", element: _jsx(Settings, {}) })] }) }));
+    return (_jsx(Router, { children: _jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Events, {}) }), _jsx(Route, { path: "/sources", element: _jsx(Sources, {}) }), _jsx(Route, { path: "/content", element: _jsx(Content, {}) }), _jsx(Route, { path: "/events", element: _jsx(Events, {}) }), _jsx(Route, { path: "/install", element: _jsx(Install, {}) }), _jsx(Route, { path: "/settings", element: _jsx(Settings, {}) }), _jsx(Route, { path: "/admin/health", element: _jsx(AdminHealth, {}) })] }) }));
 }
 export default App;

@@ -8,6 +8,7 @@ export default function Shell({ children }) {
         { name: "Content", href: "/content" },
         { name: "Install", href: "/install" },
         { name: "Settings", href: "/settings" },
+        { name: "Health", href: "/admin/health" },
     ];
     return (_jsxs("div", { className: "min-h-screen bg-gray-50", children: [_jsx("nav", { className: "bg-white shadow-sm border-b border-gray-200", children: _jsx("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8", children: _jsxs("div", { className: "flex justify-between h-16", children: [_jsxs("div", { className: "flex", children: [_jsx("div", { className: "flex-shrink-0 flex items-center", children: _jsx(Link, { to: "/", className: "text-xl font-bold text-blue-600", children: "Optiview" }) }), _jsx("div", { className: "hidden sm:ml-6 sm:flex sm:space-x-8", children: navigation.map((item) => {
                                             const isActive = location.pathname === item.href;

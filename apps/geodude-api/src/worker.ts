@@ -5,6 +5,8 @@ import { hashString, verifyHmac, isWithinSkew } from "./utils";
 import { createRateLimiter } from "./rate-limiter";
 import { validateRequestBody } from "./schema-validator";
 import { addSecurityHeaders, addBasicSecurityHeaders, getSecurityHeadersConfig } from "./security-headers";
+import { MetricsManager, ErrorCode } from "./metrics";
+import { SlackAlerts } from "./alerts";
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -16,10 +18,25 @@ export default {
     const corsConfig = getCorsConfig(env);
     const securityConfig = getSecurityHeadersConfig(env);
 
+    // Initialize metrics and alerts
+    const metrics = MetricsManager.getInstance();
+    const alerts = SlackAlerts.getInstance(SlackAlerts.getConfig(env));
+
     // Add CORS headers to all responses
     const attach = (resp: Response) => {
       // Add any additional headers here if needed
       return resp;
+    };
+
+    // Helper function to record metrics consistently
+    const recordMetrics = (keyId: string | undefined, projectId: number | undefined, latencyMs: number, ok: boolean, error?: ErrorCode) => {
+      metrics.record({
+        keyId,
+        projectId,
+        latencyMs,
+        ok,
+        error
+      });
     };
 
     // 1) Health check
@@ -27,20 +44,46 @@ export default {
       return new Response("ok", { status: 200 });
     }
 
-    // 2) Admin health check
+    // 2) Admin health check (enhanced with metrics)
     if (url.pathname === "/admin/health") {
       try {
-        // Test D1 connectivity
-        const d1Test = await env.OPTIVIEW_DB.prepare("SELECT 1 as test").first();
+        // Test D1 connectivity with timeout
+        const d1Promise = env.OPTIVIEW_DB.prepare("SELECT 1 as test").first();
+        const d1Timeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("D1 timeout")), 500)
+        );
+        const d1Test = await Promise.race([d1Promise, d1Timeout]);
 
-        // Test KV connectivity
-        const kvTest = await env.AI_FINGERPRINTS.get("ua:list", "json");
+        // Test KV connectivity with timeout
+        const kvPromise = env.AI_FINGERPRINTS.get("cron:last_run_ts", "json");
+        const kvTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("KV timeout")), 500)
+        );
+        const kvTest = await Promise.race([kvPromise, kvTimeout]);
+
+        // Get last cron timestamp
+        const lastCronTs = await env.AI_FINGERPRINTS.get("cron:last_run_ts", "text");
+
+        // Get metrics snapshot
+        const metricsSnapshot = metrics.snapshot5m();
+
+        // Check SLO breaches and send alerts
+        await alerts.checkSLOBreaches(metricsSnapshot);
+        await alerts.checkCronFailure(lastCronTs ? parseInt(lastCronTs) : null);
 
         const health = {
-          status: "healthy",
-          timestamp: Date.now(),
-          d1: d1Test ? "connected" : "error",
-          kv: kvTest ? "connected" : "error"
+          kv_ok: !!kvTest,
+          d1_ok: !!d1Test,
+          last_cron_ts: lastCronTs ? new Date(parseInt(lastCronTs)).toISOString() : null,
+          ingest: {
+            total_5m: metricsSnapshot.total,
+            error_rate_5m: metricsSnapshot.errorRate,
+            p50_ms_5m: Math.round(metricsSnapshot.p50),
+            p95_ms_5m: Math.round(metricsSnapshot.p95),
+            by_error_5m: metricsSnapshot.byError,
+            top_error_keys_5m: metricsSnapshot.topErrorKeys,
+            top_error_projects_5m: metricsSnapshot.topErrorProjects
+          }
         };
 
         const response = new Response(JSON.stringify(health), {
@@ -280,11 +323,16 @@ export default {
 
       // 6.2) Events API (now with HMAC auth + rate limiting + schema validation)
       if (url.pathname === "/api/events" && req.method === "POST") {
+        const startTime = Date.now();
+        const requestId = crypto.randomUUID();
+        
         try {
           // Check Content-Type
           const contentType = req.headers.get("content-type");
           if (!contentType || !contentType.includes("application/json")) {
             const response = new Response("Content-Type must be application/json", { status: 415 });
+            response.headers.set("x-optiview-request-id", requestId);
+            recordMetrics(undefined, undefined, Date.now() - startTime, false, ErrorCode.CONTENT_TYPE_INVALID);
             return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
@@ -292,6 +340,12 @@ export default {
           const authResult = await authenticateRequest(req, env);
           if (!authResult.valid) {
             const response = new Response(authResult.error, { status: 401 });
+            response.headers.set("x-optiview-request-id", requestId);
+            // Map auth errors to appropriate error codes
+            const errorCode = authResult.error?.includes("signature") ? ErrorCode.HMAC_FAILED : 
+                            authResult.error?.includes("timestamp") ? ErrorCode.REPLAY : 
+                            ErrorCode.UNKNOWN;
+            recordMetrics(undefined, undefined, Date.now() - startTime, false, errorCode);
             return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
@@ -308,6 +362,8 @@ export default {
                 "Retry-After": rateLimitResult.retryAfter?.toString() || "5"
               }
             });
+            response.headers.set("x-optiview-request-id", requestId);
+            recordMetrics(authResult.keyId, undefined, Date.now() - startTime, false, ErrorCode.RATE_LIMITED);
             return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
@@ -343,6 +399,8 @@ export default {
                 error: "Origin not allowed",
                 reason: corsCheck.reason
               }), { status: 403, headers: { "Content-Type": "application/json" } });
+              response.headers.set("x-optiview-request-id", requestId);
+              recordMetrics(authResult.keyId, body.project_id, Date.now() - startTime, false, ErrorCode.ORIGIN_DENIED);
               return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
             }
           }
@@ -368,6 +426,9 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
+          
+          // Add request ID header
+          response.headers.set("x-optiview-request-id", requestId);
 
           // Add trace header if xray is enabled
           if (body.property_id) {
@@ -380,6 +441,9 @@ export default {
             }
           }
 
+          // Record successful request
+          recordMetrics(authResult.keyId, validation.sanitizedData.project_id, Date.now() - startTime, true);
+          
           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin || undefined)));
         } catch (e: any) {
           log("events_create_error", { error: e.message, stack: e.stack });
@@ -387,6 +451,8 @@ export default {
             error: "Internal server error",
             message: e.message
           }), { status: 500, headers: { "Content-Type": "application/json" } });
+          response.headers.set("x-optiview-request-id", requestId);
+          recordMetrics(undefined, undefined, Date.now() - startTime, false, ErrorCode.UNKNOWN);
           return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
@@ -462,6 +528,46 @@ export default {
           return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("events_summary_error", { error: e.message, stack: e.stack });
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        }
+      }
+
+      // 6.3.5) Project-scoped Error Summary API
+      if (url.pathname === "/api/events/errors/summary" && req.method === "GET") {
+        try {
+          const { project_id } = Object.fromEntries(url.searchParams);
+          if (!project_id) {
+            const response = new Response(JSON.stringify({
+              error: "Missing project_id parameter"
+            }), { status: 400, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // For v1, return global error summary since project-specific metrics aren't fully implemented yet
+          // TODO: Enhance metrics.record() to track project_id for all requests
+          const metricsSnapshot = metrics.snapshot5m();
+          
+          const errorSummary = {
+            project_id: parseInt(project_id),
+            total_errors_5m: Object.values(metricsSnapshot.byError).reduce((sum, count) => sum + count, 0),
+            by_error_5m: metricsSnapshot.byError,
+            top_error_keys_5m: metricsSnapshot.topErrorKeys,
+            note: "Global error summary (project-specific filtering coming in v2)"
+          };
+
+          const response = new Response(JSON.stringify(errorSummary), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "public, max-age=60" // 1 min cache for error data
+            }
+          });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        } catch (e: any) {
+          log("error_summary_error", { error: e.message, stack: e.stack });
           const response = new Response(JSON.stringify({
             error: "Internal server error",
             message: e.message
@@ -721,6 +827,10 @@ export default {
     if (event.cron === "*/30 * * * *") {
       try {
         await refreshFingerprints(env);
+        
+        // Store last run timestamp in KV for health monitoring
+        await env.AI_FINGERPRINTS.put("cron:last_run_ts", Date.now().toString());
+        
         log("fingerprints_refreshed", { timestamp: Date.now() });
       } catch (error) {
         log("fingerprints_refresh_error", {
@@ -846,7 +956,7 @@ async function authenticateRequest(req: Request, env: Env): Promise<{ valid: boo
 // Generate JS tag for customer installation
 function generateJSTag(projectId: number, propertyId: string, keyId: string): string {
   const baseUrl = "https://api.optiview.ai";
-  
+
   return `
 // Optiview Analytics Tag v1.0
 !function(){

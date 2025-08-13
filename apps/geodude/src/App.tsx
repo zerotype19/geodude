@@ -4,6 +4,7 @@ import Content from "./pages/Content";
 import Events from "./pages/Events";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
+import AdminHealth from "./pages/AdminHealth";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/events" element={<Events />} />
         <Route path="/install" element={<Install />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/admin/health" element={<AdminHealth />} />
       </Routes>
     </Router>
   );
