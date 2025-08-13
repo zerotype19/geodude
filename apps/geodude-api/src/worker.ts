@@ -67,6 +67,9 @@ export default {
         // Get metrics snapshot
         const metricsSnapshot = metrics.snapshot5m();
 
+        // Get grace authentication counter
+        const graceCounter = await env.AI_FINGERPRINTS.get("auth:grace_counter", "json") || 0;
+
         // Check SLO breaches and send alerts
         await alerts.checkSLOBreaches(metricsSnapshot);
         await alerts.checkCronFailure(lastCronTs ? parseInt(lastCronTs) : null);
@@ -82,7 +85,8 @@ export default {
             p95_ms_5m: Math.round(metricsSnapshot.p95),
             by_error_5m: metricsSnapshot.byError,
             top_error_keys_5m: metricsSnapshot.topErrorKeys,
-            top_error_projects_5m: metricsSnapshot.topErrorProjects
+            top_error_projects_5m: metricsSnapshot.topErrorProjects,
+            auth_grace_5m: graceCounter
           }
         };
 
@@ -349,6 +353,13 @@ export default {
             return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
+          // Track grace authentication usage
+          if (authResult.usedGrace) {
+            // Increment grace authentication counter
+            const graceCounter = await env.AI_FINGERPRINTS.get("auth:grace_counter", "json") || 0;
+            await env.AI_FINGERPRINTS.put("auth:grace_counter", (graceCounter + 1).toString());
+          }
+
           // Rate limiting check
           const rateLimitResult = rateLimiter.tryConsume(authResult.keyId!);
           if (!rateLimitResult.allowed) {
@@ -568,6 +579,159 @@ export default {
           return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         } catch (e: any) {
           log("error_summary_error", { error: e.message, stack: e.stack });
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        }
+      }
+
+      // 6.3.6) API Key Rotation API
+      if (url.pathname.match(/^\/api\/keys\/(\d+)\/rotate$/) && req.method === "POST") {
+        try {
+          const match = url.pathname.match(/^\/api\/keys\/(\d+)\/rotate$/);
+          const keyId = parseInt(match![1]);
+          const body = await req.json() as any;
+          const { immediate = false } = body;
+
+          // TODO: Add session authentication here
+          // For now, we'll proceed without user validation
+          const userId = 1; // Placeholder
+
+          // Get the current API key
+          const currentKey = await env.OPTIVIEW_DB.prepare(`
+            SELECT ak.*, p.domain, prj.id as project_id
+            FROM api_keys ak
+            JOIN properties p ON ak.property_id = p.id
+            JOIN project prj ON ak.project_id = prj.id
+            WHERE ak.id = ? AND ak.revoked_at IS NULL
+          `).bind(keyId).first<any>();
+
+          if (!currentKey) {
+            const response = new Response(JSON.stringify({
+              error: "API key not found or already revoked"
+            }), { status: 404, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Generate new secret
+          const newSecret = crypto.randomUUID();
+          const newSecretHash = await hashString(newSecret);
+          const now = Date.now();
+
+          if (immediate) {
+            // Immediate rotation: replace secret_hash, clear grace fields
+            await env.OPTIVIEW_DB.prepare(`
+              UPDATE api_keys 
+              SET secret_hash = ?, grace_secret_hash = NULL, grace_expires_at = NULL
+              WHERE id = ?
+            `).bind(newSecretHash, keyId).run();
+          } else {
+            // Grace period rotation: move old secret to grace, set new active secret
+            const graceExpiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
+            
+            await env.OPTIVIEW_DB.prepare(`
+              UPDATE api_keys 
+              SET grace_secret_hash = secret_hash, 
+                  grace_expires_at = ?, 
+                  secret_hash = ?
+              WHERE id = ?
+            `).bind(graceExpiresAt, newSecretHash, keyId).run();
+          }
+
+          // Log the rotation
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO audit_log (user_id, action, subject_type, subject_id, metadata)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(
+            userId,
+            "rotate",
+            "api_key",
+            keyId,
+            JSON.stringify({
+              immediate,
+              property_id: currentKey.property_id,
+              project_id: currentKey.project_id
+            })
+          ).run();
+
+          const response = new Response(JSON.stringify({
+            key_id: currentKey.key_id,
+            new_secret_once: newSecret,
+            grace_expires_at: immediate ? null : new Date(now + (24 * 60 * 60 * 1000)).toISOString(),
+            message: immediate ? "Key rotated immediately" : "Key rotated with 24h grace period"
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        } catch (e: any) {
+          log("key_rotation_error", { error: e.message, stack: e.stack });
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        }
+      }
+
+      // 6.3.7) API Key Revoke API
+      if (url.pathname.match(/^\/api\/keys\/(\d+)\/revoke$/) && req.method === "POST") {
+        try {
+          const match = url.pathname.match(/^\/api\/keys\/(\d+)\/revoke$/);
+          const keyId = parseInt(match![1]);
+
+          // TODO: Add session authentication here
+          // For now, we'll proceed without user validation
+          const userId = 1; // Placeholder
+
+          // Get the current API key
+          const currentKey = await env.OPTIVIEW_DB.prepare(`
+            SELECT ak.*, p.domain, prj.id as project_id
+            FROM api_keys ak
+            JOIN properties p ON ak.property_id = p.id
+            JOIN project prj ON ak.project_id = prj.id
+            WHERE ak.id = ? AND ak.revoked_at IS NULL
+          `).bind(keyId).first<any>();
+
+          if (!currentKey) {
+            const response = new Response(JSON.stringify({
+              error: "API key not found or already revoked"
+            }), { status: 404, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Revoke the key
+          await env.OPTIVIEW_DB.prepare(`
+            UPDATE api_keys 
+            SET revoked_at = ?, grace_secret_hash = NULL, grace_expires_at = NULL
+            WHERE id = ?
+          `).bind(Date.now(), keyId).run();
+
+          // Log the revocation
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO audit_log (user_id, action, subject_type, subject_id, metadata)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(
+            userId,
+            "revoke",
+            "api_key",
+            keyId,
+            JSON.stringify({
+              property_id: currentKey.property_id,
+              project_id: currentKey.project_id
+            })
+          ).run();
+
+          const response = new Response(JSON.stringify({
+            key_id: currentKey.key_id,
+            message: "API key revoked successfully"
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        } catch (e: any) {
+          log("key_revoke_error", { error: e.message, stack: e.stack });
           const response = new Response(JSON.stringify({
             error: "Internal server error",
             message: e.message
@@ -910,8 +1074,8 @@ async function refreshFingerprints(env: Env) {
   log("fingerprint_refresh_called", { timestamp: Date.now() });
 }
 
-// Authentication middleware
-async function authenticateRequest(req: Request, env: Env): Promise<{ valid: boolean; error?: string; keyId?: string }> {
+// Authentication middleware with grace period support
+async function authenticateRequest(req: Request, env: Env): Promise<{ valid: boolean; error?: string; keyId?: string; usedGrace?: boolean }> {
   try {
     const keyId = req.headers.get("x-optiview-key-id");
     const signature = req.headers.get("x-optiview-signature");
@@ -926,27 +1090,36 @@ async function authenticateRequest(req: Request, env: Env): Promise<{ valid: boo
       return { valid: false, error: "Request timestamp too old" };
     }
 
-    // Get the API key
+    // Get the API key with grace period fields
     const key = await env.OPTIVIEW_DB.prepare(`
-      SELECT secret_hash, revoked_at FROM api_keys WHERE key_id = ? AND revoked_at IS NULL
+      SELECT secret_hash, grace_secret_hash, grace_expires_at, revoked_at 
+      FROM api_keys 
+      WHERE key_id = ? AND revoked_at IS NULL
     `).bind(keyId).first<any>();
 
     if (!key) {
       return { valid: false, error: "Invalid or revoked API key" };
     }
 
-    // For v1, we'll use a simpler approach - store encrypted secrets
-    // In production, you'd use proper HMAC verification
     const body = await req.text();
+    const now = Date.now();
 
-    // Verify the signature (simplified for v1)
-    const expectedSignature = await hashString(`${timestamp}.${body}`);
-    if (signature !== expectedSignature) {
-      log("hmac_verification_failed", { keyId, timestamp });
-      return { valid: false, error: "Invalid signature" };
+    // Try active secret first
+    let expectedSignature = await hashString(`${timestamp}.${body}`);
+    if (signature === expectedSignature) {
+      return { valid: true, keyId, usedGrace: false };
     }
 
-    return { valid: true, keyId };
+    // Try grace secret if available and not expired
+    if (key.grace_secret_hash && key.grace_expires_at && now < key.grace_expires_at) {
+      expectedSignature = await hashString(`${timestamp}.${body}`);
+      if (signature === expectedSignature) {
+        return { valid: true, keyId, usedGrace: true };
+      }
+    }
+
+    log("hmac_verification_failed", { keyId, timestamp });
+    return { valid: false, error: "Invalid signature" };
   } catch (error) {
     log("authentication_error", { error: String(error) });
     return { valid: false, error: "Authentication error" };

@@ -6,7 +6,8 @@ import Events from "./pages/Events";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
 import AdminHealth from "./pages/AdminHealth";
+import ApiKeys from "./pages/ApiKeys";
 function App() {
-    return (_jsx(Router, { children: _jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Events, {}) }), _jsx(Route, { path: "/sources", element: _jsx(Sources, {}) }), _jsx(Route, { path: "/content", element: _jsx(Content, {}) }), _jsx(Route, { path: "/events", element: _jsx(Events, {}) }), _jsx(Route, { path: "/install", element: _jsx(Install, {}) }), _jsx(Route, { path: "/settings", element: _jsx(Settings, {}) }), _jsx(Route, { path: "/admin/health", element: _jsx(AdminHealth, {}) })] }) }));
+    return (_jsx(Router, { children: _jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Events, {}) }), _jsx(Route, { path: "/sources", element: _jsx(Sources, {}) }), _jsx(Route, { path: "/content", element: _jsx(Content, {}) }), _jsx(Route, { path: "/events", element: _jsx(Events, {}) }), _jsx(Route, { path: "/install", element: _jsx(Install, {}) }), _jsx(Route, { path: "/settings", element: _jsx(Settings, {}) }), _jsx(Route, { path: "/admin/health", element: _jsx(AdminHealth, {}) }), _jsx(Route, { path: "/api-keys", element: _jsx(ApiKeys, {}) })] }) }));
 }
 export default App;

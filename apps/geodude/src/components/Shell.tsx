@@ -14,6 +14,7 @@ export default function Shell({ children }: ShellProps) {
     { name: "Sources", href: "/sources" },
     { name: "Content", href: "/content" },
     { name: "Install", href: "/install" },
+    { name: "API Keys", href: "/api-keys" },
     { name: "Settings", href: "/settings" },
     { name: "Health", href: "/admin/health" },
   ];
