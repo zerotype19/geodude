@@ -31,6 +31,12 @@ export default function Admin() {
   const [editingMapping, setEditingMapping] = useState<KvMapping | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Project handle and custom hosts state
+  const [projectHandle, setProjectHandle] = useState("");
+  const [customHosts, setCustomHosts] = useState<string[]>([]);
+  const [newCustomHost, setNewCustomHost] = useState("");
+  const [projectInfo, setProjectInfo] = useState<any>(null);
+
   // Load KV mappings
   async function loadKvMappings() {
     if (!me?.current?.org_id || !me?.current?.project_id) return;
@@ -52,6 +58,58 @@ export default function Admin() {
       }
     } catch (error) {
       console.error("Error loading KV mappings:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Load project info (handle, custom hosts, etc.)
+  async function loadProjectInfo() {
+    if (!me?.current?.project_id) return;
+    
+    try {
+      const response = await fetch(`${API_BASE}/admin/project/info`, FETCH_OPTS);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProjectInfo(data);
+        setProjectHandle(data.public_handle || "");
+        setCustomHosts(data.custom_hosts ? data.custom_hosts.split(',') : []);
+      } else {
+        console.error("Failed to load project info:", response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error("Error loading project info:", error);
+    }
+  }
+
+  // Set project handle
+  async function setProjectHandleSubmit(handle: string) {
+    if (!handle || !/^[a-z0-9-]{3,50}$/.test(handle)) {
+      alert("Handle must be 3-50 characters, lowercase letters, numbers, and hyphens only");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/admin/project/handle`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle })
+      });
+      
+      if (response.ok) {
+        setProjectHandle(handle);
+        await loadProjectInfo();
+        alert("Project handle set successfully!");
+      } else {
+        const errorText = await response.text();
+        alert(`Failed to set handle: ${errorText}`);
+      }
+    } catch (error) {
+      console.error("Error setting project handle:", error);
+      alert("Error setting project handle");
     } finally {
       setLoading(false);
     }
@@ -152,11 +210,51 @@ export default function Admin() {
     }
   }
 
+  // Add custom host
+  async function addCustomHost() {
+    if (!newCustomHost || !newCustomHost.includes(".")) {
+      alert("Please enter a valid domain (e.g., go.yourbrand.com)");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/admin/custom-hosts`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ host: newCustomHost })
+      });
+      
+      if (response.ok) {
+        setNewCustomHost("");
+        await loadProjectInfo();
+        alert("Custom host added successfully!");
+      } else {
+        const errorText = await response.text();
+        alert(`Failed to add custom host: ${errorText}`);
+      }
+    } catch (error) {
+      console.error("Error adding custom host:", error);
+      alert("Error adding custom host");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Handle Access KV button click
   function handleAccessKv() {
     setShowKvInterface(true);
     loadKvMappings();
+    loadProjectInfo();
   }
+
+  // Load project info on component mount
+  useEffect(() => {
+    if (me?.current?.project_id) {
+      loadProjectInfo();
+    }
+  }, [me?.current?.project_id]);
 
   async function generateToken() {
     try {
@@ -478,6 +576,162 @@ export default function Admin() {
                   ))}
                 </div>
               )}
+            </Card>
+
+            {/* Built Links - Test Your Redirects */}
+            <Card title="Built Links - Test Your Redirects">
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <h3 className="font-medium text-blue-900 mb-2">🚀 New Project-Scoped Redirects</h3>
+                  <p className="text-sm text-blue-700 mb-3">
+                    Your redirects now work with the new secure architecture. Set up a project handle to get public, testable URLs.
+                  </p>
+                  
+                  {/* Project Handle Setup */}
+                  <div className="bg-white border border-blue-300 rounded-md p-3 mb-3">
+                    <h4 className="font-medium text-blue-900 mb-2">
+                      1. Set Project Handle {projectHandle && <span className="text-green-600">✓ Set to: @{projectHandle}</span>}
+                    </h4>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="your-brand-name"
+                        value={projectHandle}
+                        onChange={(e) => setProjectHandle(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        pattern="[a-z0-9-]{3,50}"
+                        title="Use lowercase letters, numbers, and hyphens (3-50 characters)"
+                      />
+                      <button 
+                        onClick={() => setProjectHandleSubmit(projectHandle)}
+                        disabled={loading || !projectHandle}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      >
+                        {loading ? "Setting..." : projectHandle ? "Update Handle" : "Set Handle"}
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1">
+                      This creates URLs like: <code>/p/@{projectHandle || 'your-handle'}/pid</code>
+                    </p>
+                  </div>
+
+                  {/* Test Links */}
+                  <div className="bg-white border border-blue-300 rounded-md p-3">
+                    <h4 className="font-medium text-blue-900 mb-2">2. Test Your Redirects</h4>
+                    {!projectHandle ? (
+                      <div className="text-center py-4 text-gray-500">
+                        Set a project handle above to see test links here.
+                      </div>
+                    ) : kvMappings.length > 0 ? (
+                      <div className="space-y-2">
+                        {kvMappings.map((mapping) => (
+                          <div key={mapping.pid} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm text-gray-900">{mapping.pid}</div>
+                              <div className="text-xs text-gray-600">Redirects to: {mapping.url}</div>
+                            </div>
+                            <div className="flex gap-2">
+                              <a
+                                href={`${API_BASE.replace('/admin', '')}/p/@${projectHandle}/${mapping.pid}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                              >
+                                Test Handle URL
+                              </a>
+                              <a
+                                href={`${API_BASE.replace('/admin', '')}/p/${mapping.pid}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700"
+                                title="Only works with custom domains"
+                              >
+                                Test Direct URL
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-gray-500">Add mappings above to see test links here.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Custom Hosts Management */}
+                <div className="bg-purple-50 border border-purple-200 rounded-md p-4">
+                  <h3 className="font-medium text-purple-900 mb-2">🌐 Custom Domain Setup</h3>
+                  <p className="text-sm text-purple-700 mb-3">
+                    Use your own domain for even cleaner URLs (e.g., go.yourbrand.com/p/pricing).
+                  </p>
+                  
+                  {/* Add Custom Host */}
+                  <div className="bg-white border border-purple-300 rounded-md p-3 mb-3">
+                    <h4 className="font-medium text-purple-900 mb-2">Add Custom Domain</h4>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="go.yourbrand.com"
+                        value={newCustomHost}
+                        onChange={(e) => setNewCustomHost(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-purple-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                      <button 
+                        onClick={addCustomHost}
+                        disabled={loading || !newCustomHost}
+                        className="px-4 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                      >
+                        {loading ? "Adding..." : "Add Domain"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Current Custom Hosts */}
+                  {customHosts.length > 0 && (
+                    <div className="bg-white border border-purple-300 rounded-md p-3">
+                      <h4 className="font-medium text-purple-900 mb-2">Current Custom Domains</h4>
+                      <div className="space-y-2">
+                        {customHosts.map((host) => (
+                          <div key={host} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                            <span className="text-sm font-medium text-gray-900">{host}</span>
+                            <span className="text-xs text-green-600">✓ Active</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-purple-600 mt-2">
+                        Use URLs like: <code>https://{customHosts[0]}/p/pricing</code>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Setup Instructions */}
+                  <div className="bg-white border border-purple-300 rounded-md p-3">
+                    <h4 className="font-medium text-purple-900 mb-2">Setup Steps</h4>
+                    <ol className="text-sm text-purple-700 space-y-1 list-decimal list-inside">
+                      <li>Add your domain above</li>
+                      <li>Point your domain to Cloudflare</li>
+                      <li>Use URLs like: <code>https://{customHosts[0] || 'go.yourbrand.com'}/p/pricing</code></li>
+                    </ol>
+                  </div>
+                </div>
+
+                {/* Legacy Token URLs */}
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+                  <h3 className="font-medium text-gray-900 mb-2">🔑 Legacy Token URLs</h3>
+                  <p className="text-sm text-gray-700 mb-3">
+                    Generate tokens in the Token Lab above, then use them for campaign-specific redirects.
+                  </p>
+                  <div className="bg-white border border-gray-300 rounded-md p-3">
+                    <h4 className="font-medium text-gray-900 mb-2">Token Format</h4>
+                    <code className="text-sm bg-gray-100 px-2 py-1 rounded">
+                      {API_BASE.replace('/admin', '')}/r/[generated-token]
+                    </code>
+                    <p className="text-xs text-gray-600 mt-1">
+                      These work for everyone and include tracking parameters.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </Card>
 
             {/* Edit Mapping Modal */}
