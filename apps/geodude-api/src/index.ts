@@ -797,14 +797,24 @@ export default {
           return addCorsHeaders(response);
         }
 
+        // Get user from session first
+        const session = await env.GEO_DB.prepare(
+          `SELECT user_id FROM session WHERE id = ?1 AND expires_ts > ?2`
+        ).bind(sessionId, Date.now()).first<any>();
+
+        if (!session) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsForCredentials(response, req);
+        }
+
         // Verify user is member of org
         const membership = await env.GEO_DB.prepare(
           `SELECT user_id FROM org_member WHERE org_id = ?1 AND user_id = ?2`
-        ).bind(body.org_id, req.headers.get("cookie")?.match(/geodude_ses=([^;]+)/)?.[1]).first<any>();
+        ).bind(body.org_id, session.user_id).first<any>();
 
         if (!membership) {
           const response = new Response("unauthorized", { status: 401 });
-          return addCorsHeaders(response);
+          return addCorsForCredentials(response, req);
         }
 
         // Create project
@@ -824,7 +834,7 @@ export default {
         return response;
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: 500 });
-        return addCorsHeaders(response);
+        return addCorsForCredentials(response, req);
       }
     }
 
