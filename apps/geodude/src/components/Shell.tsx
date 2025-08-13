@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Menu, LineChart, PlusSquare, Settings } from "lucide-react";
 
 export default function Shell({ children }: { children: ReactNode }) {
@@ -8,18 +9,18 @@ export default function Shell({ children }: { children: ReactNode }) {
         <aside className="hidden lg:block bg-white border-r">
           <div className="p-4 text-xl font-semibold">Optiview</div>
           <nav className="px-2 space-y-1">
-            <a className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted" href="/">
+            <Link className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted" to="/">
               Dashboard
-            </a>
-            <a className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted" href="/citations">
-              <LineChart size={18}/>Citations
-            </a>
-            <a className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted" href="/admin">
-              <PlusSquare size={18}/>Admin
-            </a>
-            <a className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted" href="/settings">
-              <Settings size={18}/>Settings
-            </a>
+            </Link>
+            <Link className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted" to="/citations">
+              <LineChart size={18} />Citations
+            </Link>
+            <Link className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted" to="/admin">
+              <PlusSquare size={18} />Admin
+            </Link>
+            <Link className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted" to="/settings">
+              <Settings size={18} />Settings
+            </Link>
           </nav>
         </aside>
         <main className="min-h-screen">
