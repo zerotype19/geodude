@@ -1,20 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useState, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-
-interface DocPage {
-  id: string;
-  title: string;
-  path: string;
-  content: string;
-}
-
-const docs: DocPage[] = [
-  {
-    id: 'install-js',
-    title: 'Install / JS Tag',
-    path: '/docs/install/js',
-    content: `# JavaScript Tag Installation
+const docs = [
+    {
+        id: 'install-js',
+        title: 'Install / JS Tag',
+        path: '/docs/install/js',
+        content: `# JavaScript Tag Installation
 
 ## Quick Start
 
@@ -55,12 +48,12 @@ The tag respects your project settings for:
 - Data retention
 - Privacy controls
 - Rate limiting`
-  },
-  {
-    id: 'install-gtm',
-    title: 'Install / Google Tag Manager',
-    path: '/docs/install/gtm',
-    content: `# Google Tag Manager Installation
+    },
+    {
+        id: 'install-gtm',
+        title: 'Install / Google Tag Manager',
+        path: '/docs/install/gtm',
+        content: `# Google Tag Manager Installation
 
 ## Import Template
 
@@ -99,12 +92,12 @@ Common issues:
 - Verify property ID matches
 - Ensure endpoint is accessible
 - Check browser console for errors`
-  },
-  {
-    id: 'install-worker',
-    title: 'Install / Cloudflare Worker',
-    path: '/docs/install/worker',
-    content: `# Cloudflare Worker Installation
+    },
+    {
+        id: 'install-worker',
+        title: 'Install / Cloudflare Worker',
+        path: '/docs/install/worker',
+        content: `# Cloudflare Worker Installation
 
 ## Worker Setup
 
@@ -175,12 +168,12 @@ Replace these placeholders:
 2. Visit your website
 3. Check the Optiview dashboard
 4. Verify events are being tracked`
-  },
-  {
-    id: 'api-reference',
-    title: 'API Reference',
-    path: '/docs/api',
-    content: `# API Reference
+    },
+    {
+        id: 'api-reference',
+        title: 'API Reference',
+        path: '/docs/api',
+        content: `# API Reference
 
 ## Authentication
 
@@ -281,12 +274,12 @@ Export events as CSV.
   "error": "Invalid API key"
 }
 \`\`\``
-  },
-  {
-    id: 'security-privacy',
-    title: 'Security & Privacy',
-    path: '/docs/security',
-    content: `# Security & Privacy
+    },
+    {
+        id: 'security-privacy',
+        title: 'Security & Privacy',
+        path: '/docs/security',
+        content: `# Security & Privacy
 
 ## Data Protection
 
@@ -352,12 +345,12 @@ Export events as CSV.
 ### Contact Information
 - **Security Team**: security@optiview.ai
 - **Emergency**: +1-555-SECURITY`
-  },
-  {
-    id: 'runbooks',
-    title: 'Runbooks',
-    path: '/docs/runbooks',
-    content: `# Operational Runbooks
+    },
+    {
+        id: 'runbooks',
+        title: 'Runbooks',
+        path: '/docs/runbooks',
+        content: `# Operational Runbooks
 
 ## Incident Response
 
@@ -488,116 +481,61 @@ Export events as CSV.
 - Historical performance trends
 - Error rate by endpoint
 - Resource utilization`
-  }
+    }
 ];
-
-const Docs: React.FC = () => {
-  const [selectedDoc, setSelectedDoc] = useState<DocPage>(docs[0]);
-  const [isMobile, setIsMobile] = useState(false);
-  const [renderedHtml, setRenderedHtml] = useState<{ __html: string }>({ __html: '' });
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+const Docs = () => {
+    const [selectedDoc, setSelectedDoc] = useState(docs[0]);
+    const [isMobile, setIsMobile] = useState(false);
+    const [renderedHtml, setRenderedHtml] = useState({ __html: '' });
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+    useEffect(() => {
+        const renderDoc = async () => {
+            const html = await renderMarkdown(selectedDoc.content);
+            setRenderedHtml(html);
+        };
+        renderDoc();
+    }, [selectedDoc]);
+    const renderMarkdown = async (content) => {
+        // Replace placeholders with actual values
+        const processedContent = content
+            .replace(/{{PUBLIC_BASE_URL}}/g, 'https://api.optiview.ai')
+            .replace(/{{PROJECT_ID}}/g, '123')
+            .replace(/{{PROPERTY_ID}}/g, '456')
+            .replace(/{{KEY_ID}}/g, 'key_abc123')
+            .replace(/{{SECRET}}/g, 'your_secret_here')
+            .replace(/{{PROPERTY_DOMAIN}}/g, 'example.com');
+        const rawHtml = await marked.parse(processedContent);
+        const cleanHtml = DOMPurify.sanitize(rawHtml);
+        return { __html: cleanHtml };
     };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    const renderDoc = async () => {
-      const html = await renderMarkdown(selectedDoc.content);
-      setRenderedHtml(html);
+    const copyCodeBlock = (code) => {
+        navigator.clipboard.writeText(code);
+        // You could add a toast notification here
     };
-    renderDoc();
-  }, [selectedDoc]);
-
-  const renderMarkdown = async (content: string) => {
-    // Replace placeholders with actual values
-    const processedContent = content
-      .replace(/{{PUBLIC_BASE_URL}}/g, 'https://api.optiview.ai')
-      .replace(/{{PROJECT_ID}}/g, '123')
-      .replace(/{{PROPERTY_ID}}/g, '456')
-      .replace(/{{KEY_ID}}/g, 'key_abc123')
-      .replace(/{{SECRET}}/g, 'your_secret_here')
-      .replace(/{{PROPERTY_DOMAIN}}/g, 'example.com');
-
-    const rawHtml = await marked.parse(processedContent);
-    const cleanHtml = DOMPurify.sanitize(rawHtml);
-    
-    return { __html: cleanHtml };
-  };
-
-  const copyCodeBlock = (code: string) => {
-    navigator.clipboard.writeText(code);
-    // You could add a toast notification here
-  };
-
-  // Add copy button functionality to code blocks
-  useEffect(() => {
-    const codeBlocks = document.querySelectorAll('pre code');
-    codeBlocks.forEach((block) => {
-      const pre = block.parentElement;
-      if (pre && !pre.querySelector('.copy-button')) {
-        const copyButton = document.createElement('button');
-        copyButton.className = 'copy-button absolute top-2 right-2 px-2 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600';
-        copyButton.textContent = 'Copy';
-        copyButton.onclick = () => copyCodeBlock(block.textContent || '');
-        
-        pre.style.position = 'relative';
-        pre.appendChild(copyButton);
-      }
-    });
-  }, [selectedDoc]);
-
-  return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Left Navigation */}
-      <div className={`${isMobile ? 'w-64 absolute left-0 z-10 bg-white shadow-lg' : 'w-64'} bg-white border-r border-gray-200 overflow-y-auto`}>
-        <div className="p-4">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Documentation</h2>
-          <nav className="space-y-1">
-            {docs.map((doc) => (
-              <button
-                key={doc.id}
-                onClick={() => setSelectedDoc(doc)}
-                className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                  selectedDoc.id === doc.id
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-              >
-                {doc.title}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
-
-      {/* Mobile overlay */}
-      {isMobile && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-0"
-          onClick={() => setIsMobile(false)}
-        />
-      )}
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="prose prose-lg max-w-none">
-            <div 
-              dangerouslySetInnerHTML={renderedHtml}
-              className="markdown-content"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    // Add copy button functionality to code blocks
+    useEffect(() => {
+        const codeBlocks = document.querySelectorAll('pre code');
+        codeBlocks.forEach((block) => {
+            const pre = block.parentElement;
+            if (pre && !pre.querySelector('.copy-button')) {
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-button absolute top-2 right-2 px-2 py-1 text-xs bg-gray-700 text-white rounded hover:bg-gray-600';
+                copyButton.textContent = 'Copy';
+                copyButton.onclick = () => copyCodeBlock(block.textContent || '');
+                pre.style.position = 'relative';
+                pre.appendChild(copyButton);
+            }
+        });
+    }, [selectedDoc]);
+    return (_jsxs("div", { className: "flex h-screen bg-gray-50", children: [_jsx("div", { className: `${isMobile ? 'w-64 absolute left-0 z-10 bg-white shadow-lg' : 'w-64'} bg-white border-r border-gray-200 overflow-y-auto`, children: _jsxs("div", { className: "p-4", children: [_jsx("h2", { className: "text-lg font-semibold text-gray-900 mb-4", children: "Documentation" }), _jsx("nav", { className: "space-y-1", children: docs.map((doc) => (_jsx("button", { onClick: () => setSelectedDoc(doc), className: `w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedDoc.id === doc.id
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`, children: doc.title }, doc.id))) })] }) }), isMobile && (_jsx("div", { className: "fixed inset-0 bg-black bg-opacity-50 z-0", onClick: () => setIsMobile(false) })), _jsx("div", { className: "flex-1 overflow-y-auto", children: _jsx("div", { className: "max-w-4xl mx-auto p-6", children: _jsx("div", { className: "prose prose-lg max-w-none", children: _jsx("div", { dangerouslySetInnerHTML: renderedHtml, className: "markdown-content" }) }) }) })] }));
 };
-
 export default Docs;
