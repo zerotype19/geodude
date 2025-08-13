@@ -6,6 +6,7 @@ export default function Onboard() {
   const nav = useNavigate();
   const [orgName, setOrgName] = useState("");
   const [projectName, setProjectName] = useState("");
+  const [projectDomain, setProjectDomain] = useState("");
   const [slug, setSlug] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,7 +39,8 @@ export default function Onboard() {
         body: JSON.stringify({ 
           org_id: org.org.id, 
           name: projectName, 
-          slug 
+          slug,
+          domain: projectDomain || null
         })
       });
       
@@ -69,7 +71,7 @@ export default function Onboard() {
 
   return (
     <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <h1>Welcome to Geodude</h1>
+      <h1>Welcome to Optiview</h1>
       <p>Let's get you set up with your first organization and project.</p>
       
       <form onSubmit={submit} style={{ display: "grid", gap: 16, maxWidth: 480, marginTop: 24 }}>
@@ -95,6 +97,20 @@ export default function Onboard() {
             required 
             style={{ width: "100%", padding: 8, marginTop: 4 }}
           />
+          <small>Human-readable name for your project</small>
+        </div>
+        
+        <div>
+          <label htmlFor="projectDomain">Project domain</label>
+          <input 
+            id="projectDomain"
+            type="url"
+            placeholder="https://example.com" 
+            value={projectDomain} 
+            onChange={e => setProjectDomain(e.target.value)} 
+            style={{ width: "100%", padding: 8, marginTop: 4 }}
+          />
+          <small>Your website URL (optional)</small>
         </div>
         
         <div>
