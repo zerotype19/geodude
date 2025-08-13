@@ -1,0 +1,8 @@
+# Shared secrets (copy to apps/.../.dev.vars as needed)
+HMAC_KEY=CHANGE_ME
+INGEST_API_KEY=CHANGE_ME
+AI_FEED_SIGNING_KEY=CHANGE_ME
+
+# Cloudflare bindings (IDs/bucket names to be provided/confirmed)
+D1_DB_NAME=geodude-db
+R2_BUCKET_AI_CAPTURES=geodude-ai-captures

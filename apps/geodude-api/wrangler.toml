@@ -1,0 +1,36 @@
+name = "geodude-api"
+main = "src/index.ts"
+compatibility_date = "2025-08-12"
+logpush = false
+
+# ----- Local defaults (used by `wrangler dev`) -----
+[vars]
+# Local Pages dev usually runs on 127.0.0.1:8788
+CANONICAL_BASE = "http://127.0.0.1:8788"
+
+# ----- Bindings -----
+# D1
+[[d1_databases]]
+binding = "GEO_DB"
+database_name = "geodude-db"
+database_id = "5d63faff-5415-48d6-aec1-f39e6456aab8"
+
+# R2 (for Playwright artifacts later)
+[[r2_buckets]]
+binding = "AI_CAPTURES"
+bucket_name = "geodude-ai-captures"
+
+# KV (pid -> canonical URL)
+[[kv_namespaces]]
+binding = "DEST_MAP"
+id = "6b21fea06a194549a3fe650020e63f24"
+# If you have a distinct preview_id, put it here. Using the same ID is OK to start.
+preview_id = "6b21fea06a194549a3fe650020e63f24"
+
+# ----- Cloudflare "dev/staging" env -----
+[env.dev.vars]
+CANONICAL_BASE = "https://geodude.pages.dev"
+
+# ----- Production env -----
+[env.production.vars]
+CANONICAL_BASE = "https://<your-prod-domain>"

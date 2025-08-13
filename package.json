@@ -1,0 +1,23 @@
+{
+  "name": "geodude",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "scripts/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r run dev",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "cf:publish": "pnpm -r --filter geodude-api run publish && pnpm -r --filter geodude run publish",
+    "token:gen": "tsx scripts/token-gen.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "wrangler": "^3.78.0",
+    "tsx": "^4.20.4"
+  }
+}

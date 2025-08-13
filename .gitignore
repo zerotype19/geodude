@@ -1,0 +1,7 @@
+node_modules
+dist
+.vscode/.react*
+.env*
+.dev.vars
+*.local
+.playwright-cache
