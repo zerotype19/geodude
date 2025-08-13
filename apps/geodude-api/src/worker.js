@@ -97,8 +97,8 @@ export default {
 
       // 4) Content endpoint
       if (url.pathname === "/api/content" && request.method === "GET") {
-        // Return empty array directly if that's what frontend expects
-        const response = new Response(JSON.stringify([]), {
+        // Return the structure the frontend expects: { content: [] }
+        const response = new Response(JSON.stringify({ content: [] }), {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response);
@@ -128,6 +128,24 @@ export default {
           breakdown: [], 
           top_sources: [], 
           timeseries: [] 
+        }), {
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 7.5) Events last-seen endpoint (for install verification)
+      if (url.pathname === "/api/events/last-seen" && request.method === "GET") {
+        const response = new Response(JSON.stringify({
+          property_id: 1,
+          events_15m: 0,
+          by_class_15m: {
+            direct_human: 0,
+            human_via_ai: 0,
+            ai_agent_crawl: 0,
+            unknown_ai_like: 0
+          },
+          last_event_ts: null
         }), {
           headers: { "Content-Type": "application/json" }
         });
