@@ -1,6 +1,6 @@
 import { useAuth } from "./useAuth";
 import { API_BASE, FETCH_OPTS } from "./config";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function OrgProjectBar({ onChanged }: { onChanged?: () => void }) {
   const { me, refresh } = useAuth();
@@ -8,12 +8,12 @@ export default function OrgProjectBar({ onChanged }: { onChanged?: () => void })
   const [prj, setPrj] = useState(me?.current?.project_id || "");
 
   // Update local state when me changes
-  useState(() => {
+  useEffect(() => {
     if (me?.current) {
       setOrg(me.current.org_id);
       setPrj(me.current.project_id);
     }
-  });
+  }, [me]);
 
   async function setCurrent() {
     if (!org || !prj) return;
@@ -42,20 +42,13 @@ export default function OrgProjectBar({ onChanged }: { onChanged?: () => void })
   if (!me?.user) return null;
   
   return (
-    <div style={{ 
-      display: "flex", 
-      gap: 12, 
-      alignItems: "center", 
-      marginBottom: 24,
-      padding: "16px 0",
-      borderBottom: "1px solid #e1e5e9"
-    }}>
-      <span style={{ fontWeight: 500 }}>{me.user.email}</span>
+    <div className="flex gap-3 items-center mb-6 py-4 border-b border-gray-200">
+      <span className="font-medium text-slate-700">{me.user.email}</span>
       
       <select 
         value={org} 
         onChange={e => setOrg(e.target.value)}
-        style={{ padding: "4px 8px", border: "1px solid #ccc", borderRadius: 4 }}
+        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
       >
         <option value="">Select Organization</option>
         {(me.orgs || []).map(o => (
@@ -66,7 +59,7 @@ export default function OrgProjectBar({ onChanged }: { onChanged?: () => void })
       <select 
         value={prj} 
         onChange={e => setPrj(e.target.value)}
-        style={{ padding: "4px 8px", border: "1px solid #ccc", borderRadius: 4 }}
+        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
         disabled={!org}
       >
         <option value="">Select Project</option>
@@ -81,29 +74,14 @@ export default function OrgProjectBar({ onChanged }: { onChanged?: () => void })
       <button 
         onClick={setCurrent}
         disabled={!org || !prj}
-        style={{ 
-          padding: "4px 12px", 
-          backgroundColor: "#0070f3", 
-          color: "white", 
-          border: "none", 
-          borderRadius: 4,
-          cursor: org && prj ? "pointer" : "not-allowed",
-          opacity: org && prj ? 1 : 0.5
-        }}
+        className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
       >
         Switch
       </button>
       
       <button 
         onClick={logout}
-        style={{ 
-          padding: "4px 12px", 
-          backgroundColor: "#dc3545", 
-          color: "white", 
-          border: "none", 
-          borderRadius: 4,
-          cursor: "pointer"
-        }}
+        className="px-3 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
       >
         Logout
       </button>
