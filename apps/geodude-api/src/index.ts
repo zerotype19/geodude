@@ -209,31 +209,35 @@ export default {
       const pid = url.pathname.split("/").pop()!;
       try {
         log("direct_redirect_start", { pid });
-        
+
         // Try to find the PID in different org/project contexts
         // First try the system org/project, then try to infer from the request
         let destUrl = null;
         let org_id = "org_system";
         let project_id = "prj_system";
-        
+
         // Try system org/project first
         const systemKey = `${org_id}:${project_id}:${pid}`;
         log("direct_redirect_debug", { step: "trying_system", key: systemKey });
         destUrl = await env.DEST_MAP.get(systemKey);
         log("direct_redirect_debug", { step: "system_result", found: !!destUrl, url: destUrl });
-        
+
         // If not found in system, try to get from user's current context via cookie
         if (!destUrl) {
           try {
             log("direct_redirect_debug", { step: "trying_session" });
-            const session = await getCookie(req, "geodude_ses");
-            log("direct_redirect_debug", { step: "session_cookie", found: !!session, session: session ? "present" : "missing" });
+            const sessionId = req.headers.get("cookie")?.match(/geodude_ses=([^;]+)/)?.[1];
+            log("direct_redirect_debug", { step: "session_cookie", found: !!sessionId, sessionId: sessionId ? "present" : "missing" });
             
-            if (session) {
-              const sessionData = JSON.parse(session);
-              log("direct_redirect_debug", { step: "session_parsed", org_id: sessionData.org_id, project_id: sessionData.project_id });
+            if (sessionId) {
+              // Look up the actual session data from the database
+              const sessionData = await env.GEO_DB.prepare(
+                "SELECT org_id, project_id FROM session WHERE id = ? LIMIT 1"
+              ).bind(sessionId).first<any>();
               
-              if (sessionData.org_id && sessionData.project_id) {
+              log("direct_redirect_debug", { step: "session_lookup", found: !!sessionData, org_id: sessionData?.org_id, project_id: sessionData?.project_id });
+              
+              if (sessionData?.org_id && sessionData?.project_id) {
                 const userKey = `${sessionData.org_id}:${sessionData.project_id}:${pid}`;
                 log("direct_redirect_debug", { step: "trying_user_context", key: userKey });
                 destUrl = await env.DEST_MAP.get(userKey);
@@ -250,7 +254,7 @@ export default {
             // Ignore session parsing errors, fall back to system
           }
         }
-        
+
         if (!destUrl) {
           log("direct_redirect_debug", { step: "not_found", pid, org_id, project_id });
           const response = new Response(`PID not found: ${pid}`, { status: 404 });
