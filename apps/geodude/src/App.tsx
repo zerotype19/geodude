@@ -8,8 +8,13 @@ export default function App() {
   useEffect(() => {
     // Use environment variable from Cloudflare Pages, fallback to local dev
     const apiUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8787";
-
-    fetch(`${apiUrl}/overview`)
+    
+    // Ensure no double slashes by properly constructing the URL
+    const overviewUrl = apiUrl.endsWith('/') 
+      ? `${apiUrl}overview` 
+      : `${apiUrl}/overview`;
+    
+    fetch(overviewUrl)
       .then(r => r.json())
       .then(setO)
       .catch(() => setO(null));

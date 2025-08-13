@@ -10,13 +10,27 @@ type Env = {
   CANONICAL_BASE: string;
 };
 
+// Helper function to add CORS headers
+function addCorsHeaders(response: Response): Response {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext) {
     const url = new URL(req.url);
 
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return addCorsHeaders(new Response(null, { status: 204 }));
+    }
+
     // 1) Health
     if (url.pathname === "/health") {
-      return new Response("ok", { status: 200 });
+      const response = new Response("ok", { status: 200 });
+      return addCorsHeaders(response);
     }
 
     // 2) Tokenized redirector: /r/:token
@@ -57,19 +71,24 @@ export default {
             ...Object.fromEntries(headers.entries())
           }
         });
-        return resp;
+        return addCorsHeaders(resp);
       } catch (e: any) {
-        return new Response(`bad token or dest: ${e?.message ?? ""}`, { status: 400 });
+        const response = new Response(`bad token or dest: ${e?.message ?? ""}`, { status: 400 });
+        return addCorsHeaders(response);
       }
     }
 
     // 3) Event ingest: POST /v1/events  (direct-to-D1 MVP)
     if (url.pathname === "/v1/events" && req.method === "POST") {
       if (req.headers.get("authorization") !== `Bearer ${env.INGEST_API_KEY}`) {
-        return new Response("unauthorized", { status: 401 });
+        const response = new Response("unauthorized", { status: 401 });
+        return addCorsHeaders(response);
       }
       const batch = await req.json().catch(() => null);
-      if (!Array.isArray(batch)) return new Response("expected array", { status: 400 });
+      if (!Array.isArray(batch)) {
+        const response = new Response("expected array", { status: 400 });
+        return addCorsHeaders(response);
+      }
 
       let inserted = 0;
       try {
@@ -117,9 +136,11 @@ export default {
           }
         }
       } catch (e) {
-        return new Response("db error", { status: 500 });
+        const response = new Response("db error", { status: 500 });
+        return addCorsHeaders(response);
       }
-      return Response.json({ ok: true, inserted });
+      const response = Response.json({ ok: true, inserted });
+      return addCorsHeaders(response);
     }
 
     // 0) Overview metrics (simple counts for dashboard smoke test)
@@ -131,15 +152,17 @@ export default {
         q("SELECT COUNT(*) AS c FROM crawler_visit"),
         q("SELECT COUNT(*) AS c FROM ai_citation_event")
       ]);
-      return Response.json({
+      const response = Response.json({
         clicks: clicks?.c ?? 0,
         conversions: convs?.c ?? 0,
         crawler_visits: crawls?.c ?? 0,
         citations: cites?.c ?? 0
       });
+      return addCorsHeaders(response);
     }
 
-    return new Response("not found", { status: 404 });
+    const response = new Response("not found", { status: 404 });
+    return addCorsHeaders(response);
   }
 };
 
