@@ -1,12 +1,34 @@
 import { addCorsHeaders, isOriginAllowed, getCorsConfig } from "./cors";
 import { log } from "./logging";
-import { classifyRequest, type TrafficClassification } from "./classifier";
+import { classifyRequest, type TrafficClassification, getCurrentRulesetVersion } from "./classifier";
 import { hashString, verifyHmac, isWithinSkew } from "./utils";
 import { createRateLimiter } from "./rate-limiter";
 import { validateRequestBody } from "./schema-validator";
 import { addSecurityHeaders, addBasicSecurityHeaders, getSecurityHeadersConfig } from "./security-headers";
 import { MetricsManager, ErrorCode } from "./metrics";
 import { SlackAlerts } from "./alerts";
+import { generateSyntheticEvents } from "./scripts/demo-seeder";
+import { sanitizeMetadata } from "./metadata-sanitizer";
+import {
+  generateOTPCode,
+  generateSessionId,
+  normalizeEmail,
+  hashSensitiveData,
+  generateSessionExpiry,
+  generateOTPExpiry,
+  setSessionCookie,
+  clearSessionCookie,
+  getClientIP
+} from "./auth";
+import {
+  requireAuth,
+  requireAdmin,
+  getOrCreateUser,
+  createSession,
+  deleteSession,
+  bootstrapAdmin
+} from "./auth-middleware";
+import { EmailService } from "./email-service";
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -49,14 +71,14 @@ export default {
       try {
         // Test D1 connectivity with timeout
         const d1Promise = env.OPTIVIEW_DB.prepare("SELECT 1 as test").first();
-        const d1Timeout = new Promise((_, reject) => 
+        const d1Timeout = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("D1 timeout")), 500)
         );
         const d1Test = await Promise.race([d1Promise, d1Timeout]);
 
         // Test KV connectivity with timeout
         const kvPromise = env.AI_FINGERPRINTS.get("cron:last_run_ts", "json");
-        const kvTimeout = new Promise((_, reject) => 
+        const kvTimeout = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("KV timeout")), 500)
         );
         const kvTest = await Promise.race([kvPromise, kvTimeout]);
@@ -329,7 +351,7 @@ export default {
       if (url.pathname === "/api/events" && req.method === "POST") {
         const startTime = Date.now();
         const requestId = crypto.randomUUID();
-        
+
         try {
           // Check Content-Type
           const contentType = req.headers.get("content-type");
@@ -346,9 +368,9 @@ export default {
             const response = new Response(authResult.error, { status: 401 });
             response.headers.set("x-optiview-request-id", requestId);
             // Map auth errors to appropriate error codes
-            const errorCode = authResult.error?.includes("signature") ? ErrorCode.HMAC_FAILED : 
-                            authResult.error?.includes("timestamp") ? ErrorCode.REPLAY : 
-                            ErrorCode.UNKNOWN;
+            const errorCode = authResult.error?.includes("signature") ? ErrorCode.HMAC_FAILED :
+              authResult.error?.includes("timestamp") ? ErrorCode.REPLAY :
+                ErrorCode.UNKNOWN;
             recordMetrics(undefined, undefined, Date.now() - startTime, false, errorCode);
             return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
@@ -421,13 +443,25 @@ export default {
             UPDATE api_keys SET last_used_at = ? WHERE key_id = ?
           `).bind(Date.now(), authResult.keyId).run();
 
-          // Log the interaction with validated data
+          // Sanitize metadata before logging
+          const sanitizedMetadata = sanitizeMetadata(validation.sanitizedData.metadata || {});
+
+          // Log dropped keys/values for monitoring
+          if (sanitizedMetadata.droppedKeys.length > 0 || sanitizedMetadata.droppedValues.length > 0) {
+            log("metadata_sanitized", {
+              project_id: validation.sanitizedData.project_id,
+              dropped_keys: sanitizedMetadata.droppedKeys,
+              dropped_values: sanitizedMetadata.droppedValues
+            });
+          }
+
+          // Log the interaction with sanitized data
           const result = await logInteraction(env, {
             project_id: validation.sanitizedData.project_id,
             content_id: validation.sanitizedData.content_id,
             ai_source_id: validation.sanitizedData.ai_source_id,
             event_type: validation.sanitizedData.event_type,
-            metadata: validation.sanitizedData.metadata || {}
+            metadata: sanitizedMetadata.metadata
           });
 
           const response = new Response(JSON.stringify({
@@ -437,7 +471,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          
+
           // Add request ID header
           response.headers.set("x-optiview-request-id", requestId);
 
@@ -454,7 +488,7 @@ export default {
 
           // Record successful request
           recordMetrics(authResult.keyId, validation.sanitizedData.project_id, Date.now() - startTime, true);
-          
+
           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin || undefined)));
         } catch (e: any) {
           log("events_create_error", { error: e.message, stack: e.stack });
@@ -561,7 +595,7 @@ export default {
           // For v1, return global error summary since project-specific metrics aren't fully implemented yet
           // TODO: Enhance metrics.record() to track project_id for all requests
           const metricsSnapshot = metrics.snapshot5m();
-          
+
           const errorSummary = {
             project_id: parseInt(project_id),
             total_errors_5m: Object.values(metricsSnapshot.byError).reduce((sum, count) => sum + count, 0),
@@ -595,9 +629,8 @@ export default {
           const body = await req.json() as any;
           const { immediate = false } = body;
 
-          // TODO: Add session authentication here
-          // For now, we'll proceed without user validation
-          const userId = 1; // Placeholder
+          // Require authentication
+          const { user } = await requireAuth(req, env);
 
           // Get the current API key
           const currentKey = await env.OPTIVIEW_DB.prepare(`
@@ -630,7 +663,7 @@ export default {
           } else {
             // Grace period rotation: move old secret to grace, set new active secret
             const graceExpiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
-            
+
             await env.OPTIVIEW_DB.prepare(`
               UPDATE api_keys 
               SET grace_secret_hash = secret_hash, 
@@ -645,7 +678,7 @@ export default {
             INSERT INTO audit_log (user_id, action, subject_type, subject_id, metadata)
             VALUES (?, ?, ?, ?, ?)
           `).bind(
-            userId,
+            user.id,
             "rotate",
             "api_key",
             keyId,
@@ -681,9 +714,8 @@ export default {
           const match = url.pathname.match(/^\/api\/keys\/(\d+)\/revoke$/);
           const keyId = parseInt(match![1]);
 
-          // TODO: Add session authentication here
-          // For now, we'll proceed without user validation
-          const userId = 1; // Placeholder
+          // Require authentication
+          const { user } = await requireAuth(req, env);
 
           // Get the current API key
           const currentKey = await env.OPTIVIEW_DB.prepare(`
@@ -713,7 +745,7 @@ export default {
             INSERT INTO audit_log (user_id, action, subject_type, subject_id, metadata)
             VALUES (?, ?, ?, ?, ?)
           `).bind(
-            userId,
+            user.id,
             "revoke",
             "api_key",
             keyId,
@@ -743,9 +775,8 @@ export default {
       // 6.3.8) Manual Data Purge API (Admin Only)
       if (url.pathname === "/admin/purge" && req.method === "POST") {
         try {
-          // TODO: Add admin authentication here
-          // For now, we'll proceed without user validation
-          const userId = 1; // Placeholder
+          // Require admin authentication
+          const { user } = await requireAdmin(req, env);
 
           const body = await req.json() as any;
           const { project_id, type, confirm, dry_run = false } = body;
@@ -777,7 +808,7 @@ export default {
 
           if (type === "events" || type === "both") {
             const cutoffEvents = now - (projectSettings.retention_days_events * 24 * 60 * 60 * 1000);
-            
+
             if (dry_run) {
               // Count rows that would be deleted
               const countResult = await env.OPTIVIEW_DB.prepare(`
@@ -797,7 +828,7 @@ export default {
 
           if (type === "referrals" || type === "both") {
             const cutoffReferrals = now - (projectSettings.retention_days_referrals * 24 * 60 * 60 * 1000);
-            
+
             if (dry_run) {
               // Count rows that would be deleted
               const countResult = await env.OPTIVIEW_DB.prepare(`
@@ -826,7 +857,7 @@ export default {
             INSERT INTO audit_log (user_id, action, subject_type, subject_id, metadata)
             VALUES (?, ?, ?, ?, ?)
           `).bind(
-            userId,
+            user.id,
             "purge",
             "project",
             project_id,
@@ -872,12 +903,12 @@ export default {
             return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
           }
 
-          // TODO: Add session authentication here
-          // For now, we'll proceed without user validation
+          // Require authentication
+          const { user } = await requireAuth(req, env);
 
           // Get the most recent event timestamp and counts for this property within last 15 minutes
           const cutoffTime = Date.now() - (15 * 60 * 1000); // 15 minutes ago
-          
+
           const lastSeenResult = await env.OPTIVIEW_DB.prepare(`
             SELECT 
               ie.occurred_at,
@@ -1189,50 +1220,892 @@ export default {
           return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
         }
       }
-    }
 
-    // Default response - continue to origin
-    const response = new Response("not found", { status: 404 });
-    return addBasicSecurityHeaders(addCorsHeaders(response));
-  },
+      // 6.9) Events CSV Export API
+      if (url.pathname === "/api/events/export.csv" && req.method === "GET") {
+        try {
+          // Require authentication
+          const { user } = await requireAuth(req, env);
+
+          // Rate limiting for CSV exports (1 req/sec per user)
+          const csvRateLimiter = createRateLimiter({ rps: 1, burst: 1, retryAfter: 5 });
+          const rateLimitResult = csvRateLimiter.tryConsume(`csv_export_${user.id}`);
+
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded for CSV exports",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter?.toString() || "5"
+              }
+            });
+            response.headers.set("x-optiview-request-id", crypto.randomUUID());
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          const { project_id, from, to, cursor, limit = "10000" } = Object.fromEntries(url.searchParams);
+          if (!project_id) {
+            const response = new Response("Missing project_id parameter", { status: 400 });
+            response.headers.set("x-optiview-request-id", crypto.randomUUID());
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Validate project access
+          const project = await env.OPTIVIEW_DB.prepare(`
+            SELECT p.id, p.name, ps.xray_trace_enabled
+            FROM project p
+            LEFT JOIN project_settings ps ON p.id = ps.project_id
+            WHERE p.id = ?
+          `).bind(project_id).first<any>();
+
+          if (!project) {
+            const response = new Response("Project not found", { status: 404 });
+            response.headers.set("x-optiview-request-id", crypto.randomUUID());
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Parse date range
+          const fromTs = from ? new Date(from).getTime() : Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const toTs = to ? new Date(to).getTime() : Date.now();
+          const limitNum = Math.min(parseInt(limit), 10000);
+
+          // Parse cursor for pagination
+          let cursorData: { t: number; id: number } | null = null;
+          if (cursor) {
+            try {
+              const decoded = atob(cursor.replace(/-/g, '+').replace(/_/g, '/'));
+              cursorData = JSON.parse(decoded);
+            } catch (e) {
+              const response = new Response("Invalid cursor format", { status: 400 });
+              response.headers.set("x-optiview-request-id", crypto.randomUUID());
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+
+          // Build query with cursor-based pagination
+          let query = `
+            SELECT 
+              ie.occurred_at,
+              JSON_EXTRACT(ie.metadata, '$.class') as traffic_class,
+              ais.name as ai_source,
+              p.domain as property,
+              ca.url as content_url,
+              ie.event_type
+            FROM interaction_events ie
+            LEFT JOIN ai_sources ais ON ie.ai_source_id = ais.id
+            LEFT JOIN content_assets ca ON ie.content_id = ca.id
+            LEFT JOIN properties p ON ca.property_id = p.id
+            WHERE ie.project_id = ? AND ie.occurred_at BETWEEN ? AND ?
+          `;
+          let params = [project_id, fromTs, toTs];
+
+          if (cursorData) {
+            query += ` AND (ie.occurred_at > ? OR (ie.occurred_at = ? AND ie.id > ?))`;
+            params.push(cursorData.t, cursorData.t, cursorData.id);
+          }
+
+          query += ` ORDER BY ie.occurred_at ASC, ie.id ASC LIMIT ?`;
+          params.push(limitNum);
+
+          const events = await env.OPTIVIEW_DB.prepare(query).bind(...params).all<any>();
+
+          if (events.results.length === 0) {
+            // Return empty CSV with headers
+            const csvHeaders = "occurred_at,traffic_class,ai_source,property,content_url,event_type\n";
+            const response = new Response(csvHeaders, {
+              headers: {
+                "Content-Type": "text/csv; charset=utf-8",
+                "Content-Disposition": `attachment; filename="optiview_events_${new Date(fromTs).toISOString().split('T')[0]}-${new Date(toTs).toISOString().split('T')[0]}.csv"`
+              }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Generate next cursor
+          const lastEvent = events.results[events.results.length - 1];
+          const nextCursor = btoa(JSON.stringify({
+            t: lastEvent.occurred_at,
+            id: lastEvent.id
+          })).replace(/\+/g, '-').replace(/\//g, '_');
+
+          // Convert to CSV
+          const csvRows = events.results.map((event: any) => {
+            const row = [
+              new Date(event.occurred_at).toISOString(),
+              event.traffic_class || '',
+              event.ai_source || '',
+              event.property || '',
+              event.content_url || '',
+              event.event_type || ''
+            ];
+            return row.map(field => `"${field.replace(/"/g, '""')}"`).join(',');
+          });
+
+          const csvContent = "occurred_at,traffic_class,ai_source,property,content_url,event_type\n" + csvRows.join('\n');
+
+          const response = new Response(csvContent, {
+            headers: {
+              "Content-Type": "text/csv; charset=utf-8",
+              "Content-Disposition": `attachment; filename="optiview_events_${new Date(fromTs).toISOString().split('T')[0]}-${new Date(toTs).toISOString().split('T')[0]}.csv"`,
+              "x-optiview-next-cursor": nextCursor,
+              "x-optiview-total-rows": events.results.length.toString()
+            }
+          });
+
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        } catch (e: any) {
+          log("events_export_error", { error: e.message, stack: e.stack });
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          response.headers.set("x-optiview-request-id", crypto.randomUUID());
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        }
+      }
+
+      // 6.10) Referrals CSV Export API
+      if (url.pathname === "/api/referrals/export.csv" && req.method === "GET") {
+        try {
+          // Require authentication
+          const { user } = await requireAuth(req, env);
+
+          // Rate limiting for CSV exports (1 req/sec per user)
+          const csvRateLimiter = createRateLimiter({ rps: 1, burst: 1, retryAfter: 5 });
+          const rateLimitResult = csvRateLimiter.tryConsume(`csv_export_${user.id}`);
+
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded for CSV exports",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter?.toString() || "5"
+              }
+            });
+            response.headers.set("x-optiview-request-id", crypto.randomUUID());
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          const { project_id, from, to, cursor, limit = "10000" } = Object.fromEntries(url.searchParams);
+          if (!project_id) {
+            const response = new Response("Missing project_id parameter", { status: 400 });
+            response.headers.set("x-optiview-request-id", crypto.randomUUID());
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Validate project access
+          const project = await env.OPTIVIEW_DB.prepare(`
+            SELECT p.id, p.name, ps.xray_trace_enabled
+            FROM project p
+            LEFT JOIN project_settings ps ON p.id = ps.project_id
+            WHERE p.id = ?
+          `).bind(project_id).first<any>();
+
+          if (!project) {
+            const response = new Response("Project not found", { status: 404 });
+            response.headers.set("x-optiview-request-id", crypto.randomUUID());
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Parse date range
+          const fromTs = from ? new Date(from).getTime() : Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const toTs = to ? new Date(to).getTime() : Date.now();
+          const limitNum = Math.min(parseInt(limit), 10000);
+
+          // Parse cursor for pagination
+          let cursorData: { t: number; id: number } | null = null;
+          if (cursor) {
+            try {
+              const decoded = atob(cursor.replace(/-/g, '+').replace(/_/g, '/'));
+              cursorData = JSON.parse(decoded);
+            } catch (e) {
+              const response = new Response("Invalid cursor format", { status: 400 });
+              response.headers.set("x-optiview-request-id", crypto.randomUUID());
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+
+          // Build query with cursor-based pagination
+          let query = `
+            SELECT 
+              ar.detected_at,
+              ais.name as ai_source,
+              ar.ref_type,
+              p.domain as property,
+              ca.url as content_url
+            FROM ai_referrals ar
+            LEFT JOIN ai_sources ais ON ar.ai_source_id = ais.id
+            LEFT JOIN content_assets ca ON ar.content_id = ca.id
+            LEFT JOIN properties p ON ca.property_id = p.id
+            WHERE p.project_id = ? AND ar.detected_at BETWEEN ? AND ?
+          `;
+          let params = [project_id, fromTs, toTs];
+
+          if (cursorData) {
+            query += ` AND (ar.detected_at > ? OR (ar.detected_at = ? AND ar.id > ?))`;
+            params.push(cursorData.t, cursorData.t, cursorData.id);
+          }
+
+          query += ` ORDER BY ar.detected_at ASC, ar.id ASC LIMIT ?`;
+          params.push(limitNum);
+
+          const referrals = await env.OPTIVIEW_DB.prepare(query).bind(...params).all<any>();
+
+          if (referrals.results.length === 0) {
+            // Return empty CSV with headers
+            const csvHeaders = "detected_at,ai_source,ref_type,property,content_url\n";
+            const response = new Response(csvHeaders, {
+              headers: {
+                "Content-Type": "text/csv; charset=utf-8",
+                "Content-Disposition": `attachment; filename="optiview_referrals_${new Date(fromTs).toISOString().split('T')[0]}-${new Date(toTs).toISOString().split('T')[0]}.csv"`
+              }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+          }
+
+          // Generate next cursor
+          const lastReferral = referrals.results[referrals.results.length - 1];
+          const nextCursor = btoa(JSON.stringify({
+            t: lastReferral.detected_at,
+            id: lastReferral.id
+          })).replace(/\+/g, '-').replace(/\//g, '_');
+
+          // Convert to CSV
+          const csvRows = referrals.results.map((referral: any) => {
+            const row = [
+              new Date(referral.detected_at).toISOString(),
+              referral.ai_source || '',
+              referral.ref_type || '',
+              referral.property || '',
+              referral.content_url || ''
+            ];
+            return row.map(field => `"${field.replace(/"/g, '""')}"`).join(',');
+          });
+
+          const csvContent = "detected_at,ai_source,ref_type,property,content_url\n" + csvRows.join('\n');
+
+          const response = new Response(csvContent, {
+            headers: {
+              "Content-Type": "text/csv; charset=utf-8",
+              "Content-Disposition": `attachment; filename="optiview_referrals_${new Date(fromTs).toISOString().split('T')[0]}-${new Date(toTs).toISOString().split('T')[0]}.csv"`,
+              "x-optiview-next-cursor": nextCursor,
+              "x-optiview-total-rows": referrals.results.length.toString()
+            }
+          });
+
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        } catch (e: any) {
+          log("referrals_export_error", { error: e.message, stack: e.stack });
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          response.headers.set("x-optiview-request-id", crypto.randomUUID());
+          return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+        }
+
+        // 7) Authentication Routes
+        if (url.pathname.startsWith("/auth/")) {
+          // 7.1) Request OTP Code
+          if (url.pathname === "/auth/request-code" && req.method === "POST") {
+            try {
+              // Check Content-Type
+              const contentType = req.headers.get("content-type");
+              if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              const body = await req.json() as { email: string };
+              const { email } = body;
+
+              if (!email) {
+                const response = new Response(JSON.stringify({ error: "Email is required" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Normalize and validate email
+              const normalizedEmail = normalizeEmail(email);
+              if (!normalizedEmail) {
+                const response = new Response(JSON.stringify({ error: "Invalid email format" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Rate limiting by IP
+              const clientIP = getClientIP(req);
+              const loginRateLimiter = createRateLimiter({
+                rps: parseInt(env.LOGIN_RPM_PER_IP || "10") / 60,
+                burst: 1,
+                retryAfter: 60
+              });
+              const rateLimitResult = loginRateLimiter.tryConsume(`login_ip_${clientIP}`);
+
+              if (!rateLimitResult.allowed) {
+                const response = new Response(JSON.stringify({
+                  error: "Rate limit exceeded",
+                  retry_after: rateLimitResult.retryAfter
+                }), {
+                  status: 429,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Retry-After": rateLimitResult.retryAfter?.toString() || "60"
+                  }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Rate limiting by email per day
+              const emailRateLimiter = createRateLimiter({
+                rps: parseInt(env.LOGIN_RPD_PER_EMAIL || "50") / 86400,
+                burst: 1,
+                retryAfter: 86400
+              });
+              const emailRateLimitResult = emailRateLimiter.tryConsume(`login_email_${normalizedEmail}`);
+
+              if (!emailRateLimitResult.allowed) {
+                const response = new Response(JSON.stringify({
+                  error: "Too many requests for this email",
+                  retry_after: emailRateLimitResult.retryAfter
+                }), {
+                  status: 429,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Retry-After": emailRateLimitResult.retryAfter?.toString() || "86400"
+                  }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Get or create user
+              const user = await getOrCreateUser(env, normalizedEmail);
+
+              // Generate OTP code
+              const otpCode = generateOTPCode();
+              const otpHash = await hashSensitiveData(otpCode);
+              const expiresAt = generateOTPExpiry(parseInt(env.OTP_EXP_MIN || "10"));
+              const ipHash = await hashSensitiveData(clientIP);
+
+              // Store OTP code
+              await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO login_code (email, code_hash, created_at, expires_at, requester_ip_hash)
+              VALUES (?, ?, datetime('now'), ?, ?)
+            `).bind(normalizedEmail, otpHash, expiresAt.toISOString(), ipHash).run();
+
+              // Send email
+              const emailService = EmailService.fromEnv(env);
+              const htmlContent = emailService.generateOTPEmailHTML(normalizedEmail, otpCode, parseInt(env.OTP_EXP_MIN || "10"));
+              const textContent = emailService.generateOTPEmailText(normalizedEmail, otpCode, parseInt(env.OTP_EXP_MIN || "10"));
+
+              await emailService.sendEmail({
+                to: normalizedEmail,
+                subject: "Your Optiview Login Code",
+                html: htmlContent,
+                text: textContent
+              });
+
+              // Log the request (without the actual code)
+              log("otp_requested", {
+                email_hash: await hashSensitiveData(normalizedEmail),
+                ip_hash: ipHash,
+                user_id: user.id
+              });
+
+              // Always return success (no user enumeration)
+              const response = new Response(JSON.stringify({ ok: true }), {
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+
+            } catch (e: any) {
+              log("otp_request_error", { error: e.message, stack: e.stack });
+              const response = new Response(JSON.stringify({ ok: true }), { // Still no user enumeration
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+
+          // 7.2) Verify OTP Code
+          if (url.pathname === "/auth/verify-code" && req.method === "POST") {
+            try {
+              // Check Content-Type
+              const contentType = req.headers.get("content-type");
+              if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              const body = await req.json() as { email: string; code: string };
+              const { email, code } = body;
+
+              if (!email || !code) {
+                const response = new Response(JSON.stringify({ error: "Email and code are required" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Normalize email
+              const normalizedEmail = normalizeEmail(email);
+              if (!normalizedEmail) {
+                const response = new Response(JSON.stringify({ error: "Invalid email format" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Find the latest unconsumed code for this email
+              const loginCode = await env.OPTIVIEW_DB.prepare(`
+              SELECT * FROM login_code 
+              WHERE email = ? AND consumed_at IS NULL
+              ORDER BY created_at DESC 
+              LIMIT 1
+            `).bind(normalizedEmail).first<any>();
+
+              if (!loginCode) {
+                const response = new Response(JSON.stringify({ error: "Invalid or expired code" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Check if code is expired
+              if (new Date(loginCode.expires_at) < new Date()) {
+                const response = new Response(JSON.stringify({ error: "Invalid or expired code" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Check if code is locked
+              if (loginCode.attempts >= 5) {
+                const response = new Response(JSON.stringify({ error: "Code is locked due to too many attempts" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Verify code hash
+              const codeHash = await hashSensitiveData(code);
+              if (codeHash !== loginCode.code_hash) {
+                // Increment attempts
+                await env.OPTIVIEW_DB.prepare(`
+                UPDATE login_code SET attempts = attempts + 1 WHERE id = ?
+              `).bind(loginCode.id).run();
+
+                // Log failed attempt
+                log("otp_verification_failed", {
+                  email_hash: await hashSensitiveData(normalizedEmail),
+                  ip_hash: await hashSensitiveData(getClientIP(req)),
+                  attempts: loginCode.attempts + 1
+                });
+
+                const response = new Response(JSON.stringify({ error: "Invalid or expired code" }), {
+                  status: 400,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Code is valid - mark as consumed
+              await env.OPTIVIEW_DB.prepare(`
+              UPDATE login_code SET consumed_at = datetime('now') WHERE id = ?
+            `).bind(loginCode.id).run();
+
+              // Get or create user
+              const user = await getOrCreateUser(env, normalizedEmail);
+
+              // Create session
+              const sessionId = await createSession(env, user.id, req, parseInt(env.SESSION_TTL_HOURS || "720"));
+
+              // Set session cookie
+              const response = new Response(JSON.stringify({ ok: true }), {
+                headers: { "Content-Type": "application/json" }
+              });
+
+              setSessionCookie(response, sessionId, parseInt(env.SESSION_TTL_HOURS || "720") * 3600);
+
+              // Log successful login
+              log("otp_verification_success", {
+                email_hash: await hashSensitiveData(normalizedEmail),
+                ip_hash: await hashSensitiveData(getClientIP(req)),
+                user_id: user.id
+              });
+
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+
+            } catch (e: any) {
+              log("otp_verification_error", { error: e.message, stack: e.stack });
+              const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+
+          // 7.3) Logout
+          if (url.pathname === "/auth/logout" && req.method === "POST") {
+            try {
+              const sessionId = req.headers.get('cookie')?.split(';')
+                .find(c => c.trim().startsWith('ov_sess='))
+                ?.split('=')[1];
+
+              if (sessionId) {
+                await deleteSession(env, sessionId);
+              }
+
+              const response = new Response(JSON.stringify({ ok: true }), {
+                headers: { "Content-Type": "application/json" }
+              });
+
+              clearSessionCookie(response);
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+
+            } catch (e: any) {
+              log("logout_error", { error: e.message, stack: e.stack });
+              const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+
+          // 7.4) Get current user
+          if (url.pathname === "/auth/me" && req.method === "GET") {
+            try {
+              const { user } = await requireAuth(req, env);
+
+              const response = new Response(JSON.stringify({
+                id: user.id,
+                email: user.email,
+                is_admin: user.is_admin === 1
+              }), {
+                headers: { "Content-Type": "application/json" }
+              });
+
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+
+            } catch (e: any) {
+              const response = new Response(JSON.stringify({ error: "Unauthorized" }), {
+                status: 401,
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+        }
+
+        // 8) Admin Routes
+        if (url.pathname.startsWith("/admin/")) {
+          // 8.1) Admin Bootstrap (only when no admin exists)
+          if (url.pathname === "/admin/bootstrap" && req.method === "POST") {
+            try {
+              // Rate limiting for bootstrap (3 attempts/hour)
+              const bootstrapRateLimiter = createRateLimiter({ rps: 3 / 3600, burst: 1, retryAfter: 3600 });
+              const clientIP = getClientIP(req);
+              const rateLimitResult = bootstrapRateLimiter.tryConsume(`bootstrap_${clientIP}`);
+
+              if (!rateLimitResult.allowed) {
+                const response = new Response(JSON.stringify({
+                  error: "Rate limit exceeded for bootstrap",
+                  retry_after: rateLimitResult.retryAfter
+                }), {
+                  status: 429,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Retry-After": rateLimitResult.retryAfter?.toString() || "3600"
+                  }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Check if ADMIN_BOOTSTRAP_EMAIL is configured
+              const bootstrapEmail = env.ADMIN_BOOTSTRAP_EMAIL;
+              if (!bootstrapEmail) {
+                const response = new Response(JSON.stringify({
+                  error: "Bootstrap not configured"
+                }), { status: 403, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Attempt to bootstrap admin
+              const adminUser = await bootstrapAdmin(env, bootstrapEmail);
+              if (!adminUser) {
+                const response = new Response(JSON.stringify({
+                  error: "Admin already exists"
+                }), { status: 409, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              const response = new Response(JSON.stringify({
+                message: "Admin user bootstrapped successfully",
+                user: {
+                  id: adminUser.id,
+                  email: adminUser.email,
+                  is_admin: true
+                }
+              }), {
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+
+            } catch (e: any) {
+              log("admin_bootstrap_error", { error: e.message, stack: e.stack });
+              const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+              }), { status: 500, headers: { "Content-Type": "application/json" } });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+
+          // 8.2) Admin Rules Management API
+          if (url.pathname === "/admin/rules" && req.method === "GET") {
+            try {
+              // Require admin authentication
+              const { user } = await requireAdmin(req, env);
+
+              // Get current rules manifest from KV
+              const manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
+
+              if (!manifest) {
+                // Return default manifest if none exists
+                const defaultManifest = {
+                  version: 1,
+                  ua_list: [],
+                  heuristics: {
+                    referer_contains: [],
+                    headers: []
+                  },
+                  updated_at: new Date().toISOString(),
+                  updated_by: "system"
+                };
+
+                // Store default manifest
+                await env.AI_FINGERPRINTS.put("rules:manifest", JSON.stringify(defaultManifest));
+
+                const response = new Response(JSON.stringify(defaultManifest), {
+                  headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              const response = new Response(JSON.stringify(manifest), {
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            } catch (e: any) {
+              log("admin_rules_get_error", { error: e.message, stack: e.stack });
+              const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+              }), { status: 500, headers: { "Content-Type": "application/json" } });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+
+          if (url.pathname === "/admin/rules" && req.method === "POST") {
+            try {
+              // Require admin authentication
+              const { user } = await requireAdmin(req, env);
+
+              // Rate limiting for admin routes (30 rpm per IP)
+              const adminRateLimiter = createRateLimiter({ rps: 0.5, burst: 1, retryAfter: 60 });
+              const clientIP = req.headers.get("cf-connecting-ip") || "unknown";
+              const rateLimitResult = adminRateLimiter.tryConsume(`admin_${clientIP}`);
+
+              if (!rateLimitResult.allowed) {
+                const response = new Response(JSON.stringify({
+                  error: "Rate limit exceeded for admin routes",
+                  retry_after: rateLimitResult.retryAfter
+                }), {
+                  status: 429,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Retry-After": rateLimitResult.retryAfter?.toString() || "60"
+                  }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              // Check Content-Type
+              const contentType = req.headers.get("content-type");
+              if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+              }
+
+              const body = await req.json() as any;
+
+              // Get current manifest
+              const currentManifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json") || {
+                version: 0,
+                ua_list: [],
+                heuristics: {
+                  referer_contains: [],
+                  headers: []
+                },
+                updated_at: new Date(0).toISOString(),
+                updated_by: "system"
+              };
+
+              // Merge new rules with current
+              const mergedManifest = {
+                ...currentManifest,
+                ...body,
+                version: currentManifest.version + 1,
+                updated_at: new Date().toISOString(),
+                updated_by: user.id
+              };
+
+              // Store updated manifest
+              await env.AI_FINGERPRINTS.put("rules:manifest", JSON.stringify(mergedManifest));
+
+              // Update in-memory cache (if we had one)
+              // For now, the classifier will reload on next request
+
+              const response = new Response(JSON.stringify(mergedManifest), {
+                headers: { "Content-Type": "application/json" }
+              });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            } catch (e: any) {
+              log("admin_rules_post_error", { error: e.message, stack: e.stack });
+              const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+              }), { status: 500, headers: { "Content-Type": "application/json" } });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+
+          // 8.3) Admin Environment Check
+          if (url.pathname === "/admin/env-check" && req.method === "GET") {
+            try {
+              // Require admin authentication
+              const { user } = await requireAdmin(req, env);
+
+              // Check required environment variables
+              const requiredEnvVars = [
+                'SESSION_SECRET',
+                'COOKIE_NAME',
+                'SESSION_TTL_HOURS',
+                'OTP_EXP_MIN',
+                'LOGIN_RPM_PER_IP',
+                'LOGIN_RPD_PER_EMAIL',
+                'ADMIN_RPM_PER_IP',
+                'PUBLIC_BASE_URL'
+              ];
+
+              const envStatus = requiredEnvVars.map(varName => ({
+                name: varName,
+                present: !!env[varName],
+                value: env[varName] ? '***REDACTED***' : 'MISSING'
+              }));
+
+              const missingVars = envStatus.filter(status => !status.present);
+              const status = missingVars.length === 0 ? 'healthy' : 'missing_vars';
+
+              const response = new Response(JSON.stringify({
+                status,
+                timestamp: new Date().toISOString(),
+                environment: env.ENVIRONMENT || 'production',
+                variables: envStatus,
+                missing_count: missingVars.length,
+                total_required: requiredEnvVars.length
+              }), {
+                headers: { "Content-Type": "application/json" }
+              });
+
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+
+            } catch (e: any) {
+              const response = new Response(JSON.stringify({
+                error: "Unauthorized",
+                message: e.message
+              }), { status: 401, headers: { "Content-Type": "application/json" } });
+              return attach(addBasicSecurityHeaders(addCorsHeaders(response)));
+            }
+          }
+        }
+      }
+
+      // Default response - continue to origin
+      const response = new Response("not found", { status: 404 });
+      return addBasicSecurityHeaders(addCorsHeaders(response));
+    },
 
   // Cron job for refreshing fingerprints and retention purging
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    if (event.cron === "*/30 * * * *") {
-      try {
-        await refreshFingerprints(env);
-        
-        // Store last run timestamp in KV for health monitoring
-        await env.AI_FINGERPRINTS.put("cron:last_run_ts", Date.now().toString());
-        
-        log("fingerprints_refreshed", { timestamp: Date.now() });
-      } catch (error) {
-        log("fingerprints_refresh_error", {
-          error: error instanceof Error ? error.message : String(error)
-        });
+      if (event.cron === "*/30 * * * *") {
+        try {
+          await refreshFingerprints(env);
+
+          // Store last run timestamp in KV for health monitoring
+          await env.AI_FINGERPRINTS.put("cron:last_run_ts", Date.now().toString());
+
+          log("fingerprints_refreshed", { timestamp: Date.now() });
+        } catch (error) {
+          log("fingerprints_refresh_error", {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+
+      // Daily retention purge at 03:10 UTC
+      if (event.cron === "10 3 * * *") {
+        try {
+          await runRetentionPurge(env);
+
+          // Store last run timestamp in KV for health monitoring
+          await env.AI_FINGERPRINTS.put("cron:last_run_ts", Date.now().toString());
+
+          log("retention_purge_completed", { timestamp: Date.now() });
+        } catch (error) {
+          log("retention_purge_error", {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+
+      // Demo data generation every minute (for testing)
+      if (event.cron === "* * * * *") {
+        try {
+          // Check if demo mode is enabled
+          const demoMode = await env.AI_FINGERPRINTS.get("demo:enabled", "json");
+          if (demoMode) {
+            await generateSyntheticEvents(env.OPTIVIEW_DB);
+            log("demo_data_generated", { timestamp: Date.now() });
+          }
+        } catch (error) {
+          log("demo_data_generation_error", {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
       }
     }
+  };
 
-    // Daily retention purge at 03:10 UTC
-    if (event.cron === "10 3 * * *") {
-      try {
-        await runRetentionPurge(env);
-        
-        // Store last run timestamp in KV for health monitoring
-        await env.AI_FINGERPRINTS.put("cron:last_run_ts", Date.now().toString());
-        
-        log("retention_purge_completed", { timestamp: Date.now() });
-      } catch (error) {
-        log("retention_purge_error", {
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
-    }
-  }
-};
-
-// Helper functions
-async function resolvePropertyByHost(env: Env, host: string) {
+  // Helper functions
+  async function resolvePropertyByHost(env: Env, host: string) {
   try {
     const property = await env.OPTIVIEW_DB.prepare(`
       SELECT p.id, p.domain, p.project_id
@@ -1275,6 +2148,12 @@ async function logInteraction(env: Env, event: {
   metadata: any;
 }) {
   try {
+    // Add ruleset version to metadata
+    const metadataWithVersion = {
+      ...event.metadata,
+      ruleset_version: getCurrentRulesetVersion()
+    };
+
     const result = await env.OPTIVIEW_DB.prepare(`
       INSERT INTO interaction_events (project_id, content_id, ai_source_id, event_type, metadata, occurred_at)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -1283,7 +2162,7 @@ async function logInteraction(env: Env, event: {
       event.content_id,
       event.ai_source_id,
       event.event_type,
-      JSON.stringify(event.metadata),
+      JSON.stringify(metadataWithVersion),
       Date.now()
     ).run();
 
@@ -1325,14 +2204,14 @@ async function runRetentionPurge(env: Env) {
         const cutoffEvents = now - (project.retention_days_events * 24 * 60 * 60 * 1000);
         let affectedRows = 1;
         let maxLoops = 100; // Safety guard
-        
+
         while (affectedRows > 0 && maxLoops > 0) {
           const result = await env.OPTIVIEW_DB.prepare(`
             DELETE FROM interaction_events 
             WHERE project_id = ? AND occurred_at < ? 
             LIMIT 1000
           `).bind(project.project_id, cutoffEvents).run();
-          
+
           affectedRows = result.meta.changes || 0;
           projectDeletedEvents += affectedRows;
           maxLoops--;
@@ -1342,7 +2221,7 @@ async function runRetentionPurge(env: Env) {
         const cutoffReferrals = now - (project.retention_days_referrals * 24 * 60 * 60 * 1000);
         affectedRows = 1;
         maxLoops = 100; // Safety guard
-        
+
         while (affectedRows > 0 && maxLoops > 0) {
           const result = await env.OPTIVIEW_DB.prepare(`
             DELETE FROM ai_referrals 
@@ -1353,7 +2232,7 @@ async function runRetentionPurge(env: Env) {
             ) AND detected_at < ?
             LIMIT 1000
           `).bind(project.project_id, cutoffReferrals).run();
-          
+
           affectedRows = result.meta.changes || 0;
           projectDeletedReferrals += affectedRows;
           maxLoops--;
@@ -1385,7 +2264,7 @@ async function runRetentionPurge(env: Env) {
     }
 
     const duration = Date.now() - startTime;
-    
+
     // Log summary
     log("retention_purge_summary", {
       projects_processed: projectsProcessed,

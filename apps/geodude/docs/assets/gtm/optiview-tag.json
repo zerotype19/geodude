@@ -1,0 +1,202 @@
+{
+  "exportFormat": 1,
+  "exportVersion": 1,
+  "exportTime": "2025-08-13T17:30:00Z",
+  "containerVersion": {
+    "path": "accounts/123456789/containers/123456789/versions/1",
+    "accountId": "123456789",
+    "containerId": "123456789",
+    "containerVersionId": "1",
+    "container": {
+      "path": "accounts/123456789/containers/123456789",
+      "accountId": "123456789",
+      "containerId": "123456789",
+      "name": "Optiview Demo Container",
+      "publicId": "GTM-XXXXXXX",
+      "usageContext": ["web"],
+      "fingerprint": "1234567890abcdef"
+    },
+    "name": "Version 1",
+    "description": "",
+    "path": "accounts/123456789/containers/123456789/versions/1",
+    "fingerprint": "1234567890abcdef",
+    "tag": [
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "tagId": "1",
+        "name": "Optiview Analytics",
+        "type": "html",
+        "tagFiringOption": "oncePerEvent",
+        "parameter": [
+          {
+            "type": "template",
+            "key": "html",
+            "value": "<script>\n(function() {\n  try {\n    var projectId = '{{PROJECT_ID}}';\n    var propertyId = '{{PROPERTY_ID}}';\n    var keyId = '{{KEY_ID}}';\n    var endpoint = '{{ENDPOINT}}' || '{{PUBLIC_BASE_URL}}/api/events';\n    \n    var payload = {\n      project_id: parseInt(projectId),\n      property_id: propertyId,\n      event_type: 'page_view',\n      metadata: {\n        p: location.pathname,\n        r: document.referrer ? new URL(document.referrer).hostname : '',\n        t: document.title.slice(0,120),\n        ua: navigator.userAgent.slice(0,100),\n        gtm: true\n      }\n    };\n    \n    var body = JSON.stringify(payload);\n    var timestamp = Math.floor(Date.now() / 1000);\n    \n    // For GTM, we'll use a simplified approach\n    // In production, implement proper HMAC signing\n    fetch(endpoint, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        'x-optiview-key-id': keyId,\n        'x-optiview-timestamp': timestamp.toString()\n      },\n      body: body\n    }).catch(function(e) {\n      // Silent fail for analytics\n      console.debug('Optiview tracking failed:', e);\n    });\n  } catch(e) {\n    console.debug('Optiview tracking error:', e);\n  }\n})();\n</script>"
+          }
+        ],
+        "firingTriggerId": ["1"],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?tagId=1&fireTag=1"
+      }
+    ],
+    "trigger": [
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "triggerId": "1",
+        "name": "All Pages",
+        "type": "pageview",
+        "autoEventFilter": [],
+        "filter": [],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?triggerId=1"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "triggerId": "2",
+        "name": "Custom Events",
+        "type": "customEvent",
+        "autoEventFilter": [],
+        "filter": [],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?triggerId=2"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "triggerId": "3",
+        "name": "Form Submissions",
+        "type": "formSubmit",
+        "autoEventFilter": [],
+        "filter": [],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?triggerId=3"
+      }
+    ],
+    "variable": [
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "1",
+        "name": "PROJECT_ID",
+        "type": "constant",
+        "parameter": [
+          {
+            "type": "template",
+            "key": "value",
+            "value": "123"
+          }
+        ],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=1"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "2",
+        "name": "PROPERTY_ID",
+        "type": "constant",
+        "parameter": [
+          {
+            "type": "template",
+            "key": "value",
+            "value": "456"
+          }
+        ],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=2"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "3",
+        "name": "KEY_ID",
+        "type": "constant",
+        "parameter": [
+          {
+            "type": "template",
+            "key": "value",
+            "value": "key_abc123"
+          }
+        ],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=3"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "4",
+        "name": "ENDPOINT",
+        "type": "constant",
+        "parameter": [
+          {
+            "type": "template",
+            "key": "value",
+            "value": "{{PUBLIC_BASE_URL}}/api/events"
+          }
+        ],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=4"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "5",
+        "name": "PUBLIC_BASE_URL",
+        "type": "constant",
+        "parameter": [
+          {
+            "type": "template",
+            "key": "value",
+            "value": "https://api.optiview.ai"
+          }
+        ],
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=5"
+      }
+    ],
+    "builtInVariable": [
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "1",
+        "name": "Page URL",
+        "type": "pageUrl",
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=1"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "2",
+        "name": "Page Hostname",
+        "type": "pageHostname",
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=2"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "3",
+        "name": "Page Path",
+        "type": "pagePath",
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=3"
+      },
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "variableId": "4",
+        "name": "Referrer",
+        "type": "referrer",
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1?variableId=4"
+      }
+    ],
+    "client": [],
+    "customTemplate": [],
+    "folder": [],
+    "permission": [
+      {
+        "accountId": "123456789",
+        "containerId": "123456789",
+        "permission": [
+          "read",
+          "edit",
+          "delete",
+          "publish"
+        ]
+      }
+    ],
+    "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/123456789/containers/123456789/versions/1"
+  }
+}

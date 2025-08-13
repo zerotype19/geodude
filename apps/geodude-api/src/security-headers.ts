@@ -13,11 +13,11 @@ export function addSecurityHeaders(response: Response, config: SecurityHeadersCo
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-Frame-Options', 'DENY');
-  
+
   // Add CSP based on mode
   const csp = generateCSP(config.cspMode);
   response.headers.set('Content-Security-Policy', csp);
-  
+
   return response;
 }
 
@@ -27,6 +27,14 @@ export function addSecurityHeaders(response: Response, config: SecurityHeadersCo
 export function addBasicSecurityHeaders(response: Response): Response {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  return response;
+}
+
+/**
+ * Add trace header for dashboard pages when xray is enabled
+ */
+export function addTraceHeader(response: Response, trafficClass: string, rulesetVersion: number): Response {
+  response.headers.set('x-optiview-trace', `${trafficClass},v=${rulesetVersion}`);
   return response;
 }
 
@@ -47,7 +55,7 @@ function generateCSP(mode: 'production' | 'development'): string {
       "form-action 'self'"
     ].join('; ');
   }
-  
+
   // Production CSP (strict)
   return [
     "default-src 'self'",

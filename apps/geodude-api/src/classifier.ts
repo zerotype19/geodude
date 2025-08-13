@@ -8,12 +8,11 @@ export interface TrafficClassification {
   category: string | null;
 }
 
-// In-memory cache for fingerprints (5 min TTL)
-let fingerprintCache: {
-  ua_patterns: any[];
-  heuristics: any;
-  sources_index: any;
+// In-memory cache for rules manifest (5 min TTL)
+let rulesCache: {
+  manifest: any;
   last_updated: number;
+  version: number;
 } | null = null;
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -21,11 +20,11 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 export async function classifyRequest(req: Request, env: Env): Promise<TrafficClassification> {
   try {
     // Warm cache if needed
-    await warmFingerprintCache(env);
-    
+    await warmRulesCache(env);
+
     const userAgent = req.headers.get("user-agent") || "";
     const referer = req.headers.get("referer") || "";
-    
+
     // 1. Check User-Agent patterns first (highest confidence)
     const uaMatch = matchUserAgent(userAgent);
     if (uaMatch) {
@@ -37,7 +36,7 @@ export async function classifyRequest(req: Request, env: Env): Promise<TrafficCl
         category: uaMatch.category
       };
     }
-    
+
     // 2. Check referer heuristics (medium confidence)
     const refMatch = matchReferer(referer);
     if (refMatch) {
@@ -49,7 +48,7 @@ export async function classifyRequest(req: Request, env: Env): Promise<TrafficCl
         category: refMatch.category
       };
     }
-    
+
     // 3. Check header heuristics
     const headerMatch = matchHeaders(req.headers);
     if (headerMatch) {
@@ -61,7 +60,7 @@ export async function classifyRequest(req: Request, env: Env): Promise<TrafficCl
         category: headerMatch.category
       };
     }
-    
+
     // 4. Check for unknown AI-like patterns
     if (isUnknownAILike(userAgent)) {
       return {
@@ -72,7 +71,7 @@ export async function classifyRequest(req: Request, env: Env): Promise<TrafficCl
         category: null
       };
     }
-    
+
     // 5. Default to direct human
     return {
       traffic_class: "direct_human",
@@ -81,14 +80,14 @@ export async function classifyRequest(req: Request, env: Env): Promise<TrafficCl
       confidence: 1.0,
       category: null
     };
-    
+
   } catch (error) {
-    log("classification_error", { 
+    log("classification_error", {
       error: error instanceof Error ? error.message : String(error),
       ua: req.headers.get("user-agent"),
       referer: req.headers.get("referer")
     });
-    
+
     // Fallback to unknown
     return {
       traffic_class: "unknown_ai_like",
@@ -100,85 +99,98 @@ export async function classifyRequest(req: Request, env: Env): Promise<TrafficCl
   }
 }
 
-async function warmFingerprintCache(env: Env) {
+async function warmRulesCache(env: Env) {
   const now = Date.now();
-  
-  // Check if cache is still valid
-  if (fingerprintCache && (now - fingerprintCache.last_updated) < CACHE_TTL) {
-    return;
-  }
-  
+
   try {
-    // Load fingerprints from KV
-    const [uaPatterns, heuristics, sourcesIndex] = await Promise.all([
-      env.AI_FINGERPRINTS.get("ua:list", "json"),
-      env.AI_FINGERPRINTS.get("rules:heuristics", "json"),
-      env.AI_FINGERPRINTS.get("sources:index", "json")
-    ]);
-    
-    fingerprintCache = {
-      ua_patterns: (uaPatterns as any[]) || [],
-      heuristics: (heuristics as any) || { referer_contains: [], headers: [] },
-      sources_index: (sourcesIndex as any) || {},
-      last_updated: now
-    };
-    
-    log("fingerprint_cache_warmed", { 
-      patterns: fingerprintCache.ua_patterns.length,
-      heuristics: Object.keys(fingerprintCache.heuristics).length,
-      sources: Object.keys(fingerprintCache.sources_index).length
-    });
-    
+    // Load rules manifest from KV
+    const manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
+
+    // Check if cache is still valid and version hasn't changed
+    if (rulesCache &&
+      (now - rulesCache.last_updated) < CACHE_TTL &&
+      rulesCache.version === (manifest?.version || 0)) {
+      return;
+    }
+
+    if (manifest) {
+      rulesCache = {
+        manifest,
+        last_updated: now,
+        version: manifest.version
+      };
+
+      log("rules_cache_warmed", {
+        version: manifest.version,
+        ua_patterns: manifest.ua_list?.length || 0,
+        heuristics: Object.keys(manifest.heuristics || {}).length
+      });
+    } else {
+      // Use fallback data if no manifest exists
+      rulesCache = {
+        manifest: {
+          version: 0,
+          ua_list: [],
+          heuristics: { referer_contains: [], headers: [] }
+        },
+        last_updated: now,
+        version: 0
+      };
+    }
+
   } catch (error) {
-    log("fingerprint_cache_warm_error", { 
-      error: error instanceof Error ? error.message : String(error) 
+    log("rules_cache_warm_error", {
+      error: error instanceof Error ? error.message : String(error)
     });
-    
+
     // Use fallback data if KV is unavailable
-    fingerprintCache = {
-      ua_patterns: [] as any[],
-      heuristics: { referer_contains: [], headers: [] } as any,
-      sources_index: {} as any,
-      last_updated: now
+    rulesCache = {
+      manifest: {
+        version: 0,
+        ua_list: [],
+        heuristics: { referer_contains: [], headers: [] }
+      },
+      last_updated: now,
+      version: 0
     };
   }
 }
 
 function matchUserAgent(userAgent: string): any | null {
-  if (!fingerprintCache?.ua_patterns) return null;
-  
-  for (const pattern of fingerprintCache.ua_patterns) {
+  if (!rulesCache?.manifest?.ua_list) return null;
+
+  for (const pattern of rulesCache.manifest.ua_list) {
     if (userAgent.includes(pattern.pattern)) {
       return {
         ...pattern,
-        ai_source_id: fingerprintCache.sources_index[pattern.source] || null
+        ai_source_id: null // Would need to be resolved from ai_sources table
       };
     }
   }
-  
+
   return null;
 }
 
 function matchReferer(referer: string): any | null {
-  if (!fingerprintCache?.heuristics?.referer_contains) return null;
-  
-  for (const rule of fingerprintCache.heuristics.referer_contains) {
+  if (!rulesCache?.manifest?.heuristics?.referer_contains) return null;
+
+  for (const rule of rulesCache.manifest.heuristics.referer_contains) {
     if (referer.includes(rule.needle)) {
       return {
         ...rule,
-        ai_source_id: fingerprintCache.sources_index[rule.source] || null,
+        ai_source_id: null, // Would need to be resolved from ai_sources table
         category: getCategoryFromSource(rule.source)
       };
     }
   }
-  
+
   return null;
 }
 
 function matchHeaders(headers: Headers): any | null {
-  if (!fingerprintCache?.heuristics?.headers) return null;
-  
-  for (const rule of fingerprintCache.heuristics.headers) {
+  if (!rulesCache?.manifest?.heuristics?.headers) return null;
+
+  for (const rule of rulesCache.heuristics.headers) {
     const headerValue = headers.get(rule.header);
     if (headerValue && (rule.value === "*" || headerValue.includes(rule.value))) {
       return {
@@ -188,27 +200,27 @@ function matchHeaders(headers: Headers): any | null {
       };
     }
   }
-  
+
   return null;
 }
 
 function isUnknownAILike(userAgent: string): boolean {
   if (!userAgent) return true;
-  
+
   const aiKeywords = ["AI", "Bot", "Crawler", "Spider", "Agent"];
-  const hasAIKeyword = aiKeywords.some(keyword => 
+  const hasAIKeyword = aiKeywords.some(keyword =>
     userAgent.toLowerCase().includes(keyword.toLowerCase())
   );
-  
+
   // Check for suspicious patterns
   const suspiciousPatterns = [
     /^[A-Za-z0-9]{20,}$/, // Very long random strings
     /^[A-Za-z0-9]{1,5}$/, // Very short strings
     /^[A-Za-z0-9]+$/, // Only alphanumeric (no spaces, punctuation)
   ];
-  
+
   const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(userAgent));
-  
+
   return hasAIKeyword || isSuspicious;
 }
 
@@ -225,6 +237,13 @@ function getCategoryFromSource(source: string): string {
   };
   
   return categoryMap[source] || "unknown";
+}
+
+/**
+ * Get the current ruleset version for stamping events
+ */
+export function getCurrentRulesetVersion(): number {
+  return rulesCache?.version || 0;
 }
 
 // Types
