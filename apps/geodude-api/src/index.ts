@@ -208,6 +208,8 @@ export default {
     if (url.pathname.startsWith("/p/")) {
       const pid = url.pathname.split("/").pop()!;
       try {
+        log("direct_redirect_start", { pid });
+        
         // Try to find the PID in different org/project contexts
         // First try the system org/project, then try to infer from the request
         let destUrl = null;
@@ -216,17 +218,27 @@ export default {
         
         // Try system org/project first
         const systemKey = `${org_id}:${project_id}:${pid}`;
+        log("direct_redirect_debug", { step: "trying_system", key: systemKey });
         destUrl = await env.DEST_MAP.get(systemKey);
+        log("direct_redirect_debug", { step: "system_result", found: !!destUrl, url: destUrl });
         
         // If not found in system, try to get from user's current context via cookie
         if (!destUrl) {
           try {
+            log("direct_redirect_debug", { step: "trying_session" });
             const session = await getCookie(req, "geodude_ses");
+            log("direct_redirect_debug", { step: "session_cookie", found: !!session, session: session ? "present" : "missing" });
+            
             if (session) {
               const sessionData = JSON.parse(session);
+              log("direct_redirect_debug", { step: "session_parsed", org_id: sessionData.org_id, project_id: sessionData.project_id });
+              
               if (sessionData.org_id && sessionData.project_id) {
                 const userKey = `${sessionData.org_id}:${sessionData.project_id}:${pid}`;
+                log("direct_redirect_debug", { step: "trying_user_context", key: userKey });
                 destUrl = await env.DEST_MAP.get(userKey);
+                log("direct_redirect_debug", { step: "user_context_result", found: !!destUrl, url: destUrl });
+                
                 if (destUrl) {
                   org_id = sessionData.org_id;
                   project_id = sessionData.project_id;
@@ -234,14 +246,18 @@ export default {
               }
             }
           } catch (e) {
+            log("direct_redirect_debug", { step: "session_error", error: e.message });
             // Ignore session parsing errors, fall back to system
           }
         }
         
         if (!destUrl) {
+          log("direct_redirect_debug", { step: "not_found", pid, org_id, project_id });
           const response = new Response(`PID not found: ${pid}`, { status: 404 });
           return attach(addCorsHeaders(response));
         }
+
+        log("direct_redirect_debug", { step: "found", pid, org_id, project_id, destUrl });
 
         // session + ai_ref cookies
         const headers = new Headers();
@@ -281,6 +297,7 @@ export default {
         log("direct_redirect", { pid: pid, dest: dest.toString(), org_id, project_id });
         return attach(addCorsHeaders(resp));
       } catch (e: any) {
+        log("direct_redirect_error", { pid, error: e.message, stack: e.stack });
         const response = new Response(`redirect error: ${e?.message ?? ""}`, { status: 500 });
         return attach(addCorsHeaders(response));
       }
