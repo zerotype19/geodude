@@ -207,122 +207,250 @@ export default {
       }
     }
 
-            // Delete mapping
-        if (url.pathname === "/admin/kv" && req.method === "DELETE") {
-          try {
-            requireAdmin(req, env);
-            const pid = url.searchParams.get("pid");
-            if (!pid) {
-              const response = new Response("bad request", { status: 400 });
-              return addCorsHeaders(response);
-            }
-            await env.DEST_MAP.delete(pid);
-            const response = Response.json({ ok: true });
-            return addCorsHeaders(response);
-          } catch (e: any) {
-            const response = new Response(e.message || "error", { status: e.message === "unauthorized" ? 500 : 500 });
-            return addCorsHeaders(response);
-          }
+    // Delete mapping
+    if (url.pathname === "/admin/kv" && req.method === "DELETE") {
+      try {
+        requireAdmin(req, env);
+        const pid = url.searchParams.get("pid");
+        if (!pid) {
+          const response = new Response("bad request", { status: 400 });
+          return addCorsHeaders(response);
         }
+        await env.DEST_MAP.delete(pid);
+        const response = Response.json({ ok: true });
+        return addCorsHeaders(response);
+      } catch (e: any) {
+        const response = new Response(e.message || "error", { status: e.message === "unauthorized" ? 500 : 500 });
+        return addCorsHeaders(response);
+      }
+    }
 
-        // AI Citation Ingest: NDJSON lines of {"capture":{...}} and {"citation":{...}}
-        if (url.pathname === "/ingest/ai-citations" && req.method === "POST") {
-          if (req.headers.get("authorization") !== `Bearer ${env.INGEST_API_KEY}`) {
-            const response = new Response("unauthorized", { status: 401 });
-            return addCorsHeaders(response);
-          }
-          const reader = req.body?.getReader();
-          if (!reader) {
-            const response = new Response("no body", { status: 400 });
-            return addCorsHeaders(response);
-          }
+    // AI Citation Ingest: NDJSON lines of {"capture":{...}} and {"citation":{...}}
+    if (url.pathname === "/ingest/ai-citations" && req.method === "POST") {
+      if (req.headers.get("authorization") !== `Bearer ${env.INGEST_API_KEY}`) {
+        const response = new Response("unauthorized", { status: 401 });
+        return addCorsHeaders(response);
+      }
+      const reader = req.body?.getReader();
+      if (!reader) {
+        const response = new Response("no body", { status: 400 });
+        return addCorsHeaders(response);
+      }
 
-          const decoder = new TextDecoder();
-          let buf = ""; 
-          let inserted = 0;
-          const captures: any[] = []; 
-          const cites: any[] = [];
+      const decoder = new TextDecoder();
+      let buf = "";
+      let inserted = 0;
+      const captures: any[] = [];
+      const cites: any[] = [];
 
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            let i;
-            while ((i = buf.indexOf("\n")) >= 0) {
-              const line = buf.slice(0, i).trim(); 
-              buf = buf.slice(i + 1);
-              if (!line) continue;
-              const obj = JSON.parse(line);
-              if (obj.capture) captures.push(obj.capture);
-              if (obj.citation) cites.push(obj.citation);
-            }
-          }
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, i).trim();
+          buf = buf.slice(i + 1);
+          if (!line) continue;
+          const obj = JSON.parse(line);
+          if (obj.capture) captures.push(obj.capture);
+          if (obj.citation) cites.push(obj.citation);
+        }
+      }
 
-          const stmts: D1PreparedStatement[] = [];
-          for (const c of captures) {
-            stmts.push(
-              env.GEO_DB.prepare(
-                `INSERT OR REPLACE INTO ai_surface_capture
+      const stmts: D1PreparedStatement[] = [];
+      for (const c of captures) {
+        stmts.push(
+          env.GEO_DB.prepare(
+            `INSERT OR REPLACE INTO ai_surface_capture
                  (id, ts, surface, model_variant, persona, geo, query_text, dom_url, screenshot_url)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
-              ).bind(
-                c.id, c.ts, c.surface, c.model_variant ?? null, c.persona ?? null, c.geo ?? null,
-                c.query_text ?? null, c.dom_url ?? null, c.screenshot_url ?? null
-              )
-            );
-          }
-          for (const x of cites) {
-            stmts.push(
-              env.GEO_DB.prepare(
-                `INSERT INTO ai_citation_event
+          ).bind(
+            c.id, c.ts, c.surface, c.model_variant ?? null, c.persona ?? null, c.geo ?? null,
+            c.query_text ?? null, c.dom_url ?? null, c.screenshot_url ?? null
+          )
+        );
+      }
+      for (const x of cites) {
+        stmts.push(
+          env.GEO_DB.prepare(
+            `INSERT INTO ai_citation_event
                  (capture_id, ts, surface, query, url, rank, confidence)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
-              ).bind(
-                x.capture_id, x.ts, x.surface, x.query, x.url, x.rank ?? null, x.confidence ?? null
-              )
-            );
-          }
-          if (stmts.length) {
-            const CHUNK = 50;
-            for (let k = 0; k < stmts.length; k += CHUNK) {
-              await env.GEO_DB.batch(stmts.slice(k, k + CHUNK));
-            }
-            inserted = stmts.length;
-          }
-          const response = Response.json({ inserted, captures: captures.length, citations: cites.length });
+          ).bind(
+            x.capture_id, x.ts, x.surface, x.query, x.url, x.rank ?? null, x.confidence ?? null
+          )
+        );
+      }
+      if (stmts.length) {
+        const CHUNK = 50;
+        for (let k = 0; k < stmts.length; k += CHUNK) {
+          await env.GEO_DB.batch(stmts.slice(k, k + CHUNK));
+        }
+        inserted = stmts.length;
+      }
+      const response = Response.json({ inserted, captures: captures.length, citations: cites.length });
+      return addCorsHeaders(response);
+    }
+
+    // Public AI feeds (signed NDJSON)
+    function sign(body: string, key: string) {
+      // simple HMAC-SHA256 base64url
+      return crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+        .then(k => crypto.subtle.sign("HMAC", k, new TextEncoder().encode(body)))
+        .then(buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
+    }
+
+    if (url.pathname === "/ai/corpus.ndjson" && req.method === "GET") {
+      const body = [
+        JSON.stringify({ type: "entity", id: "site", canonical: "https://geodude.pages.dev" }),
+        JSON.stringify({ type: "fact", entity: "site", property: "product", value: "geodude" })
+      ].join("\n") + "\n";
+      const h = new Headers({ "content-type": "application/x-ndjson" });
+      const signature = await sign(body, env.AI_FEED_SIGNING_KEY);
+      h.set("X-AI-Signature", signature);
+      const response = new Response(body, { headers: h });
+      return addCorsHeaders(response);
+    }
+
+    if (url.pathname === "/ai/faqs.ndjson" && req.method === "GET") {
+      const body = [
+        JSON.stringify({ type: "faq", q: "What is geodude?", a: "AI referral tracking and GEO toolkit.", canonical: "https://geodude.pages.dev" })
+      ].join("\n") + "\n";
+      const h = new Headers({ "content-type": "application/x-ndjson" });
+      const signature = await sign(body, env.AI_FEED_SIGNING_KEY);
+      h.set("X-AI-Signature", signature);
+      const response = new Response(body, { headers: h });
+      return addCorsHeaders(response);
+    }
+
+    // Admin token generator (server-side signing)
+    type TokenReq = {
+      src: "chatgpt" | "perplexity" | "copilot" | "gemini" | "meta" | "other";
+      model?: string;         // e.g. gpt-5-browser
+      pid: string;            // slug: [a-z0-9_-]{1,64}
+      geo?: string;           // e.g. us
+      ttl_minutes?: number;   // default 60
+    };
+
+    function validPid(pid: string) {
+      return /^[a-z0-9_-]{1,64}$/.test(pid);
+    }
+
+    async function hmacSign(payload: object, secret: string) {
+      const b64 = btoa(JSON.stringify(payload));
+      const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(b64));
+      const sig = btoa(String.fromCharCode(...new Uint8Array(mac))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      return `${b64}.${sig}`;
+    }
+
+    if (url.pathname === "/admin/token" && req.method === "POST") {
+      try {
+        requireAdmin(req, env);
+        const body = await req.json() as TokenReq;
+        if (!body?.src || !body?.pid) {
+          const response = new Response("bad request", { status: 400 });
+          return addCorsHeaders(response);
+        }
+        if (!validPid(body.pid)) {
+          const response = new Response("invalid pid", { status: 400 });
           return addCorsHeaders(response);
         }
 
-        // Public AI feeds (signed NDJSON)
-        function sign(body: string, key: string) {
-          // simple HMAC-SHA256 base64url
-          return crypto.subtle.importKey("raw", new TextEncoder().encode(key), {name:"HMAC", hash:"SHA-256"}, false, ["sign"])
-            .then(k => crypto.subtle.sign("HMAC", k, new TextEncoder().encode(body)))
-            .then(buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""));
-        }
+        const ttl = Math.min(Math.max(body.ttl_minutes ?? 60, 5), 7 * 24 * 60); // 5 min – 7 days
+        const tokenPayload = {
+          v: 1,
+          src: body.src,
+          model: body.model ?? null,
+          pid: body.pid,
+          geo: body.geo ?? null,
+          exp: Math.floor(Date.now() / 1000) + ttl * 60
+        };
+        const token = await hmacSign(tokenPayload, env.HMAC_KEY);
+        const base = new URL(req.url);
+        const redirectUrl = `${base.origin}/r/${token}`;
 
-        if (url.pathname === "/ai/corpus.ndjson" && req.method === "GET") {
-          const body = [
-            JSON.stringify({ type:"entity", id:"site", canonical:"https://geodude.pages.dev" }),
-            JSON.stringify({ type:"fact", entity:"site", property:"product", value:"geodude" })
-          ].join("\n") + "\n";
-          const h = new Headers({ "content-type":"application/x-ndjson" });
-          const signature = await sign(body, env.AI_FEED_SIGNING_KEY);
-          h.set("X-AI-Signature", signature);
-          const response = new Response(body, { headers: h });
-          return addCorsHeaders(response);
-        }
+        const response = Response.json({ token, redirectUrl, payload: tokenPayload });
+        return addCorsHeaders(response);
+      } catch (e: any) {
+        const response = new Response(e.message || "error", { status: e.message === "unauthorized" ? 401 : 500 });
+        return addCorsHeaders(response);
+      }
+    }
 
-        if (url.pathname === "/ai/faqs.ndjson" && req.method === "GET") {
-          const body = [
-            JSON.stringify({ type:"faq", q:"What is geodude?", a:"AI referral tracking and GEO toolkit.", canonical:"https://geodude.pages.dev" })
-          ].join("\n") + "\n";
-          const h = new Headers({ "content-type":"application/x-ndjson" });
-          const signature = await sign(body, env.AI_FEED_SIGNING_KEY);
-          h.set("X-AI-Signature", signature);
-          const response = new Response(body, { headers: h });
-          return addCorsHeaders(response);
-        }
+    // Analytics APIs (filters + charts)
+    function parseWindow(u: URL) {
+      const now = Date.now();
+      const from = Number(u.searchParams.get("from") ?? (now - 7 * 24 * 3600 * 1000)); // 7d default
+      const to = Number(u.searchParams.get("to") ?? now);
+      return { from, to };
+    }
+
+    // aggregate: clicks by src
+    if (url.pathname === "/metrics/clicks_by_src" && req.method === "GET") {
+      const { from, to } = parseWindow(url);
+      const rows = await env.GEO_DB.prepare(
+        `SELECT COALESCE(src,'unknown') AS src, COUNT(*) AS cnt
+             FROM edge_click_event WHERE ts BETWEEN ?1 AND ?2
+             GROUP BY src ORDER BY cnt DESC`
+      ).bind(from, to).all<any>();
+      const response = Response.json({ rows: rows.results ?? [] });
+      return addCorsHeaders(response);
+    }
+
+    // aggregate: top pids
+    if (url.pathname === "/metrics/top_pids" && req.method === "GET") {
+      const { from, to } = parseWindow(url);
+      const limit = Math.min(parseInt(url.searchParams.get("limit") || "20", 10), 100);
+      const rows = await env.GEO_DB.prepare(
+        `SELECT COALESCE(pid,'') AS pid, COUNT(*) AS cnt
+             FROM edge_click_event WHERE ts BETWEEN ?1 AND ?2
+             GROUP BY pid ORDER BY cnt DESC LIMIT ?3`
+      ).bind(from, to, limit).all<any>();
+      const response = Response.json({ rows: rows.results ?? [] });
+      return addCorsHeaders(response);
+    }
+
+    // timeseries (daily buckets)
+    if (url.pathname === "/metrics/clicks_timeseries" && req.method === "GET") {
+      const { from, to } = parseWindow(url);
+      const rows = await env.GEO_DB.prepare(
+        `SELECT CAST((ts/86400000) AS INTEGER) AS day, COUNT(*) AS cnt
+             FROM edge_click_event WHERE ts BETWEEN ?1 AND ?2
+             GROUP BY day ORDER BY day ASC`
+      ).bind(from, to).all<any>();
+      const response = Response.json({ rows: rows.results?.map(r => ({ day: r.day, ts: r.day * 86400000, cnt: r.cnt })) ?? [] });
+      return addCorsHeaders(response);
+    }
+
+    // CSV exports (easy BI pulls)
+    function csv(rows: any[]) {
+      if (!rows.length) return "id,ts\n";
+      const cols = Object.keys(rows[0]);
+      const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      return cols.join(",") + "\n" + rows.map(r => cols.map(c => esc(r[c])).join(",")).join("\n") + "\n";
+    }
+
+    if (url.pathname === "/export/clicks.csv" && req.method === "GET") {
+      const { from, to } = parseWindow(url);
+      const rows = await env.GEO_DB.prepare(
+        `SELECT id, ts, src, pid, dest, session_id FROM edge_click_event
+             WHERE ts BETWEEN ?1 AND ?2 ORDER BY ts DESC LIMIT 10000`
+      ).bind(from, to).all<any>();
+      const response = new Response(csv(rows.results || []), { headers: { "content-type": "text/csv" } });
+      return addCorsHeaders(response);
+    }
+
+    if (url.pathname === "/export/conversions.csv" && req.method === "GET") {
+      const { from, to } = parseWindow(url);
+      const rows = await env.GEO_DB.prepare(
+        `SELECT id, ts, session_id, type, value_cents, meta FROM conversion_event
+             WHERE ts BETWEEN ?1 AND ?2 ORDER BY ts DESC LIMIT 10000`
+      ).bind(from, to).all<any>();
+      const response = new Response(csv(rows.results || []), { headers: { "content-type": "text/csv" } });
+      return addCorsHeaders(response);
+    }
 
     const response = new Response("not found", { status: 404 });
     return addCorsHeaders(response);

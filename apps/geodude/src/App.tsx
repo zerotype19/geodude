@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { API_BASE } from "./config";
+import { API_BASE, ENABLE_ADMIN } from "./config";
+import TokenLab from "./TokenLab";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line } from "recharts";
 
 type Overview = { clicks: number; conversions: number; crawler_visits: number; citations: number };
 
@@ -10,6 +12,58 @@ function useAdminToken() {
     set(v: string) { sessionStorage.setItem("ADMIN_TOKEN", v); setT(v); },
     clear() { sessionStorage.removeItem("ADMIN_TOKEN"); setT(null); }
   };
+}
+
+function useFetch<T>(path: string, deps: any[] = []) {
+  const [data, setData] = useState<T | null>(null);
+  useEffect(() => { fetch(`${API_BASE}${path}`).then(r=>r.json()).then(setData as any).catch(()=>setData(null)); }, deps);
+  return data;
+}
+
+function Charts() {
+  const bySrc = useFetch<{rows:{src:string;cnt:number}[]}>(`/metrics/clicks_by_src`, []);
+  const topPids = useFetch<{rows:{pid:string;cnt:number}[]}>(`/metrics/top_pids?limit=10`, []);
+  const ts = useFetch<{rows:{ts:number;cnt:number}[]}>(`/metrics/clicks_timeseries`, []);
+  return (
+    <section style={{ marginTop: 24 }}>
+      <h2>Analytics</h2>
+      <div style={{ display:"grid", gap:24, gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))" }}>
+        <div style={{ height: 260 }}>
+          <h3>Clicks by Source</h3>
+          <ResponsiveContainer>
+            <BarChart data={(bySrc?.rows||[]).map(r => ({ name:r.src, cnt:r.cnt }))}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="name" /><YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="cnt" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{ height: 260 }}>
+          <h3>Top PIDs</h3>
+          <ResponsiveContainer>
+            <BarChart data={(topPids?.rows||[]).map(r => ({ name:r.pid||"(none)", cnt:r.cnt }))}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="name" /><YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="cnt" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{ height: 260 }}>
+          <h3>Clicks Over Time</h3>
+          <ResponsiveContainer>
+            <LineChart data={ts?.rows||[]}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="ts" tickFormatter={(v)=>new Date(v).toLocaleDateString()} />
+              <YAxis allowDecimals={false} />
+              <Line type="monotone" dataKey="cnt" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function KvAdmin() {
@@ -107,8 +161,10 @@ export default function App() {
             <li>Citations: {o.citations}</li>
           </ul>
         )}
-      </div>
-      <KvAdmin />
+                </div>
+          <Charts />
+          <KvAdmin />
+          {ENABLE_ADMIN ? <TokenLab /> : null}
     </main>
   );
 }
