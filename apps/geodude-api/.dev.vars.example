@@ -1,55 +1,14 @@
-# Development Environment Variables
-# Copy this file to .dev.vars and fill in your values
+# Development environment variables
+# Copy this to .dev.vars and adjust as needed
 
-# Base URLs
-PUBLIC_BASE_URL=https://api.optiview.ai
-PUBLIC_BASE_URL_DEV=http://localhost:8787
-
-# Security
-SESSION_SECRET=your-32-byte-session-secret-here
-COOKIE_NAME=ov_sess
-SESSION_TTL_HOURS=720
-OTP_EXP_MIN=10
-
-# Rate Limiting
-LOGIN_RPM_PER_IP=10
-LOGIN_RPD_PER_EMAIL=50
-INGEST_RATE_LIMIT_RPS=10
-INGEST_RATE_LIMIT_BURST=50
-RATE_LIMIT_RETRY_AFTER=5
-CSV_EXPORT_RATE_LIMIT_RPS=1
-ADMIN_RPM_PER_IP=30
-
-# Admin Bootstrap
-ADMIN_BOOTSTRAP_EMAIL=admin@example.com
-
-# Email Configuration
-DEV_MAIL_ECHO=true
-EMAIL_FROM=noreply@optiview.ai
-SMTP_HOST=
-SMTP_PORT=
-SMTP_USER=
-SMTP_PASS=
-
-# Demo Mode
-DEMO_MODE_ENABLED=false
-
-# Rules Refresh
-RULES_REFRESH_TTL_SEC=300
-
-# Magic Link & Invites
-PUBLIC_APP_URL=http://localhost:3000
-MAGIC_LINK_EXP_MIN=15
-MAGIC_LINK_RPM_PER_IP=10
+# Rate limits (higher for development/testing)
 MAGIC_LINK_RPD_PER_EMAIL=50
-INVITE_EXP_DAYS=14
+MAGIC_LINK_RPM_PER_IP=10
+
+# Other settings
+MAGIC_LINK_EXP_MIN=15
+INVITE_EXP_DAYS=7
+EMAIL_FROM=support@optiview.ai
 EMAIL_SENDER_NAME=Optiview
-
-# Slack Integration
-SLACK_WEBHOOK_URL=
-
-# CORS
-ALLOWED_ORIGINS_FALLBACK=https://localhost:3000,https://localhost:5173
-
-# CSP Mode
-CSP_MODE=production
+PUBLIC_APP_URL=https://optiview.ai
+NODE_ENV=development

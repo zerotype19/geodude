@@ -26,12 +26,21 @@ export default {
         return response;
       };
 
-      // Helper function to validate continue path (internal paths only)
-      const validateContinuePath = (continuePath) => {
-        if (!continuePath) return "/onboarding";
-        if (!continuePath.startsWith("/")) return "/onboarding";
-        if (continuePath.startsWith("//") || continuePath.includes("://")) return "/onboarding";
-        return continuePath;
+      // Helper function to sanitize continue path (single source of truth)
+      const sanitizeContinuePath = (input) => {
+        const fallback = "/onboarding";
+        if (typeof input !== "string") return fallback;
+
+        // reject control chars and backslashes
+        if (/[\\\u0000-\u001F]/.test(input)) return fallback;
+
+        // must be an absolute *internal* path: starts with single '/'
+        if (!input.startsWith("/") || input.startsWith("//")) return fallback;
+
+        // optional: allow only URL-path-safe chars
+        if (!/^\/[A-Za-z0-9\-._~!$&'()*+,;=:@/%?]*$/.test(input)) return fallback;
+
+        return input;
       };
 
       // Helper function to generate secure tokens
@@ -152,7 +161,7 @@ export default {
           }
 
           // Validate continue path
-          const validatedContinuePath = validateContinuePath(continue_path);
+          const validatedContinuePath = sanitizeContinuePath(continue_path);
 
           // Generate secure token
           const token = generateToken();
@@ -259,13 +268,13 @@ export default {
           // Clean up used magic link
           await env.AI_FINGERPRINTS.delete(`magic_link:${tokenHash}`);
 
-          // Redirect to continue path or onboarding
-          const redirectUrl = storedData.continue_path || "/onboarding";
+          // Re-sanitize continue path before redirect (defense-in-depth)
+          const sanitizedRedirectUrl = sanitizeContinuePath(storedData.continue_path);
 
           const response = new Response(null, {
             status: 302,
             headers: {
-              "Location": redirectUrl,
+              "Location": sanitizedRedirectUrl,
               "Set-Cookie": `optiview_session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${24 * 60 * 60}`
             }
           });
@@ -606,6 +615,60 @@ export default {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response);
+      }
+
+      // 4.5) Dev Test Endpoint - Magic Link Token Peek (TEST_MODE only)
+      if (url.pathname === "/_test/magic-link" && request.method === "GET" && env.TEST_MODE === "1") {
+        try {
+          const email = url.searchParams.get("email");
+          if (!email) {
+            const response = new Response(JSON.stringify({ error: "Email parameter required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Rate limit this endpoint even in dev
+          const clientIP = request.headers.get("cf-connecting-ip") || "unknown";
+          const ipKey = `rate_limit:test_magic_link:ip:${clientIP}`;
+          const ipLimit = await checkRateLimit(ipKey, 10, 60 * 1000); // 10 per minute per IP
+
+          if (!ipLimit.allowed) {
+            const response = new Response(JSON.stringify({ error: "Too many test requests from this IP" }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": Math.ceil((ipLimit.resetTime - Date.now()) / 1000)
+              }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Find the most recent unconsumed magic link for this email
+          // Note: This is a simplified lookup - in production we'd have proper database queries
+          // For now, we'll return a placeholder response
+          console.log("🔍 TEST MODE - Looking for magic link token for:", email);
+
+          // TODO: Implement proper token lookup from database
+          // For now, return a placeholder response
+          const response = new Response(JSON.stringify({
+            message: "Test endpoint active - token lookup not yet implemented",
+            email: email,
+            note: "This endpoint is for development/testing only"
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("Test magic link peek error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
       }
 
       // 8) Fallback response for any unmatched routes
