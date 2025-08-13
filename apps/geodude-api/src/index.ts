@@ -8,6 +8,8 @@ type Env = {
   AI_CAPTURES: R2Bucket;
   DEST_MAP: KVNamespace;
   CANONICAL_BASE: string;
+  RESEND_API_KEY?: string;
+  APP_BASE_URL?: string;
 };
 
 // Helper function to add CORS headers
@@ -64,7 +66,9 @@ export default {
           ip: req.headers.get("cf-connecting-ip"),
           asn: (req as any).cf?.asn ? String((req as any).cf.asn) : null,
           dest: dest.toString(),
-          session_id: sid
+          session_id: sid,
+          org_id: (payload as any).org || "org_system",
+          project_id: (payload as any).prj || "prj_system"
         }));
 
         // Create redirect response with headers
@@ -177,11 +181,18 @@ export default {
     if (url.pathname === "/admin/kv" && req.method === "GET") {
       try {
         requireAdmin(req, env);
-        const list = await env.DEST_MAP.list({ limit: 1000 });
+        const org = url.searchParams.get("org") || "org_system";
+        const project = url.searchParams.get("project") || "prj_system";
+        const prefix = `${org}:${project}:`;
+        
+        const list = await env.DEST_MAP.list({ prefix, limit: 1000 });
         const rows = await Promise.all(
-          (list.keys || []).map(async k => ({ pid: k.name, url: await env.DEST_MAP.get(k.name) }))
+          (list.keys || []).map(async k => {
+            const pid = k.name.replace(prefix, ""); // Remove prefix for display
+            return { pid, url: await env.DEST_MAP.get(k.name) };
+          })
         );
-        const response = Response.json({ items: rows });
+        const response = Response.json({ items: rows, org, project });
         return addCorsHeaders(response);
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: e.message === "unauthorized" ? 401 : 500 });
@@ -193,13 +204,16 @@ export default {
     if (url.pathname === "/admin/kv" && req.method === "PUT") {
       try {
         requireAdmin(req, env);
-        const body = await json<{ pid: string; url: string }>(req);
+        const body = await json<{ pid: string; url: string; org?: string; project?: string }>(req);
         if (!body?.pid || !body?.url) {
           const response = new Response("bad request", { status: 400 });
           return addCorsHeaders(response);
         }
-        await env.DEST_MAP.put(body.pid, body.url);
-        const response = Response.json({ ok: true });
+        const org = body.org || "org_system";
+        const project = body.project || "prj_system";
+        const kvKey = `${org}:${project}:${body.pid}`;
+        await env.DEST_MAP.put(kvKey, body.url);
+        const response = Response.json({ ok: true, key: kvKey });
         return addCorsHeaders(response);
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: e.message === "unauthorized" ? 401 : 500 });
@@ -212,12 +226,15 @@ export default {
       try {
         requireAdmin(req, env);
         const pid = url.searchParams.get("pid");
+        const org = url.searchParams.get("org") || "org_system";
+        const project = url.searchParams.get("project") || "prj_system";
         if (!pid) {
           const response = new Response("bad request", { status: 400 });
           return addCorsHeaders(response);
         }
-        await env.DEST_MAP.delete(pid);
-        const response = Response.json({ ok: true });
+        const kvKey = `${org}:${project}:${pid}`;
+        await env.DEST_MAP.delete(kvKey);
+        const response = Response.json({ ok: true, key: kvKey });
         return addCorsHeaders(response);
       } catch (e: any) {
         const response = new Response(e.message || "error", { status: e.message === "unauthorized" ? 500 : 500 });
@@ -331,6 +348,29 @@ export default {
       pid: string;            // slug: [a-z0-9_-]{1,64}
       geo?: string;           // e.g. us
       ttl_minutes?: number;   // default 60
+      org_id?: string;        // e.g. org_system (defaults to system)
+      project_id?: string;    // e.g. prj_system (defaults to system)
+    };
+
+    // Token payload types for multi-tenancy
+    type TokenV1 = {
+      v: 1;
+      src: string;
+      model?: string;
+      pid: string;
+      geo?: string;
+      exp: number;
+    };
+
+    type TokenV2 = {
+      v: 2;
+      org: string;        // e.g., "org_system" for now
+      prj: string;        // e.g., "prj_system"
+      src: string;
+      model?: string;
+      pid: string;
+      geo?: string;
+      exp: number;
     };
 
     function validPid(pid: string) {
@@ -359,7 +399,21 @@ export default {
         }
 
         const ttl = Math.min(Math.max(body.ttl_minutes ?? 60, 5), 7 * 24 * 60); // 5 min – 7 days
-        const tokenPayload = {
+        
+        // Build v2 payload when org/prj provided; else emit v1 for back-compat
+        const org = body.org_id || "org_system";
+        const prj = body.project_id || "prj_system";
+        
+        const tokenPayload: TokenV1 | TokenV2 = (body.org_id || body.project_id) ? {
+          v: 2,
+          org,
+          prj,
+          src: body.src,
+          model: body.model ?? null,
+          pid: body.pid,
+          geo: body.geo ?? null,
+          exp: Math.floor(Date.now() / 1000) + ttl * 60
+        } : {
           v: 1,
           src: body.src,
           model: body.model ?? null,
@@ -452,6 +506,250 @@ export default {
       return addCorsHeaders(response);
     }
 
+    // Authentication endpoints
+    if (url.pathname === "/auth/magic/start" && req.method === "POST") {
+      try {
+        const body = await json<{ email: string }>(req);
+        if (!body?.email) {
+          const response = new Response("email required", { status: 400 });
+          return addCorsHeaders(response);
+        }
+
+        const email = body.email.toLowerCase().trim();
+        if (!email.includes("@")) {
+          const response = new Response("invalid email", { status: 400 });
+          return addCorsHeaders(response);
+        }
+
+        // Generate magic link token
+        const token = crypto.randomUUID();
+        const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+        // Store magic link
+        await env.GEO_DB.prepare(
+          `INSERT OR REPLACE INTO magic_link (token, email, created_ts, expires_ts)
+           VALUES (?1, ?2, ?3, ?4)`
+        ).bind(token, email, Date.now(), expires).run();
+
+        // Send email if RESEND_API_KEY is configured
+        if (env.RESEND_API_KEY) {
+          // TODO: Implement email sending with Resend
+          console.log("Magic link email would be sent:", { email, token });
+        } else {
+          // Dev mode: log the link
+          const baseUrl = env.APP_BASE_URL || "https://geodude.pages.dev";
+          console.log(`Magic link for ${email}: ${baseUrl}/auth/magic?token=${token}`);
+        }
+
+        const response = Response.json({ ok: true, message: "Magic link sent" });
+        return addCorsHeaders(response);
+      } catch (e: any) {
+        const response = new Response(e.message || "error", { status: 500 });
+        return addCorsHeaders(response);
+      }
+    }
+
+    if (url.pathname === "/auth/magic/verify" && req.method === "POST") {
+      try {
+        const body = await json<{ token: string }>(req);
+        if (!body?.token) {
+          const response = new Response("token required", { status: 400 });
+          return addCorsHeaders(response);
+        }
+
+        // Verify magic link
+        const magicLink = await env.GEO_DB.prepare(
+          `SELECT email, expires_ts FROM magic_link WHERE token = ?1 AND used_ts IS NULL AND expires_ts > ?2`
+        ).bind(body.token, Date.now()).first<any>();
+
+        if (!magicLink) {
+          const response = new Response("invalid or expired token", { status: 400 });
+          return addCorsHeaders(response);
+        }
+
+        // Mark token as used
+        await env.GEO_DB.prepare(
+          `UPDATE magic_link SET used_ts = ?1 WHERE token = ?2`
+        ).bind(Date.now(), body.token).run();
+
+        // Upsert user
+        let userId = await env.GEO_DB.prepare(
+          `SELECT id FROM user WHERE email = ?1`
+        ).bind(magicLink.email).first<any>();
+
+        if (!userId) {
+          userId = `usr_${crypto.randomUUID()}`;
+          await env.GEO_DB.prepare(
+            `INSERT INTO user (id, email, created_ts) VALUES (?1, ?2, ?3)`
+          ).bind(userId, magicLink.email, Date.now()).run();
+        } else {
+          userId = userId.id;
+        }
+
+        // Create session
+        const sessionId = `ses_${crypto.randomUUID()}`;
+        const expires = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
+
+        await env.GEO_DB.prepare(
+          `INSERT INTO session (id, user_id, created_ts, expires_ts) VALUES (?1, ?2, ?3, ?4)`
+        ).bind(sessionId, userId, Date.now(), expires).run();
+
+        // Update user last login
+        await env.GEO_DB.prepare(
+          `UPDATE user SET last_login_ts = ?1 WHERE id = ?2`
+        ).bind(Date.now(), userId).run();
+
+        const response = Response.json({ ok: true, user: { id: userId, email: magicLink.email } });
+        response.headers.set("Set-Cookie", `geodude_ses=${sessionId}; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}; Path=/`);
+        return addCorsHeaders(response);
+      } catch (e: any) {
+        const response = new Response(e.message || "error", { status: 500 });
+        return addCorsHeaders(response);
+      }
+    }
+
+    if (url.pathname === "/auth/logout" && req.method === "POST") {
+      const response = Response.json({ ok: true });
+      response.headers.set("Set-Cookie", "geodude_ses=; HttpOnly; Secure; SameSite=Lax; Max-Age=0; Path=/");
+      return addCorsHeaders(response);
+    }
+
+    // User management endpoints
+    if (url.pathname === "/me" && req.method === "GET") {
+      try {
+        const sessionId = req.headers.get("cookie")?.match(/geodude_ses=([^;]+)/)?.[1];
+        if (!sessionId) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        // Get session and user
+        const session = await env.GEO_DB.prepare(
+          `SELECT user_id, expires_ts FROM session WHERE id = ?1 AND expires_ts > ?2`
+        ).bind(sessionId, Date.now()).first<any>();
+
+        if (!session) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        const user = await env.GEO_DB.prepare(
+          `SELECT id, email, created_ts, last_login_ts FROM user WHERE id = ?1`
+        ).bind(session.user_id).first<any>();
+
+        if (!user) {
+          const response = new Response("user not found", { status: 404 });
+          return addCorsHeaders(response);
+        }
+
+        // Get user's orgs and projects
+        const orgs = await env.GEO_DB.prepare(
+          `SELECT o.id, o.name, om.role FROM organization o
+           JOIN org_member om ON o.id = om.org_id
+           WHERE om.user_id = ?1`
+        ).bind(session.user_id).all<any>();
+
+        const projects = await env.GEO_DB.prepare(
+          `SELECT p.id, p.name, p.slug, p.domain FROM project p
+           JOIN org_member om ON p.org_id = om.org_id
+           WHERE om.user_id = ?1`
+        ).bind(session.user_id).all<any>();
+
+        const response = Response.json({
+          user,
+          orgs: orgs.results || [],
+          projects: projects.results || []
+        });
+        return addCorsHeaders(response);
+      } catch (e: any) {
+        const response = new Response(e.message || "error", { status: 500 });
+        return addCorsHeaders(response);
+      }
+    }
+
+    // Organization management
+    if (url.pathname === "/org" && req.method === "POST") {
+      try {
+        const sessionId = req.headers.get("cookie")?.match(/geodude_ses=([^;]+)/)?.[1];
+        if (!sessionId) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        const body = await json<{ name: string }>(req);
+        if (!body?.name) {
+          const response = new Response("name required", { status: 400 });
+          return addCorsHeaders(response);
+        }
+
+        // Get user from session
+        const session = await env.GEO_DB.prepare(
+          `SELECT user_id FROM session WHERE id = ?1 AND expires_ts > ?2`
+        ).bind(sessionId, Date.now()).first<any>();
+
+        if (!session) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        // Create organization
+        const orgId = `org_${crypto.randomUUID()}`;
+        await env.GEO_DB.prepare(
+          `INSERT INTO organization (id, name, created_ts) VALUES (?1, ?2, ?3)`
+        ).bind(orgId, body.name, Date.now()).run();
+
+        // Add user as admin
+        await env.GEO_DB.prepare(
+          `INSERT INTO org_member (org_id, user_id, role) VALUES (?1, ?2, ?3)`
+        ).bind(orgId, session.user_id, "admin").run();
+
+        const response = Response.json({ ok: true, org: { id: orgId, name: body.name } });
+        return addCorsHeaders(response);
+      } catch (e: any) {
+        const response = new Response(e.message || "error", { status: 500 });
+        return addCorsHeaders(response);
+      }
+    }
+
+    // Project management
+    if (url.pathname === "/project" && req.method === "POST") {
+      try {
+        const sessionId = req.headers.get("cookie")?.match(/geodude_ses=([^;]+)/)?.[1];
+        if (!sessionId) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        const body = await json<{ org_id: string; name: string; slug: string; domain?: string }>(req);
+        if (!body?.org_id || !body?.name || !body?.slug) {
+          const response = new Response("org_id, name, and slug required", { status: 400 });
+          return addCorsHeaders(response);
+        }
+
+        // Verify user is member of org
+        const membership = await env.GEO_DB.prepare(
+          `SELECT user_id FROM org_member WHERE org_id = ?1 AND user_id = ?2`
+        ).bind(body.org_id, req.headers.get("cookie")?.match(/geodude_ses=([^;]+)/)?.[1]).first<any>();
+
+        if (!membership) {
+          const response = new Response("unauthorized", { status: 401 });
+          return addCorsHeaders(response);
+        }
+
+        // Create project
+        const projectId = `prj_${crypto.randomUUID()}`;
+        await env.GEO_DB.prepare(
+          `INSERT INTO project (id, org_id, name, slug, domain, created_ts) VALUES (?1, ?2, ?3, ?4, ?5, ?6)`
+        ).bind(projectId, body.org_id, body.name, body.slug, body.domain || null, Date.now()).run();
+
+        const response = Response.json({ ok: true, project: { id: projectId, name: body.name, slug: body.slug } });
+        return addCorsHeaders(response);
+      } catch (e: any) {
+        const response = new Response(e.message || "error", { status: 500 });
+        return addCorsHeaders(response);
+      }
+    }
+
     const response = new Response("not found", { status: 404 });
     return addCorsHeaders(response);
   }
@@ -475,7 +773,11 @@ async function resolveDest(payload: Record<string, unknown>, env: Env): Promise<
   // Rule: if pid exists and a KV mapping exists, use it; else fall back to CANONICAL_BASE
   const pid = (payload["pid"] as string) || "";
   if (pid) {
-    const mapped = await env.DEST_MAP.get(pid);
+    // Extract org/project from token or fallback to system IDs
+    const org = (payload as any).org || "org_system";
+    const prj = (payload as any).prj || "prj_system";
+    const kvKey = `${org}:${prj}:${pid}`; // namespaced
+    const mapped = await env.DEST_MAP.get(kvKey);
     if (mapped) return mapped;
   }
   const base = requireCanonicalBase(env); // throws if missing
@@ -486,8 +788,8 @@ async function insertClick(db: D1Database, row: any) {
   await db
     .prepare(
       `INSERT INTO edge_click_event
-       (ts, src, model, pid, geo, ua, ip, asn, dest, session_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`
+       (ts, src, model, pid, geo, ua, ip, asn, dest, session_id, org_id, project_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`
     )
     .bind(
       row.ts,
@@ -499,7 +801,9 @@ async function insertClick(db: D1Database, row: any) {
       row.ip,
       row.asn,
       row.dest,
-      row.session_id
+      row.session_id,
+      row.org_id || "org_system",
+      row.project_id || "prj_system"
     )
     .run();
 }
