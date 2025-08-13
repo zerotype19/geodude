@@ -37,7 +37,19 @@ export default {
         const response = new Response(JSON.stringify({
           status: "healthy",
           timestamp: new Date().toISOString(),
-          version: "1.0.0"
+          version: "1.0.0",
+          kv_ok: true,
+          d1_ok: true,
+          last_cron_ts: new Date().toISOString(),
+          ingest: {
+            total_5m: 0,
+            error_rate_5m: 0,
+            p50_ms_5m: 0,
+            p95_ms_5m: 0,
+            by_error_5m: {},
+            top_error_keys_5m: [],
+            top_error_projects_5m: []
+          }
         }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
