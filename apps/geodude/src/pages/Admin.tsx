@@ -47,6 +47,14 @@ export default function Admin() {
         <div className="grid md:grid-cols-2 gap-6">
           <Card title="KV Admin">
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+              {/* Hidden username field for accessibility */}
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                style={{ display: 'none' }}
+                aria-hidden="true"
+              />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Admin Token (INGEST_API_KEY)
@@ -70,7 +78,15 @@ export default function Admin() {
           </Card>
 
           <Card title="Token Lab">
-            <div className="space-y-4">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+              {/* Hidden username field for accessibility */}
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                style={{ display: 'none' }}
+                aria-hidden="true"
+              />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Admin Token (once)
@@ -157,6 +173,7 @@ export default function Admin() {
               </div>
 
               <button
+                type="submit"
                 onClick={generateToken}
                 className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
               >
@@ -176,7 +193,7 @@ export default function Admin() {
                   />
                 </div>
               )}
-            </div>
+            </form>
           </Card>
         </div>
       </div>
