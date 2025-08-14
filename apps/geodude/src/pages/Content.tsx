@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE, FETCH_OPTS } from '../config';
 
 interface ContentAsset {
   id: number;
@@ -39,7 +40,7 @@ const Content: React.FC = () => {
   const [newAsset, setNewAsset] = useState({ url: '', type: 'page' });
   const [assetDetails, setAssetDetails] = useState<Record<number, ContentDetail>>({});
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'https://api.optiview.ai';
+
 
   useEffect(() => {
     if (project?.id) {
@@ -62,9 +63,7 @@ const Content: React.FC = () => {
         pageSize: filters.pageSize.toString()
       });
 
-      const response = await fetch(`${API_BASE}/api/content?${params}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_BASE}/api/content?${params}`, FETCH_OPTS);
 
       if (response.ok) {
         const data = await response.json();
@@ -84,9 +83,7 @@ const Content: React.FC = () => {
     if (assetDetails[assetId]) return; // Already loaded
 
     try {
-      const response = await fetch(`${API_BASE}/api/content/${assetId}/detail?window=7d`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_BASE}/api/content/${assetId}/detail?window=7d`, FETCH_OPTS);
 
       if (response.ok) {
         const detail = await response.json();
@@ -112,11 +109,11 @@ const Content: React.FC = () => {
     if (!project?.id || !newAsset.url.trim()) return;
 
     try {
-      const response = await fetch(`${API_BASE}/api/content`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+              const response = await fetch(`${API_BASE}/api/content`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          ...FETCH_OPTS,
+          body: JSON.stringify({
           project_id: project.id,
           property_id: 1, // TODO: Get from project properties
           url: newAsset.url,
