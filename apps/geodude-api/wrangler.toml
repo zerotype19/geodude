@@ -40,6 +40,7 @@ EMAIL_SENDER_NAME = "Optiview"
 TEST_MODE = "1"
 
 [env.dev]
+name = "geodude-api"
 CSP_MODE = "development"
 NODE_ENV = "development"
 PUBLIC_APP_URL = "https://optiview.ai"
@@ -50,3 +51,12 @@ INVITE_EXP_DAYS = "7"
 EMAIL_FROM = "support@optiview.ai"
 EMAIL_SENDER_NAME = "Optiview"
 TEST_MODE = "1"
+
+[[env.dev.d1_databases]]
+binding = "OPTIVIEW_DB"
+database_name = "optiview_db"
+database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+
+[[env.dev.kv_namespaces]]
+binding = "AI_FINGERPRINTS"
+id = "571e1b9f739c4d0a9027b350cf091d20"
