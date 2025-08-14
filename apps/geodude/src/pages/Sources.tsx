@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
+import { useAuth } from "../contexts/AuthContext";
 
 interface AISource {
   id: number;
@@ -12,18 +13,23 @@ interface AISource {
 }
 
 export default function Sources() {
+  const { project } = useAuth();
   const [sources, setSources] = useState<AISource[]>([]);
   const [loading, setLoading] = useState(true);
   const [newSource, setNewSource] = useState({ name: "", category: "search", fingerprint: "" });
 
   useEffect(() => {
-    loadSources();
-  }, []);
+    if (project?.id) {
+      loadSources();
+    }
+  }, [project]);
 
   async function loadSources() {
+    if (!project?.id) return;
+    
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/sources`, FETCH_OPTS);
+      const response = await fetch(`${API_BASE}/api/sources?project_id=${project.id}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
         setSources(data.sources || []);
@@ -38,14 +44,15 @@ export default function Sources() {
   }
 
   async function addSource() {
-    if (!newSource.name || !newSource.category) return;
+    if (!project?.id || !newSource.name || !newSource.category) return;
     
     try {
+      const sourceData = { ...newSource, project_id: project.id };
       const response = await fetch(`${API_BASE}/api/sources`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newSource)
+        body: JSON.stringify(sourceData)
       });
       
       if (response.ok) {
@@ -64,7 +71,9 @@ export default function Sources() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">AI Sources</h1>
-          <p className="text-slate-600 mt-2">Manage and monitor AI platforms that reference your content</p>
+          <p className="text-slate-600 mt-2">
+            Manage and monitor AI platforms that reference your {project?.name || 'project'} content
+          </p>
         </div>
 
         {/* Add New Source */}

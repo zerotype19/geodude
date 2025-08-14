@@ -3,6 +3,7 @@ import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { CheckCircle, Clock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ApiKey {
   id: number;
@@ -161,7 +162,7 @@ function InstallVerificationBanner({ properties, apiKeys }: InstallVerificationB
             <span className="text-sm text-gray-500">Auto-refresh stopped</span>
           )}
         </div>
-        
+
         {!autoRefresh && (
           <button
             onClick={() => {
@@ -199,7 +200,7 @@ function InstallVerificationBanner({ properties, apiKeys }: InstallVerificationB
                       <p className="text-sm text-gray-600">{status.text}</p>
                     </div>
                   </div>
-                  
+
                   {status.status === 'connected' && lastEventText && (
                     <span className="text-sm text-green-600">
                       Last event: {lastEventText}
@@ -291,7 +292,7 @@ curl -X POST ${API_BASE}/api/events \\
           </div>
           {expandedSections['tag'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
-        
+
         {expandedSections['tag'] && (
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
@@ -333,7 +334,7 @@ curl -X POST ${API_BASE}/api/events \\
           </div>
           {expandedSections['origin'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
-        
+
         {expandedSections['origin'] && (
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
@@ -369,7 +370,7 @@ curl -X POST ${API_BASE}/api/events \\
           </div>
           {expandedSections['time'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
-        
+
         {expandedSections['time'] && (
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
@@ -401,7 +402,7 @@ curl -X POST ${API_BASE}/api/events \\
           </div>
           {expandedSections['cors'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
-        
+
         {expandedSections['cors'] && (
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
@@ -435,7 +436,7 @@ curl -X POST ${API_BASE}/api/events \\
           </div>
           {expandedSections['key'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
-        
+
         {expandedSections['key'] && (
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
@@ -444,7 +445,7 @@ curl -X POST ${API_BASE}/api/events \\
               </p>
               <div className="bg-blue-50 p-3 rounded-md">
                 <div className="text-sm text-blue-800">
-                  <strong>Next step:</strong> 
+                  <strong>Next step:</strong>
                   <a href="/api-keys" className="text-blue-600 hover:text-blue-800 underline ml-1">
                     Go to API Keys page
                   </a>
@@ -467,7 +468,7 @@ curl -X POST ${API_BASE}/api/events \\
           </div>
           {expandedSections['curl'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
-        
+
         {expandedSections['curl'] && (
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
@@ -495,7 +496,7 @@ curl -X POST ${API_BASE}/api/events \\
               )}
               <div className="bg-blue-50 p-3 rounded-md">
                 <div className="text-sm text-blue-800">
-                  <strong>Next step:</strong> 
+                  <strong>Next step:</strong>
                   <a href="/api-keys" className="text-blue-600 hover:text-blue-800 underline">
                     Create API keys on the API Keys page
                   </a>
@@ -518,7 +519,7 @@ curl -X POST ${API_BASE}/api/events \\
           </div>
           {expandedSections['errors'] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
-        
+
         {expandedSections['errors'] && (
           <div className="px-4 pb-4 border-t border-gray-200">
             <div className="pt-3 space-y-3">
@@ -539,26 +540,33 @@ curl -X POST ${API_BASE}/api/events \\
 }
 
 export default function Install() {
+  const { project } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
-  const [newProperty, setNewProperty] = useState({ 
-    project_id: "1", 
-    domain: "" 
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newProperty, setNewProperty] = useState({
+    project_id: project?.id || "",
+    domain: ""
   });
 
   useEffect(() => {
-    loadProperties();
-  }, []);
+    if (project?.id) {
+      setNewProperty(prev => ({ ...prev, project_id: project.id }));
+      loadProperties();
+    }
+  }, [project]);
 
   async function loadProperties() {
+    if (!project?.id) return;
+
     try {
-      // For now, using placeholder project_id - in real app this would come from context
-      const response = await fetch(`${API_BASE}/api/content?project_id=1`, FETCH_OPTS);
+      const response = await fetch(`${API_BASE}/api/content?project_id=${project.id}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
         // Extract unique properties from content
         const uniqueProperties = data.content.reduce((acc: Property[], item: any) => {
           if (item.domain && !acc.find(p => p.domain === item.domain)) {
-            acc.push({ id: item.id, domain: item.domain, project_id: 1 });
+            acc.push({ id: item.id, domain: item.domain, project_id: parseInt(project.id) });
           }
           return acc;
         }, []);
@@ -570,23 +578,23 @@ export default function Install() {
   }
 
   async function addProperty() {
-    if (!newProperty.project_id || !newProperty.domain) return;
-    
+    if (!project?.id || !newProperty.domain) return;
+
     try {
       const response = await fetch(`${API_BASE}/api/content`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          project_id: parseInt(newProperty.project_id),
+          project_id: parseInt(project.id),
           domain: newProperty.domain,
           url: `https://${newProperty.domain}/`,
           type: "website"
         })
       });
-      
+
       if (response.ok) {
-        setNewProperty({ project_id: "1", domain: "" });
+        setNewProperty({ project_id: project.id, domain: "" });
         await loadProperties();
       } else {
         console.error("Failed to add property");
@@ -613,7 +621,9 @@ export default function Install() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Installation & Setup</h1>
-          <p className="text-slate-600 mt-2">Get Optiview tracking on your website with our easy installation options</p>
+          <p className="text-slate-600 mt-2">
+            Get Optiview tracking on your {project?.name || 'project'} website with our easy installation options
+          </p>
         </div>
 
         {/* Properties Management */}
@@ -635,7 +645,7 @@ export default function Install() {
                 Add Property
               </button>
             </div>
-            
+
             {properties.length > 0 && (
               <div className="space-y-2">
                 <h4 className="font-medium text-slate-700">Your Properties:</h4>
@@ -735,8 +745,8 @@ export default function Install() {
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                 <div className="text-sm text-blue-800">
-                  <strong>Download:</strong> <a 
-                    href="/examples/customer-worker.js" 
+                  <strong>Download:</strong> <a
+                    href="/examples/customer-worker.js"
                     download
                     className="text-blue-600 hover:text-blue-800 underline"
                   >
@@ -771,7 +781,7 @@ export default function Install() {
         {/* Installation Verification Banner */}
         {properties.length > 0 && (
           <Card title="Installation Status">
-            <InstallVerificationBanner 
+            <InstallVerificationBanner
               properties={properties}
               apiKeys={[]} // Pass an empty array as apiKeys is removed
             />
@@ -780,7 +790,7 @@ export default function Install() {
 
         {/* Troubleshooting Guide */}
         <Card title="Troubleshooting">
-          <TroubleshootingGuide 
+          <TroubleshootingGuide
             properties={properties}
             apiKeys={[]} // Pass an empty array as apiKeys is removed
           />

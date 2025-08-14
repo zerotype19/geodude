@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ContentAsset {
   id: number;
@@ -13,10 +14,11 @@ interface ContentAsset {
 }
 
 export default function Content() {
+  const { project } = useAuth();
   const [content, setContent] = useState<ContentAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [newContent, setNewContent] = useState({ 
-    project_id: "", 
+    project_id: project?.id || "", 
     domain: "", 
     url: "", 
     type: "page", 
@@ -24,14 +26,18 @@ export default function Content() {
   });
 
   useEffect(() => {
-    loadContent();
-  }, []);
+    if (project?.id) {
+      setNewContent(prev => ({ ...prev, project_id: project.id }));
+      loadContent();
+    }
+  }, [project]);
 
   async function loadContent() {
+    if (!project?.id) return;
+    
     setLoading(true);
     try {
-      // For now, using a placeholder project_id - in real app this would come from context
-      const response = await fetch(`${API_BASE}/api/content?project_id=1`, FETCH_OPTS);
+      const response = await fetch(`${API_BASE}/api/content?project_id=${project.id}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
         setContent(data.content || []);
@@ -46,18 +52,19 @@ export default function Content() {
   }
 
   async function addContent() {
-    if (!newContent.project_id || !newContent.domain || !newContent.url) return;
+    if (!project?.id || !newContent.domain || !newContent.url) return;
     
     try {
+      const contentData = { ...newContent, project_id: project.id };
       const response = await fetch(`${API_BASE}/api/content`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newContent)
+        body: JSON.stringify(contentData)
       });
       
       if (response.ok) {
-        setNewContent({ project_id: "", domain: "", url: "", type: "page", metadata: "" });
+        setNewContent({ project_id: project.id, domain: "", url: "", type: "page", metadata: "" });
         await loadContent();
       } else {
         console.error("Failed to add content");
@@ -72,26 +79,15 @@ export default function Content() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Content Assets</h1>
-          <p className="text-slate-600 mt-2">Manage your content that AI platforms can reference and recommend</p>
+          <p className="text-slate-600 mt-2">
+            Manage your {project?.name || 'project'} content that AI platforms can reference and recommend
+          </p>
         </div>
 
         {/* Add New Content */}
         <Card title="Add Content Asset">
           <form onSubmit={(e) => { e.preventDefault(); addContent(); }} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Project ID
-                </label>
-                <input
-                  type="text"
-                  value={newContent.project_id}
-                  onChange={(e) => setNewContent({ ...newContent, project_id: e.target.value })}
-                  placeholder="1"
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Domain
