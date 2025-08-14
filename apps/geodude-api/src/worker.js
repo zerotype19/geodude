@@ -2,6 +2,43 @@ import { loadConfig, getConfigForEnvCheck, getConfigErrors, getMissingConfigKeys
 import { EmailService } from './email-service.js';
 import { addCorsHeaders } from './cors';
 
+// D1 Error Tracer (temporary)
+function traceD1(d1) {
+  return {
+    prepare(sql) {
+      const stmt = d1.prepare(sql);
+      return {
+        bind: (...args) => {
+          const bound = stmt.bind(...args);
+          return {
+            all: async () => {
+              try { return await bound.all(); }
+              catch (e) {
+                console.error("D1_SQL_ERROR", { sql, args, message: e.message });
+                throw e;
+              }
+            },
+            first: async (column) => {
+              try { return await bound.first(column); }
+              catch (e) {
+                console.error("D1_SQL_ERROR", { sql, args, message: e.message });
+                throw e;
+              }
+            },
+            run: async () => {
+              try { return await bound.run(); }
+              catch (e) {
+                console.error("D1_SQL_ERROR", { sql, args, message: e.message });
+                throw e;
+              }
+            }
+          };
+        }
+      };
+    }
+  };
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -136,7 +173,7 @@ export default {
 
         try {
           // Get current count from D1 rate_limiting table
-          const current = await env.OPTIVIEW_DB.prepare(`
+          const current = await d1.prepare(`
             SELECT count, reset_time FROM rate_limiting 
             WHERE key_name = ? AND reset_time > ?
           `).bind(key, windowStart).first();
@@ -148,7 +185,7 @@ export default {
             }
 
             // Increment count
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               UPDATE rate_limiting 
               SET count = count + 1, updated_at = ? 
               WHERE key_name = ?
@@ -158,7 +195,7 @@ export default {
           } else {
             // Create new rate limit record
             const resetTime = new Date(now + windowMs);
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO rate_limiting (key_name, count, reset_time) 
               VALUES (?, 1, ?)
             `).bind(key, resetTime.toISOString()).run();
@@ -172,6 +209,9 @@ export default {
         }
       };
 
+      // Wrap D1 with tracer for this request
+      const d1 = traceD1(env.OPTIVIEW_DB);
+
       // 1) Health check
       if (url.pathname === "/health") {
         const response = new Response("ok", { status: 200 });
@@ -182,28 +222,28 @@ export default {
       if (url.pathname === "/admin/health") {
         try {
           // Get pending rules suggestions count
-          const pendingSuggestions = await env.OPTIVIEW_DB.prepare(`
+          const pendingSuggestions = await d1.prepare(`
             SELECT COUNT(*) as count FROM rules_suggestions WHERE status = 'pending'
           `).first();
 
           // Get content metrics
-          const contentAssetsTotal = await env.OPTIVIEW_DB.prepare(`
+          const contentAssetsTotal = await d1.prepare(`
             SELECT COUNT(*) as count FROM content_assets
           `).first();
 
-          const activeAssets24h = await env.OPTIVIEW_DB.prepare(`
+          const activeAssets24h = await d1.prepare(`
             SELECT COUNT(DISTINCT content_id) as count
             FROM interaction_events
             WHERE occurred_at >= datetime('now','-1 day') AND content_id IS NOT NULL
           `).first();
 
-          const events24h = await env.OPTIVIEW_DB.prepare(`
+          const events24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM interaction_events
             WHERE occurred_at >= datetime('now','-1 day')
           `).first();
 
-          const referrals24h = await env.OPTIVIEW_DB.prepare(`
+          const referrals24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM ai_referrals
             WHERE detected_at >= datetime('now','-1 day')
@@ -211,45 +251,45 @@ export default {
 
           // Get 5-minute metrics for content operations
           const current5MinWindow = Math.floor(Date.now() / (5 * 60 * 1000));
-          const listViewsMetric = await env.OPTIVIEW_DB.prepare(`
+          const listViewsMetric = await d1.prepare(`
             SELECT value FROM metrics WHERE key = ?
           `).bind(`content_list_viewed_5m:${current5MinWindow}`).first();
 
-          const assetCreatedMetric = await env.OPTIVIEW_DB.prepare(`
+          const assetCreatedMetric = await d1.prepare(`
             SELECT value FROM metrics WHERE key = ?
           `).bind(`content_asset_created_5m:${current5MinWindow}`).first();
 
-          const assetUpdatedMetric = await env.OPTIVIEW_DB.prepare(`
+          const assetUpdatedMetric = await d1.prepare(`
             SELECT value FROM metrics WHERE key = ?
           `).bind(`content_asset_updated_5m:${current5MinWindow}`).first();
 
           // Get 5-minute metrics for conversions
-          const conversionsCreatedMetric = await env.OPTIVIEW_DB.prepare(`
+          const conversionsCreatedMetric = await d1.prepare(`
             SELECT value FROM metrics WHERE key = ?
           `).bind(`conversions_created_5m:${current5MinWindow}`).first();
 
-          const conversionsListViewedMetric = await env.OPTIVIEW_DB.prepare(`
+          const conversionsListViewedMetric = await d1.prepare(`
             SELECT value FROM metrics WHERE key = ?
           `).bind(`conversions_list_viewed_5m:${current5MinWindow}`).first();
 
-          const conversionsDetailViewedMetric = await env.OPTIVIEW_DB.prepare(`
+          const conversionsDetailViewedMetric = await d1.prepare(`
             SELECT value FROM metrics WHERE key = ?
           `).bind(`conversions_detail_viewed_5m:${current5MinWindow}`).first();
 
           // Get referrals metrics
-          const referralsTotal24h = await env.OPTIVIEW_DB.prepare(`
+          const referralsTotal24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM ai_referrals
             WHERE detected_at >= datetime('now','-1 day')
           `).first();
 
-          const referralsActiveContents24h = await env.OPTIVIEW_DB.prepare(`
+          const referralsActiveContents24h = await d1.prepare(`
             SELECT COUNT(DISTINCT content_id) as count
             FROM ai_referrals
             WHERE detected_at >= datetime('now','-1 day')
           `).first();
 
-          const referralsBySource24h = await env.OPTIVIEW_DB.prepare(`
+          const referralsBySource24h = await d1.prepare(`
             SELECT s.slug, COUNT(*) as count
             FROM ai_referrals ar
             JOIN ai_sources s ON s.id = ar.ai_source_id
@@ -260,13 +300,13 @@ export default {
           `).all();
 
           // Get conversions metrics
-          const conversionsTotal7d = await env.OPTIVIEW_DB.prepare(`
+          const conversionsTotal7d = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM conversion_event
             WHERE occurred_at >= datetime('now','-7 days')
           `).first();
 
-          const conversionsAiAttributed7d = await env.OPTIVIEW_DB.prepare(`
+          const conversionsAiAttributed7d = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -306,13 +346,13 @@ export default {
             AND lta.ai_source_id IS NOT NULL
           `).first();
 
-          const conversionsRevenue7d = await env.OPTIVIEW_DB.prepare(`
+          const conversionsRevenue7d = await d1.prepare(`
             SELECT COALESCE(SUM(amount_cents), 0) as revenue_cents
             FROM conversion_event
             WHERE occurred_at >= datetime('now','-7 days')
           `).first();
 
-          const conversionsBySource7d = await env.OPTIVIEW_DB.prepare(`
+          const conversionsBySource7d = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -359,20 +399,20 @@ export default {
           `).all();
 
           // Get funnels metrics for admin health
-          const funnelsReferrals24h = await env.OPTIVIEW_DB.prepare(`
+          const funnelsReferrals24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM ai_referrals
             WHERE detected_at >= datetime('now','-1 day')
           `).first();
 
-          const funnelsConversions24h = await env.OPTIVIEW_DB.prepare(`
+          const funnelsConversions24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM conversion_event
             WHERE occurred_at >= datetime('now','-1 day')
           `).first();
 
           // Calculate average p50 TTC for funnels in last 24h
-          const funnelsAvgP50TTC24h = await env.OPTIVIEW_DB.prepare(`
+          const funnelsAvgP50TTC24h = await d1.prepare(`
             WITH last_touch AS (
               SELECT 
                 ce.id,
@@ -627,7 +667,7 @@ export default {
           const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
 
           // Insert into D1 magic_link table
-          const insertResult = await env.OPTIVIEW_DB.prepare(`
+          const insertResult = await d1.prepare(`
             INSERT INTO magic_link (email, token_hash, expires_at, continue_path, requester_ip_hash)
             VALUES (?, ?, ?, ?, ?)
           `).bind(
@@ -707,7 +747,7 @@ export default {
 
           // Find and validate magic link
           const tokenHash = await hashString(token);
-          const magicLinkData = await env.OPTIVIEW_DB.prepare(`
+          const magicLinkData = await d1.prepare(`
             SELECT email, expires_at FROM magic_link 
             WHERE token_hash = ? AND expires_at > ?
           `).bind(tokenHash, new Date().toISOString()).first();
@@ -718,7 +758,7 @@ export default {
           }
 
           // Check if user exists
-          let userRecord = await env.OPTIVIEW_DB.prepare(`
+          let userRecord = await d1.prepare(`
             SELECT id, email, is_admin, created_ts FROM user WHERE email = ?
           `).bind(magicLinkData.email).first();
 
@@ -729,7 +769,7 @@ export default {
             const now = Math.floor(Date.now() / 1000);
 
             // Check if this is the first user in the system
-            const userCount = await env.OPTIVIEW_DB.prepare(`
+            const userCount = await d1.prepare(`
               SELECT COUNT(*) as count FROM user
             `).first();
 
@@ -737,7 +777,7 @@ export default {
             const isAdmin = userCount.count === 0 ? 1 : 0;
             console.log(`🔑 User ${isAdmin ? 'IS' : 'is NOT'} admin (user count: ${userCount.count})`);
 
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO user (id, email, is_admin, created_ts, last_login_ts)
               VALUES (?, ?, ?, ?, ?)
             `).bind(userId, magicLinkData.email, isAdmin, now, now).run();
@@ -747,14 +787,14 @@ export default {
           } else {
             // Update last_login_ts for existing user
             const now = Math.floor(Date.now() / 1000);
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               UPDATE user SET last_login_ts = ? WHERE id = ?
             `).bind(now, userRecord.id).run();
             console.log("✅ Updated last_login_ts for existing user:", userRecord.id);
           }
 
           // Check if user has already completed onboarding
-          const hasOrganization = await env.OPTIVIEW_DB.prepare(`
+          const hasOrganization = await d1.prepare(`
             SELECT COUNT(*) as count FROM org_member WHERE user_id = ?
           `).bind(userRecord.id).first();
 
@@ -775,7 +815,7 @@ export default {
           const userAgent = request.headers.get("user-agent") || "unknown";
           const uaHash = await hashString(userAgent);
 
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             INSERT INTO session (user_id, session_id, expires_at, ip_hash, ua_hash)
             VALUES (?, ?, ?, ?, ?)
           `).bind(
@@ -789,7 +829,7 @@ export default {
           console.log("✅ Session created in existing session table");
 
           // Delete used magic link
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             DELETE FROM magic_link WHERE token_hash = ?
           `).bind(tokenHash).run();
 
@@ -858,7 +898,7 @@ export default {
 
           // Store organization in database
           console.log('💾 Inserting organization into database...');
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             INSERT INTO organization (id, name, created_ts)
             VALUES (?, ?, ?)
           `).bind(orgId, name, now).run();
@@ -876,7 +916,7 @@ export default {
               console.log('🔍 Found session ID:', sessionId.substring(0, 8) + '...');
 
               // Get user ID from session
-              const sessionData = await env.OPTIVIEW_DB.prepare(`
+              const sessionData = await d1.prepare(`
                 SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
               `).bind(sessionId, new Date().toISOString()).first();
 
@@ -885,7 +925,7 @@ export default {
                 console.log('👤 Found user ID from session:', userId);
 
                 // Create org_member record linking user to organization
-                await env.OPTIVIEW_DB.prepare(`
+                await d1.prepare(`
                   INSERT INTO org_member (org_id, user_id, role)
                   VALUES (?, ?, 'admin')
                 `).bind(orgId, userId).run();
@@ -944,7 +984,7 @@ export default {
           const now = Date.now();
 
           // Store project in database
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             INSERT INTO project (id, org_id, name, slug, created_ts)
             VALUES (?, ?, ?, ?, ?)
           `).bind(projectId, organizationId, name, slug, now).run();
@@ -996,7 +1036,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -1008,7 +1048,7 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          const userData = await env.OPTIVIEW_DB.prepare(`
+          const userData = await d1.prepare(`
             SELECT id, email, is_admin, created_ts, last_login_ts FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
@@ -1057,7 +1097,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -1069,7 +1109,7 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          const orgData = await env.OPTIVIEW_DB.prepare(`
+          const orgData = await d1.prepare(`
             SELECT o.id, o.name, o.created_ts 
             FROM organization o
             JOIN org_member om ON o.id = om.org_id
@@ -1122,7 +1162,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -1134,7 +1174,7 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          const projectData = await env.OPTIVIEW_DB.prepare(`
+          const projectData = await d1.prepare(`
             SELECT p.id, p.name, p.slug, p.org_id, p.created_ts
             FROM project p
             JOIN organization o ON p.org_id = o.id
@@ -1189,7 +1229,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -1201,7 +1241,7 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          const organizations = await env.OPTIVIEW_DB.prepare(`
+          const organizations = await d1.prepare(`
             SELECT o.id, o.name, o.created_ts
             FROM organization o
             JOIN org_member om ON o.id = om.org_id
@@ -1246,7 +1286,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -1258,7 +1298,7 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          const projects = await env.OPTIVIEW_DB.prepare(`
+          const projects = await d1.prepare(`
             SELECT p.id, p.name, p.slug, p.org_id, p.created_ts
             FROM project p
             JOIN organization o ON p.org_id = o.id
@@ -1301,7 +1341,7 @@ export default {
           const now = Date.now();
 
           // Store property in database
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             INSERT INTO property (id, project_id, domain, name, created_ts, updated_ts)
             VALUES (?, ?, ?, ?, ?, ?)
           `).bind(propertyId, project_id, domain, domain, now, now).run();
@@ -1347,7 +1387,7 @@ export default {
           const now = Date.now();
 
           // Store API key in database
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             INSERT INTO api_key (id, project_id, name, hash, created_ts)
             VALUES (?, ?, ?, ?, ?)
           `).bind(keyId, project_id, name, secretHash, now).run();
@@ -1598,7 +1638,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -1623,7 +1663,7 @@ export default {
           }
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -1639,7 +1679,7 @@ export default {
           }
 
           // Get API keys for this project
-          const keys = await env.OPTIVIEW_DB.prepare(`
+          const keys = await d1.prepare(`
             SELECT 
               ak.id,
               ak.id as key_id,
@@ -1694,7 +1734,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -1718,7 +1758,7 @@ export default {
           }
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -1740,7 +1780,7 @@ export default {
           const now = Date.now();
 
           // Get org_id from project
-          const projectData = await env.OPTIVIEW_DB.prepare(`
+          const projectData = await d1.prepare(`
             SELECT org_id FROM project WHERE id = ?
           `).bind(project_id).first();
 
@@ -1753,7 +1793,7 @@ export default {
           }
 
           // Store API key in database
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             INSERT INTO api_key (id, project_id, org_id, name, hash, created_ts)
             VALUES (?, ?, ?, ?, ?, ?)
           `).bind(keyId, project_id, projectData.org_id, name, secretHash, now).run();
@@ -1803,7 +1843,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -1828,7 +1868,7 @@ export default {
           }
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -1845,7 +1885,7 @@ export default {
 
           // Record metrics: content list viewed
           try {
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
@@ -1920,7 +1960,7 @@ export default {
             FROM content_assets ca
             WHERE ${baseFilters}
           `;
-          const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...baseParams).first();
+          const totalResult = await d1.prepare(countQuery).bind(...baseParams).first();
           const total = totalResult?.total || 0;
 
           // Bulletproof query with explicit column aliases
@@ -1937,7 +1977,7 @@ export default {
           `;
 
           const mainParams = [...baseParams, pageSize, (page - 1) * pageSize];
-          const mainResult = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...mainParams).all();
+          const mainResult = await d1.prepare(mainQuery).bind(...mainParams).all();
 
           // Response with real metrics
           const items = mainResult.results.map(row => ({
@@ -1996,7 +2036,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -2020,7 +2060,7 @@ export default {
           }
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -2037,7 +2077,7 @@ export default {
 
           // Record metrics: content asset created
           try {
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
@@ -2084,7 +2124,7 @@ export default {
           }
 
           // Verify the property belongs to the project
-          const propertyCheck = await env.OPTIVIEW_DB.prepare(`
+          const propertyCheck = await d1.prepare(`
             SELECT id FROM properties WHERE id = ? AND project_id = ?
           `).bind(property_id, project_id).first();
 
@@ -2112,7 +2152,7 @@ export default {
 
           // Upsert content asset (property_id + url should be unique)
           const now = new Date().toISOString();
-          const result = await env.OPTIVIEW_DB.prepare(`
+          const result = await d1.prepare(`
             INSERT INTO content_assets (property_id, project_id, url, type, metadata, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(property_id, url) DO UPDATE SET
@@ -2168,7 +2208,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -2186,7 +2226,7 @@ export default {
           const { type, metadata } = body;
 
           // Get the content asset and verify access
-          const contentAsset = await env.OPTIVIEW_DB.prepare(`
+          const contentAsset = await d1.prepare(`
             SELECT ca.id, ca.project_id, ca.property_id
             FROM content_assets ca
             JOIN properties p ON p.id = ca.property_id
@@ -2204,7 +2244,7 @@ export default {
 
           // Record metrics: content asset updated
           try {
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
@@ -2272,7 +2312,7 @@ export default {
 
           // Update the content asset
           updateParams.push(contentId);
-          const result = await env.OPTIVIEW_DB.prepare(`
+          const result = await d1.prepare(`
             UPDATE content_assets 
             SET ${updateFields.join(', ')}
             WHERE id = ?
@@ -2318,7 +2358,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -2335,7 +2375,7 @@ export default {
           const window = url.searchParams.get("window") || "7d";
 
           // Get the content asset and verify access via project_id
-          const contentAsset = await env.OPTIVIEW_DB.prepare(`
+          const contentAsset = await d1.prepare(`
             SELECT ca.id, ca.url, ca.type, ca.metadata, ca.project_id
             FROM content_assets ca
             JOIN org_member om ON om.org_id = (SELECT org_id FROM project WHERE id = ca.project_id)
@@ -2370,7 +2410,7 @@ export default {
           }
 
           // Get by-source breakdown for the window
-          const bySourceResult = await env.OPTIVIEW_DB.prepare(`
+          const bySourceResult = await d1.prepare(`
             SELECT s.slug, COUNT(*) as events
             FROM interaction_events ie
             JOIN ai_sources s ON s.id = ie.ai_source_id
@@ -2411,10 +2451,10 @@ export default {
             timeseriesParams = [contentId];
           }
 
-          const timeseriesResult = await env.OPTIVIEW_DB.prepare(timeseriesQuery).bind(...timeseriesParams).all();
+          const timeseriesResult = await d1.prepare(timeseriesQuery).bind(...timeseriesParams).all();
 
           // Get recent events (last 10)
-          const recentEventsResult = await env.OPTIVIEW_DB.prepare(`
+          const recentEventsResult = await d1.prepare(`
             SELECT 
               ie.occurred_at,
               ie.event_type,
@@ -2482,7 +2522,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -2507,7 +2547,7 @@ export default {
           }
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -2559,7 +2599,7 @@ export default {
             ORDER BY COALESCE(e24.last_seen, '0000-01-01') DESC, s.name ASC
           `;
 
-          const sources = await env.OPTIVIEW_DB.prepare(sourcesQuery)
+          const sources = await d1.prepare(sourcesQuery)
             .bind(projectId, projectId, projectId, projectId)
             .all();
 
@@ -2576,7 +2616,7 @@ export default {
                 LIMIT 5
               `;
 
-              const topContent = await env.OPTIVIEW_DB.prepare(topContentQuery)
+              const topContent = await d1.prepare(topContentQuery)
                 .bind(projectId, source.id)
                 .all();
 
@@ -2623,7 +2663,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -2656,7 +2696,7 @@ export default {
           }
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -2672,7 +2712,7 @@ export default {
           }
 
           // Verify ai_source exists and is active
-          const sourceCheck = await env.OPTIVIEW_DB.prepare(`
+          const sourceCheck = await d1.prepare(`
             SELECT id FROM ai_sources WHERE id = ? AND is_active = 1
           `).bind(ai_source_id).first();
 
@@ -2685,7 +2725,7 @@ export default {
           }
 
           // Upsert project_ai_sources
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             INSERT INTO project_ai_sources (project_id, ai_source_id, enabled, notes, suggested_pattern_json, updated_at)
             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(project_id, ai_source_id) DO UPDATE SET
@@ -2697,7 +2737,7 @@ export default {
 
           // Create rules_suggestions if pattern provided
           if (suggested_pattern_json) {
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO rules_suggestions (project_id, ai_source_id, author_user_id, suggestion_json, status)
               VALUES (?, ?, ?, ?, 'pending')
             `).bind(project_id, ai_source_id, sessionData.user_id, JSON.stringify(suggested_pattern_json)).run();
@@ -2750,7 +2790,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -2774,7 +2814,7 @@ export default {
           }
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -2790,7 +2830,7 @@ export default {
           }
 
           // Set enabled=0 for the project_ai_sources row
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             UPDATE project_ai_sources 
             SET enabled = 0, updated_at = CURRENT_TIMESTAMP
             WHERE project_id = ? AND ai_source_id = ?
@@ -2854,7 +2894,7 @@ export default {
 
           // Validate API key
           const keyHash = await hashToken(key_id);
-          const apiKey = await env.OPTIVIEW_DB.prepare(`
+          const apiKey = await d1.prepare(`
             SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
           `).bind(keyHash).first();
 
@@ -2871,7 +2911,7 @@ export default {
 
           // Verify property belongs to project (if property_id provided)
           if (property_id) {
-            const propertyCheck = await env.OPTIVIEW_DB.prepare(`
+            const propertyCheck = await d1.prepare(`
               SELECT id FROM properties WHERE id = ? AND project_id = ?
             `).bind(property_id, projectId).first();
 
@@ -2905,7 +2945,7 @@ export default {
           let contentId = null;
           if (metadata && metadata.p) {
             // Try to find existing content asset by path
-            const existingContent = await env.OPTIVIEW_DB.prepare(`
+            const existingContent = await d1.prepare(`
               SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
             `).bind(`%${metadata.p}%`, projectId).first();
 
@@ -2917,7 +2957,7 @@ export default {
           // Store event in interaction_events table
           const now = new Date().toISOString();
 
-          const result = await env.OPTIVIEW_DB.prepare(`
+          const result = await d1.prepare(`
             INSERT INTO interaction_events (
               project_id, property_id, content_id, ai_source_id, 
               event_type, metadata, occurred_at
@@ -2956,7 +2996,7 @@ export default {
                 }
               }
 
-              await env.OPTIVIEW_DB.prepare(`
+              await d1.prepare(`
                 INSERT INTO ai_referrals (
                   project_id, ai_source_id, content_id, ref_type, 
                   detected_at, ref_url, metadata
@@ -2977,7 +3017,7 @@ export default {
           }
 
           // Update last_used timestamp for API key
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             UPDATE api_key SET last_used_ts = ? WHERE id = ?
           `).bind(Date.now(), apiKey.id).run();
 
@@ -3041,7 +3081,7 @@ export default {
 
           // Validate API key
           const keyHash = await hashToken(authHeader);
-          const apiKey = await env.OPTIVIEW_DB.prepare(`
+          const apiKey = await d1.prepare(`
             SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
           `).bind(keyHash).first();
 
@@ -3093,7 +3133,7 @@ export default {
             }
 
             // Verify property belongs to project
-            const propertyCheck = await env.OPTIVIEW_DB.prepare(`
+            const propertyCheck = await d1.prepare(`
               SELECT id FROM properties WHERE id = ? AND project_id = ?
             `).bind(finalPropertyId, project_id).first();
 
@@ -3106,14 +3146,14 @@ export default {
             }
 
             // Upsert content asset
-            const existingContent = await env.OPTIVIEW_DB.prepare(`
+            const existingContent = await d1.prepare(`
               SELECT id FROM content_assets WHERE url = ? AND property_id = ?
             `).bind(url, finalPropertyId).first();
 
             if (existingContent) {
               finalContentId = existingContent.id;
             } else {
-              const contentResult = await env.OPTIVIEW_DB.prepare(`
+              const contentResult = await d1.prepare(`
                 INSERT INTO content_assets (property_id, project_id, url, type, created_at)
                 VALUES (?, ?, ?, 'page', ?)
               `).bind(finalPropertyId, project_id, url, new Date().toISOString()).run();
@@ -3141,7 +3181,7 @@ export default {
 
           // Insert conversion
           const now = new Date().toISOString();
-          const result = await env.OPTIVIEW_DB.prepare(`
+          const result = await d1.prepare(`
             INSERT INTO conversion_event (
               project_id, property_id, content_id, amount_cents, 
               currency, metadata, occurred_at
@@ -3157,7 +3197,7 @@ export default {
           ).run();
 
           // Update last_used timestamp for API key
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             UPDATE api_key SET last_used_ts = ? WHERE id = ?
           `).bind(Date.now(), apiKey.id).run();
 
@@ -3235,7 +3275,7 @@ export default {
           }
 
           // Get totals with attribution
-          const totals = await env.OPTIVIEW_DB.prepare(`
+          const totals = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -3286,7 +3326,7 @@ export default {
           `).bind(project_id).first();
 
           // Get breakdown by source
-          const bySource = await env.OPTIVIEW_DB.prepare(`
+          const bySource = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -3341,7 +3381,7 @@ export default {
           `).bind(project_id).all();
 
           // Get top content
-          const topContent = await env.OPTIVIEW_DB.prepare(`
+          const topContent = await d1.prepare(`
             SELECT 
               ca.id as content_id,
               ca.url,
@@ -3356,7 +3396,7 @@ export default {
           `).bind(project_id).all();
 
           // Get timeseries data
-          const timeseries = await env.OPTIVIEW_DB.prepare(`
+          const timeseries = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -3584,7 +3624,7 @@ export default {
             offset                  // 8
           ];
 
-          const items = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...bindList).all();
+          const items = await d1.prepare(mainQuery).bind(...bindList).all();
 
           // COUNT query (same filters, no LIMIT/OFFSET)
           const countQuery = `
@@ -3649,7 +3689,7 @@ export default {
             source || null          // 6
           ];
 
-          const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...countBind).first();
+          const totalResult = await d1.prepare(countQuery).bind(...countBind).first();
           const total = totalResult?.total || 0;
 
           // Get assists for each content+source combination
@@ -3697,7 +3737,7 @@ export default {
             GROUP BY r.content_id, r.ai_source_id, ais.slug
           `;
 
-          const assists = await env.OPTIVIEW_DB.prepare(assistsQuery).bind(project_id, sinceISO, lookbackMod).all();
+          const assists = await d1.prepare(assistsQuery).bind(project_id, sinceISO, lookbackMod).all();
 
           // Group assists by content_id and source_slug
           const assistsMap = {};
@@ -3794,7 +3834,7 @@ export default {
           }
 
           // Get content info
-          const content = await env.OPTIVIEW_DB.prepare(`
+          const content = await d1.prepare(`
             SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?
           `).bind(content_id, project_id).first();
 
@@ -3809,13 +3849,13 @@ export default {
           // Get source info if specified
           let sourceInfo = null;
           if (source && source !== 'null') {
-            sourceInfo = await env.OPTIVIEW_DB.prepare(`
+            sourceInfo = await d1.prepare(`
               SELECT slug, name FROM ai_sources WHERE slug = ?
             `).bind(source).first();
           }
 
           // Get summary stats
-          const summary = await env.OPTIVIEW_DB.prepare(`
+          const summary = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -3857,7 +3897,7 @@ export default {
           `).bind(project_id, content_id, project_id, content_id, ...(source && source !== 'null' ? [source] : [])).first();
 
           // Get timeseries data
-          const timeseries = await env.OPTIVIEW_DB.prepare(`
+          const timeseries = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -3901,7 +3941,7 @@ export default {
           `).bind(project_id, content_id, project_id, content_id, ...(source && source !== 'null' ? [source] : [])).all();
 
           // Get recent conversions
-          const recent = await env.OPTIVIEW_DB.prepare(`
+          const recent = await d1.prepare(`
             SELECT 
               occurred_at,
               amount_cents,
@@ -3914,7 +3954,7 @@ export default {
           `).bind(project_id, content_id).all();
 
           // Get assists
-          const assists = await env.OPTIVIEW_DB.prepare(`
+          const assists = await d1.prepare(`
             SELECT 
               ais.slug,
               COUNT(DISTINCT ce.id) as count
@@ -4086,7 +4126,7 @@ export default {
              ORDER BY r.referrals DESC
            `;
 
-          const summaryResult = await env.OPTIVIEW_DB.prepare(summaryQuery).bind(project_id, sinceISO).all();
+          const summaryResult = await d1.prepare(summaryQuery).bind(project_id, sinceISO).all();
 
           // Get totals
           const totalsQuery = `
@@ -4098,7 +4138,7 @@ export default {
               (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND ce.occurred_at >= p.since) as conversions
           `;
 
-          const totalsResult = await env.OPTIVIEW_DB.prepare(totalsQuery).bind(project_id, sinceISO).first();
+          const totalsResult = await d1.prepare(totalsQuery).bind(project_id, sinceISO).first();
           const totalReferrals = totalsResult?.referrals || 0;
           const totalConversions = totalsResult?.conversions || 0;
           const totalConvRate = totalReferrals > 0 ? totalConversions / totalReferrals : 0;
@@ -4107,7 +4147,7 @@ export default {
           const bySource = [];
           for (const row of summaryResult.results || []) {
             const sourceQuery = `SELECT slug, name FROM ai_sources WHERE id = ?`;
-            const sourceResult = await env.OPTIVIEW_DB.prepare(sourceQuery).bind(row.ai_source_id).first();
+            const sourceResult = await d1.prepare(sourceQuery).bind(row.ai_source_id).first();
 
             if (sourceResult) {
               // Calculate TTC percentiles
@@ -4196,11 +4236,11 @@ export default {
             `;
           }
 
-          const timeseriesResult = await env.OPTIVIEW_DB.prepare(timeseriesQuery).bind(project_id, sinceISO).all();
+          const timeseriesResult = await d1.prepare(timeseriesQuery).bind(project_id, sinceISO).all();
 
           // Record metrics: funnels summary viewed
           try {
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
@@ -4430,7 +4470,7 @@ export default {
           if (q) bindParams.push(`%${q}%`);
           bindParams.push(pageSizeNum, offset);
 
-          const items = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...bindParams).all();
+          const items = await d1.prepare(mainQuery).bind(...bindParams).all();
 
           // Process TTC data for each item
           const itemsWithTTC = items.results?.map(item => {
@@ -4497,12 +4537,12 @@ export default {
           if (source) countBind.push(source);
           if (q) countBind.push(`%${q}%`);
 
-          const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...countBind).first();
+          const totalResult = await d1.prepare(countQuery).bind(...countBind).first();
           const total = totalResult?.total || 0;
 
           // Record metrics: funnels list viewed
           try {
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
@@ -4593,7 +4633,7 @@ export default {
 
           // Get content info
           const contentQuery = `SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?`;
-          const contentResult = await env.OPTIVIEW_DB.prepare(contentQuery).bind(content_id, project_id).first();
+          const contentResult = await d1.prepare(contentQuery).bind(content_id, project_id).first();
 
           if (!contentResult) {
             const response = new Response(JSON.stringify({ error: "Content not found" }), {
@@ -4605,7 +4645,7 @@ export default {
 
           // Get source info
           const sourceQuery = `SELECT id, slug, name FROM ai_sources WHERE slug = ?`;
-          const sourceResult = await env.OPTIVIEW_DB.prepare(sourceQuery).bind(source).first();
+          const sourceResult = await d1.prepare(sourceQuery).bind(source).first();
 
           if (!sourceResult) {
             const response = new Response(JSON.stringify({ error: "Source not found" }), {
@@ -4680,7 +4720,7 @@ export default {
              LEFT JOIN attributed a ON 1=1
            `;
 
-          const summaryResult = await env.OPTIVIEW_DB.prepare(summaryQuery).bind(
+          const summaryResult = await d1.prepare(summaryQuery).bind(
             project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
           ).first();
 
@@ -4758,7 +4798,7 @@ export default {
             `;
           }
 
-          const timeseriesResult = await env.OPTIVIEW_DB.prepare(timeseriesQuery).bind(
+          const timeseriesResult = await d1.prepare(timeseriesQuery).bind(
             project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
           ).all();
 
@@ -4804,13 +4844,13 @@ export default {
             SELECT * FROM attributed
           `;
 
-          const recentResult = await env.OPTIVIEW_DB.prepare(recentQuery).bind(
+          const recentResult = await d1.prepare(recentQuery).bind(
             project_id, content_id, sinceISO
           ).all();
 
           // Record metrics: funnels detail viewed
           try {
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
@@ -4923,7 +4963,7 @@ export default {
           }
 
           // Get totals
-          const totals = await env.OPTIVIEW_DB.prepare(`
+          const totals = await d1.prepare(`
             SELECT 
               COUNT(*) as referrals,
               COUNT(DISTINCT content_id) as contents,
@@ -4933,7 +4973,7 @@ export default {
           `).bind(projectId).first();
 
           // Get by source
-          const bySource = await env.OPTIVIEW_DB.prepare(`
+          const bySource = await d1.prepare(`
             SELECT 
               s.slug,
               s.name,
@@ -4946,7 +4986,7 @@ export default {
           `).bind(projectId).all();
 
           // Get top content
-          const topContent = await env.OPTIVIEW_DB.prepare(`
+          const topContent = await d1.prepare(`
             SELECT 
               ar.content_id,
               ca.url,
@@ -4967,7 +5007,7 @@ export default {
             for (let i = 14; i >= 0; i--) {
               const bucketStart = now - (i * 60);
               const bucketEnd = bucketStart + 60;
-              const count = await env.OPTIVIEW_DB.prepare(`
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? 
@@ -4986,7 +5026,7 @@ export default {
             for (let i = 23; i >= 0; i--) {
               const bucketStart = now - (i * 3600);
               const bucketEnd = bucketStart + 3600;
-              const count = await env.OPTIVIEW_DB.prepare(`
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? 
@@ -5005,7 +5045,7 @@ export default {
             for (let i = 6; i >= 0; i--) {
               const bucketStart = now - (i * 86400);
               const bucketEnd = bucketStart + 86400;
-              const count = await env.OPTIVIEW_DB.prepare(`
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? 
@@ -5126,7 +5166,7 @@ export default {
             JOIN content_assets ca ON ca.id = ar.content_id
             WHERE ${whereClause}
           `;
-          const totalResult = await env.OPTIVIEW_DB.prepare(totalQuery).bind(...params).first();
+          const totalResult = await d1.prepare(totalQuery).bind(...params).first();
           const total = totalResult?.count || 0;
 
           // Get paginated results
@@ -5148,12 +5188,12 @@ export default {
             ORDER BY referrals_24h DESC, last_seen DESC
             LIMIT ? OFFSET ?
           `;
-          const listResult = await env.OPTIVIEW_DB.prepare(listQuery).bind(...params, pageSize, offset).all();
+          const listResult = await d1.prepare(listQuery).bind(...params, pageSize, offset).all();
 
           // Calculate share_of_ai for each row
           const items = await Promise.all(listResult.results.map(async (row) => {
             // Get total AI events for this content in the window
-            const totalAIEvents = await env.OPTIVIEW_DB.prepare(`
+            const totalAIEvents = await d1.prepare(`
               SELECT COUNT(*) as count
               FROM interaction_events
               WHERE project_id = ? AND content_id = ? AND ai_source_id IS NOT NULL AND occurred_at >= ${timeFilter}
@@ -5250,7 +5290,7 @@ export default {
           }
 
           // Get content info
-          const content = await env.OPTIVIEW_DB.prepare(`
+          const content = await d1.prepare(`
             SELECT id, url FROM content_assets 
             WHERE id = ? AND project_id = ?
           `).bind(contentId, projectId).first();
@@ -5264,7 +5304,7 @@ export default {
           }
 
           // Get source info
-          const source = await env.OPTIVIEW_DB.prepare(`
+          const source = await d1.prepare(`
             SELECT id, slug, name FROM ai_sources WHERE id = ?
           `).bind(aiSourceId).first();
 
@@ -5277,7 +5317,7 @@ export default {
           }
 
           // Get summary stats
-          const summary = await env.OPTIVIEW_DB.prepare(`
+          const summary = await d1.prepare(`
             SELECT 
               SUM(CASE WHEN detected_at >= datetime('now','-15 minutes') THEN 1 ELSE 0 END) as referrals_15m,
               SUM(CASE WHEN detected_at >= datetime('now','-1 day') THEN 1 ELSE 0 END) as referrals_24h,
@@ -5294,7 +5334,7 @@ export default {
             for (let i = 14; i >= 0; i--) {
               const bucketStart = now - (i * 60);
               const bucketEnd = bucketStart + 60;
-              const count = await env.OPTIVIEW_DB.prepare(`
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
@@ -5313,7 +5353,7 @@ export default {
             for (let i = 23; i >= 0; i--) {
               const bucketStart = now - (i * 3600);
               const bucketEnd = bucketStart + 3600;
-              const count = await env.OPTIVIEW_DB.prepare(`
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
@@ -5332,7 +5372,7 @@ export default {
             for (let i = 6; i >= 0; i--) {
               const bucketStart = now - (i * 86400);
               const bucketEnd = bucketStart + 86400;
-              const count = await env.OPTIVIEW_DB.prepare(`
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
@@ -5348,7 +5388,7 @@ export default {
           }
 
           // Get recent referrals (last 10)
-          const recent = await env.OPTIVIEW_DB.prepare(`
+          const recent = await d1.prepare(`
             SELECT 
               detected_at,
               ref_url,
@@ -5416,7 +5456,7 @@ export default {
           const fifteenMinutesAgo = now - (15 * 60 * 1000);
 
           // Get events in the last 15 minutes for this property
-          const recentEvents = await env.OPTIVIEW_DB.prepare(`
+          const recentEvents = await d1.prepare(`
             SELECT COUNT(*) as count, event_type, metadata
             FROM edge_click_event 
             WHERE property_id = ? AND timestamp > ?
@@ -5424,7 +5464,7 @@ export default {
           `).bind(propertyId, fifteenMinutesAgo).all();
 
           // Get the last event timestamp
-          const lastEvent = await env.OPTIVIEW_DB.prepare(`
+          const lastEvent = await d1.prepare(`
             SELECT timestamp FROM edge_click_event 
             WHERE property_id = ? 
             ORDER BY timestamp DESC 
@@ -5432,7 +5472,7 @@ export default {
           `).bind(propertyId).first();
 
           // Count total events in last 15 minutes
-          const totalEvents = await env.OPTIVIEW_DB.prepare(`
+          const totalEvents = await d1.prepare(`
             SELECT COUNT(*) as count FROM edge_click_event 
             WHERE property_id = ? AND timestamp > ?
           `).bind(propertyId, fifteenMinutesAgo).first();
@@ -5484,7 +5524,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -5497,7 +5537,7 @@ export default {
           }
 
           // Check if user is admin
-          const userData = await env.OPTIVIEW_DB.prepare(`
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
@@ -5566,7 +5606,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -5579,7 +5619,7 @@ export default {
           }
 
           // Check if user is admin
-          const userData = await env.OPTIVIEW_DB.prepare(`
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
@@ -5613,7 +5653,7 @@ export default {
           }
 
           // Create new ai_source
-          const result = await env.OPTIVIEW_DB.prepare(`
+          const result = await d1.prepare(`
             INSERT INTO ai_sources (slug, name, category, is_active, created_at, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
           `).bind(slug, name, category, is_active !== false ? 1 : 0).run();
@@ -5662,7 +5702,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -5675,7 +5715,7 @@ export default {
           }
 
           // Check if user is admin
-          const userData = await env.OPTIVIEW_DB.prepare(`
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
@@ -5730,7 +5770,7 @@ export default {
           }
 
           const updateQuery = `UPDATE ai_sources SET ${updates.join(', ')} WHERE id = ?`;
-          await env.OPTIVIEW_DB.prepare(updateQuery).bind(...values).run();
+          await d1.prepare(updateQuery).bind(...values).run();
 
           const response = new Response(JSON.stringify({
             success: true,
@@ -5773,7 +5813,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -5786,7 +5826,7 @@ export default {
           }
 
           // Check if user is admin
-          const userData = await env.OPTIVIEW_DB.prepare(`
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
@@ -5800,7 +5840,7 @@ export default {
 
           const status = url.searchParams.get('status') || 'pending';
 
-          const suggestions = await env.OPTIVIEW_DB.prepare(`
+          const suggestions = await d1.prepare(`
             SELECT rs.*, p.name as project_name, s.name as source_name, s.slug as source_slug, u.email as author_email
             FROM rules_suggestions rs
             JOIN project p ON p.id = rs.project_id
@@ -5846,7 +5886,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -5859,7 +5899,7 @@ export default {
           }
 
           // Check if user is admin
-          const userData = await env.OPTIVIEW_DB.prepare(`
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
@@ -5884,7 +5924,7 @@ export default {
           }
 
           // Update suggestion status
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             UPDATE rules_suggestions 
             SET status = ?, admin_comment = ?, decided_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -5942,7 +5982,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -5966,7 +6006,7 @@ export default {
           }
 
           // Verify user has access to this organization and project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -6035,7 +6075,7 @@ export default {
           // Query the D1 magic_link table
           console.log("🔍 TEST MODE - Looking for magic link token for:", email);
 
-          const magicLinkData = await env.OPTIVIEW_DB.prepare(`
+          const magicLinkData = await d1.prepare(`
             SELECT ml.id, ml.email, ml.token_hash, ml.expires_at, ml.continue_path, ml.created_at, ml.consumed_at
             FROM magic_link ml
             WHERE ml.email = ? AND ml.consumed_at IS NULL AND ml.expires_at > ?
@@ -6100,7 +6140,7 @@ export default {
             .trim('-'); // Remove leading/trailing hyphens
 
           // Check if organization already exists
-          const existingOrg = await env.OPTIVIEW_DB.prepare(`
+          const existingOrg = await d1.prepare(`
             SELECT id FROM organization WHERE name = ?
           `).bind(name).first();
 
@@ -6118,7 +6158,7 @@ export default {
           console.log('🔧 Attempting to create organization:', { orgId, name, now });
 
           try {
-            await env.OPTIVIEW_DB.prepare(`
+            await d1.prepare(`
               INSERT INTO organization (id, name, created_ts)
               VALUES (?, ?, ?)
             `).bind(orgId, name, now).run();
@@ -6172,7 +6212,7 @@ export default {
           }
 
           // Verify organization exists
-          const org = await env.OPTIVIEW_DB.prepare(`
+          const org = await d1.prepare(`
             SELECT id, name FROM organization WHERE id = ?
           `).bind(organizationId).first();
 
@@ -6188,7 +6228,7 @@ export default {
           const now = Math.floor(Date.now() / 1000);
           const projectSlug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-          await env.OPTIVIEW_DB.prepare(`
+          await d1.prepare(`
             INSERT INTO project (id, name, slug, org_id, created_ts)
             VALUES (?, ?, ?, ?, ?)
           `).bind(projectId, name, projectSlug, organizationId, now).run();
@@ -6234,7 +6274,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -6251,7 +6291,7 @@ export default {
           const projectId = urlObj.pathname.split('/')[3];
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -6312,7 +6352,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -6329,7 +6369,7 @@ export default {
           const projectId = urlObj.pathname.split('/')[3];
 
           // Verify user has access to this project
-          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
@@ -6389,7 +6429,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -6402,7 +6442,7 @@ export default {
           }
 
           // Check if user is admin
-          const userData = await env.OPTIVIEW_DB.prepare(`
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
@@ -6426,7 +6466,7 @@ export default {
           }
 
           // Update user to admin
-          const updateResult = await env.OPTIVIEW_DB.prepare(`
+          const updateResult = await d1.prepare(`
             UPDATE user SET is_admin = 1 WHERE email = ?
           `).bind(email).run();
 
@@ -6478,7 +6518,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          const sessionData = await env.OPTIVIEW_DB.prepare(`
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
@@ -6491,7 +6531,7 @@ export default {
           }
 
           // Get user data
-          const userData = await env.OPTIVIEW_DB.prepare(`
+          const userData = await d1.prepare(`
             SELECT id, email, is_admin, created_ts, last_login_ts FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
