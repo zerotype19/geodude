@@ -393,105 +393,85 @@ export default {
         }
       }
 
-      // 2.5) Magic Link Consumption (M3)
+      // 2.2) Consume Magic Link
       if (url.pathname === "/auth/magic" && request.method === "GET") {
         try {
-          const token = url.searchParams.get("token");
+          const urlObj = new URL(request.url);
+          const token = urlObj.searchParams.get("token");
+          const continuePath = urlObj.searchParams.get("continue") || "/onboarding";
+
           if (!token) {
-            const response = new Response("Invalid token", { status: 400 });
-            return addCorsHeaders(response);
+            return new Response("Missing token", { status: 400 });
           }
 
-          // Extract client IP from request headers
-          const clientIP = request.headers.get("cf-connecting-ip") ||
-            request.headers.get("x-forwarded-for") ||
-            request.headers.get("x-real-ip") ||
-            "unknown";
+          console.log("🔐 Magic link consumption for token:", token.substring(0, 12) + "...");
 
-          console.log('🔐 Magic link consumption for token:', token.substring(0, 8) + '...');
-          console.log('📍 Client IP:', clientIP);
+          // Get client IP for session
+          const clientIP = request.headers.get("cf-connecting-ip") || 
+                          request.headers.get("x-forwarded-for") || 
+                          request.headers.get("x-real-ip") || 
+                          "unknown";
+          console.log("📍 Client IP:", clientIP);
 
-          // Hash the token for comparison
-          const tokenHash = await hashString(token);
+          // Find and validate magic link
+          const magicLinkData = await env.OPTIVIEW_DB.prepare(`
+            SELECT email, expires_at FROM magic_link 
+            WHERE token = ? AND expires_at > ?
+          `).bind(token, new Date().toISOString()).first();
 
-          // Get stored magic link data
-          const storedData = await env.OPTIVIEW_DB.prepare(`
-            SELECT ml.email, ml.token_hash, ml.expires_at, ml.continue_path, ml.requester_ip_hash, ml.created_at, ml.consumed_at
-            FROM magic_link ml
-            WHERE ml.token_hash = ?
-          `).bind(tokenHash).first();
-
-          if (!storedData) {
-            const response = new Response("Invalid or expired token", { status: 400 });
-            return addCorsHeaders(response);
+          if (!magicLinkData) {
+            return new Response("Invalid or expired magic link", { status: 400 });
           }
 
-          // Check expiration
-          if (new Date(storedData.expires_at) < new Date()) {
-            // Clean up expired token
-            await env.OPTIVIEW_DB.prepare(`
-              DELETE FROM magic_link WHERE token_hash = ?
-            `).bind(tokenHash).run();
-            const response = new Response("Token expired", { status: 400 });
-            return addCorsHeaders(response);
-          }
-
-          // Check if user is already logged in as different user
-          const currentUserCookie = request.headers.get("cookie");
-          let shouldPromptSwitch = false;
-          let currentUserEmail = null;
-
-          if (currentUserCookie) {
-            // Parse current session to check if different user
-            // For now, assume we'll implement session parsing later
-            // TODO: Implement session cookie parsing
-          }
-
-          // Get or create user (auto-create if first time)
+          // Check if user exists
           let userRecord = await env.OPTIVIEW_DB.prepare(`
-            SELECT id, email, is_admin FROM user WHERE email = ?
-          `).bind(storedData.email).first();
+            SELECT id, email, is_admin, created_ts FROM user WHERE email = ?
+          `).bind(magicLinkData.email).first();
 
           if (!userRecord) {
-            console.log('👤 Creating new user for:', storedData.email);
-
+            console.log("👤 Creating new user for:", magicLinkData.email);
             // Create new user
-            const userId = generateToken(); // Generate unique ID
-            const now = Math.floor(Date.now() / 1000); // Unix timestamp
-
-            const insertResult = await env.OPTIVIEW_DB.prepare(`
-              INSERT INTO user (id, email, created_ts, is_admin)
-              VALUES (?, ?, ?, 0)
-            `).bind(userId, storedData.email, now).run();
-
-            if (insertResult.success) {
-              userRecord = { id: userId, email: storedData.email, is_admin: 0 };
-              console.log('✅ New user created with ID:', userId);
-            } else {
-              console.error('❌ Failed to create user');
-              return new Response(JSON.stringify({ error: 'Failed to create user account' }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' }
-              });
-            }
+            const userId = `usr_${generateToken().substring(0, 12)}`;
+            const now = Math.floor(Date.now() / 1000);
+            
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO user (id, email, is_admin, created_ts, last_login_ts)
+              VALUES (?, ?, 0, ?, ?)
+            `).bind(userId, magicLinkData.email, now, now).run();
+            
+            userRecord = { id: userId, email: magicLinkData.email, is_admin: 0, created_ts: now };
+            console.log("✅ New user created with ID:", userId);
           } else {
             // Update last_login_ts for existing user
             const now = Math.floor(Date.now() / 1000);
             await env.OPTIVIEW_DB.prepare(`
               UPDATE user SET last_login_ts = ? WHERE id = ?
             `).bind(now, userRecord.id).run();
-            console.log('✅ Updated last_login_ts for existing user:', userRecord.id);
+            console.log("✅ Updated last_login_ts for existing user:", userRecord.id);
           }
 
-          // Create session (store in existing D1 session table)
-          const sessionId = generateToken();
+          // Check if user has already completed onboarding
+          const hasOrganization = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count FROM org_member WHERE user_id = ?
+          `).bind(userRecord.id).first();
 
-          // Get user agent for ua_hash
+          let redirectPath = continuePath;
+          if (hasOrganization.count > 0) {
+            // User has completed onboarding, redirect to main app
+            redirectPath = "/";
+            console.log("✅ User has completed onboarding, redirecting to main app");
+          } else {
+            console.log("🆕 New user, redirecting to onboarding");
+          }
+
+          // Create session
+          const sessionId = generateToken();
+          const sessionExpiresAt = new Date();
+          sessionExpiresAt.setHours(sessionExpiresAt.getHours() + parseInt(env.SESSION_TTL_HOURS || "720"));
+          
           const userAgent = request.headers.get("user-agent") || "unknown";
           const uaHash = await hashString(userAgent);
-
-          // Store session in existing session table
-          const sessionExpiresAt = new Date(Date.now() + config.SESSION_TTL_HOURS * 60 * 60 * 1000);
+          
           await env.OPTIVIEW_DB.prepare(`
             INSERT INTO session (user_id, session_id, expires_at, ip_hash, ua_hash)
             VALUES (?, ?, ?, ?, ?)
@@ -503,39 +483,26 @@ export default {
             uaHash
           ).run();
 
-          console.log('✅ Session created in existing session table');
+          console.log("✅ Session created in existing session table");
 
-          // Clean up used magic link
+          // Delete used magic link
           await env.OPTIVIEW_DB.prepare(`
-            UPDATE magic_link SET consumed_at = ? WHERE token_hash = ?
-          `).bind(new Date().toISOString(), tokenHash).run();
+            DELETE FROM magic_link WHERE token = ?
+          `).bind(token).run();
 
-          // Default to /onboarding if no continue_path or if it's invalid
-          let redirectPath = "/onboarding";
-          if (storedData.continue_path && storedData.continue_path !== "/onboarding") {
-            // Re-sanitize continue path before redirect (defense-in-depth)
-            const sanitizedRedirectUrl = sanitizeContinuePath(storedData.continue_path);
-            redirectPath = sanitizedRedirectUrl.value;
-
-            // Record sanitization metrics if sanitized
-            if (sanitizedRedirectUrl.sanitized) {
-              recordContinueSanitized("consume", sanitizedRedirectUrl.reason);
-            }
-          }
-
-          const response = new Response(null, {
+          // Redirect to appropriate page
+          const redirectUrl = `${env.PUBLIC_APP_URL}${redirectPath}`;
+          return new Response(null, {
             status: 302,
             headers: {
-              "Location": redirectPath,
-              "Set-Cookie": `optiview_session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${config.SESSION_TTL_HOURS * 60 * 60}`
+              "Location": redirectUrl,
+              "Set-Cookie": `optiview_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
             }
           });
-          return addCorsHeaders(response);
 
         } catch (e) {
           console.error("Magic link consumption error:", e);
-          const response = new Response("Internal server error", { status: 500 });
-          return addCorsHeaders(response);
+          return new Response("Internal server error", { status: 500 });
         }
       }
 
