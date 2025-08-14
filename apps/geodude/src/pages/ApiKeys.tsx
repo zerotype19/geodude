@@ -4,6 +4,7 @@ import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import KeyRotationModal from "../components/KeyRotationModal";
 import { RotateCcw, Trash2, AlertTriangle, Clock, CheckCircle, XCircle } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ApiKey {
   id: number;
@@ -20,6 +21,7 @@ interface ApiKey {
 }
 
 export default function ApiKeys() {
+  const { project } = useAuth();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,19 +29,23 @@ export default function ApiKeys() {
   const [newKey, setNewKey] = useState({ domain: "", name: "" });
 
   useEffect(() => {
-    loadKeys();
-  }, []);
+    if (project?.id) {
+      loadKeys();
+    }
+  }, [project]);
 
   async function loadKeys() {
+    if (!project?.id) return;
+
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await fetch(`${API_BASE}/api/keys`, FETCH_OPTS);
+
+      const response = await fetch(`${API_BASE}/api/keys?project_id=${project.id}`, FETCH_OPTS);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       setKeys(data.keys || []); // Extract the keys array from the response
     } catch (err) {
@@ -50,23 +56,23 @@ export default function ApiKeys() {
   }
 
   async function createApiKey() {
-    if (!newKey.domain || !newKey.name) return;
-    
+    if (!project?.id || !newKey.domain || !newKey.name) return;
+
     try {
       setLoading(true);
-      
+
       const response = await fetch(`${API_BASE}/api/keys`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          project_id: 1, // Default project ID for now
-          property_id: 1, // Default property ID for now
+          project_id: parseInt(project.id),
+          property_id: 1, // We'll need to get this from the domain
           name: newKey.name,
           domain: newKey.domain
         })
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         alert(`API Key created! Key ID: ${data.key_id}\nSecret: ${data.secret_once}\n\n⚠️ Store this secret securely - it won't be shown again!`);
@@ -95,13 +101,13 @@ export default function ApiKeys() {
       }
 
       const result = await response.json();
-      
+
       // Reload keys to get updated grace period info
       await loadKeys();
-      
+
       // Show success message (could be a toast)
       console.log("Key rotated successfully:", result);
-      
+
       // Close modal
       setRotationModal(null);
     } catch (err) {
@@ -127,7 +133,7 @@ export default function ApiKeys() {
 
       // Reload keys
       await loadKeys();
-      
+
       // Show success message
       console.log("Key revoked successfully");
     } catch (err) {
@@ -140,7 +146,7 @@ export default function ApiKeys() {
     if (key.revoked_at) {
       return { status: 'revoked', icon: <XCircle className="text-red-600" size={16} />, text: 'Revoked' };
     }
-    
+
     if (key.grace_secret_hash && key.grace_expires_at) {
       const expiry = new Date(key.grace_expires_at);
       const now = new Date();
@@ -148,22 +154,22 @@ export default function ApiKeys() {
         return { status: 'grace', icon: <Clock className="text-yellow-600" size={16} />, text: 'Grace Period' };
       }
     }
-    
+
     return { status: 'active', icon: <CheckCircle className="text-green-600" size={16} />, text: 'Active' };
   }
 
   function getGraceCountdown(key: ApiKey) {
     if (!key.grace_expires_at) return null;
-    
+
     const expiry = new Date(key.grace_expires_at);
     const now = new Date();
     const diffMs = expiry.getTime() - now.getTime();
-    
+
     if (diffMs <= 0) return null;
-    
+
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     return `${hours}h ${minutes}m remaining`;
   }
 
@@ -205,7 +211,7 @@ export default function ApiKeys() {
           <Card title="No API Keys">
             <div className="text-center py-8">
               <p className="text-gray-500 mb-6">No API keys found. Create your first key to start collecting data.</p>
-              
+
               {/* Create API Key Form */}
               <div className="max-w-md mx-auto">
                 <div className="space-y-4">
@@ -222,7 +228,7 @@ export default function ApiKeys() {
                       onChange={(e) => setNewKey({ ...newKey, domain: e.target.value })}
                     />
                   </div>
-                  
+
                   <div>
                     <label htmlFor="key-name" className="block text-sm font-medium text-gray-700 mb-1">
                       Key Name
@@ -236,10 +242,10 @@ export default function ApiKeys() {
                       onChange={(e) => setNewKey({ ...newKey, name: e.target.value })}
                     />
                   </div>
-                  
+
                   <button
                     onClick={createApiKey}
-                    disabled={!newKey.domain || !newKey.name}
+                    disabled={!project?.id || !newKey.domain || !newKey.name}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
                   >
                     Create API Key
@@ -253,7 +259,7 @@ export default function ApiKeys() {
             {keys.map((key) => {
               const status = getKeyStatus(key);
               const graceCountdown = getGraceCountdown(key);
-              
+
               return (
                 <Card key={key.id} title={`${key.name} (${key.domain})`}>
                   <div className="p-6">
@@ -262,26 +268,25 @@ export default function ApiKeys() {
                         <p className="text-sm font-medium text-gray-500">Key ID</p>
                         <p className="text-sm text-gray-900 font-mono">{key.key_id}</p>
                       </div>
-                      
+
                       <div>
                         <p className="text-sm font-medium text-gray-500">Status</p>
                         <div className="flex items-center space-x-2">
                           {status.icon}
-                          <span className={`text-sm ${
-                            status.status === 'active' ? 'text-green-600' :
-                            status.status === 'grace' ? 'text-yellow-600' :
-                            'text-red-600'
-                          }`}>
+                          <span className={`text-sm ${status.status === 'active' ? 'text-green-600' :
+                              status.status === 'grace' ? 'text-yellow-600' :
+                                'text-red-600'
+                            }`}>
                             {status.text}
                           </span>
                         </div>
                       </div>
-                      
+
                       <div>
                         <p className="text-sm font-medium text-gray-500">Created</p>
                         <p className="text-sm text-gray-900">{formatDate(key.created_at)}</p>
                       </div>
-                      
+
                       <div>
                         <p className="text-sm font-medium text-gray-500">Last Used</p>
                         <p className="text-sm text-gray-900">
@@ -319,7 +324,7 @@ export default function ApiKeys() {
                           <span>Rotate</span>
                         </button>
                       )}
-                      
+
                       {status.status !== 'revoked' && (
                         <button
                           onClick={() => handleRevoke(key.id)}

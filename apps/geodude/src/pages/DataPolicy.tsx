@@ -3,6 +3,7 @@ import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { Shield, Database, Clock, AlertTriangle, Trash2, Edit3, Save, X } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ProjectSettings {
   project_id: number;
@@ -22,6 +23,7 @@ interface PurgeResult {
 }
 
 export default function DataPolicy() {
+  const { project } = useAuth();
   const [settings, setSettings] = useState<ProjectSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,23 +34,23 @@ export default function DataPolicy() {
   const [purging, setPurging] = useState(false);
 
   useEffect(() => {
-    loadSettings();
-  }, []);
+    if (project?.id) {
+      loadSettings();
+    }
+  }, [project]);
 
   async function loadSettings() {
+    if (!project?.id) return;
+
     try {
       setLoading(true);
       setError(null);
-      
-      // For now, we'll use a placeholder project ID
-      // In a real app, this would come from the user's session
-      const projectId = 1;
-      
-      const response = await fetch(`${API_BASE}/api/projects/${projectId}/settings`, FETCH_OPTS);
+
+      const response = await fetch(`${API_BASE}/api/projects/${project.id}/settings`, FETCH_OPTS);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       setSettings(data);
       setEditForm({
@@ -93,7 +95,7 @@ export default function DataPolicy() {
 
     try {
       setPurging(true);
-      
+
       const response = await fetch(`${API_BASE}/admin/purge`, {
         ...FETCH_OPTS,
         method: 'POST',
@@ -111,7 +113,7 @@ export default function DataPolicy() {
 
       const result = await response.json();
       setPurgeResult(result);
-      
+
       if (!purgeModal.dryRun) {
         // Reload settings after actual purge
         await loadSettings();
@@ -156,15 +158,15 @@ export default function DataPolicy() {
 
   function validateRetention(events: number, referrals: number) {
     const errors: string[] = [];
-    
+
     if (events < 7 || events > 3650) {
       errors.push("Events retention must be between 7 and 3650 days");
     }
-    
+
     if (referrals < 30 || referrals > 3650) {
       errors.push("Referrals retention must be between 30 and 3650 days");
     }
-    
+
     return errors;
   }
 
@@ -185,7 +187,7 @@ export default function DataPolicy() {
           <div className="text-red-600 text-lg">{error}</div>
         </div>
       </Shell>
-      );
+    );
   }
 
   if (!settings) {
@@ -209,7 +211,7 @@ export default function DataPolicy() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Data Policy</h1>
           <p className="mt-2 text-gray-600">
-            Manage your data retention policies and storage settings
+            Manage your {project?.name || 'project'} data retention policies and storage settings
           </p>
         </div>
 
@@ -229,7 +231,7 @@ export default function DataPolicy() {
                     </p>
                   </div>
                 </div>
-                
+
                 {canEdit && (
                   <button
                     onClick={() => setEditing(!editing)}
@@ -248,163 +250,163 @@ export default function DataPolicy() {
         <div className="mb-6">
           <Card title="Data Retention Policies">
             <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Events Retention */}
-              <div>
-                <div className="flex items-center space-x-2 mb-3">
-                  <Database className="h-5 w-5 text-blue-600" />
-                  <h4 className="text-lg font-medium text-gray-900">Interaction Events</h4>
-                </div>
-                
-                {editing && canEdit ? (
-                  <div>
-                    <input
-                      type="number"
-                      min="7"
-                      max="3650"
-                      value={editForm.events}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, events: parseInt(e.target.value) || 0 }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Days to retain event data (7-3650)
-                    </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Events Retention */}
+                <div>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Database className="h-5 w-5 text-blue-600" />
+                    <h4 className="text-lg font-medium text-gray-900">Interaction Events</h4>
                   </div>
-                ) : (
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {settings.retention_days_events} days
+
+                  {editing && canEdit ? (
+                    <div>
+                      <input
+                        type="number"
+                        min="7"
+                        max="3650"
+                        value={editForm.events}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, events: parseInt(e.target.value) || 0 }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        Days to retain event data (7-3650)
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-500">
-                      {settings.retention_days_events === defaultRetention.events 
-                        ? "Default for your plan" 
-                        : "Custom setting"
-                      }
-                    </p>
+                  ) : (
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {settings.retention_days_events} days
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        {settings.retention_days_events === defaultRetention.events
+                          ? "Default for your plan"
+                          : "Custom setting"
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Referrals Retention */}
+                <div>
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Clock className="h-5 w-5 text-green-600" />
+                    <h4 className="text-lg font-medium text-gray-900">AI Referrals</h4>
                   </div>
-                )}
+
+                  {editing && canEdit ? (
+                    <div>
+                      <input
+                        type="number"
+                        min="30"
+                        max="3650"
+                        value={editForm.referrals}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, referrals: parseInt(e.target.value) || 0 }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        Days to retain referral data (30-3650)
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {settings.retention_days_referrals} days
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        {settings.retention_days_referrals === defaultRetention.referrals
+                          ? "Default for your plan"
+                          : "Custom setting"
+                        }
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Referrals Retention */}
-              <div>
-                <div className="flex items-center space-x-2 mb-3">
-                  <Clock className="h-5 w-5 text-green-600" />
-                  <h4 className="text-lg font-medium text-gray-900">AI Referrals</h4>
-                </div>
-                
-                {editing && canEdit ? (
-                  <div>
-                    <input
-                      type="number"
-                      min="30"
-                      max="3650"
-                      value={editForm.referrals}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, referrals: parseInt(e.target.value) || 0 }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Days to retain referral data (30-3650)
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {settings.retention_days_referrals} days
+              {/* Validation Errors */}
+              {editing && validationErrors.length > 0 && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                  <div className="flex items-start">
+                    <AlertTriangle className="text-red-600 mt-0.5 mr-2 flex-shrink-0" size={16} />
+                    <div className="text-sm text-red-800">
+                      <p className="font-medium mb-1">Please fix the following errors:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {validationErrors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
                     </div>
-                    <p className="text-sm text-gray-500">
-                      {settings.retention_days_referrals === defaultRetention.referrals 
-                        ? "Default for your plan" 
-                        : "Custom setting"
-                      }
-                    </p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* Save Button */}
+              {editing && canEdit && (
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={handleSave}
+                    disabled={validationErrors.length > 0}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Save size={16} className="inline mr-2" />
+                    Save Changes
+                  </button>
+                </div>
+              )}
             </div>
-
-            {/* Validation Errors */}
-            {editing && validationErrors.length > 0 && (
-              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-start">
-                  <AlertTriangle className="text-red-600 mt-0.5 mr-2 flex-shrink-0" size={16} />
-                  <div className="text-sm text-red-800">
-                    <p className="font-medium mb-1">Please fix the following errors:</p>
-                    <ul className="list-disc list-inside space-y-1">
-                      {validationErrors.map((error, index) => (
-                        <li key={index}>{error}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Save Button */}
-            {editing && canEdit && (
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={handleSave}
-                  disabled={validationErrors.length > 0}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Save size={16} className="inline mr-2" />
-                  Save Changes
-                </button>
-              </div>
-            )}
-          </div>
-        </Card>
+          </Card>
         </div>
 
         {/* Data Management */}
         <div className="mb-6">
           <Card title="Data Management">
             <div className="p-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
-              <div className="flex items-start">
-                <AlertTriangle className="text-blue-600 mt-0.5 mr-2 flex-shrink-0" size={16} />
-                <div className="text-sm text-blue-800">
-                  <p className="font-medium mb-1">About Data Retention</p>
-                  <p>
-                    Retention applies to raw event rows. Aggregated metrics are recomputed on the fly 
-                    and are not affected by retention policies. Data is automatically purged daily at 03:10 UTC.
-                  </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
+                <div className="flex items-start">
+                  <AlertTriangle className="text-blue-600 mt-0.5 mr-2 flex-shrink-0" size={16} />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">About Data Retention</p>
+                    <p>
+                      Retention applies to raw event rows. Aggregated metrics are recomputed on the fly
+                      and are not affected by retention policies. Data is automatically purged daily at 03:10 UTC.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Manual Purge Options */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-medium text-gray-900">Manual Data Purge</h4>
+                <p className="text-sm text-gray-600">
+                  Use these options to manually purge data or preview what would be deleted.
+                </p>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setPurgeModal({ isOpen: true, type: "events", dryRun: true })}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Preview Events Purge
+                  </button>
+
+                  <button
+                    onClick={() => setPurgeModal({ isOpen: true, type: "referrals", dryRun: true })}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Preview Referrals Purge
+                  </button>
+
+                  <button
+                    onClick={() => setPurgeModal({ isOpen: true, type: "both", dryRun: true })}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Preview All Purge
+                  </button>
                 </div>
               </div>
             </div>
-
-            {/* Manual Purge Options */}
-            <div className="space-y-4">
-              <h4 className="text-lg font-medium text-gray-900">Manual Data Purge</h4>
-              <p className="text-sm text-gray-600">
-                Use these options to manually purge data or preview what would be deleted.
-              </p>
-              
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => setPurgeModal({ isOpen: true, type: "events", dryRun: true })}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Preview Events Purge
-                </button>
-                
-                <button
-                  onClick={() => setPurgeModal({ isOpen: true, type: "referrals", dryRun: true })}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Preview Referrals Purge
-                </button>
-                
-                <button
-                  onClick={() => setPurgeModal({ isOpen: true, type: "both", dryRun: true })}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Preview All Purge
-                </button>
-              </div>
-            </div>
-          </div>
-        </Card>
+          </Card>
         </div>
 
         {/* Purge Modal */}
@@ -415,9 +417,9 @@ export default function DataPolicy() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   {purgeModal.dryRun ? "Preview Data Purge" : "Confirm Data Purge"}
                 </h3>
-                
+
                 <p className="text-sm text-gray-600 mb-6">
-                  {purgeModal.dryRun 
+                  {purgeModal.dryRun
                     ? `This will show you how many ${purgeModal.type === "both" ? "events and referrals" : purgeModal.type} would be deleted based on your current retention policy.`
                     : `This will permanently delete ${purgeModal.type === "both" ? "all expired events and referrals" : `expired ${purgeModal.type}`} based on your retention policy. This action cannot be undone.`
                   }
@@ -444,7 +446,7 @@ export default function DataPolicy() {
                   >
                     Cancel
                   </button>
-                  
+
                   {!purgeResult && (
                     <button
                       onClick={handlePurge}
@@ -454,7 +456,7 @@ export default function DataPolicy() {
                       {purging ? "Processing..." : purgeModal.dryRun ? "Preview" : "Purge Data"}
                     </button>
                   )}
-                  
+
                   {purgeResult && !purgeModal.dryRun && (
                     <button
                       onClick={() => {
