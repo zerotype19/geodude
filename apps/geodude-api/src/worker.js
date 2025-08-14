@@ -317,16 +317,129 @@ export default {
             console.log("Expires:", expiresAt.toISOString());
           }
 
-          // Always return { ok: true } to prevent user enumeration
           const response = new Response(JSON.stringify({ ok: true }), {
+            status: 200,
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response);
 
         } catch (e) {
           console.error("Magic link request error:", e);
-          // Still return { ok: true } to prevent user enumeration
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+      }
+
+      // 2.1) Frontend-compatible Magic Link endpoint (for optiview.ai frontend)
+      if (url.pathname === "/api/auth/request-link" && request.method === "POST") {
+        // This endpoint handles the frontend's expected API path
+        // It forwards to the same logic as /auth/request-code
+        try {
+          const body = await request.json();
+          const { email, continue_path } = body;
+
+          if (!email) {
+            const response = new Response(JSON.stringify({ error: "Email is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Rate limiting per IP and per email
+          const clientIP = request.headers.get("cf-connecting-ip") || "unknown";
+          const ipKey = `rate_limit:magic_link:ip:${clientIP}`;
+          const emailKey = `rate_limit:magic_link:email:${email}`;
+
+          const ipLimit = await checkRateLimit(ipKey, config.MAGIC_LINK_RPM_PER_IP, 60 * 1000); // per minute per IP
+          const emailLimit = await checkRateLimit(emailKey, config.MAGIC_LINK_RPD_PER_EMAIL, 24 * 60 * 60 * 1000); // per day per email
+
+          if (!ipLimit.allowed) {
+            const response = new Response(JSON.stringify({ error: "Too many requests from this IP" }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": Math.ceil((ipLimit.resetTime - Date.now()) / 1000)
+              }
+            });
+            return addCorsHeaders(response);
+          }
+
+          if (!emailLimit.allowed) {
+            const response = new Response(JSON.stringify({ error: "Too many requests for this email" }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": Math.ceil((emailLimit.resetTime - Date.now()) / 1000)
+              }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Validate continue path
+          const sanitizeResult = sanitizeContinuePath(continue_path);
+
+          // Record sanitization metrics if sanitized
+          if (sanitizeResult.sanitized) {
+            recordContinueSanitized("request", sanitizeResult.reason);
+          }
+
+          // Debug logging to see what's being stored
+          console.log("🔍 Magic Link Request Debug (Frontend):");
+          console.log("  Original continue_path:", continue_path);
+          console.log("  Sanitized continue_path:", sanitizeResult.value);
+          console.log("  Was sanitized:", sanitizeResult.sanitized);
+          console.log("  Reason:", sanitizeResult.reason);
+          console.log("  Email:", email);
+
+          // Generate secure token
+          const token = generateToken();
+          const tokenHash = await hashToken(token);
+
+          // Store token in database (for now, use KV as temporary storage)
+          const expirationMinutes = config.MAGIC_LINK_EXP_MIN;
+          const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
+
+          const magicLinkData = {
+            email,
+            token_hash: tokenHash,
+            continue_path: sanitizeResult.value, // Store only the sanitized value
+            expires_at: expiresAt.toISOString(),
+            created_at: new Date().toISOString()
+          };
+
+          await env.AI_FINGERPRINTS.put(`magic_link:${tokenHash}`, JSON.stringify(magicLinkData), {
+            expirationTtl: expirationMinutes * 60
+          });
+
+          // Generate magic link
+          const appUrl = config.PUBLIC_APP_URL;
+          const magicLink = `${appUrl}/auth/magic?token=${token}`;
+
+          // Send email (for now, log to console in dev)
+          if (config.NODE_ENV === "production") {
+            // TODO: Implement real email sending
+            console.log("Would send email to:", email, "with link:", magicLink);
+          } else {
+            // Dev mode: log the link
+            console.log("🔐 DEV MODE - Magic Link for", email, ":", magicLink);
+            console.log("Token Hash:", tokenHash);
+            console.log("Expires:", expiresAt.toISOString());
+          }
+
           const response = new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("Magic link request error (Frontend):", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response);

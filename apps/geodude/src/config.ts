@@ -1,8 +1,8 @@
 // API configuration
-export const API_BASE =
-    location.hostname.endsWith("optiview.ai")
-        ? "https://api.optiview.ai"
-        : "http://127.0.0.1:8787";
+export const API_BASE = (import.meta as any).env?.VITE_API_URL || 
+  (location.hostname.endsWith("optiview.ai")
+    ? "https://api.optiview.ai"
+    : "http://127.0.0.1:8787");
 
 export const FETCH_OPTS: RequestInit = { credentials: "include" }; // send cookies
 

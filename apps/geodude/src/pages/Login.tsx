@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
+import { API_BASE } from '../config';
 
 interface LoginState {
   email: string;
@@ -31,7 +32,7 @@ export default function Login() {
 
     try {
       if (state.authMethod === 'otp') {
-        const response = await fetch('/api/auth/request-code', {
+        const response = await fetch(`${API_BASE}/api/auth/request-code`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -56,7 +57,7 @@ export default function Login() {
         }
       } else {
         // Magic link flow
-        const response = await fetch('/api/auth/request-link', {
+        const response = await fetch(`${API_BASE}/api/auth/request-link`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -96,7 +97,7 @@ export default function Login() {
     setState(prev => ({ ...prev, loading: true, error: '', success: '' }));
 
     try {
-      const response = await fetch('/api/auth/verify-code', {
+      const response = await fetch(`${API_BASE}/api/auth/verify-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
