@@ -318,26 +318,23 @@ export async function handleApiRoutes(
             const conversions = conversionsResult?.conversions || 0;
             const conv_rate = referrals > 0 ? conversions / referrals : 0;
 
-            // Get breakdown by source (simplified - no JOIN to avoid syntax issues)
+            // Get breakdown by source (minimal test query)
             const bySourceResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
                     ar.ai_source_id,
-                    COUNT(*) referrals,
-                    0 conversions,
-                    0 conv_rate
+                    COUNT(*) referrals
                 FROM ai_referrals ar
                 WHERE ar.project_id = ? AND ar.detected_at >= ?
                 GROUP BY ar.ai_source_id
-                ORDER BY referrals DESC
             `).bind(project_id, since).all<any>();
 
-            // Simplified source data (using ai_source_id for now)
+            // Simplified source data (minimal)
             const bySource = (bySourceResult.results || []).map((source) => ({
                 slug: `source_${source.ai_source_id}`,
                 name: `AI Source ${source.ai_source_id}`,
                 referrals: source.referrals,
-                conversions: source.conversions,
-                conv_rate: source.conv_rate,
+                conversions: 0,
+                conv_rate: 0,
                 p50_ttc_min: null,
                 p90_ttc_min: null
             }));
