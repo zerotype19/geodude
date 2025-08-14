@@ -186,10 +186,42 @@ export default {
             SELECT COUNT(*) as count FROM rules_suggestions WHERE status = 'pending'
           `).first();
 
-          // Get content assets total count
+          // Get content metrics
           const contentAssetsTotal = await env.OPTIVIEW_DB.prepare(`
             SELECT COUNT(*) as count FROM content_assets
           `).first();
+
+          const activeAssets24h = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(DISTINCT content_id) as count
+            FROM interaction_events
+            WHERE occurred_at >= datetime('now','-1 day') AND content_id IS NOT NULL
+          `).first();
+
+          const events24h = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count
+            FROM interaction_events
+            WHERE occurred_at >= datetime('now','-1 day')
+          `).first();
+
+          const referrals24h = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count
+            FROM ai_referrals
+            WHERE detected_at >= datetime('now','-1 day')
+          `).first();
+
+          // Get 5-minute metrics for content operations
+          const current5MinWindow = Math.floor(Date.now() / (5 * 60 * 1000));
+          const listViewsMetric = await env.OPTIVIEW_DB.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`content_list_viewed_5m:${current5MinWindow}`).first();
+
+          const assetCreatedMetric = await env.OPTIVIEW_DB.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`content_asset_created_5m:${current5MinWindow}`).first();
+
+          const assetUpdatedMetric = await env.OPTIVIEW_DB.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`content_asset_updated_5m:${current5MinWindow}`).first();
 
           const response = new Response(JSON.stringify({
             status: "healthy",
@@ -216,7 +248,15 @@ export default {
               rules_suggestions_pending: pendingSuggestions?.count || 0
             },
             content: {
-              assets_total: contentAssetsTotal?.count || 0
+              assets_total: contentAssetsTotal?.count || 0,
+              active_assets_24h: activeAssets24h?.count || 0,
+              events_24h: events24h?.count || 0,
+              referrals_24h: referrals24h?.count || 0,
+              metrics_5m: {
+                list_views: listViewsMetric?.value || 0,
+                asset_created: assetCreatedMetric?.value || 0,
+                asset_updated: assetUpdatedMetric?.value || 0
+              }
             }
           }), {
             status: 200,
@@ -236,7 +276,15 @@ export default {
               rules_suggestions_pending: 0
             },
             content: {
-              assets_total: 0
+              assets_total: 0,
+              active_assets_24h: 0,
+              events_24h: 0,
+              referrals_24h: 0,
+              metrics_5m: {
+                list_views: 0,
+                asset_created: 0,
+                asset_updated: 0
+              }
             }
           }), {
             status: 200,
@@ -1578,6 +1626,24 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
+          // Record metrics: content list viewed
+          try {
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `content_list_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record content list view metric:", e);
+          }
+
           // Rate limiting: 60 rpm per user
           const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
           const userKey = `rate_limit:content_list:user:${sessionData.user_id}`;
@@ -1752,6 +1818,24 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
+          // Record metrics: content asset created
+          try {
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `content_asset_created_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record content asset created metric:", e);
+          }
+
           // Rate limiting: 30 rpm per user
           const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
           const userKey = `rate_limit:content_create:user:${sessionData.user_id}`;
@@ -1899,6 +1983,24 @@ export default {
               headers: { "Content-Type": "application/json" }
             });
             return addCorsHeaders(response, origin);
+          }
+
+          // Record metrics: content asset updated
+          try {
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `content_asset_updated_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record content asset updated metric:", e);
           }
 
           // Rate limiting: 30 rpm per user
