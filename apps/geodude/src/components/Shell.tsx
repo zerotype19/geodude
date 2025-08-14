@@ -1,14 +1,17 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, LineChart, PlusSquare, Settings, User, Users, Building2, ChevronDown } from "lucide-react";
+import { Menu, LineChart, PlusSquare, Settings, User, Users, Building2, ChevronDown, LogOut } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ShellProps {
   children: ReactNode;
 }
 
-export default function Shell({ children }: ShellProps) {
+export default function Shell({ children }: ReactNode) {
   const location = useLocation();
+  const { user, organization, project, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   
   const navigation = [
     { name: "Events", href: "/events" },
@@ -20,6 +23,11 @@ export default function Shell({ children }: ShellProps) {
     { name: "Settings", href: "/settings" },
     { name: "Health", href: "/admin/health" },
   ];
+
+  const handleLogout = () => {
+    logout();
+    setUserMenuOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -54,6 +62,42 @@ export default function Shell({ children }: ShellProps) {
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center">
               <div className="ml-3 relative">
+                {/* Organization/Project Selector */}
+                <div className="relative mr-4">
+                  <button
+                    onClick={() => setOrgMenuOpen(!orgMenuOpen)}
+                    className="flex items-center space-x-2 text-sm text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-3 py-2 border border-gray-300"
+                  >
+                    <Building2 className="h-4 w-4" />
+                    <span className="max-w-32 truncate">
+                      {organization?.name || 'Loading...'}
+                    </span>
+                    <span className="text-gray-400">/</span>
+                    <span className="max-w-32 truncate">
+                      {project?.name || 'Loading...'}
+                    </span>
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  
+                  {orgMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                      <div className="py-2">
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <h3 className="text-sm font-medium text-gray-900">Current Selection</h3>
+                          <p className="text-sm text-gray-500 mt-1">
+                            <span className="font-medium">{organization?.name}</span> / {project?.name}
+                          </p>
+                        </div>
+                        <div className="px-4 py-2">
+                          <p className="text-xs text-gray-500">
+                            Organization and project switching will be implemented in the next phase
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* User Menu */}
                 <div className="relative">
                   <button
@@ -61,13 +105,21 @@ export default function Shell({ children }: ShellProps) {
                     className="flex items-center space-x-2 text-sm text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-3 py-2"
                   >
                     <User className="h-5 w-5" />
-                    <span>User</span>
+                    <span className="max-w-24 truncate">
+                      {user?.email?.split('@')[0] || 'User'}
+                    </span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
                   
                   {userMenuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                       <div className="py-1">
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <p className="text-sm font-medium text-gray-900">{user?.email}</p>
+                          <p className="text-xs text-gray-500">
+                            {organization?.name} / {project?.name}
+                          </p>
+                        </div>
                         <Link
                           to="/settings/members"
                           className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -93,6 +145,14 @@ export default function Shell({ children }: ShellProps) {
                           <Settings className="h-4 w-4 mr-3" />
                           Account settings
                         </Link>
+                        <div className="border-t border-gray-100 my-1"></div>
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <LogOut className="h-4 w-4 mr-3" />
+                          Sign out
+                        </button>
                       </div>
                     </div>
                   )}
@@ -139,6 +199,34 @@ export default function Shell({ children }: ShellProps) {
                   </svg>
                 </Link>
               </li>
+              {organization && (
+                <>
+                  <li>
+                    <svg className="h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </li>
+                  <li>
+                    <span className="text-sm font-medium text-gray-500">
+                      {organization.name}
+                    </span>
+                  </li>
+                </>
+              )}
+              {project && (
+                <>
+                  <li>
+                    <svg className="h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </li>
+                  <li>
+                    <span className="text-sm font-medium text-gray-500">
+                      {project.name}
+                    </span>
+                  </li>
+                </>
+              )}
               {location.pathname !== "/" && (
                 <>
                   <li>
@@ -167,7 +255,7 @@ export default function Shell({ children }: ShellProps) {
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
-              © 2024 Optiview. All rights reserved.
+              © 2024 {organization?.name || 'Optiview'}. All rights reserved.
             </div>
             <div className="flex space-x-6">
               <Link

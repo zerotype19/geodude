@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
+import { useAuth } from "../contexts/AuthContext";
 
 interface InteractionEvent {
   id: number;
@@ -20,11 +21,12 @@ interface EventsSummary {
 }
 
 export default function Events() {
+  const { project } = useAuth();
   const [events, setEvents] = useState<InteractionEvent[]>([]);
   const [summary, setSummary] = useState<EventsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [newEvent, setNewEvent] = useState({ 
-    project_id: "", 
+    project_id: project?.id || "", 
     content_url: "", 
     ai_source_name: "", 
     event_type: "view", 
@@ -32,15 +34,19 @@ export default function Events() {
   });
 
   useEffect(() => {
-    loadEvents();
-    loadSummary();
-  }, []);
+    if (project?.id) {
+      setNewEvent(prev => ({ ...prev, project_id: project.id }));
+      loadEvents();
+      loadSummary();
+    }
+  }, [project]);
 
   async function loadEvents() {
+    if (!project?.id) return;
+
     setLoading(true);
     try {
-      // For now, using a placeholder project_id - in real app this would come from context
-      const response = await fetch(`${API_BASE}/api/events?project_id=1`, FETCH_OPTS);
+      const response = await fetch(`${API_BASE}/api/events?project_id=${project.id}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
         setEvents(data.events || []);
@@ -55,8 +61,10 @@ export default function Events() {
   }
 
   async function loadSummary() {
+    if (!project?.id) return;
+
     try {
-      const response = await fetch(`${API_BASE}/api/events/summary?project_id=1`, FETCH_OPTS);
+      const response = await fetch(`${API_BASE}/api/events/summary?project_id=${project.id}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
         setSummary(data);
@@ -69,18 +77,19 @@ export default function Events() {
   }
 
   async function addEvent() {
-    if (!newEvent.project_id || !newEvent.event_type) return;
+    if (!project?.id || !newEvent.event_type) return;
     
     try {
+      const eventData = { ...newEvent, project_id: project.id };
       const response = await fetch(`${API_BASE}/api/events`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newEvent)
+        body: JSON.stringify(eventData)
       });
       
       if (response.ok) {
-        setNewEvent({ project_id: "", content_url: "", ai_source_name: "", event_type: "view", metadata: "" });
+        setNewEvent({ project_id: project.id, content_url: "", ai_source_name: "", event_type: "view", metadata: "" });
         await loadEvents();
         await loadSummary();
       } else {
@@ -301,9 +310,9 @@ export default function Events() {
                           </td>
                           <td className="py-3 pr-4">
                             {event.content_url ? (
-                              <a 
-                                href={event.content_url} 
-                                target="_blank" 
+                              <a
+                                href={event.content_url}
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-blue-600 hover:underline truncate block max-w-xs"
                               >

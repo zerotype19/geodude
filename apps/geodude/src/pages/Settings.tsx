@@ -1,8 +1,10 @@
 import { useState } from "react";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Settings() {
+  const { user, organization, project } = useAuth();
   const [activeTab, setActiveTab] = useState("general");
   const [traceHeaderEnabled, setTraceHeaderEnabled] = useState(false);
 
@@ -19,7 +21,9 @@ export default function Settings() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-          <p className="text-slate-600 mt-2">Configure your Optiview account and preferences</p>
+          <p className="text-slate-600 mt-2">
+            Configure your {organization?.name || 'Optiview'} account and preferences
+          </p>
         </div>
 
         {/* Tab Navigation */}
@@ -51,9 +55,11 @@ export default function Settings() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="Acme Corp"
+                    defaultValue={organization?.name || 'Loading...'}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled
                   />
+                  <p className="text-xs text-gray-500 mt-1">Organization name cannot be changed here</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -61,9 +67,23 @@ export default function Settings() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="Main Website"
+                    defaultValue={project?.name || 'Loading...'}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled
                   />
+                  <p className="text-xs text-gray-500 mt-1">Project name cannot be changed here</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    User Email
+                  </label>
+                  <input
+                    type="email"
+                    defaultValue={user?.email || 'Loading...'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Email cannot be changed here</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
