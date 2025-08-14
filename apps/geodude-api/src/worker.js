@@ -1640,54 +1640,30 @@ export default {
           const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...baseParams).first();
           const total = totalResult?.total || 0;
 
-          // Bulletproof query - use COALESCE to handle all NULL cases
+          // Debug: Ultra-simple query to isolate the issue
           const mainQuery = `
-            SELECT
-              ca.id, ca.url, ca.type,
-              COALESCE((SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id), NULL) AS last_seen,
-              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=?), 0) AS events_window,
-              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')), 0) AS events_15m,
-              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')), 0) AS events_24h,
-              COALESCE((SELECT COUNT(*) FROM ai_referrals ar WHERE ar.project_id=ca.project_id AND ar.content_id=ca.id AND ar.detected_at>=datetime('now','-1 day')), 0) AS ai_referrals_24h,
-              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day') AND ie.ai_source_id IS NOT NULL), 0) AS ai_events_24h,
-              CASE 
-                WHEN COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day') AND ie.ai_source_id IS NOT NULL), 0) > 0 THEN 50
-                ELSE 0
-              END AS coverage_score
+            SELECT ca.id, ca.url, ca.type
             FROM content_assets ca
             WHERE ${baseFilters}
             ORDER BY ca.url ASC
             LIMIT ? OFFSET ?
           `;
 
-          const mainParams = [...baseParams, sinceTime, pageSize, (page - 1) * pageSize];
+          const mainParams = [...baseParams, pageSize, (page - 1) * pageSize];
           const mainResult = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...mainParams).all();
 
-          // Get by-source breakdown for the returned items
-          const items = [];
-          for (const row of mainResult.results) {
-            // Get by-source breakdown for 24h
-            const bySourceResult = await env.OPTIVIEW_DB.prepare(`
-              SELECT s.slug, COUNT(*) as events
-              FROM interaction_events ie
-              JOIN ai_sources s ON s.id = ie.ai_source_id
-              WHERE ie.project_id = ? AND ie.content_id = ? AND ie.occurred_at >= datetime('now','-1 day')
-              GROUP BY s.slug
-              ORDER BY events DESC
-            `).bind(projectId, row.id).all();
-
-            items.push({
-              id: row.id,
-              url: row.url,
-              type: row.type,
-              last_seen: row.last_seen,
-              events_15m: row.events_15m,
-              events_24h: row.events_24h,
-              ai_referrals_24h: row.ai_referrals_24h,
-              by_source_24h: bySourceResult.results,
-              coverage_score: row.coverage_score
-            });
-          }
+          // Simple response with basic fields
+          const items = mainResult.results.map(row => ({
+            id: row.id,
+            url: row.url,
+            type: row.type,
+            last_seen: null,
+            events_15m: 0,
+            events_24h: 0,
+            ai_referrals_24h: 0,
+            by_source_24h: [],
+            coverage_score: 0
+          }));
 
           const response = new Response(JSON.stringify({
             items,
