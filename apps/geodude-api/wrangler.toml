@@ -2,17 +2,8 @@ name = "geodude-api"
 main = "src/worker.js"
 compatibility_date = "2025-08-01"
 
-# Default/local fallback (rarely used)
+# Default/production values (used when no environment specified)
 [vars]
-PUBLIC_APP_URL = "http://localhost:3000"
-PUBLIC_BASE_URL = "http://127.0.0.1:8787"
-CSP_MODE = "development"
-NODE_ENV = "development"
-TEST_MODE = "1"
-DEV_MAIL_ECHO = "true"
-
-# Production environment
-[env.production.vars]
 PUBLIC_APP_URL = "https://app.optiview.ai"
 PUBLIC_BASE_URL = "https://api.optiview.ai"
 CSP_MODE = "production"
@@ -20,7 +11,7 @@ NODE_ENV = "production"
 TEST_MODE = "0"
 DEV_MAIL_ECHO = "false"
 
-# Auth & limits (prod defaults)
+# Auth & limits (production defaults)
 SESSION_TTL_HOURS = "720"
 OTP_EXP_MIN = "10"
 MAGIC_LINK_EXP_MIN = "15"
@@ -29,14 +20,14 @@ MAGIC_LINK_RPD_PER_EMAIL = "50"
 INVITE_EXP_DAYS = "14"
 ADMIN_RPM_PER_IP = "30"
 
-# Ingest limits (prod defaults)
+# Ingest limits (production defaults)
 INGEST_RATE_LIMIT_RPS = "10"
 INGEST_RATE_LIMIT_BURST = "50"
 RATE_LIMIT_RETRY_AFTER = "5"
 CSV_EXPORT_RATE_LIMIT_RPS = "1"
 RULES_REFRESH_TTL_SEC = "300"
 
-# Email settings (non-secret)
+# Email settings (production defaults)
 EMAIL_SENDER_NAME = "Optiview"
 EMAIL_FROM = "noreply@optiview.ai"
 
