@@ -144,24 +144,44 @@ export default {
       // Helper function to check rate limits
       const checkRateLimit = async (key, limit, windowMs) => {
         const now = Date.now();
-        const windowStart = now - windowMs;
+        const windowStart = new Date(now - windowMs).toISOString();
 
-        // Get current count from KV
-        const current = await env.AI_FINGERPRINTS.get(key, { type: "json" }) || { count: 0, resetTime: now + windowMs };
+        try {
+          // Get current count from D1 rate_limiting table
+          const current = await env.OPTIVIEW_DB.prepare(`
+            SELECT count, reset_time FROM rate_limiting 
+            WHERE key_name = ? AND reset_time > ?
+          `).bind(key, windowStart).first();
 
-        if (now > current.resetTime) {
-          // Reset window
-          await env.AI_FINGERPRINTS.put(key, JSON.stringify({ count: 1, resetTime: now + windowMs }), { expirationTtl: Math.ceil(windowMs / 1000) });
-          return { allowed: true, remaining: limit - 1, resetTime: current.resetTime };
+          if (current) {
+            // Update existing rate limit record
+            if (current.count >= limit) {
+              return { allowed: false, remaining: 0, resetTime: new Date(current.reset_time).getTime() };
+            }
+            
+            // Increment count
+            await env.OPTIVIEW_DB.prepare(`
+              UPDATE rate_limiting 
+              SET count = count + 1, updated_at = ? 
+              WHERE key_name = ?
+            `).bind(new Date().toISOString(), key).run();
+            
+            return { allowed: true, remaining: limit - current.count - 1, resetTime: new Date(current.reset_time).getTime() };
+          } else {
+            // Create new rate limit record
+            const resetTime = new Date(now + windowMs);
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO rate_limiting (key_name, count, reset_time) 
+              VALUES (?, 1, ?)
+            `).bind(key, resetTime.toISOString()).run();
+            
+            return { allowed: true, remaining: limit - 1, resetTime: resetTime.getTime() };
+          }
+        } catch (error) {
+          console.error('Rate limiting error:', error);
+          // Fail open - allow request if rate limiting fails
+          return { allowed: true, remaining: 1, resetTime: now + windowMs };
         }
-
-        if (current.count >= limit) {
-          return { allowed: false, remaining: 0, resetTime: current.resetTime };
-        }
-
-        // Increment count
-        await env.AI_FINGERPRINTS.put(key, JSON.stringify({ count: current.count + 1, resetTime: current.resetTime }), { expirationTtl: Math.ceil(windowMs / 1000) });
-        return { allowed: true, remaining: limit - current.count - 1, resetTime: current.resetTime };
       };
 
       // 1) Health check
@@ -418,18 +438,35 @@ export default {
             // TODO: Implement session cookie parsing
           }
 
-          // Create session (for now, simple cookie)
+          // Create session (store in existing D1 session table)
           const sessionId = generateToken();
-          const sessionData = {
-            user_email: storedData.email,
-            created_at: new Date().toISOString(),
-            magic_link_used: true
-          };
+          
+          // Get user_id from the user table
+          const userRecord = await env.OPTIVIEW_DB.prepare(`
+            SELECT id FROM user WHERE email = ?
+          `).bind(storedData.email).first();
+          
+          if (!userRecord) {
+            console.error('❌ User not found for session creation');
+            return new Response(JSON.stringify({ error: 'User not found' }), {
+              status: 404,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
 
-          // Store session in KV (temporary until we implement proper sessions)
-          await env.AI_FINGERPRINTS.put(`session:${sessionId}`, JSON.stringify(sessionData), {
-            expirationTtl: config.SESSION_TTL_HOURS * 60 * 60 // Convert hours to seconds
-          });
+          // Store session in existing session table
+          const sessionExpiresAt = new Date(Date.now() + config.SESSION_TTL_HOURS * 60 * 60 * 1000);
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO session (user_id, session_id, expires_at, ip_hash)
+            VALUES (?, ?, ?, ?)
+          `).bind(
+            userRecord.id,
+            sessionId,
+            sessionExpiresAt.toISOString(),
+            await hashString(clientIP)
+          ).run();
+
+          console.log('✅ Session created in existing session table');
 
           // Clean up used magic link
           await env.OPTIVIEW_DB.prepare(`
