@@ -59,6 +59,7 @@ export default function Onboarding() {
       const response = await fetch(`${API_BASE}/api/onboarding/organization`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           name: state.organization.name.trim()
           // slug will be auto-generated on the backend
@@ -80,48 +81,48 @@ export default function Onboarding() {
         console.log('📊 Parsed response data:', data);
       } catch (parseError) {
         console.error('❌ Failed to parse response as JSON:', parseError);
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           error: 'Invalid response from server',
-          loading: false 
+          loading: false
         }));
         return;
       }
 
       if (response.ok) {
         console.log('✅ Organization creation successful, data:', data);
-        
+
         // The API returns organization data directly, not wrapped in an organization object
         if (!data.id) {
           console.error('❌ Response missing organization.id:', data);
-          setState(prev => ({ 
-            ...prev, 
+          setState(prev => ({
+            ...prev,
             error: 'Server response missing organization ID',
-            loading: false 
+            loading: false
           }));
           return;
         }
 
-        setState(prev => ({ 
-          ...prev, 
-          step: 2, 
+        setState(prev => ({
+          ...prev,
+          step: 2,
           organization: { ...prev.organization, id: data.id },
-          loading: false 
+          loading: false
         }));
       } else {
         console.error('❌ Organization creation failed:', data);
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           error: data.error || 'Failed to create organization',
-          loading: false 
+          loading: false
         }));
       }
     } catch (error) {
       console.error('❌ Network error:', error);
-      setState(prev => ({ 
-        ...prev, 
+      setState(prev => ({
+        ...prev,
         error: 'Network error. Please try again.',
-        loading: false 
+        loading: false
       }));
     }
   };
@@ -138,6 +139,7 @@ export default function Onboarding() {
       const response = await fetch(`${API_BASE}/api/onboarding/project`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           name: state.project.name.trim(),
           description: state.project.description.trim(),
@@ -149,24 +151,24 @@ export default function Onboarding() {
 
       if (response.ok) {
         console.log('✅ Project creation successful, data:', data);
-        
+
         // The API returns project data directly, not wrapped in a project object
         if (!data.id) {
           console.error('❌ Response missing project.id:', data);
-          setState(prev => ({ 
-            ...prev, 
+          setState(prev => ({
+            ...prev,
             error: 'Server response missing project ID',
-            loading: false 
+            loading: false
           }));
           return;
         }
 
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           project: { ...prev.project, id: data.id },
-          loading: false 
+          loading: false
         }));
-        
+
         // Complete onboarding and redirect to main app
         setTimeout(() => {
           window.location.href = '/';
@@ -227,19 +229,17 @@ export default function Onboarding() {
           <div className="flex items-center space-x-8">
             {[1, 2].map((step) => (
               <div key={step} className="flex items-center">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium ${
-                  step < state.step 
-                    ? 'bg-green-500 text-white' 
-                    : step === state.step 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium ${step < state.step
+                    ? 'bg-green-500 text-white'
+                    : step === state.step
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}>
                   {step < state.step ? '✓' : step}
                 </div>
                 {step < 2 && (
-                  <div className={`w-20 h-1 mx-4 ${
-                    step < state.step ? 'bg-green-500' : 'bg-gray-200'
-                  }`} />
+                  <div className={`w-20 h-1 mx-4 ${step < state.step ? 'bg-green-500' : 'bg-gray-200'
+                    }`} />
                 )}
               </div>
             ))}
@@ -325,8 +325,8 @@ export default function Onboarding() {
               onClick={handleNext}
               disabled={!canProceed()}
               className={`px-6 py-2 rounded-md font-medium ${canProceed()
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
             >
               {state.loading ? 'Creating...' : state.step === 2 ? 'Complete Setup' : 'Next'}
