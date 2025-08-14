@@ -343,7 +343,7 @@ export default {
           console.log('✅ Magic link stored in D1 database');
 
           // Generate magic link
-          const apiUrl = config.PUBLIC_BASE_URL;
+          const apiUrl = env.VITE_API_URL || "https://api.optiview.ai";
           const magicLink = `${apiUrl}/auth/magic?token=${token}`;
 
           // Send email using EmailService
