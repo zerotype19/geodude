@@ -56,7 +56,8 @@ export default function Shell({ children }: ShellProps) {
     { name: "API Keys", href: "/api-keys" },
     { name: "Data Policy", href: "/data-policy" },
     { name: "Settings", href: "/settings" },
-    { name: "Health", href: "/admin/health" },
+    // Only show Health for admin users
+    ...(user?.is_admin ? [{ name: "Health", href: "/admin/health" }] : []),
   ];
 
   const handleLogout = () => {
