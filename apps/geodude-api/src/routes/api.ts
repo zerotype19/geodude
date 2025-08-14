@@ -65,9 +65,9 @@ export async function handleApiRoutes(
 
             let query = `
         SELECT ak.id, ak.name, ak.key_id, ak.created_at, ak.last_used_at, ak.revoked_at,
-               p.domain property_domain
-        FROM api_keys ak
-        JOIN properties p ON ak.property_id = p.id
+               p.domain AS property_domain
+        FROM api_key AS ak
+        JOIN properties AS p ON ak.property_id = p.id
         WHERE ak.project_id = ?
       `;
             let params = [project_id];
@@ -151,51 +151,65 @@ export async function handleApiRoutes(
 
             // Get total events
             const totalResult = await env.OPTIVIEW_DB.prepare(`
-        SELECT COUNT(*) total
+        SELECT COUNT(*) AS total
         FROM interaction_events
-        WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
+        WHERE project_id = ? AND occurred_at >= ? AND occurred_at < ?
       `).bind(project_id, fromTs, toTs).first<any>();
 
             // Get breakdown by traffic class
             const classBreakdown = await env.OPTIVIEW_DB.prepare(`
         SELECT 
-          metadata traffic_class,
-          COUNT(*) count
+          json_extract(metadata, '$.class') AS traffic_class,
+          COUNT(*) AS cnt
         FROM interaction_events
-        WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
-        GROUP BY metadata
-        ORDER BY count DESC
+        WHERE project_id = ? AND occurred_at >= ? AND occurred_at < ?
+        GROUP BY traffic_class
+        ORDER BY cnt DESC
       `).bind(project_id, fromTs, toTs).all<any>();
 
-            // Get top AI sources - simplified to avoid JOIN issues
+            // Get top AI sources
             const topSources = await env.OPTIVIEW_DB.prepare(`
         SELECT 
-          ai_source_id,
-          COUNT(*) count
-        FROM interaction_events
-        WHERE project_id = ? AND occurred_at BETWEEN ? AND ? AND ai_source_id IS NOT NULL
-        GROUP BY ai_source_id
-        ORDER BY count DESC
+          s.slug AS source_slug,
+          s.name AS source_name,
+          COUNT(*) AS cnt
+        FROM interaction_events AS ie
+        JOIN ai_sources AS s ON s.id = ie.ai_source_id
+        WHERE ie.project_id = ?
+          AND ie.occurred_at >= ? AND ie.occurred_at < ?
+        GROUP BY ie.ai_source_id
+        ORDER BY cnt DESC
         LIMIT 5
       `).bind(project_id, fromTs, toTs).all<any>();
 
-            // Get timeseries data - simplified for D1 compatibility
+            // Get timeseries data by day + class
             const timeseries = await env.OPTIVIEW_DB.prepare(`
         SELECT 
-          occurred_at day,
-          COUNT(*) count,
-          metadata traffic_class
+          date(occurred_at) AS day,
+          json_extract(metadata,'$.class') AS traffic_class,
+          COUNT(*) AS cnt
         FROM interaction_events
-        WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
-        GROUP BY metadata
-        ORDER BY occurred_at
+        WHERE project_id = ? AND occurred_at >= ? AND occurred_at < ?
+        GROUP BY day, traffic_class
+        ORDER BY day
       `).bind(project_id, fromTs, toTs).all<any>();
 
             const summary = {
                 total: totalResult?.total || 0,
-                breakdown: classBreakdown.results || [],
-                top_sources: topSources.results || [],
-                timeseries: timeseries.results || []
+                breakdown: (classBreakdown.results || []).map(row => ({
+                    traffic_class: row.traffic_class,
+                    count: row.cnt
+                })),
+                top_sources: (topSources.results || []).map(row => ({
+                    source_slug: row.source_slug,
+                    source_name: row.source_name,
+                    count: row.cnt
+                })),
+                timeseries: (timeseries.results || []).map(row => ({
+                    day: row.day,
+                    traffic_class: row.traffic_class,
+                    count: row.cnt
+                }))
             };
 
             const response = new Response(JSON.stringify(summary), {
