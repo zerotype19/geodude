@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../config';
-import Card from '../components/ui/Card';
+import { Card } from '../components/ui/Card';
 
 interface OnboardingState {
   step: number;
