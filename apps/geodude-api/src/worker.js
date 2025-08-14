@@ -45,8 +45,10 @@ export default {
       }
 
       // Helper function to add CORS headers
-      const addCorsHeaders = (response) => {
-        response.headers.set("Access-Control-Allow-Origin", origin || "*");
+      const addCorsHeaders = (response, origin) => {
+        // Always allow the frontend origin
+        const allowedOrigin = origin || "https://optiview.ai";
+        response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
         response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
         response.headers.set("Access-Control-Allow-Credentials", "true");
@@ -187,7 +189,7 @@ export default {
       // 1) Health check
       if (url.pathname === "/health") {
         const response = new Response("ok", { status: 200 });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 1.5) Admin health check
@@ -217,7 +219,7 @@ export default {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 1.6) Admin environment check (for debugging)
@@ -238,7 +240,7 @@ export default {
             status: 200,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         } catch (error) {
           const response = new Response(JSON.stringify({
             error: "Failed to generate environment check",
@@ -248,7 +250,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -262,7 +264,7 @@ export default {
           status: 308, // Permanent Redirect
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 2.1) Frontend-compatible Magic Link endpoint (for optiview.ai frontend)
@@ -278,7 +280,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Rate limiting per IP and per email
@@ -297,7 +299,7 @@ export default {
                 "Retry-After": Math.ceil((ipLimit.resetTime - Date.now()) / 1000)
               }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           if (!emailLimit.allowed) {
@@ -308,7 +310,7 @@ export default {
                 "Retry-After": Math.ceil((emailLimit.resetTime - Date.now()) / 1000)
               }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Validate continue path
@@ -381,7 +383,7 @@ export default {
             status: 200,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Magic link request error (Frontend):", e);
@@ -389,7 +391,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -505,7 +507,10 @@ export default {
               "Set-Cookie": `optiview_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
             }
           });
-          return addCorsHeaders(response);
+          
+          // Get origin from request headers for CORS
+          const origin = request.headers.get("origin");
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Magic link consumption error:", e);
@@ -521,7 +526,7 @@ export default {
           status: 200,
           headers: { "Content-Type": "text/html" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 3.1) Create Organization
@@ -538,7 +543,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Generate organization ID
@@ -600,7 +605,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Organization creation error:", e);
@@ -608,7 +613,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -625,7 +630,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Generate project ID and slug
@@ -651,7 +656,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Project creation error:", e);
@@ -659,7 +664,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -850,7 +855,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Generate property ID
@@ -871,7 +876,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Property creation error:", e);
@@ -879,7 +884,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -894,7 +899,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Generate API key ID and secret
@@ -920,7 +925,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("API key creation error:", e);
@@ -928,7 +933,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -940,7 +945,7 @@ export default {
 
           if (!pid || !kid) {
             const response = new Response("Missing pid or kid parameters", { status: 400 });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Generate the JS tag
@@ -988,12 +993,12 @@ export default {
               "Cache-Control": "public, max-age=3600"
             }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("JS tag generation error:", e);
           const response = new Response("Internal server error", { status: 500 });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -1008,7 +1013,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Validate role
@@ -1017,7 +1022,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Check if user is already a member
@@ -1027,7 +1032,7 @@ export default {
               status: 409,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Check if there's already a pending invite
@@ -1037,7 +1042,7 @@ export default {
               status: 409,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Generate invite token
@@ -1084,7 +1089,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Invite creation error:", e);
@@ -1092,7 +1097,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -1102,7 +1107,7 @@ export default {
           const token = url.searchParams.get("token");
           if (!token) {
             const response = new Response("Invalid invite token", { status: 400 });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Hash the token to compare with stored hash
@@ -1124,12 +1129,12 @@ export default {
             status: 200,
             headers: { "Content-Type": "text/html" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Invite acceptance error:", e);
           const response = new Response("Internal server error", { status: 500 });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -1139,7 +1144,7 @@ export default {
         const response = new Response(JSON.stringify({ keys: [] }), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       if (url.pathname === "/api/keys" && request.method === "POST") {
@@ -1153,7 +1158,7 @@ export default {
         }), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 4) Content endpoint
@@ -1162,7 +1167,7 @@ export default {
         const response = new Response(JSON.stringify({ content: [] }), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 5) Sources endpoint
@@ -1171,7 +1176,7 @@ export default {
         const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 6) Events endpoint
@@ -1179,7 +1184,7 @@ export default {
         const response = new Response(JSON.stringify({ events: [], total: 0 }), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 6.1) Events POST endpoint (for JS tag)
@@ -1194,7 +1199,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Validate API key
@@ -1208,7 +1213,7 @@ export default {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Store event in database
@@ -1244,7 +1249,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Event creation error:", e);
@@ -1252,7 +1257,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -1266,7 +1271,7 @@ export default {
         }), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 7.5) Events last-seen endpoint (for install verification)
@@ -1279,7 +1284,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           const now = Date.now();
@@ -1320,7 +1325,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Last-seen query error:", e);
@@ -1328,7 +1333,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -1337,7 +1342,7 @@ export default {
         const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 9) Projects endpoint (might be missing)
@@ -1345,7 +1350,7 @@ export default {
         const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 10) Organizations endpoint (might be missing)
@@ -1353,7 +1358,7 @@ export default {
         const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 11) User endpoint (might be missing)
@@ -1365,7 +1370,7 @@ export default {
         }), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 12) Dashboard endpoint (might be missing)
@@ -1379,7 +1384,7 @@ export default {
         }), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 13) Any other /api/ endpoint that might be missing
@@ -1399,7 +1404,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
 
         if (url.pathname.match(/^\/api\/projects\/\d+$/)) {
@@ -1412,7 +1417,7 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
 
         if (url.pathname.match(/^\/api\/properties\/\d+$/)) {
@@ -1425,14 +1430,14 @@ export default {
           }), {
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
 
         // Default fallback for any other API endpoint
         const response = new Response(JSON.stringify([]), {
           headers: { "Content-Type": "application/json" }
         });
-        return addCorsHeaders(response);
+        return addCorsHeaders(response, origin);
       }
 
       // 4.5) Dev Test Endpoint - Magic Link Token Peek (TEST_MODE only)
@@ -1444,7 +1449,7 @@ export default {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Rate limiting for test endpoint
@@ -1460,7 +1465,7 @@ export default {
                 "Retry-After": Math.ceil((ipLimit.resetTime - Date.now()) / 1000)
               }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
           // Find the most recent unconsumed magic link for this email
@@ -1489,7 +1494,7 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           } else {
             const response = new Response(JSON.stringify({
               message: "No active magic link found for this email",
@@ -1499,7 +1504,7 @@ export default {
             }), {
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response);
+            return addCorsHeaders(response, origin);
           }
 
         } catch (e) {
@@ -1508,7 +1513,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response);
+          return addCorsHeaders(response, origin);
         }
       }
 
@@ -1646,7 +1651,7 @@ export default {
 
       // 8) Fallback response for any unmatched routes
       const fallbackResponse = new Response("Not Found", { status: 404 });
-      return addCorsHeaders(fallbackResponse);
+      return addCorsHeaders(fallbackResponse, origin);
 
     } catch (error) {
       console.error("Worker error:", error);
