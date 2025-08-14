@@ -10,6 +10,7 @@ export interface EmailConfig {
   smtpPass?: string;
   fromEmail: string;
   devMode: boolean;
+  resendKey?: string; // Added for Resend API
 }
 
 export interface EmailOptions {
@@ -27,44 +28,51 @@ export class EmailService {
   }
 
   /**
-   * Send email via Cloudflare Email Routing (recommended for Workers)
+   * Send email via Resend API (production mode)
    */
-  private async sendViaCloudflare(options: EmailOptions): Promise<boolean> {
+  private async sendViaResend(options: EmailOptions): Promise<boolean> {
     try {
-      console.log(`📧 Sending email via Cloudflare Email Routing to ${options.to}`);
+      console.log(`📧 Sending email via Resend to ${options.to}`);
       
-      // Cloudflare Email Routing uses a simple HTTP API
-      // For now, we'll simulate the call since the actual implementation
-      // depends on your Cloudflare Email Routing configuration
-      
-      // In a real implementation, you'd either:
-      // 1. Use Cloudflare's Email API (if available)
-      // 2. Send to a Cloudflare Email Routing endpoint
-      // 3. Use the built-in email routing from your domain
-      
-      console.log(`📧 Email would be sent via Cloudflare Email Routing:`);
-      console.log(`   To: ${options.to}`);
-      console.log(`   From: ${this.config.fromEmail}`);
-      console.log(`   Subject: ${options.subject}`);
-      
-      // For now, return true to simulate success
-      // You'll need to implement the actual Cloudflare Email Routing call
-      return true;
+      // Use Resend's REST API to send emails
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.config.resendKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: this.config.fromEmail,
+          to: options.to,
+          subject: options.subject,
+          html: options.html,
+          text: options.text,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`✅ Email sent successfully via Resend. ID: ${result.id}`);
+        return true;
+      } else {
+        const error = await response.text();
+        console.error(`❌ Resend API error: ${response.status} - ${error}`);
+        return false;
+      }
     } catch (error) {
-      console.error('Cloudflare Email Routing failed:', error);
+      console.error('Resend email failed:', error);
       return false;
     }
   }
 
   /**
-   * Send email (Cloudflare Email Routing or console echo)
+   * Send email (Resend API or console echo)
    */
   async sendEmail(options: EmailOptions): Promise<boolean> {
-    if (this.config.devMode || !this.config.smtpHost) {
+    if (this.config.devMode || !this.config.resendKey) {
       return this.echoToConsole(options);
     } else {
-      // Use Cloudflare Email Routing instead of SMTP
-      return this.sendViaCloudflare(options);
+      return this.sendViaResend(options);
     }
   }
 
@@ -73,7 +81,7 @@ export class EmailService {
    */
   private async echoToConsole(options: EmailOptions): Promise<boolean> {
     const divider = '='.repeat(80);
-    
+
     console.log('\n' + divider);
     console.log('📧 EMAIL WOULD BE SENT (DEV MODE)');
     console.log(divider);
@@ -89,7 +97,7 @@ export class EmailService {
       console.log(options.text);
     }
     console.log(divider + '\n');
-    
+
     return true;
   }
 
@@ -337,7 +345,8 @@ This email was sent to ${email}
       smtpUser: env.SMTP_USER,
       smtpPass: env.SMTP_PASS,
       fromEmail: env.EMAIL_FROM || 'support@optiview.ai',
-      devMode: !env.SMTP_HOST || env.DEV_MAIL_ECHO === 'true'
+      devMode: !env.SMTP_HOST || env.DEV_MAIL_ECHO === 'true',
+      resendKey: env.RESEND_KEY // Added for Resend API
     };
 
     return new EmailService(config);
