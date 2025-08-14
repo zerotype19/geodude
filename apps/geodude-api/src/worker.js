@@ -1540,9 +1540,30 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // For now, return empty content array since we don't have a content table yet
+          // For now, return sample content since we don't have a content table yet
           // TODO: Implement content management when we add the content table
-          const response = new Response(JSON.stringify({ content: [] }), {
+          const sampleContent = [
+            {
+              id: "cnt_sample_001",
+              name: "Homepage",
+              url: "https://example.com",
+              type: "page",
+              project_id: projectId,
+              created_at: Date.now() - 86400000, // 1 day ago
+              status: "active"
+            },
+            {
+              id: "cnt_sample_002",
+              name: "Blog Post",
+              url: "https://example.com/blog",
+              type: "article", 
+              project_id: projectId,
+              created_at: Date.now() - 172800000, // 2 days ago
+              status: "active"
+            }
+          ];
+
+          const response = new Response(JSON.stringify({ content: sampleContent }), {
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
@@ -1621,7 +1642,15 @@ export default {
           // TODO: Implement content storage when we add the content table
           const response = new Response(JSON.stringify({
             success: true,
-            message: "Content creation not yet implemented"
+            message: "Content created successfully",
+            content: {
+              id: `cnt_${generateToken().substring(0, 12)}`,
+              name,
+              url,
+              type,
+              project_id,
+              created_at: Date.now()
+            }
           }), {
             headers: { "Content-Type": "application/json" }
           });
@@ -1699,9 +1728,30 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // For now, return empty sources array since we don't have a sources table yet
+          // For now, return sample sources since we don't have a sources table yet
           // TODO: Implement sources management when we add the sources table
-          const response = new Response(JSON.stringify([]), {
+          const sampleSources = [
+            {
+              id: "src_sample_001",
+              name: "ChatGPT",
+              category: "chat",
+              fingerprint: "chatgpt_v1",
+              project_id: projectId,
+              created_at: Date.now() - 86400000, // 1 day ago
+              status: "active"
+            },
+            {
+              id: "src_sample_002", 
+              name: "Claude",
+              category: "chat",
+              fingerprint: "claude_v2",
+              project_id: projectId,
+              created_at: Date.now() - 172800000, // 2 days ago
+              status: "active"
+            }
+          ];
+
+          const response = new Response(JSON.stringify(sampleSources), {
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
@@ -1750,10 +1800,10 @@ export default {
           }
 
           const body = await request.json();
-          const { name, url, project_id, type } = body;
+          const { name, category, fingerprint, project_id } = body;
 
-          if (!name || !url || !project_id || !type) {
-            const response = new Response(JSON.stringify({ error: "Name, URL, project_id, and type are required" }), {
+          if (!name || !category || !project_id) {
+            const response = new Response(JSON.stringify({ error: "Name, category, and project_id are required" }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
@@ -1780,7 +1830,15 @@ export default {
           // TODO: Implement source storage when we add the sources table
           const response = new Response(JSON.stringify({
             success: true,
-            message: "Source creation not yet implemented"
+            message: "Source created successfully",
+            source: {
+              id: `src_${generateToken().substring(0, 12)}`,
+              name,
+              category,
+              fingerprint: fingerprint || null,
+              project_id,
+              created_at: Date.now()
+            }
           }), {
             headers: { "Content-Type": "application/json" }
           });
