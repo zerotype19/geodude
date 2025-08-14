@@ -425,13 +425,22 @@ export default {
             const userId = `usr_${generateToken().substring(0, 12)}`;
             const now = Math.floor(Date.now() / 1000);
 
+            // Check if this is the first user in the system
+            const userCount = await env.OPTIVIEW_DB.prepare(`
+              SELECT COUNT(*) as count FROM user
+            `).first();
+
+            // Make the first user an admin
+            const isAdmin = userCount.count === 0 ? 1 : 0;
+            console.log(`🔑 User ${isAdmin ? 'IS' : 'is NOT'} admin (user count: ${userCount.count})`);
+
             await env.OPTIVIEW_DB.prepare(`
               INSERT INTO user (id, email, is_admin, created_ts, last_login_ts)
-              VALUES (?, ?, 0, ?, ?)
-            `).bind(userId, magicLinkData.email, now, now).run();
+              VALUES (?, ?, ?, ?, ?)
+            `).bind(userId, magicLinkData.email, isAdmin, now, now).run();
 
-            userRecord = { id: userId, email: magicLinkData.email, is_admin: 0, created_ts: now };
-            console.log("✅ New user created with ID:", userId);
+            userRecord = { id: userId, email: magicLinkData.email, is_admin: isAdmin, created_ts: now };
+            console.log("✅ New user created with ID:", userId, "Admin:", isAdmin ? "YES" : "NO");
           } else {
             // Update last_login_ts for existing user
             const now = Math.floor(Date.now() / 1000);
@@ -484,12 +493,12 @@ export default {
           // Redirect to frontend with session cookie
           const frontendUrl = env.PUBLIC_APP_URL || "https://optiview.ai";
           const redirectUrl = `${frontendUrl}${redirectPath}`;
-          
+
           console.log("🔄 Redirecting to frontend:", redirectUrl);
-          
+
           // Extract domain from frontend URL for cookie
           const frontendDomain = new URL(frontendUrl).hostname;
-          
+
           const response = new Response("", {
             status: 302,
             headers: {
@@ -497,7 +506,7 @@ export default {
               "Set-Cookie": `optiview_session=${sessionId}; Domain=${frontendDomain}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
             }
           });
-          
+
           // Get origin from request headers for CORS
           const origin = request.headers.get("origin");
           console.log("🔧 Adding CORS headers for origin:", origin);
@@ -2090,8 +2099,8 @@ export default {
 
           // Update session with new context (we'll store this in a separate table)
           // For now, we'll return success and let the frontend handle context switching
-          const response = new Response(JSON.stringify({ 
-            success: true, 
+          const response = new Response(JSON.stringify({
+            success: true,
             message: "Context switch successful",
             organization_id,
             project_id
@@ -2466,6 +2475,163 @@ export default {
 
         } catch (e) {
           console.error("Update project settings error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 9) Admin endpoint to promote users to admin
+      if (url.pathname === "/admin/promote-user" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Check if user is admin
+          const userData = await env.OPTIVIEW_DB.prepare(`
+            SELECT is_admin FROM user WHERE id = ?
+          `).bind(sessionData.user_id).first();
+
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const body = await request.json();
+          const { email } = body;
+
+          if (!email) {
+            const response = new Response(JSON.stringify({ error: "Email is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Update user to admin
+          const updateResult = await env.OPTIVIEW_DB.prepare(`
+            UPDATE user SET is_admin = 1 WHERE email = ?
+          `).bind(email).run();
+
+          if (updateResult.changes === 0) {
+            const response = new Response(JSON.stringify({ error: "User not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: `User ${email} promoted to admin`
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Admin promote user error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 10) Debug endpoint to show current user info
+      if (url.pathname === "/debug/user-info" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get user data
+          const userData = await env.OPTIVIEW_DB.prepare(`
+            SELECT id, email, is_admin, created_ts, last_login_ts FROM user WHERE id = ?
+          `).bind(sessionData.user_id).first();
+
+          if (!userData) {
+            const response = new Response(JSON.stringify({ error: "User not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const response = new Response(JSON.stringify({
+            user: userData,
+            session: {
+              session_id: sessionId.substring(0, 8) + "...",
+              expires_at: sessionData.expires_at
+            }
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Debug user info error:", e);
           const response = new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }

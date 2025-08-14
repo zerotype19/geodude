@@ -134,9 +134,24 @@ export default function AdminHealth() {
     return (
       <Shell>
         <div className="flex items-center justify-center min-h-64">
-          <div className="text-center">
-            <div className="text-red-600 text-lg mb-2">Access Denied</div>
-            <div className="text-gray-600">Admin privileges required to view this page.</div>
+          <div className="text-center max-w-md">
+            <div className="text-red-600 text-lg mb-4">Access Denied</div>
+            <div className="text-gray-600 mb-4">Admin privileges required to view this page.</div>
+
+            {/* Debug Information */}
+            <div className="bg-gray-50 p-4 rounded-md text-left">
+              <h4 className="font-medium text-gray-900 mb-2">Debug Information:</h4>
+              <div className="text-sm text-gray-600 space-y-1">
+                <div>User ID: {user.id}</div>
+                <div>Email: {user.email}</div>
+                <div>Admin Status: {user.is_admin ? 'true' : 'false'}</div>
+                <div>Created: {user.created_ts ? new Date(user.created_ts * 1000).toLocaleString() : 'Unknown'}</div>
+              </div>
+            </div>
+
+            <div className="mt-4 text-xs text-gray-500">
+              To grant admin access, update the user record in the database to set is_admin = 1
+            </div>
           </div>
         </div>
       </Shell>
