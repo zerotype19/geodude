@@ -403,10 +403,10 @@ export default {
           }
 
           // Extract client IP from request headers
-          const clientIP = request.headers.get("cf-connecting-ip") || 
-                         request.headers.get("x-forwarded-for") || 
-                         request.headers.get("x-real-ip") || 
-                         "unknown";
+          const clientIP = request.headers.get("cf-connecting-ip") ||
+            request.headers.get("x-forwarded-for") ||
+            request.headers.get("x-real-ip") ||
+            "unknown";
 
           console.log('🔐 Magic link consumption for token:', token.substring(0, 8) + '...');
           console.log('📍 Client IP:', clientIP);
@@ -1340,7 +1340,7 @@ export default {
       if (url.pathname === "/api/onboarding/organization" && request.method === "POST") {
         try {
           const { name } = await request.json();
-          
+
           if (!name) {
             return new Response(JSON.stringify({ error: "Name is required" }), {
               status: 400,
@@ -1370,19 +1370,33 @@ export default {
           // Create organization
           const orgId = generateToken();
           const now = Math.floor(Date.now() / 1000);
-          
-          await env.OPTIVIEW_DB.prepare(`
-            INSERT INTO organization (id, name, created_ts)
-            VALUES (?, ?, ?)
-          `).bind(orgId, name, now).run();
+
+          console.log('🔧 Attempting to create organization:', { orgId, name, now });
+
+          try {
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO organization (id, name, created_ts)
+              VALUES (?, ?, ?)
+            `).bind(orgId, name, now).run();
+
+            console.log('✅ Organization created successfully');
+          } catch (insertError) {
+            console.error('❌ Organization insert failed:', insertError);
+            console.error('❌ Error details:', {
+              message: insertError.message,
+              code: insertError.code,
+              stack: insertError.stack
+            });
+            throw insertError;
+          }
 
           console.log('✅ Organization created:', { id: orgId, name, slug });
 
-          const responseData = { 
-            success: true, 
-            organization: { id: orgId, name, slug } 
+          const responseData = {
+            success: true,
+            organization: { id: orgId, name, slug }
           };
-          
+
           console.log('📤 Sending response:', responseData);
 
           return new Response(JSON.stringify(responseData), {
@@ -1402,7 +1416,7 @@ export default {
       if (url.pathname === "/api/onboarding/project" && request.method === "POST") {
         try {
           const { name, description, organizationId } = await request.json();
-          
+
           if (!name || !organizationId) {
             return new Response(JSON.stringify({ error: "Name and organization ID are required" }), {
               status: 400,
@@ -1426,7 +1440,7 @@ export default {
           const projectId = generateToken();
           const now = Math.floor(Date.now() / 1000);
           const projectSlug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-          
+
           await env.OPTIVIEW_DB.prepare(`
             INSERT INTO project (id, name, slug, org_id, created_ts)
             VALUES (?, ?, ?, ?, ?)
@@ -1434,9 +1448,9 @@ export default {
 
           console.log('✅ Project created:', { id: projectId, name, slug: projectSlug, orgId: organizationId });
 
-          return new Response(JSON.stringify({ 
-            success: true, 
-            project: { id: projectId, name, slug: projectSlug, organizationId } 
+          return new Response(JSON.stringify({
+            success: true,
+            project: { id: projectId, name, slug: projectSlug, organizationId }
           }), {
             status: 201,
             headers: { 'Content-Type': 'application/json' }

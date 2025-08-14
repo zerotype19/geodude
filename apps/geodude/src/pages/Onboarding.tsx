@@ -170,20 +170,22 @@ export default function Onboarding() {
 
         {/* Progress Steps */}
         <div className="flex justify-center mb-8">
-          <div className="flex space-x-4">
+          <div className="flex items-center space-x-8">
             {[1, 2].map((step) => (
               <div key={step} className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${step < state.step
-                    ? 'bg-green-500 text-white'
-                    : step === state.step
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step < state.step 
+                    ? 'bg-green-500 text-white' 
+                    : step === state.step 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-600'
+                }`}>
                   {step < state.step ? '✓' : step}
                 </div>
                 {step < 2 && (
-                  <div className={`w-16 h-1 mx-2 ${step < state.step ? 'bg-green-500' : 'bg-gray-200'
-                    }`} />
+                  <div className={`w-20 h-1 mx-4 ${
+                    step < state.step ? 'bg-green-500' : 'bg-gray-200'
+                  }`} />
                 )}
               </div>
             ))}
