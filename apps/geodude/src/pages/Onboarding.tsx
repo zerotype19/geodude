@@ -68,7 +68,7 @@ export default function Onboarding() {
       console.log('📥 Response received:', {
         status: response.status,
         statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
+        headers: 'Response headers available'
       });
 
       const responseText = await response.text();
