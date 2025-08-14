@@ -33,7 +33,7 @@ export class EmailService {
   private async sendViaResend(options: EmailOptions): Promise<boolean> {
     try {
       console.log(`📧 Sending email via Resend to ${options.to}`);
-      
+
       // Use Resend's REST API to send emails
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -208,7 +208,8 @@ This email was sent to ${email}
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { text-align: center; margin-bottom: 30px; }
-        .button { display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500; margin: 20px 0; }
+        .button { display: inline-block; background-color: #2563eb; color: white !important; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; text-align: center; min-width: 120px; }
+        .button:hover { background-color: #1d4ed8; }
         .expires { text-align: center; color: #6b7280; font-size: 14px; margin: 20px 0; }
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 12px; }
     </style>

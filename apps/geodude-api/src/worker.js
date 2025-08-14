@@ -132,6 +132,15 @@ export default {
         return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
       };
 
+      // Helper function to hash string (for IP)
+      const hashString = async (input) => {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(input);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+      };
+
       // Helper function to check rate limits
       const checkRateLimit = async (key, limit, windowMs) => {
         const now = Date.now();
@@ -287,21 +296,28 @@ export default {
           const token = generateToken();
           const tokenHash = await hashToken(token);
 
-          // Store token in database (for now, use KV as temporary storage)
+          // Store token in database (use D1 instead of KV)
           const expirationMinutes = config.MAGIC_LINK_EXP_MIN;
           const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
 
-          const magicLinkData = {
+          // Insert into D1 magic_link table
+          const insertResult = await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO magic_link (email, token_hash, expires_at, continue_path, requester_ip_hash)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(
             email,
-            token_hash: tokenHash,
-            continue_path: sanitizeResult.value, // Store only the sanitized value
-            expires_at: expiresAt.toISOString(),
-            created_at: new Date().toISOString()
-          };
+            tokenHash,
+            expiresAt.toISOString(),
+            sanitizeResult.value,
+            await hashString(clientIP)
+          ).run();
 
-          await env.AI_FINGERPRINTS.put(`magic_link:${tokenHash}`, JSON.stringify(magicLinkData), {
-            expirationTtl: expirationMinutes * 60
-          });
+          if (!insertResult.success) {
+            console.error('Failed to insert magic link into D1:', insertResult.error);
+            throw new Error('Database error');
+          }
+
+          console.log('✅ Magic link stored in D1 database');
 
           // Generate magic link
           const appUrl = config.PUBLIC_APP_URL;
@@ -408,21 +424,28 @@ export default {
           const token = generateToken();
           const tokenHash = await hashToken(token);
 
-          // Store token in database (for now, use KV as temporary storage)
+          // Store token in database (use D1 instead of KV)
           const expirationMinutes = config.MAGIC_LINK_EXP_MIN;
           const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
 
-          const magicLinkData = {
+          // Insert into D1 magic_link table
+          const insertResult = await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO magic_link (email, token_hash, expires_at, continue_path, requester_ip_hash)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(
             email,
-            token_hash: tokenHash,
-            continue_path: sanitizeResult.value, // Store only the sanitized value
-            expires_at: expiresAt.toISOString(),
-            created_at: new Date().toISOString()
-          };
+            tokenHash,
+            expiresAt.toISOString(),
+            sanitizeResult.value,
+            await hashString(clientIP)
+          ).run();
 
-          await env.AI_FINGERPRINTS.put(`magic_link:${tokenHash}`, JSON.stringify(magicLinkData), {
-            expirationTtl: expirationMinutes * 60
-          });
+          if (!insertResult.success) {
+            console.error('Failed to insert magic link into D1:', insertResult.error);
+            throw new Error('Database error');
+          }
+
+          console.log('✅ Magic link stored in D1 database');
 
           // Generate magic link
           const appUrl = config.PUBLIC_APP_URL;
@@ -476,7 +499,12 @@ export default {
           const tokenHash = await hashToken(token);
 
           // Get stored magic link data
-          const storedData = await env.AI_FINGERPRINTS.get(`magic_link:${tokenHash}`, { type: "json" });
+          const storedData = await env.OPTIVIEW_DB.prepare(`
+            SELECT ml.email, ml.token_hash, ml.expires_at, ml.continue_path, ml.requester_ip_hash, ml.created_at, ml.consumed_at
+            FROM magic_link ml
+            WHERE ml.token_hash = ?
+          `).bind(tokenHash).first();
+
           if (!storedData) {
             const response = new Response("Invalid or expired token", { status: 400 });
             return addCorsHeaders(response);
@@ -485,7 +513,9 @@ export default {
           // Check expiration
           if (new Date(storedData.expires_at) < new Date()) {
             // Clean up expired token
-            await env.AI_FINGERPRINTS.delete(`magic_link:${tokenHash}`);
+            await env.OPTIVIEW_DB.prepare(`
+              DELETE FROM magic_link WHERE token_hash = ?
+            `).bind(tokenHash).run();
             const response = new Response("Token expired", { status: 400 });
             return addCorsHeaders(response);
           }
@@ -515,7 +545,9 @@ export default {
           });
 
           // Clean up used magic link
-          await env.AI_FINGERPRINTS.delete(`magic_link:${tokenHash}`);
+          await env.OPTIVIEW_DB.prepare(`
+            UPDATE magic_link SET consumed_at = ? WHERE token_hash = ?
+          `).bind(new Date().toISOString(), tokenHash).run();
 
           // Default to /onboarding if no continue_path or if it's invalid
           let redirectPath = "/onboarding";
@@ -1307,45 +1339,27 @@ export default {
           }
 
           // Find the most recent unconsumed magic link for this email
-          // Note: This is a simplified lookup - in production we'd have proper database queries
-          // For now, we'll search through KV storage for magic links
+          // Query the D1 magic_link table
           console.log("🔍 TEST MODE - Looking for magic link token for:", email);
 
-          // Search for magic links by email in KV storage
-          let foundToken = null;
-          let foundData = null;
+          const magicLinkData = await env.OPTIVIEW_DB.prepare(`
+            SELECT ml.id, ml.email, ml.token_hash, ml.expires_at, ml.continue_path, ml.created_at, ml.consumed_at
+            FROM magic_link ml
+            WHERE ml.email = ? AND ml.consumed_at IS NULL AND ml.expires_at > ?
+            ORDER BY ml.created_at DESC
+            LIMIT 1
+          `).bind(email, new Date().toISOString()).first();
 
-          // List all magic link keys and find ones for this email
-          // This is a simplified approach - in production we'd have proper database queries
-          const magicLinkKeys = await env.AI_FINGERPRINTS.list({ prefix: "magic_link:" });
-
-          for (const key of magicLinkKeys.keys) {
-            try {
-              const magicLinkData = await env.AI_FINGERPRINTS.get(key.name);
-              if (magicLinkData) {
-                const parsed = JSON.parse(magicLinkData);
-                if (parsed.email === email && !parsed.consumed) {
-                  // Found a valid magic link for this email
-                  foundToken = key.name.replace("magic_link:", "");
-                  foundData = parsed;
-                  break;
-                }
-              }
-            } catch (e) {
-              console.error("Error parsing magic link data:", e);
-            }
-          }
-
-          if (foundToken && foundData) {
+          if (magicLinkData) {
             const response = new Response(JSON.stringify({
               message: "Magic link found",
               email: email,
-              token: foundToken,
-              token_hash: foundData.token_hash,
-              continue_path: foundData.continue_path,
-              expires_at: foundData.expires_at,
-              created_at: foundData.created_at,
-              consumed: foundData.consumed || false,
+              token: magicLinkData.token_hash,
+              token_hash: magicLinkData.token_hash,
+              continue_path: magicLinkData.continue_path,
+              expires_at: magicLinkData.expires_at,
+              created_at: magicLinkData.created_at,
+              consumed: magicLinkData.consumed_at !== null,
               status: "found"
             }), {
               headers: { "Content-Type": "application/json" }

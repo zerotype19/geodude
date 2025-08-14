@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Onboarding from "./pages/Onboarding";
+import MagicLink from "./pages/MagicLink";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/auth/magic" element={<MagicLink />} />
         <Route path="/" element={<Events />} />
         <Route path="/sources" element={<Sources />} />
         <Route path="/content" element={<Content />} />
