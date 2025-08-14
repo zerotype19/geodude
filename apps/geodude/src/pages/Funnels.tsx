@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shell } from '../components/Shell';
+import Shell from '../components/Shell';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -68,7 +68,7 @@ interface FunnelDetail {
   }>;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8787';
+const API_BASE = 'https://api.optiview.ai';
 
 export default function Funnels() {
   const { user } = useAuth();
@@ -76,7 +76,7 @@ export default function Funnels() {
   const [items, setItems] = useState<FunnelItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Filters and pagination
   const [window, setWindow] = useState<'15m' | '24h' | '7d'>('7d');
   const [source, setSource] = useState('');
@@ -85,14 +85,14 @@ export default function Funnels() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [total, setTotal] = useState(0);
-  
+
   // Detail drawer
   const [selectedItem, setSelectedItem] = useState<FunnelItem | null>(null);
   const [detail, setDetail] = useState<FunnelDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Get project ID from user context (you may need to adjust this based on your auth structure)
-  const projectId = user?.current_project_id || 'prj_cTSh3LZ8qMVZ'; // fallback to known project ID
+  // Get project ID from project context
+  const projectId = project?.id || 'prj_cTSh3LZ8qMVZ'; // fallback to known project ID
 
   useEffect(() => {
     fetchSummary();
@@ -105,16 +105,16 @@ export default function Funnels() {
         project_id: projectId,
         window
       });
-      
+
       const response = await fetch(`${API_BASE}/api/funnels/summary?${params}`, {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${user?.session_id}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) throw new Error('Failed to fetch summary');
-      
+
       const data = await response.json();
       setSummary(data);
     } catch (err) {
@@ -135,16 +135,16 @@ export default function Funnels() {
         page: page.toString(),
         pageSize: pageSize.toString()
       });
-      
+
       const response = await fetch(`${API_BASE}/api/funnels?${params}`, {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${user?.session_id}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) throw new Error('Failed to fetch items');
-      
+
       const data = await response.json();
       setItems(data.items || []);
       setTotal(data.total || 0);
@@ -165,16 +165,16 @@ export default function Funnels() {
         source: item.source_slug,
         window
       });
-      
+
       const response = await fetch(`${API_BASE}/api/funnels/detail?${params}`, {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${user?.session_id}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) throw new Error('Failed to fetch detail');
-      
+
       const data = await response.json();
       setDetail(data);
     } catch (err) {
@@ -262,13 +262,11 @@ export default function Funnels() {
                 <button
                   key={w}
                   onClick={() => setWindow(w)}
-                  className={`px-4 py-2 text-sm font-medium ${
-                    window === w
+                  className={`px-4 py-2 text-sm font-medium ${window === w
                       ? 'bg-blue-600 text-white'
                       : 'bg-white text-gray-700 hover:text-gray-500 border border-gray-300'
-                  } ${w === '15m' ? 'rounded-l-md' : ''} ${w === '7d' ? 'rounded-r-md' : ''} ${
-                    w !== '15m' && w !== '7d' ? 'border-l-0' : ''
-                  }`}
+                    } ${w === '15m' ? 'rounded-l-md' : ''} ${w === '7d' ? 'rounded-r-md' : ''} ${w !== '15m' && w !== '7d' ? 'border-l-0' : ''
+                    }`}
                 >
                   {w}
                 </button>
