@@ -38,6 +38,9 @@ export default function MagicLink() {
           if (data.success) {
             setStatus('success');
             
+            // Wait a bit for the session cookie to be set in the browser
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
             // Refresh user data to get the latest state
             await refreshUserData();
             
