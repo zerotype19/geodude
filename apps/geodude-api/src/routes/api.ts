@@ -65,7 +65,7 @@ export async function handleApiRoutes(
 
             let query = `
         SELECT ak.id, ak.name, ak.key_id, ak.created_at, ak.last_used_at, ak.revoked_at,
-               p.domain as property_domain
+               p.domain property_domain
         FROM api_keys ak
         JOIN properties p ON ak.property_id = p.id
         WHERE ak.project_id = ?
@@ -151,7 +151,7 @@ export async function handleApiRoutes(
 
             // Get total events
             const totalResult = await env.OPTIVIEW_DB.prepare(`
-        SELECT COUNT(*) as total
+        SELECT COUNT(*) total
         FROM interaction_events
         WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
       `).bind(project_id, fromTs, toTs).first<any>();
@@ -302,14 +302,14 @@ export async function handleApiRoutes(
             }
 
             // Get total referrals and conversions in window (simplified to avoid subquery issues)
-            const referralsResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT COUNT(*) as referrals
+                        const referralsResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) referrals
                 FROM ai_referrals 
                 WHERE project_id = ? AND detected_at >= ?
             `).bind(project_id, since).first<any>();
-
+            
             const conversionsResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT COUNT(*) as conversions
+                SELECT COUNT(*) conversions
                 FROM conversion_event 
                 WHERE project_id = ? AND occurred_at >= ?
             `).bind(project_id, since).first<any>();
