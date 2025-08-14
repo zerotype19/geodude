@@ -3,38 +3,74 @@ import { useState, useEffect } from 'react';
 import Shell from '../components/Shell';
 import { Card } from '../components/ui/Card';
 
+// Type definitions
+interface ConversionSummary {
+  totals: {
+    conversions: number;
+    ai_attributed: number;
+    non_ai: number;
+    revenue_cents: number;
+  };
+  by_source: Array<{
+    slug: string;
+    name: string;
+    conversions: number;
+    revenue_cents: number;
+  }>;
+  top_content: Array<{
+    content_id: number;
+    url: string;
+    conversions: number;
+    revenue_cents: number;
+  }>;
+  timeseries: Array<{
+    ts: string;
+    conversions: number;
+    ai_attributed: number;
+    revenue_cents: number;
+  }>;
+}
+
+interface ConversionItem {
+  content_id: number;
+  url: string;
+  source_slug: string | null;
+  source_name: string | null;
+  last_seen: string;
+  conversions: number;
+  revenue_cents: number;
+  assists: Array<{
+    slug: string;
+    count: number;
+  }>;
+}
+
 const Conversions = () => {
-    const [summary, setSummary] = useState(null);
-    const [conversions, setConversions] = useState([]);
+    const [summary, setSummary] = useState<ConversionSummary | null>(null);
+    const [conversions, setConversions] = useState<ConversionItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    
-    // Filters
+    const [error, setError] = useState<string | null>(null);
     const [window, setWindow] = useState('7d');
     const [source, setSource] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [pageSize] = useState(50);
     const [total, setTotal] = useState(0);
-    
-    // Mock project ID for now - in real app this would come from context/auth
-    const projectId = 'prj_test';
+    const [projectId] = useState('test_project'); // This should come from auth context
 
     const fetchSummary = async () => {
         try {
-            const response = await fetch(`/api/conversions/summary?project_id=${projectId}&window=${window}`);
-            if (!response.ok) throw new Error('Failed to fetch summary');
+            const response = await fetch(`https://api.optiview.ai/api/conversions/summary?project_id=${projectId}&window=${window}`);
+            if (!response.ok) throw new Error('Failed to load conversions summary');
             const data = await response.json();
             setSummary(data);
         } catch (err) {
-            console.error('Error fetching summary:', err);
-            setError('Failed to load conversions summary');
+            setError(err instanceof Error ? err.message : 'Failed to load conversions summary');
         }
     };
 
     const fetchConversions = async () => {
         try {
-            setLoading(true);
             const params = new URLSearchParams({
                 project_id: projectId,
                 window,
@@ -42,92 +78,80 @@ const Conversions = () => {
                 pageSize: pageSize.toString()
             });
             if (source) params.append('source', source);
-            if (searchQuery) params.append('q', searchQuery);
-            
-            const response = await fetch(`/api/conversions?${params}`);
-            if (!response.ok) throw new Error('Failed to fetch conversions');
+            if (search) params.append('q', search);
+
+            const response = await fetch(`https://api.optiview.ai/api/conversions?${params}`);
+            if (!response.ok) throw new Error('Failed to load conversions');
             const data = await response.json();
-            setConversions(data.items);
-            setTotal(data.total);
+            setConversions(data.items || []);
+            setTotal(data.total || 0);
         } catch (err) {
-            console.error('Error fetching conversions:', err);
-            setError('Failed to load conversions');
-        } finally {
-            setLoading(false);
+            setError(err instanceof Error ? err.message : 'Failed to load conversions');
         }
     };
 
     useEffect(() => {
         fetchSummary();
-    }, [window]);
-
-    useEffect(() => {
         fetchConversions();
-    }, [window, source, searchQuery, page]);
+    }, [window, source, search, page]);
 
-    const handleWindowChange = (newWindow) => {
+    const handleWindowChange = (newWindow: string) => {
         setWindow(newWindow);
         setPage(1);
     };
 
-    const handleSourceChange = (newSource) => {
+    const handleSourceChange = (newSource: string) => {
         setSource(newSource);
         setPage(1);
     };
 
-    const handleSearch = (query) => {
-        setSearchQuery(query);
+    const handleSearchChange = (query: string) => {
+        setSearch(query);
         setPage(1);
     };
 
-    const formatUrl = (url) => {
-        try {
-            const urlObj = new URL(url);
-            return urlObj.pathname || urlObj.hostname;
-        } catch {
-            return url;
-        }
+    const handlePageChange = (url: string) => {
+        const urlParams = new URLSearchParams(url.split('?')[1]);
+        const newPage = parseInt(urlParams.get('page') || '1');
+        setPage(newPage);
     };
 
-    const formatLastSeen = (timestamp) => {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-        
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        return `${diffDays}d ago`;
+    const formatTimestamp = (timestamp: string) => {
+        return new Date(timestamp).toLocaleDateString();
     };
 
-    const formatRevenue = (cents) => {
-        if (!cents) return '—';
-        return `$${(cents / 100).toFixed(2)}`;
+    const formatCurrency = (cents: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(cents / 100);
     };
 
-    const getSourceBadgeColor = (slug) => {
-        if (!slug) return 'bg-gray-100 text-gray-800';
-        switch (slug) {
-            case 'openai_chatgpt': return 'bg-green-100 text-green-800';
-            case 'anthropic_claude': return 'bg-orange-100 text-orange-800';
-            case 'perplexity': return 'bg-blue-100 text-blue-800';
-            case 'google_gemini': return 'bg-purple-100 text-purple-800';
-            default: return 'bg-gray-100 text-gray-800';
-        }
+    const formatSource = (slug: string | null) => {
+        if (!slug) return '—';
+        return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/_/g, ' ');
     };
 
-    const getSourceDisplay = (source) => {
-        if (!source || source === 'non_ai') return { name: '—', slug: null };
-        return { name: source, slug: source };
+    const handleRowClick = (source: string | null, contentId: number) => {
+        // This would open a detail drawer
+        console.log('Opening detail for:', { source, contentId });
     };
+
+    if (loading) {
+        return (
+            <Shell>
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-lg">Loading conversions...</div>
+                </div>
+            </Shell>
+        );
+    }
 
     if (error) {
         return (
             <Shell>
-                <div className="p-6">
-                    <div className="text-red-600 text-center py-8">{error}</div>
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-lg text-red-600">Error: {error}</div>
                 </div>
             </Shell>
         );
@@ -135,244 +159,230 @@ const Conversions = () => {
 
     return (
         <Shell>
-            <div className="p-6 space-y-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {/* Header */}
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Conversions</h1>
-                        <p className="text-gray-600">Track conversions and AI attribution</p>
-                    </div>
-                    <a href="/docs/conversions" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                        View Docs →
-                    </a>
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900">Conversions</h1>
+                    <p className="mt-2 text-gray-600">Track and analyze your conversion performance</p>
                 </div>
 
                 {/* KPI Cards */}
                 {summary && (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                         <Card>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-gray-900">
-                                    {summary.totals.conversions}
-                                </div>
-                                <div className="text-sm text-gray-600">Conversions</div>
-                                <div className="text-xs text-gray-500 mt-1">{window}</div>
+                            <div className="p-6">
+                                <h3 className="text-sm font-medium text-gray-500">Total Conversions</h3>
+                                <p className="mt-2 text-3xl font-bold text-gray-900">{summary.totals.conversions}</p>
+                                <p className="mt-1 text-sm text-gray-600">Last {window}</p>
                             </div>
                         </Card>
-                        
                         <Card>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-gray-900">
-                                    {summary.totals.ai_attributed}
-                                </div>
-                                <div className="text-sm text-gray-600">AI-Attributed</div>
-                                <div className="text-xs text-gray-500 mt-1">
+                            <div className="p-6">
+                                <h3 className="text-sm font-medium text-gray-500">AI-Attributed</h3>
+                                <p className="mt-2 text-3xl font-bold text-blue-600">{summary.totals.ai_attributed}</p>
+                                <p className="mt-1 text-sm text-gray-600">
                                     {summary.totals.conversions > 0 
-                                        ? `${((summary.totals.ai_attributed / summary.totals.conversions) * 100).toFixed(1)}%`
-                                        : '0%'
-                                    }
-                                </div>
+                                        ? Math.round((summary.totals.ai_attributed / summary.totals.conversions) * 100)
+                                        : 0}%
+                                </p>
                             </div>
                         </Card>
-                        
                         <Card>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-gray-900">
-                                    {formatRevenue(summary.totals.revenue_cents)}
-                                </div>
-                                <div className="text-sm text-gray-600">Revenue</div>
-                                <div className="text-xs text-gray-500 mt-1">{window}</div>
+                            <div className="p-6">
+                                <h3 className="text-sm font-medium text-gray-500">Revenue</h3>
+                                <p className="mt-2 text-3xl font-bold text-green-600">
+                                    {formatCurrency(summary.totals.revenue_cents)}
+                                </p>
+                                <p className="mt-1 text-sm text-gray-600">Last {window}</p>
                             </div>
                         </Card>
-                        
                         <Card>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-gray-900">
-                                    {summary.by_source[0]?.name || 'None'}
-                                </div>
-                                <div className="text-sm text-gray-600">Top AI Source</div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                    {summary.by_source[0]?.conversions || 0} conversions
-                                </div>
+                            <div className="p-6">
+                                <h3 className="text-sm font-medium text-gray-500">Top AI Source</h3>
+                                <p className="mt-2 text-3xl font-bold text-purple-600">
+                                    {summary.by_source.length > 0 ? summary.by_source[0].name : '—'}
+                                </p>
+                                <p className="mt-1 text-sm text-gray-600">
+                                    {summary.by_source.length > 0 ? summary.by_source[0].conversions : 0} conversions
+                                </p>
                             </div>
                         </Card>
                     </div>
                 )}
 
                 {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-gray-700">Window:</span>
-                        <div className="flex bg-gray-100 rounded-lg p-1">
-                            {['24h', '7d', '30d'].map((w) => (
-                                <button
-                                    key={w}
-                                    onClick={() => handleWindowChange(w)}
-                                    className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                                        window === w
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-600 hover:text-gray-900'
-                                    }`}
-                                >
-                                    {w}
-                                </button>
-                            ))}
+                <div className="bg-white rounded-lg shadow p-6 mb-8">
+                    <div className="flex flex-wrap gap-4 items-center">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Time Window</label>
+                            <div className="flex space-x-2">
+                                {['24h', '7d', '30d'].map((w) => (
+                                    <button
+                                        key={w}
+                                        onClick={() => handleWindowChange(w)}
+                                        className={`px-3 py-1 rounded-md text-sm font-medium ${
+                                            window === w
+                                                ? 'bg-blue-100 text-blue-700'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {w}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-gray-700">Source:</span>
-                        <select
-                            value={source}
-                            onChange={(e) => handleSourceChange(e.target.value)}
-                            className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">All Sources</option>
-                            {summary?.by_source.map((s) => (
-                                <option key={s.slug} value={s.slug}>
-                                    {s.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-gray-700">Search:</span>
-                        <input
-                            type="text"
-                            placeholder="Search URLs..."
-                            value={searchQuery}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">AI Source</label>
+                            <select
+                                value={source}
+                                onChange={(e) => handleSourceChange(e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            >
+                                <option value="">All Sources</option>
+                                {summary?.by_source.map((s) => (
+                                    <option key={s.slug} value={s.slug}>
+                                        {s.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Search URLs</label>
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                placeholder="Search content URLs..."
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* Conversions Table */}
-                <Card>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Source
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        URL
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Last Seen
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Conversions
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Revenue
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Assists
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                                            Loading...
-                                        </td>
-                                    </tr>
-                                ) : conversions.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                                            No conversions found in the selected window.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    conversions.map((conversion) => {
-                                        const sourceDisplay = getSourceDisplay(conversion.source_slug);
-                                        return (
-                                            <tr key={`${conversion.content_id}-${conversion.source_slug || 'non_ai'}`} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    {sourceDisplay.slug ? (
-                                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSourceBadgeColor(sourceDisplay.slug)}`}>
-                                                            {sourceDisplay.name}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-gray-500">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="max-w-xs truncate" title={conversion.url}>
-                                                        {formatUrl(conversion.url)}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    {formatLastSeen(conversion.last_seen)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {conversion.conversions}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {formatRevenue(conversion.revenue_cents)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {conversion.assists && conversion.assists.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {conversion.assists.map((assist, idx) => (
-                                                                <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                                    {assist.slug} ({assist.count})
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-400">—</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h3 className="text-lg font-medium text-gray-900">Conversions</h3>
                     </div>
-                    
-                    {/* Pagination */}
-                    {total > pageSize && (
-                        <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
-                            <div className="text-sm text-gray-700">
-                                Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total} results
+                    {conversions.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Source
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            URL
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Last Seen
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Conversions
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Revenue
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Assists
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {conversions.map((item, idx) => (
+                                        <tr 
+                                            key={`${item.content_id}-${item.source_slug || 'non-ai'}`}
+                                            className="hover:bg-gray-50 cursor-pointer"
+                                            onClick={() => handleRowClick(item.source_slug, item.content_id)}
+                                        >
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                    item.source_slug 
+                                                        ? 'bg-blue-100 text-blue-800' 
+                                                        : 'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                    {formatSource(item.source_slug)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm text-gray-900 truncate max-w-xs">
+                                                    {item.url}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {formatTimestamp(item.last_seen)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {item.conversions}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {formatCurrency(item.revenue_cents)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                {item.assists.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {item.assists.map((assist, idx) => (
+                                                            <span key={idx} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                {assist.slug} ({assist.count})
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-400">—</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="text-center py-12">
+                            <div className="text-gray-400 mb-4">
+                                <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
                             </div>
-                            <div className="flex space-x-2">
-                                <button
-                                    onClick={() => setPage(page - 1)}
-                                    disabled={page === 1}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                >
-                                    Previous
-                                </button>
-                                <button
-                                    onClick={() => setPage(page + 1)}
-                                    disabled={page * pageSize >= total}
-                                    className="px-3 py-1 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                                >
-                                    Next
-                                </button>
-                            </div>
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">No conversions yet</h3>
+                            <p className="text-gray-500 mb-4">
+                                {summary?.totals.conversions === 0 
+                                    ? "Start tracking conversions to see data here."
+                                    : "No conversions match your current filters."
+                                }
+                            </p>
+                            <a
+                                href="/docs/conversions"
+                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                            >
+                                View Documentation
+                            </a>
                         </div>
                     )}
-                </Card>
+                </div>
 
-                {/* Empty State */}
-                {!loading && conversions.length === 0 && summary?.totals.conversions === 0 && (
-                    <div className="text-center py-12">
-                        <div className="text-gray-400 text-6xl mb-4">💰</div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No conversions yet</h3>
-                        <p className="text-gray-600 mb-4">
-                            Conversions will appear here when you start tracking them. Add conversion tracking to your checkout or lead forms.
-                        </p>
-                        <a href="/docs/conversions" className="text-blue-600 hover:text-blue-800 font-medium">
-                            Learn how to add conversion tracking →
-                        </a>
+                {/* Pagination */}
+                {total > pageSize && (
+                    <div className="mt-8 flex items-center justify-between">
+                        <div className="text-sm text-gray-700">
+                            Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total} results
+                        </div>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => setPage(Math.max(1, page - 1))}
+                                disabled={page === 1}
+                                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Previous
+                            </button>
+                            <button
+                                onClick={() => setPage(page + 1)}
+                                disabled={page * pageSize >= total}
+                                className="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Next
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

@@ -48,7 +48,6 @@ export default function Shell({ children }) {
         { name: "Events", href: "/events" },
         { name: "Sources", href: "/sources" },
         { name: "Content", href: "/content" },
-        { name: "Conversions", href: "/conversions" },
         { name: "Install", href: "/install" },
         { name: "API Keys", href: "/api-keys" },
         { name: "Data Policy", href: "/data-policy" },
