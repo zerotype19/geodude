@@ -80,45 +80,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         .split('; ')
         .find(row => row.startsWith('optiview_session='));
       
+      console.log('🔍 AuthContext: Session cookie found:', !!sessionCookie);
+      console.log('🔍 AuthContext: Full cookies:', document.cookie);
+      
       if (!sessionCookie) {
+        console.log('❌ AuthContext: No session cookie found');
         setLoading(false);
         return;
       }
 
       // Get current user data
+      console.log('🔍 AuthContext: Calling /api/auth/me...');
       const userResponse = await fetch(`${API_BASE}/api/auth/me`, {
         credentials: 'include',
       });
 
+      console.log('🔍 AuthContext: /api/auth/me response status:', userResponse.status);
+
       if (!userResponse.ok) {
+        console.log('❌ AuthContext: /api/auth/me failed:', userResponse.status, userResponse.statusText);
         throw new Error('Failed to fetch user data');
       }
 
       const userData = await userResponse.json();
+      console.log('✅ AuthContext: User data received:', userData);
       
       // Get user's organization and project
+      console.log('🔍 AuthContext: Calling /api/auth/organization...');
       const orgResponse = await fetch(`${API_BASE}/api/auth/organization`, {
         credentials: 'include',
       });
 
+      console.log('🔍 AuthContext: /api/auth/organization response status:', orgResponse.status);
+
       if (orgResponse.ok) {
         const orgData = await orgResponse.json();
+        console.log('✅ AuthContext: Organization data received:', orgData);
         setOrganization(orgData);
         
         // Get project data
+        console.log('🔍 AuthContext: Calling /api/auth/project...');
         const projectResponse = await fetch(`${API_BASE}/api/auth/project`, {
           credentials: 'include',
         });
 
+        console.log('🔍 AuthContext: /api/auth/project response status:', projectResponse.status);
+
         if (projectResponse.ok) {
           const projectData = await projectResponse.json();
+          console.log('✅ AuthContext: Project data received:', projectData);
           setProject(projectData);
         }
       }
 
       setUser(userData);
+      console.log('✅ AuthContext: User state updated successfully');
     } catch (err) {
-      console.error('Failed to refresh user data:', err);
+      console.error('❌ AuthContext: Failed to refresh user data:', err);
       setError(err instanceof Error ? err.message : 'Failed to refresh user data');
       // If we can't get user data, they might be logged out
       logout();

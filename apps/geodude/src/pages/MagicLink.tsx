@@ -38,20 +38,30 @@ export default function MagicLink() {
           if (data.success) {
             setStatus('success');
             
+            // Debug: Check if session cookie is set
+            console.log('🍪 Session cookie after magic link:', document.cookie);
+            
             // Wait a bit for the session cookie to be set in the browser
             await new Promise(resolve => setTimeout(resolve, 500));
             
+            // Debug: Check cookie again after delay
+            console.log('🍪 Session cookie after delay:', document.cookie);
+            
             // Refresh user data to get the latest state
+            console.log('🔄 Calling refreshUserData...');
             await refreshUserData();
+            console.log('✅ refreshUserData completed');
             
             // Redirect based on whether user has organization
             if (data.has_organization) {
               // User has completed onboarding, go to main app
+              console.log('🏠 Redirecting to main app...');
               setTimeout(() => {
                 navigate('/');
               }, 1000);
             } else {
               // New user, go to onboarding
+              console.log('📝 Redirecting to onboarding...');
               setTimeout(() => {
                 navigate('/onboarding');
               }, 1000);
