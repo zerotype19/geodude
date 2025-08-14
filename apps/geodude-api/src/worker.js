@@ -3429,158 +3429,225 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          const pageNum = parseInt(page);
-          const pageSizeNum = Math.min(parseInt(pageSize), 100); // Cap at 100
+          const pageNum = Math.max(1, parseInt(page, 10));
+          const pageSizeNum = Math.min(100, Math.max(10, parseInt(pageSize, 10)));
           const offset = (pageNum - 1) * pageSizeNum;
 
-          // Calculate time window
-          let timeFilter;
-          if (window === '24h') {
-            timeFilter = "datetime('now','-1 day')";
-          } else if (window === '7d') {
-            timeFilter = "datetime('now','-7 days')";
-          } else { // 30d
-            timeFilter = "datetime('now','-30 days')";
-          }
+          // window → since (ISO). Keep attribution lookback = 7d for v1 (constant).
+          const now = new Date();
+          const sinceISO = (() => {
+            if (window === "24h") return new Date(now.getTime() - 24*3600e3).toISOString();
+            if (window === "30d") return new Date(now.getTime() - 30*86400e3).toISOString();
+            return new Date(now.getTime() - 7*86400e3).toISOString(); // 7d default
+          })();
+          const lookbackMod = "-7 days"; // SQLite datetime(c.occurred_at, ?)
 
-          // Build WHERE clause
-          let whereClause = `ce.project_id = ? AND ce.occurred_at >= ${timeFilter}`;
-          let params = [project_id];
+          // SAFE sort whitelist
+          const sortSql = (() => {
+            switch (sort) {
+              case "conversions_desc": return "conversions DESC, last_seen DESC";
+              case "last_seen_desc": 
+              default: return "last_seen DESC, conversions DESC";
+            }
+          })();
 
-          if (source) {
-            whereClause += ` AND ais.slug = ?`;
-            params.push(source);
-          }
-
-          if (q) {
-            whereClause += ` AND ca.url LIKE ?`;
-            params.push(`%${q}%`);
-          }
-
-          // Get total count - simplified to match main query structure
-          const countQuery = `
-            SELECT COUNT(DISTINCT ce.content_id) as total
-            FROM conversion_event ce
-            JOIN content_assets ca ON ce.content_id = ca.id
-            WHERE ${whereClause}
-          `;
-
-          const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...params).first();
-          const total = totalResult?.total || 0;
-
-          // Build main query
-          let orderClause;
-          if (sort === 'conversions_desc') {
-            orderClause = 'conversions DESC, last_seen DESC';
-          } else {
-            orderClause = 'last_seen DESC';
-          }
-
+          // MAIN LIST QUERY (positional placeholders only)
+          // PARAM ORDER (9 total):
+          //  1: project_id
+          //  2: sinceISO
+          //  3: lookbackMod
+          //  4: q (nullable)
+          //  5: source (nullable)
+          //  6: source (same value, repeated)
+          //  7: pageSize (int)
+          //  8: offset (int)
           const mainQuery = `
-            WITH conversion_attribution AS (
-              SELECT 
-                ce.id,
-                ce.amount_cents,
-                ce.content_id,
-                ce.occurred_at,
-                ar.ai_source_id,
-                ar.detected_at
-              FROM conversion_event ce
-              LEFT JOIN ai_referrals ar ON 
-                ce.project_id = ar.project_id 
-                AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
-                AND ar.detected_at <= ce.occurred_at
-              WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            WITH params AS (
+              SELECT ? AS pid, ? AS since, ? AS lookback, ? AS q
             ),
-            last_touch_attribution AS (
-              SELECT 
-                id,
-                amount_cents,
-                content_id,
-                occurred_at,
-                ai_source_id,
-                detected_at,
-                ROW_NUMBER() OVER (
-                  PARTITION BY content_id, occurred_at 
-                  ORDER BY detected_at DESC
-                ) as rn
-              FROM conversion_attribution
-              WHERE ai_source_id IS NOT NULL
+            conv AS (
+              SELECT c.id, c.project_id, c.content_id, c.amount_cents, c.currency, c.occurred_at
+              FROM conversion_event c, params p
+              WHERE c.project_id = p.pid
+                AND c.occurred_at >= p.since
             ),
-            grouped_conversions AS (
-              SELECT 
-                ca.id as content_id,
-                ca.url,
-                ais.slug as source_slug,
-                ais.name as source_name,
-                MAX(ce.occurred_at) as last_seen,
-                COUNT(*) as conversions,
-                COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
-              FROM conversion_event ce
-              JOIN content_assets ca ON ce.content_id = ca.id
-              LEFT JOIN (
-                SELECT 
-                  ca2.id,
-                  lta.ai_source_id
-                FROM conversion_attribution ca2
-                LEFT JOIN last_touch_attribution lta ON 
-                  ca2.content_id = lta.content_id AND lta.rn = 1
-              ) attribution ON ce.content_id = attribution.id
-              LEFT JOIN ai_sources ais ON attribution.ai_source_id = ais.id
-              WHERE ${whereClause}
-              GROUP BY ca.id, ca.url, ais.slug, ais.name
+            lt AS (
+              SELECT c.id AS conv_id,
+                     (
+                       SELECT ar.ai_source_id
+                       FROM ai_referrals ar, params p
+                       WHERE ar.project_id = c.project_id
+                         AND ar.content_id = c.content_id
+                         AND ar.detected_at <= c.occurred_at
+                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                       ORDER BY ar.detected_at DESC
+                       LIMIT 1
+                     ) AS ai_source_id
+              FROM conv c
+            ),
+            rows AS (
+              SELECT
+                c.content_id,
+                lt.ai_source_id,
+                COUNT(*) AS conversions,
+                SUM(COALESCE(c.amount_cents,0)) AS revenue_cents,
+                MAX(c.occurred_at) AS last_seen
+              FROM conv c
+              LEFT JOIN lt ON lt.conv_id = c.id
+              GROUP BY c.content_id, lt.ai_source_id
+            ),
+            urls AS (
+              SELECT ca.id AS content_id, ca.url
+              FROM content_assets ca, params p
+              WHERE ca.project_id = p.pid
+                AND (p.q IS NULL OR ca.url LIKE '%' || p.q || '%')
+            ),
+            rows2 AS (
+              SELECT r.*, u.url,
+                     s.slug AS source_slug, s.name AS source_name
+              FROM rows r
+              JOIN urls u ON u.content_id = r.content_id
+              LEFT JOIN ai_sources s ON s.id = r.ai_source_id
+              WHERE ( ? IS NULL OR s.slug = ? )
             )
-            SELECT 
-              content_id,
-              url,
-              source_slug,
-              source_name,
-              last_seen,
-              conversions,
-              revenue_cents
-            FROM grouped_conversions
-            ORDER BY ${orderClause}
-            LIMIT ? OFFSET ?
+            SELECT
+              rows2.content_id,
+              rows2.url,
+              rows2.source_slug,
+              rows2.source_name,
+              rows2.last_seen,
+              rows2.conversions,
+              rows2.revenue_cents
+            FROM rows2
+            ORDER BY ${sortSql}
+            LIMIT ? OFFSET ?;
           `;
 
-          const items = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...params, pageSizeNum, offset).all();
+          const bindList = [
+            project_id,
+            sinceISO,
+            lookbackMod,
+            q || null,              // 4
+            source || null,         // 5
+            source || null,         // 6 (same value)
+            pageSizeNum,            // 7
+            offset                  // 8
+          ];
+
+          const items = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...bindList).all();
+
+          // COUNT query (same filters, no LIMIT/OFFSET)
+          const countQuery = `
+            WITH params AS (
+              SELECT ? AS pid, ? AS since, ? AS lookback, ? AS q
+            ),
+            conv AS (
+              SELECT c.id, c.project_id, c.content_id, c.amount_cents, c.currency, c.occurred_at
+              FROM conversion_event c, params p
+              WHERE c.project_id = p.pid
+                AND c.occurred_at >= p.since
+            ),
+            lt AS (
+              SELECT c.id AS conv_id,
+                     (
+                       SELECT ar.ai_source_id
+                       FROM ai_referrals ar, params p
+                       WHERE ar.project_id = c.project_id
+                         AND ar.content_id = c.content_id
+                         AND ar.detected_at <= c.occurred_at
+                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                       ORDER BY ar.detected_at DESC
+                       LIMIT 1
+                     ) AS ai_source_id
+              FROM conv c
+            ),
+            rows AS (
+              SELECT
+                c.content_id,
+                lt.ai_source_id,
+                COUNT(*) AS conversions,
+                SUM(COALESCE(c.amount_cents,0)) AS revenue_cents,
+                MAX(c.occurred_at) AS last_seen
+              FROM conv c
+              LEFT JOIN lt ON lt.conv_id = c.id
+              GROUP BY c.content_id, lt.ai_source_id
+            ),
+            urls AS (
+              SELECT ca.id AS content_id, ca.url
+              FROM content_assets ca, params p
+              WHERE ca.project_id = p.pid
+                AND (p.q IS NULL OR ca.url LIKE '%' || p.q || '%')
+            ),
+            rows2 AS (
+              SELECT r.*, u.url,
+                     s.slug AS source_slug, s.name AS source_name
+              FROM rows r
+              JOIN urls u ON u.content_id = r.content_id
+              LEFT JOIN ai_sources s ON s.id = r.ai_source_id
+              WHERE ( ? IS NULL OR s.slug = ? )
+            )
+            SELECT COUNT(*) AS total
+            FROM rows2;
+          `;
+
+          const countBind = [
+            project_id,
+            sinceISO,
+            lookbackMod,
+            q || null,              // 4
+            source || null,         // 5
+            source || null          // 6
+          ];
+
+          const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...countBind).first();
+          const total = totalResult?.total || 0;
 
           // Get assists for each content+source combination
           const assistsQuery = `
-            WITH conversion_attribution AS (
-              SELECT 
-                ce.id,
-                ce.amount_cents,
-                ce.content_id,
-                ce.occurred_at,
-                ar.ai_source_id,
-                ar.detected_at
-              FROM conversion_event ce
-              LEFT JOIN ai_referrals ar ON 
-                ce.project_id = ar.project_id 
-                AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
-                AND ar.detected_at <= ce.occurred_at
-              WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            WITH params AS (
+              SELECT ? AS pid, ? AS since, ? AS lookback
+            ),
+            conv AS (
+              SELECT c.id, c.project_id, c.content_id, c.occurred_at
+              FROM conversion_event c, params p
+              WHERE c.project_id = p.pid
+                AND c.occurred_at >= p.since
+            ),
+            lt AS (
+              SELECT c.id AS conv_id,
+                     (
+                       SELECT ar.ai_source_id
+                       FROM ai_referrals ar, params p
+                       WHERE ar.project_id = c.project_id
+                         AND ar.content_id = c.content_id
+                         AND ar.detected_at <= c.occurred_at
+                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                       ORDER BY ar.detected_at DESC
+                       LIMIT 1
+                     ) AS ai_source_id
+              FROM conv c
+            ),
+            rows AS (
+              SELECT
+                c.content_id,
+                lt.ai_source_id,
+                COUNT(*) AS conversions
+              FROM conv c
+              LEFT JOIN lt ON lt.conv_id = c.id
+              GROUP BY c.content_id, lt.ai_source_id
             )
             SELECT 
-              ce.content_id,
-              ar.ai_source_id,
+              r.content_id,
+              r.ai_source_id,
               ais.slug,
-              COUNT(DISTINCT ce.id) as count
-            FROM conversion_event ce
-            JOIN ai_referrals ar ON 
-              ce.project_id = ar.project_id 
-              AND ce.content_id = ar.content_id 
-              AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
-              AND ar.detected_at <= ce.occurred_at
-            JOIN ai_sources ais ON ar.ai_source_id = ais.id
-            WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
-            GROUP BY ce.content_id, ar.ai_source_id, ais.slug
+              r.conversions as count
+            FROM rows r
+            JOIN ai_sources ais ON ais.id = r.ai_source_id
+            WHERE r.ai_source_id IS NOT NULL
+            GROUP BY r.content_id, r.ai_source_id, ais.slug
           `;
 
-          const assists = await env.OPTIVIEW_DB.prepare(assistsQuery).bind(project_id, project_id).all();
+          const assists = await env.OPTIVIEW_DB.prepare(assistsQuery).bind(project_id, sinceISO, lookbackMod).all();
 
           // Group assists by content_id and source_slug
           const assistsMap = {};
