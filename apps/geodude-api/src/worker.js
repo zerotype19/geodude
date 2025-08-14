@@ -1608,13 +1608,13 @@ export default {
           // Calculate time window
           let sinceTime;
           if (window === "15m") {
-            sinceTime = "datetime('now','-15 minutes')";
+            sinceTime = new Date(Date.now() - 15 * 60 * 1000).toISOString();
           } else if (window === "24h") {
-            sinceTime = "datetime('now','-1 day')";
+            sinceTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
           } else if (window === "7d") {
-            sinceTime = "datetime('now','-7 days')";
+            sinceTime = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
           } else {
-            sinceTime = "datetime('now','-1 day')"; // Default to 24h
+            sinceTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // Default to 24h
           }
 
           // Build base filters
@@ -1645,7 +1645,7 @@ export default {
             WITH ai_by_content AS (
               SELECT ie.content_id, ie.ai_source_id, COUNT(*) AS n
               FROM interaction_events ie
-              WHERE ie.project_id = ? AND ie.occurred_at >= ${sinceTime} AND ie.ai_source_id IS NOT NULL
+              WHERE ie.project_id = ? AND ie.occurred_at >= ? AND ie.ai_source_id IS NOT NULL
               GROUP BY ie.content_id, ie.ai_source_id
             ),
             ai_by_content_rollup AS (
@@ -1656,7 +1656,7 @@ export default {
             ref_by_content AS (
               SELECT ar.content_id, COUNT(*) AS ai_referrals
               FROM ai_referrals ar
-              WHERE ar.project_id = ? AND ar.detected_at >= ${sinceTime}
+              WHERE ar.project_id = ? AND ar.detected_at >= ?
               GROUP BY ar.content_id
             ),
             last_seen AS (
@@ -1673,7 +1673,7 @@ export default {
             SELECT
               ca.id, ca.url, ca.type,
               ls.last_seen,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=${sinceTime}) AS events_window,
+              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=?) AS events_window,
               (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')) AS events_15m,
               (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')) AS events_24h,
               COALESCE(r.ai_referrals,0) AS ai_referrals_24h,
@@ -1688,7 +1688,7 @@ export default {
             LIMIT ? OFFSET ?
           `;
 
-          const mainParams = [...baseParams, aiOnly ? 1 : 0, pageSize, (page - 1) * pageSize];
+          const mainParams = [...baseParams, projectId, sinceTime, projectId, sinceTime, projectId, sinceTime, aiOnly ? 1 : 0, pageSize, (page - 1) * pageSize];
           const mainResult = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...mainParams).all();
 
           // Get by-source breakdown for the returned items
