@@ -223,6 +223,19 @@ export default {
             SELECT value FROM metrics WHERE key = ?
           `).bind(`content_asset_updated_5m:${current5MinWindow}`).first();
 
+          // Get 5-minute metrics for conversions
+          const conversionsCreatedMetric = await env.OPTIVIEW_DB.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`conversions_created_5m:${current5MinWindow}`).first();
+
+          const conversionsListViewedMetric = await env.OPTIVIEW_DB.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`conversions_list_viewed_5m:${current5MinWindow}`).first();
+
+          const conversionsDetailViewedMetric = await env.OPTIVIEW_DB.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`conversions_detail_viewed_5m:${current5MinWindow}`).first();
+
           // Get referrals metrics
           const referralsTotal24h = await env.OPTIVIEW_DB.prepare(`
             SELECT COUNT(*) as count
@@ -243,6 +256,105 @@ export default {
             WHERE ar.detected_at >= datetime('now','-1 day')
             GROUP BY ar.ai_source_id, s.slug
             ORDER BY count DESC
+            LIMIT 5
+          `).all();
+
+          // Get conversions metrics
+          const conversionsTotal7d = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count
+            FROM conversion_event
+            WHERE occurred_at >= datetime('now','-7 days')
+          `).first();
+
+          const conversionsAiAttributed7d = await env.OPTIVIEW_DB.prepare(`
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.content_id,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.occurred_at >= datetime('now','-7 days')
+            ),
+            last_touch_attribution AS (
+              SELECT 
+                id,
+                amount_cents,
+                content_id,
+                occurred_at,
+                ai_source_id,
+                detected_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY content_id, occurred_at 
+                  ORDER BY detected_at DESC
+                ) as rn
+              FROM conversion_attribution
+              WHERE ai_source_id IS NOT NULL
+            )
+            SELECT COUNT(*) as count
+            FROM conversion_event ce
+            LEFT JOIN last_touch_attribution lta ON 
+              ce.id = lta.id AND lta.rn = 1
+            WHERE ce.occurred_at >= datetime('now','-7 days')
+            AND lta.ai_source_id IS NOT NULL
+          `).first();
+
+          const conversionsRevenue7d = await env.OPTIVIEW_DB.prepare(`
+            SELECT COALESCE(SUM(amount_cents), 0) as revenue_cents
+            FROM conversion_event
+            WHERE occurred_at >= datetime('now','-7 days')
+          `).first();
+
+          const conversionsBySource7d = await env.OPTIVIEW_DB.prepare(`
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.content_id,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.occurred_at >= datetime('now','-7 days')
+            ),
+            last_touch_attribution AS (
+              SELECT 
+                id,
+                amount_cents,
+                content_id,
+                occurred_at,
+                ai_source_id,
+                detected_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY content_id, occurred_at 
+                  ORDER BY detected_at DESC
+                ) as rn
+              FROM conversion_attribution
+              WHERE ai_source_id IS NOT NULL
+            )
+            SELECT 
+              ais.slug,
+              COUNT(*) as conversions
+            FROM conversion_event ce
+            LEFT JOIN last_touch_attribution lta ON 
+              ce.id = lta.id AND lta.rn = 1
+            JOIN ai_sources ais ON lta.ai_source_id = ais.id
+            WHERE ce.occurred_at >= datetime('now','-7 days')
+            AND lta.ai_source_id IS NOT NULL
+            GROUP BY ais.id, ais.slug
+            ORDER BY conversions DESC
             LIMIT 5
           `).all();
 
@@ -281,6 +393,17 @@ export default {
                 asset_updated: assetUpdatedMetric?.value || 0
               }
             },
+            conversions: {
+              total_7d: conversionsTotal7d?.count || 0,
+              ai_attributed_7d: conversionsAiAttributed7d?.count || 0,
+              revenue_cents_7d: conversionsRevenue7d?.revenue_cents || 0,
+              by_source_7d: conversionsBySource7d?.results || [],
+              metrics_5m: {
+                created: conversionsCreatedMetric?.value || 0,
+                list_viewed: conversionsListViewedMetric?.value || 0,
+                detail_viewed: conversionsDetailViewedMetric?.value || 0
+              }
+            },
             referrals: {
               total_24h: referralsTotal24h?.count || 0,
               active_contents_24h: referralsActiveContents24h?.count || 0,
@@ -314,10 +437,27 @@ export default {
                 asset_updated: 0
               }
             },
+            conversions: {
+              total_7d: 0,
+              ai_attributed_7d: 0,
+              revenue_cents_7d: 0,
+              by_source_7d: [],
+              metrics_5m: {
+                created: 0,
+                list_viewed: 0,
+                detail_viewed: 0
+              }
+            },
             referrals: {
               total_24h: 0,
               active_contents_24h: 0,
               by_source_24h: []
+            },
+            conversions: {
+              total_7d: 0,
+              ai_attributed_7d: 0,
+              revenue_cents_7d: 0,
+              by_source_7d: []
             }
           }), {
             status: 200,
@@ -2830,6 +2970,905 @@ export default {
         return addCorsHeaders(response, origin);
       }
 
+      // 7.0.1) Conversions POST endpoint
+      if (url.pathname === "/api/conversions" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { project_id, property_id, content_id, url, amount_cents, currency, metadata } = body;
+
+          // Validate required fields
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "Missing required field: project_id" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate API key (same as events endpoint)
+          const authHeader = request.headers.get('x-optiview-key-id');
+          if (!authHeader) {
+            const response = new Response(JSON.stringify({ error: "Missing API key header: x-optiview-key-id" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate API key
+          const keyHash = await hashToken(authHeader);
+          const apiKey = await env.OPTIVIEW_DB.prepare(`
+            SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
+          `).bind(keyHash).first();
+
+          if (!apiKey) {
+            const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Enforce project scope using the API key
+          if (apiKey.project_id !== project_id) {
+            const response = new Response(JSON.stringify({ error: "Project ID mismatch" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm per key
+          const rateLimitKey = `conversions_create:${apiKey.id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          let finalContentId = content_id;
+          let finalPropertyId = property_id;
+
+          // If content_id missing but url present, upsert content_assets
+          if (!finalContentId && url) {
+            if (!finalPropertyId) {
+              const response = new Response(JSON.stringify({ error: "property_id required when url is provided" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            // Verify property belongs to project
+            const propertyCheck = await env.OPTIVIEW_DB.prepare(`
+              SELECT id FROM properties WHERE id = ? AND project_id = ?
+            `).bind(finalPropertyId, project_id).first();
+
+            if (!propertyCheck) {
+              const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            // Upsert content asset
+            const existingContent = await env.OPTIVIEW_DB.prepare(`
+              SELECT id FROM content_assets WHERE url = ? AND property_id = ?
+            `).bind(url, finalPropertyId).first();
+
+            if (existingContent) {
+              finalContentId = existingContent.id;
+            } else {
+              const contentResult = await env.OPTIVIEW_DB.prepare(`
+                INSERT INTO content_assets (property_id, project_id, url, type, created_at)
+                VALUES (?, ?, ?, 'page', ?)
+              `).bind(finalPropertyId, project_id, url, new Date().toISOString()).run();
+              finalContentId = contentResult.meta.last_row_id;
+            }
+          }
+
+          // Sanitize metadata (≤1KB, drop PII keys)
+          let sanitizedMetadata = null;
+          if (metadata) {
+            const cleanMetadata = { ...metadata };
+            // Drop PII keys
+            delete cleanMetadata.ip;
+            delete cleanMetadata.ua;
+            delete cleanMetadata.email;
+            delete cleanMetadata.phone;
+            delete cleanMetadata.name;
+            delete cleanMetadata.address;
+
+            const metadataStr = JSON.stringify(cleanMetadata);
+            if (metadataStr.length <= 1024) {
+              sanitizedMetadata = metadataStr;
+            }
+          }
+
+          // Insert conversion
+          const now = new Date().toISOString();
+          const result = await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO conversion_event (
+              project_id, property_id, content_id, amount_cents, 
+              currency, metadata, occurred_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            project_id,
+            finalPropertyId,
+            finalContentId,
+            amount_cents || null,
+            currency || 'USD',
+            sanitizedMetadata,
+            now
+          ).run();
+
+          // Update last_used timestamp for API key
+          await env.OPTIVIEW_DB.prepare(`
+            UPDATE api_key SET last_used_ts = ? WHERE id = ?
+          `).bind(Date.now(), apiKey.id).run();
+
+          const response = new Response(JSON.stringify({
+            ok: true,
+            id: result.meta.last_row_id,
+            occurred_at: now
+          }), {
+            status: 201,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Conversion creation error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to create conversion" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.0.2) Conversions Summary endpoint
+      if (url.pathname === "/api/conversions/summary" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['24h', '7d', '30d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `conversions_summary:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          let timeFilter;
+          let bucketFormat;
+          if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+            bucketFormat = "strftime('%Y-%m-%d %H:00:00', datetime(?, 'unixepoch'))";
+          } else if (window === '7d') {
+            timeFilter = "datetime('now','-7 days')";
+            bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
+          } else { // 30d
+            timeFilter = "datetime('now','-30 days')";
+            bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
+          }
+
+          // Get totals with attribution
+          const totals = await env.OPTIVIEW_DB.prepare(`
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.content_id,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            ),
+            last_touch_attribution AS (
+              SELECT 
+                id,
+                amount_cents,
+                content_id,
+                occurred_at,
+                ai_source_id,
+                detected_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY content_id, occurred_at 
+                  ORDER BY detected_at DESC
+                ) as rn
+              FROM conversion_attribution
+              WHERE ai_source_id IS NOT NULL
+            )
+            SELECT 
+              COUNT(*) as conversions,
+              COUNT(CASE WHEN ai_source_id IS NOT NULL THEN 1 END) as ai_attributed,
+              COUNT(CASE WHEN ai_source_id IS NULL THEN 1 END) as non_ai,
+              COALESCE(SUM(amount_cents), 0) as revenue_cents
+            FROM (
+              SELECT 
+                ca.id,
+                ca.amount_cents,
+                ca.content_id,
+                ca.occurred_at,
+                lta.ai_source_id
+              FROM conversion_attribution ca
+              LEFT JOIN last_touch_attribution lta ON 
+                ca.id = lta.id AND lta.rn = 1
+            )
+          `).bind(project_id).first();
+
+          // Get breakdown by source
+          const bySource = await env.OPTIVIEW_DB.prepare(`
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.content_id,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            ),
+            last_touch_attribution AS (
+              SELECT 
+                id,
+                amount_cents,
+                content_id,
+                occurred_at,
+                ai_source_id,
+                detected_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY content_id, occurred_at 
+                  ORDER BY detected_at DESC
+                ) as rn
+              FROM conversion_attribution
+              WHERE ai_source_id IS NOT NULL
+            )
+            SELECT 
+              ais.slug,
+              ais.name,
+              COUNT(*) as conversions,
+              COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
+            FROM (
+              SELECT 
+                ca.id,
+                ca.amount_cents,
+                ca.content_id,
+                ca.occurred_at,
+                lta.ai_source_id
+              FROM conversion_attribution ca
+              LEFT JOIN last_touch_attribution lta ON 
+                ca.id = lta.id AND lta.rn = 1
+            ) ce
+            JOIN ai_sources ais ON ce.ai_source_id = ais.id
+            WHERE ce.ai_source_id IS NOT NULL
+            GROUP BY ais.id, ais.slug, ais.name
+            ORDER BY conversions DESC
+          `).bind(project_id).all();
+
+          // Get top content
+          const topContent = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              ca.id as content_id,
+              ca.url,
+              COUNT(*) as conversions,
+              COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
+            FROM conversion_event ce
+            JOIN content_assets ca ON ce.content_id = ca.id
+            WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            GROUP BY ca.id, ca.url
+            ORDER BY conversions DESC
+            LIMIT 10
+          `).bind(project_id).all();
+
+          // Get timeseries data
+          const timeseries = await env.OPTIVIEW_DB.prepare(`
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.content_id,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            ),
+            last_touch_attribution AS (
+              SELECT 
+                id,
+                amount_cents,
+                content_id,
+                occurred_at,
+                ai_source_id,
+                detected_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY content_id, occurred_at 
+                  ORDER BY detected_at DESC
+                ) as rn
+              FROM conversion_attribution
+              WHERE ai_source_id IS NOT NULL
+            )
+            SELECT 
+              strftime('%Y-%m-%d', ce.occurred_at) as ts,
+              COUNT(*) as conversions,
+              COUNT(CASE WHEN lta.ai_source_id IS NOT NULL THEN 1 END) as ai_attributed,
+              COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
+            FROM conversion_event ce
+            LEFT JOIN last_touch_attribution lta ON 
+              ce.id = lta.id AND lta.rn = 1
+            WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            GROUP BY strftime('%Y-%m-%d', ce.occurred_at)
+            ORDER BY ts
+          `).bind(project_id, project_id).all();
+
+          const summary = {
+            totals: {
+              conversions: totals?.conversions || 0,
+              ai_attributed: totals?.ai_attributed || 0,
+              non_ai: totals?.non_ai || 0,
+              revenue_cents: totals?.revenue_cents || 0
+            },
+            by_source: bySource.results || [],
+            top_content: topContent.results || [],
+            timeseries: timeseries.results || []
+          };
+
+          const response = new Response(JSON.stringify(summary), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Conversions summary error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.0.3) Conversions List endpoint
+      if (url.pathname === "/api/conversions" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d", source, q, page = "1", pageSize = "50", sort = "last_seen_desc" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['24h', '7d', '30d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate sort parameter
+          if (!['last_seen_desc', 'conversions_desc'].includes(sort)) {
+            const response = new Response(JSON.stringify({ error: "Invalid sort. Must be one of: last_seen_desc, conversions_desc" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `conversions_list:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const pageNum = parseInt(page);
+          const pageSizeNum = Math.min(parseInt(pageSize), 100); // Cap at 100
+          const offset = (pageNum - 1) * pageSizeNum;
+
+          // Calculate time window
+          let timeFilter;
+          if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+          } else if (window === '7d') {
+            timeFilter = "datetime('now','-7 days')";
+          } else { // 30d
+            timeFilter = "datetime('now','-30 days')";
+          }
+
+          // Build WHERE clause
+          let whereClause = `ce.project_id = ? AND ce.occurred_at >= ${timeFilter}`;
+          let params = [project_id];
+
+          if (source) {
+            whereClause += ` AND ais.slug = ?`;
+            params.push(source);
+          }
+
+          if (q) {
+            whereClause += ` AND ca.url LIKE ?`;
+            params.push(`%${q}%`);
+          }
+
+          // Get total count
+          const countQuery = `
+            SELECT COUNT(DISTINCT ce.content_id, COALESCE(ais.slug, 'non_ai')) as total
+            FROM conversion_event ce
+            JOIN content_assets ca ON ce.content_id = ca.id
+            LEFT JOIN (
+              SELECT DISTINCT 
+                ce2.content_id,
+                ar.ai_source_id,
+                ais.slug
+              FROM conversion_event ce2
+              LEFT JOIN ai_referrals ar ON 
+                ce2.project_id = ar.project_id 
+                AND ce2.content_id = ar.content_id 
+                AND ar.detected_at >= ce2.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce2.occurred_at
+              LEFT JOIN ai_sources ais ON ar.ai_source_id = ais.id
+              WHERE ce2.project_id = ? AND ce2.occurred_at >= ${timeFilter}
+            ) attribution ON ce.content_id = attribution.content_id
+            LEFT JOIN ai_sources ais ON attribution.ai_source_id = ais.id
+            WHERE ${whereClause}
+          `;
+
+          const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...params).first();
+          const total = totalResult?.total || 0;
+
+          // Build main query
+          let orderClause;
+          if (sort === 'conversions_desc') {
+            orderClause = 'conversions DESC, last_seen DESC';
+          } else {
+            orderClause = 'last_seen DESC';
+          }
+
+          const mainQuery = `
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.content_id,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            ),
+            last_touch_attribution AS (
+              SELECT 
+                id,
+                amount_cents,
+                content_id,
+                occurred_at,
+                ai_source_id,
+                detected_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY content_id, occurred_at 
+                  ORDER BY detected_at DESC
+                ) as rn
+              FROM conversion_attribution
+              WHERE ai_source_id IS NOT NULL
+            ),
+            grouped_conversions AS (
+              SELECT 
+                ca.id as content_id,
+                ca.url,
+                ais.slug as source_slug,
+                ais.name as source_name,
+                MAX(ce.occurred_at) as last_seen,
+                COUNT(*) as conversions,
+                COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
+              FROM conversion_event ce
+              JOIN content_assets ca ON ce.content_id = ca.id
+              LEFT JOIN (
+                SELECT 
+                  ca2.id,
+                  lta.ai_source_id
+                FROM conversion_attribution ca2
+                LEFT JOIN last_touch_attribution lta ON 
+                  ca2.content_id = lta.content_id AND lta.rn = 1
+              ) attribution ON ce.content_id = attribution.id
+              LEFT JOIN ai_sources ais ON attribution.ai_source_id = ais.id
+              WHERE ${whereClause}
+              GROUP BY ca.id, ca.url, ais.slug, ais.name
+            )
+            SELECT 
+              content_id,
+              url,
+              source_slug,
+              source_name,
+              last_seen,
+              conversions,
+              revenue_cents
+            FROM grouped_conversions
+            ORDER BY ${orderClause}
+            LIMIT ? OFFSET ?
+          `;
+
+          const items = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...params, pageSizeNum, offset).all();
+
+          // Get assists for each content+source combination
+          const assistsQuery = `
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.content_id,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            )
+            SELECT 
+              ce.content_id,
+              ar.ai_source_id,
+              ais.slug,
+              COUNT(DISTINCT ce.id) as count
+            FROM conversion_event ce
+            JOIN ai_referrals ar ON 
+              ce.project_id = ar.project_id 
+              AND ce.content_id = ar.content_id 
+              AND ar.detected_at >= ce.occurred_at - interval '7 days'
+              AND ar.detected_at <= ce.occurred_at
+            JOIN ai_sources ais ON ar.ai_source_id = ais.id
+            WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
+            GROUP BY ce.content_id, ar.ai_source_id, ais.slug
+          `;
+
+          const assists = await env.OPTIVIEW_DB.prepare(assistsQuery).bind(project_id, project_id).all();
+
+          // Group assists by content_id and source_slug
+          const assistsMap = {};
+          assists.results?.forEach(assist => {
+            const key = `${assist.content_id}_${assist.slug}`;
+            if (!assistsMap[key]) {
+              assistsMap[key] = [];
+            }
+            assistsMap[key].push({
+              slug: assist.slug,
+              count: assist.count
+            });
+          });
+
+          // Add assists to items
+          const itemsWithAssists = items.results?.map(item => {
+            const key = `${item.content_id}_${item.source_slug || 'non_ai'}`;
+            return {
+              ...item,
+              assists: assistsMap[key] || []
+            };
+          }) || [];
+
+          const response = new Response(JSON.stringify({
+            items: itemsWithAssists,
+            page: pageNum,
+            pageSize: pageSizeNum,
+            total
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Conversions list error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.0.4) Conversions Detail endpoint
+      if (url.pathname === "/api/conversions/detail" && request.method === "GET") {
+        try {
+          const { project_id, content_id, source, window = "7d" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id || !content_id) {
+            const response = new Response(JSON.stringify({ error: "project_id and content_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['24h', '7d', '30d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `conversions_detail:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          let timeFilter;
+          if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+          } else if (window === '7d') {
+            timeFilter = "datetime('now','-7 days')";
+          } else { // 30d
+            timeFilter = "datetime('now','-30 days')";
+          }
+
+          // Get content info
+          const content = await env.OPTIVIEW_DB.prepare(`
+            SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?
+          `).bind(content_id, project_id).first();
+
+          if (!content) {
+            const response = new Response(JSON.stringify({ error: "Content not found or not accessible" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get source info if specified
+          let sourceInfo = null;
+          if (source && source !== 'null') {
+            sourceInfo = await env.OPTIVIEW_DB.prepare(`
+              SELECT slug, name FROM ai_sources WHERE slug = ?
+            `).bind(source).first();
+          }
+
+          // Get summary stats
+          const summary = await env.OPTIVIEW_DB.prepare(`
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.project_id = ? AND ce.content_id = ? AND ce.occurred_at >= ${timeFilter}
+            ),
+            last_touch_attribution AS (
+              SELECT 
+                id,
+                amount_cents,
+                occurred_at,
+                ai_source_id,
+                detected_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY occurred_at 
+                  ORDER BY detected_at DESC
+                ) as rn
+              FROM conversion_attribution
+              WHERE ai_source_id IS NOT NULL
+            )
+            SELECT 
+              COUNT(*) as conversions,
+              COALESCE(SUM(ce.amount_cents), 0) as revenue_cents,
+              MAX(ce.occurred_at) as last_seen
+            FROM conversion_event ce
+            LEFT JOIN last_touch_attribution lta ON 
+              ce.id = lta.id AND lta.rn = 1
+            WHERE ce.project_id = ? AND ce.content_id = ? AND ce.occurred_at >= ${timeFilter}
+            ${source && source !== 'null' ? 'AND lta.ai_source_id = (SELECT id FROM ai_sources WHERE slug = ?)' : ''}
+          `).bind(project_id, content_id, project_id, content_id, ...(source && source !== 'null' ? [source] : [])).first();
+
+          // Get timeseries data
+          const timeseries = await env.OPTIVIEW_DB.prepare(`
+            WITH conversion_attribution AS (
+              SELECT 
+                ce.id,
+                ce.amount_cents,
+                ce.occurred_at,
+                ar.ai_source_id,
+                ar.detected_at
+              FROM conversion_event ce
+              LEFT JOIN ai_referrals ar ON 
+                ce.project_id = ar.project_id 
+                AND ce.content_id = ar.content_id 
+                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at <= ce.occurred_at
+              WHERE ce.project_id = ? AND ce.content_id = ? AND ce.occurred_at >= ${timeFilter}
+            ),
+            last_touch_attribution AS (
+              SELECT 
+                id,
+                amount_cents,
+                occurred_at,
+                ai_source_id,
+                detected_at,
+                ROW_NUMBER() OVER (
+                  PARTITION BY occurred_at 
+                  ORDER BY detected_at DESC
+                ) as rn
+              FROM conversion_attribution
+              WHERE ai_source_id IS NOT NULL
+            )
+            SELECT 
+              strftime('%Y-%m-%d', ce.occurred_at) as ts,
+              COUNT(*) as conversions,
+              COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
+            FROM conversion_event ce
+            LEFT JOIN last_touch_attribution lta ON 
+              ce.id = lta.id AND lta.rn = 1
+            WHERE ce.project_id = ? AND ce.content_id = ? AND ce.occurred_at >= ${timeFilter}
+            ${source && source !== 'null' ? 'AND lta.ai_source_id = (SELECT id FROM ai_sources WHERE slug = ?)' : ''}
+            GROUP BY strftime('%Y-%m-%d', ce.occurred_at)
+            ORDER BY ts
+          `).bind(project_id, content_id, project_id, content_id, ...(source && source !== 'null' ? [source] : [])).all();
+
+          // Get recent conversions
+          const recent = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              occurred_at,
+              amount_cents,
+              currency,
+              metadata
+            FROM conversion_event
+            WHERE project_id = ? AND content_id = ? AND occurred_at >= ${timeFilter}
+            ORDER BY occurred_at DESC
+            LIMIT 10
+          `).bind(project_id, content_id).all();
+
+          // Get assists
+          const assists = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              ais.slug,
+              COUNT(DISTINCT ce.id) as count
+            FROM conversion_event ce
+            JOIN ai_referrals ar ON 
+              ce.project_id = ar.project_id 
+              AND ce.content_id = ar.content_id 
+              AND ar.detected_at >= ce.occurred_at - interval '7 days'
+              AND ar.detected_at <= ce.occurred_at
+            JOIN ai_sources ais ON ar.ai_source_id = ais.id
+            WHERE ce.project_id = ? AND ce.content_id = ? AND ce.occurred_at >= ${timeFilter}
+            ${source && source !== 'null' ? 'AND ar.ai_source_id != (SELECT id FROM ai_sources WHERE slug = ?)' : ''}
+            GROUP BY ais.slug
+            ORDER BY count DESC
+          `).bind(project_id, content_id, ...(source && source !== 'null' ? [source] : [])).all();
+
+          const detail = {
+            content: {
+              id: content.id,
+              url: content.url
+            },
+            source: sourceInfo,
+            summary: {
+              conversions: summary?.conversions || 0,
+              revenue_cents: summary?.revenue_cents || 0,
+              last_seen: summary?.last_seen || null
+            },
+            timeseries: timeseries.results || [],
+            recent: recent.results || [],
+            assists: assists.results || []
+          };
+
+          const response = new Response(JSON.stringify(detail), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Conversions detail error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // 7.1) Referrals summary endpoint
       if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
         try {
@@ -3166,12 +4205,12 @@ export default {
           const rateLimitKey = `referrals_detail:${request.headers.get('x-optiview-request-id') || 'anonymous'}`;
           const rateLimitResult = await checkRateLimit(env, rateLimitKey, 60, 60);
           if (!rateLimitResult.allowed) {
-            const response = new Response(JSON.stringify({ 
-              error: "Rate limit exceeded", 
-              retry_after: rateLimitResult.retryAfter 
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
             }), {
               status: 429,
-              headers: { 
+              headers: {
                 "Content-Type": "application/json",
                 "Retry-After": rateLimitResult.retryAfter.toString()
               }
@@ -3263,7 +4302,7 @@ export default {
                   AND detected_at >= datetime(?, 'unixepoch')
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
-              
+
               timeseries.push({
                 ts: new Date(bucketStart * 1000).toISOString(),
                 count: count?.count || 0
@@ -3282,7 +4321,7 @@ export default {
                   AND detected_at >= datetime(?, 'unixepoch')
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
-              
+
               timeseries.push({
                 ts: new Date(bucketStart * 1000).toISOString(),
                 count: count?.count || 0
@@ -3301,7 +4340,7 @@ export default {
                   AND detected_at >= datetime(?, 'unixepoch')
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
-              
+
               timeseries.push({
                 ts: new Date(bucketStart * 1000).toISOString(),
                 count: count?.count || 0
@@ -3344,7 +4383,7 @@ export default {
             }))
           }), {
             status: 200,
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "private, max-age=120"
             }

@@ -50,6 +50,102 @@ The tag respects your project settings for:
 - Rate limiting`
     },
     {
+        id: 'conversions',
+        title: 'Conversions',
+        path: '/docs/conversions',
+        content: `# Conversion Tracking
+
+## Overview
+
+Track conversions and attribute them to AI sources using our simple, deterministic attribution model.
+
+## Attribution Model
+
+**Last-Touch AI Attribution**: Each conversion is attributed to the most recent AI source that referred traffic to the same content within a 7-day lookback window.
+
+**Assisted Conversions**: Other AI sources that referred traffic to the same content in the same window are counted as assists.
+
+## API Endpoint
+
+\`POST /api/conversions\`
+
+## Authentication
+
+Include your API key in the header:
+\`\`\`
+x-optiview-key-id: YOUR_API_KEY_ID
+\`\`\`
+
+## Request Body
+
+\`\`\`json
+{
+  "project_id": "proj_...",
+  "property_id": 1,
+  "content_id": 123,             // optional if you send url
+  "url": "https://site.com/checkout/thank-you",  // optional if content_id provided
+  "amount_cents": 1299,          // optional
+  "currency": "USD",             // optional
+  "metadata": { "order_id": "A123" }  // ≤1KB, sanitized
+}
+\`\`\`
+
+## JavaScript Example
+
+\`\`\`javascript
+// Minimal example — replace placeholders
+fetch("https://api.optiview.ai/api/conversions", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    "x-optiview-key-id": "<KEY_ID>"
+  },
+  body: JSON.stringify({
+    project_id: "<PROJECT_ID>",
+    property_id: <PROPERTY_ID>,
+    url: window.location.href,
+    amount_cents: 1299,
+    currency: "USD",
+    metadata: { order_id: "A123" }
+  })
+});
+\`\`\`
+
+## Parameters Explained
+
+- **project_id**: Your Optiview project ID (required)
+- **property_id**: Your property ID (required when url is provided)
+- **content_id**: Existing content asset ID (optional)
+- **url**: Page URL (optional, used to upsert content if content_id missing)
+- **amount_cents**: Conversion value in cents (optional, for revenue tracking)
+- **currency**: Currency code (optional, defaults to USD)
+- **metadata**: Additional data (≤1KB, PII keys are automatically dropped)
+
+## Response
+
+\`\`\`json
+{
+  "ok": true,
+  "id": 123,
+  "occurred_at": "2025-01-15T10:30:00Z"
+}
+\`\`\`
+
+## Rate Limits
+
+- 60 requests per minute per API key
+- Automatic content asset creation when URL provided
+- Metadata sanitization and PII removal
+
+## Dashboard
+
+View your conversions data in the **Conversions** page:
+- KPI cards showing totals and AI attribution
+- Grouped by content and AI source
+- Revenue tracking and assists
+- Time-based filtering (24h, 7d, 30d)`
+    },
+    {
         id: 'install-gtm',
         title: 'Install / Google Tag Manager',
         path: '/docs/install/gtm',
