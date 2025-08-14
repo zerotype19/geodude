@@ -12,6 +12,7 @@ export default function Shell({ children }: ShellProps) {
   const { user, organization, project, logout, listOrganizations, listProjects, switchContext } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [availableOrgs, setAvailableOrgs] = useState<Array<{ id: string, name: string }>>([]);
   const [availableProjects, setAvailableProjects] = useState<Array<{ id: string, name: string, org_id: string }>>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
@@ -85,8 +86,8 @@ export default function Shell({ children }: ShellProps) {
                       key={item.name}
                       to={item.href}
                       className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
-                          ? "border-blue-500 text-gray-900"
-                          : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                        ? "border-blue-500 text-gray-900"
+                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                         }`}
                     >
                       {item.name}
@@ -123,7 +124,7 @@ export default function Shell({ children }: ShellProps) {
                             <span className="font-medium">{organization?.name}</span> / {project?.name}
                           </p>
                         </div>
-                        
+
                         {loadingOrgs ? (
                           <div className="px-4 py-2">
                             <p className="text-sm text-gray-500">Loading available contexts...</p>
@@ -141,11 +142,10 @@ export default function Shell({ children }: ShellProps) {
                                     <button
                                       key={proj.id}
                                       onClick={() => handleContextSwitch(org.id, proj.id)}
-                                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                                        org.id === organization?.id && proj.id === project?.id
+                                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${org.id === organization?.id && proj.id === project?.id
                                           ? 'bg-blue-50 text-blue-700'
                                           : 'text-gray-700'
-                                      }`}
+                                        }`}
                                     >
                                       <span className="ml-4">{proj.name}</span>
                                       {org.id === organization?.id && proj.id === project?.id && (
@@ -158,7 +158,6 @@ export default function Shell({ children }: ShellProps) {
                             })}
                           </div>
                         )}
-                        
                         {availableOrgs.length === 0 && !loadingOrgs && (
                           <div className="px-4 py-2">
                             <p className="text-xs text-gray-500">No other organizations available</p>
@@ -173,56 +172,30 @@ export default function Shell({ children }: ShellProps) {
                 <div className="relative">
                   <button
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className="flex items-center space-x-2 text-sm text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-3 py-2"
+                    className="flex items-center space-x-2 text-sm text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-3 py-2 border border-gray-300"
                   >
-                    <User className="h-5 w-5" />
-                    <span className="max-w-24 truncate">
-                      {user?.email?.split('@')[0] || 'User'}
+                    <User className="h-4 w-4" />
+                    <span className="max-w-32 truncate">
+                      {user?.email || 'Loading...'}
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
 
                   {userMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
-                      <div className="py-1">
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                      <div className="py-2">
                         <div className="px-4 py-2 border-b border-gray-100">
                           <p className="text-sm font-medium text-gray-900">{user?.email}</p>
                           <p className="text-xs text-gray-500">
                             {organization?.name} / {project?.name}
                           </p>
                         </div>
-                        <Link
-                          to="/settings/members"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <Users className="h-4 w-4 mr-3" />
-                          Invite teammates
-                        </Link>
-                        <Link
-                          to="/settings/organization"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <Building2 className="h-4 w-4 mr-3" />
-                          Organization settings
-                        </Link>
-                        <div className="border-t border-gray-100 my-1"></div>
-                        <Link
-                          to="/settings"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <Settings className="h-4 w-4 mr-3" />
-                          Account settings
-                        </Link>
-                        <div className="border-t border-gray-100 my-1"></div>
                         <button
                           onClick={handleLogout}
-                          className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
                         >
-                          <LogOut className="h-4 w-4 mr-3" />
-                          Sign out
+                          <LogOut className="h-4 w-4" />
+                          <span>Sign out</span>
                         </button>
                       </div>
                     </div>
@@ -230,28 +203,105 @@ export default function Shell({ children }: ShellProps) {
                 </div>
               </div>
             </div>
+
+            {/* Mobile menu button */}
+            <div className="flex items-center sm:hidden">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                aria-expanded="false"
+              >
+                <span className="sr-only">Open main menu</span>
+                {mobileMenuOpen ? (
+                  <svg className="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Mobile navigation */}
-      <div className="sm:hidden">
-        <div className="pt-2 pb-3 space-y-1">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${isActive
-                    ? "bg-blue-50 border-blue-500 text-blue-700"
-                    : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
-                  }`}
+      <div className={`sm:hidden ${mobileMenuOpen ? 'block' : 'hidden'}`}>
+        {/* Backdrop */}
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-75 z-40"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+
+        {/* Mobile menu panel */}
+        <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out">
+          <div className="pt-2 pb-3 space-y-1 bg-white border-b border-gray-200 shadow-lg h-full overflow-y-auto">
+            {/* Header with close button */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Menu</h3>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="rounded-md p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100"
               >
-                {item.name}
-              </Link>
-            );
-          })}
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Current Context Display */}
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+              <div className="flex items-center space-x-2">
+                <Building2 className="h-4 w-4 text-gray-500" />
+                <div className="text-sm">
+                  <p className="font-medium text-gray-900">
+                    {organization?.name || 'Loading...'}
+                  </p>
+                  <p className="text-gray-500">
+                    {project?.name || 'Loading...'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation Links */}
+            {navigation.map((item) => {
+              const isActive = location.pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block pl-4 pr-4 py-3 border-l-4 text-base font-medium ${isActive
+                      ? "bg-blue-50 border-blue-500 text-blue-700"
+                      : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                    }`}
+                >
+                  {item.name}
+                </Link>
+              );
+            })}
+
+            {/* User Info and Actions */}
+            <div className="border-t border-gray-200 pt-4 pb-3 mt-auto">
+              <div className="px-4 py-2">
+                <p className="text-sm font-medium text-gray-900">{user?.email}</p>
+                <p className="text-xs text-gray-500">Signed in</p>
+              </div>
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-3 text-base font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 flex items-center space-x-2"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Sign out</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
