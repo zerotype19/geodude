@@ -1640,18 +1640,18 @@ export default {
           const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...baseParams).first();
           const total = totalResult?.total || 0;
 
-          // Add back real metrics one by one
+          // Bulletproof query - use COALESCE to handle all NULL cases
           const mainQuery = `
             SELECT
               ca.id, ca.url, ca.type,
-              (SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id) AS last_seen,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=?) AS events_window,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')) AS events_15m,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')) AS events_24h,
-              (SELECT COUNT(*) FROM ai_referrals ar WHERE ar.project_id=ca.project_id AND ar.content_id=ca.id AND ar.detected_at>=datetime('now','-1 day')) AS ai_referrals_24h,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day') AND ie.ai_source_id IS NOT NULL) AS ai_events_24h,
+              COALESCE((SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id), NULL) AS last_seen,
+              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=?), 0) AS events_window,
+              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')), 0) AS events_15m,
+              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')), 0) AS events_24h,
+              COALESCE((SELECT COUNT(*) FROM ai_referrals ar WHERE ar.project_id=ca.project_id AND ar.content_id=ca.id AND ar.detected_at>=datetime('now','-1 day')), 0) AS ai_referrals_24h,
+              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day') AND ie.ai_source_id IS NOT NULL), 0) AS ai_events_24h,
               CASE 
-                WHEN (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day') AND ie.ai_source_id IS NOT NULL) > 0 THEN 50
+                WHEN COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day') AND ie.ai_source_id IS NOT NULL), 0) > 0 THEN 50
                 ELSE 0
               END AS coverage_score
             FROM content_assets ca
