@@ -1640,16 +1640,16 @@ export default {
           const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...baseParams).first();
           const total = totalResult?.total || 0;
 
-          // Simplified main query - just get content assets with basic activity counts
+          // Ultra-simple query - just get the basic content assets
           const mainQuery = `
             SELECT
               ca.id, ca.url, ca.type,
-              (SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id) AS last_seen,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=?) AS events_window,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')) AS events_15m,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')) AS events_24h,
-              (SELECT COUNT(*) FROM ai_referrals ar WHERE ar.project_id=ca.project_id AND ar.content_id=ca.id AND ar.detected_at>=datetime('now','-1 day')) AS ai_referrals_24h,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day') AND ie.ai_source_id IS NOT NULL) AS ai_events_24h,
+              NULL as last_seen,
+              0 as events_window,
+              0 as events_15m,
+              0 as events_24h,
+              0 as ai_referrals_24h,
+              0 as ai_events_24h,
               0 AS coverage_score
             FROM content_assets ca
             WHERE ${baseFilters}
@@ -1657,7 +1657,7 @@ export default {
             LIMIT ? OFFSET ?
           `;
 
-          const mainParams = [...baseParams, sinceTime, pageSize, (page - 1) * pageSize];
+          const mainParams = [...baseParams, pageSize, (page - 1) * pageSize];
           const mainResult = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...mainParams).all();
 
           // Get by-source breakdown for the returned items
