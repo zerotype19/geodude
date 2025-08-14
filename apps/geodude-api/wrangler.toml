@@ -25,6 +25,7 @@ MAGIC_LINK_RPD_PER_EMAIL = "5"
 INVITE_EXP_DAYS = "7"
 EMAIL_FROM = "support@optiview.ai"
 EMAIL_SENDER_NAME = "Optiview"
+TEST_MODE = "1"
 
 [env.development]
 CSP_MODE = "development"

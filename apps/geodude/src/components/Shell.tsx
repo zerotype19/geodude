@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, LineChart, PlusSquare, Settings } from "lucide-react";
+import { Menu, LineChart, PlusSquare, Settings, User, Users, Building2, ChevronDown } from "lucide-react";
 
 interface ShellProps {
   children: ReactNode;
@@ -8,6 +8,7 @@ interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   const location = useLocation();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   
   const navigation = [
     { name: "Events", href: "/events" },
@@ -53,8 +54,48 @@ export default function Shell({ children }: ShellProps) {
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center">
               <div className="ml-3 relative">
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-500">AI Visibility Platform</span>
+                {/* User Menu */}
+                <div className="relative">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center space-x-2 text-sm text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-3 py-2"
+                  >
+                    <User className="h-5 w-5" />
+                    <span>User</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                      <div className="py-1">
+                        <Link
+                          to="/settings/members"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Users className="h-4 w-4 mr-3" />
+                          Invite teammates
+                        </Link>
+                        <Link
+                          to="/settings/organization"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Building2 className="h-4 w-4 mr-3" />
+                          Organization settings
+                        </Link>
+                        <div className="border-t border-gray-100 my-1"></div>
+                        <Link
+                          to="/settings"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Settings className="h-4 w-4 mr-3" />
+                          Account settings
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -86,10 +127,71 @@ export default function Shell({ children }: ShellProps) {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Breadcrumbs */}
+        <div className="px-4 sm:px-0 mb-4">
+          <nav className="flex" aria-label="Breadcrumb">
+            <ol className="flex items-center space-x-2">
+              <li>
+                <Link to="/" className="text-gray-400 hover:text-gray-500">
+                  <span className="sr-only">Home</span>
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                  </svg>
+                </Link>
+              </li>
+              {location.pathname !== "/" && (
+                <>
+                  <li>
+                    <svg className="h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </li>
+                  <li>
+                    <span className="text-sm font-medium text-gray-500 capitalize">
+                      {location.pathname.split('/').filter(Boolean).join(' / ')}
+                    </span>
+                  </li>
+                </>
+              )}
+            </ol>
+          </nav>
+        </div>
+        
         <div className="px-4 py-6 sm:px-0">
           {children}
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 mt-auto">
+        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-500">
+              © 2024 Optiview. All rights reserved.
+            </div>
+            <div className="flex space-x-6">
+              <Link
+                to="/docs"
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Documentation
+              </Link>
+              <Link
+                to="/privacy"
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Privacy
+              </Link>
+              <Link
+                to="/terms"
+                className="text-sm text-gray-500 hover:text-gray-700"
+              >
+                Terms
+              </Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
