@@ -414,10 +414,11 @@ export default {
           console.log("📍 Client IP:", clientIP);
 
           // Find and validate magic link
+          const tokenHash = await hashString(token);
           const magicLinkData = await env.OPTIVIEW_DB.prepare(`
             SELECT email, expires_at FROM magic_link 
-            WHERE token = ? AND expires_at > ?
-          `).bind(token, new Date().toISOString()).first();
+            WHERE token_hash = ? AND expires_at > ?
+          `).bind(tokenHash, new Date().toISOString()).first();
 
           if (!magicLinkData) {
             return new Response("Invalid or expired magic link", { status: 400 });
@@ -487,8 +488,8 @@ export default {
 
           // Delete used magic link
           await env.OPTIVIEW_DB.prepare(`
-            DELETE FROM magic_link WHERE token = ?
-          `).bind(token).run();
+            DELETE FROM magic_link WHERE token_hash = ?
+          `).bind(tokenHash).run();
 
           // Redirect to appropriate page
           const redirectUrl = `${env.PUBLIC_APP_URL}${redirectPath}`;
