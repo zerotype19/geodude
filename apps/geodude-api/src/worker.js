@@ -153,10 +153,26 @@ export default {
             top_error_projects_5m: []
           },
           auth: {
-            continue_sanitized_5m: 0, // Counter for sanitization fallbacks
+            continue_sanitized_5m: 0,
             magic_links_requested_5m: 0,
             magic_links_consumed_5m: 0
           }
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
+      }
+
+      // 1.6) Admin environment check (for debugging)
+      if (url.pathname === "/admin/env-check") {
+        const response = new Response(JSON.stringify({
+          TEST_MODE: env.TEST_MODE,
+          NODE_ENV: env.NODE_ENV,
+          MAGIC_LINK_RPM_PER_IP: env.MAGIC_LINK_RPM_PER_IP,
+          MAGIC_LINK_RPD_PER_EMAIL: env.MAGIC_LINK_RPD_PER_EMAIL,
+          PUBLIC_APP_URL: env.PUBLIC_APP_URL,
+          timestamp: new Date().toISOString()
         }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
@@ -210,12 +226,12 @@ export default {
 
           // Validate continue path
           const sanitizeResult = sanitizeContinuePath(continue_path);
-          
+
           // Record sanitization metrics if sanitized
           if (sanitizeResult.sanitized) {
             recordContinueSanitized("request", sanitizeResult.reason);
           }
-          
+
           // Debug logging to see what's being stored
           console.log("🔍 Magic Link Request Debug:");
           console.log("  Original continue_path:", continue_path);
