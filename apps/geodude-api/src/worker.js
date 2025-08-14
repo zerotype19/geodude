@@ -1640,9 +1640,13 @@ export default {
           const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...baseParams).first();
           const total = totalResult?.total || 0;
 
-          // Debug: Ultra-simple query to isolate the issue
+          // Add back real metrics step by step
           const mainQuery = `
-            SELECT ca.id, ca.url, ca.type
+            SELECT 
+              ca.id, ca.url, ca.type,
+              (SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id) AS last_seen,
+              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')) AS events_24h,
+              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')) AS events_15m
             FROM content_assets ca
             WHERE ${baseFilters}
             ORDER BY ca.url ASC
@@ -1652,17 +1656,17 @@ export default {
           const mainParams = [...baseParams, pageSize, (page - 1) * pageSize];
           const mainResult = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...mainParams).all();
 
-          // Simple response with basic fields
+          // Response with real metrics
           const items = mainResult.results.map(row => ({
             id: row.id,
             url: row.url,
             type: row.type,
-            last_seen: null,
-            events_15m: 0,
-            events_24h: 0,
-            ai_referrals_24h: 0,
-            by_source_24h: [],
-            coverage_score: 0
+            last_seen: row.last_seen,
+            events_15m: row.events_15m || 0,
+            events_24h: row.events_24h || 0,
+            ai_referrals_24h: 0, // Will add this next
+            by_source_24h: [], // Will add this next
+            coverage_score: row.events_24h > 0 ? 50 : 0 // Simple coverage based on 24h events
           }));
 
           const response = new Response(JSON.stringify({
