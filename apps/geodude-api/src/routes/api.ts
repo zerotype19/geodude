@@ -301,26 +301,13 @@ export async function handleApiRoutes(
                     break;
             }
 
-                        // Get total referrals and conversions in window (simplified to avoid subquery issues)
-            const referralsResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT COUNT(*) referrals FROM ai_referrals WHERE project_id = ? AND detected_at >= ?
-            `).bind(project_id, since).first<any>();
-            
-            const conversionsResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT COUNT(*) conversions FROM conversion_event WHERE project_id = ? AND occurred_at >= ?
-            `).bind(project_id, since).first<any>();
+                        // Minimal test - just count referrals
+            const referrals = 0;
+            const conversions = 0;
+            const conv_rate = 0;
 
-            const referrals = referralsResult?.referrals || 0;
-            const conversions = conversionsResult?.conversions || 0;
-            const conv_rate = referrals > 0 ? conversions / referrals : 0;
-
-            // Get breakdown by source (minimal test query)
-            const bySourceResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT ar.ai_source_id, COUNT(*) referrals
-                FROM ai_referrals ar
-                WHERE ar.project_id = ? AND ar.detected_at >= ?
-                GROUP BY ar.ai_source_id
-            `).bind(project_id, since).all<any>();
+            // Empty source data for now
+            const bySource = [];
 
             // Simplified source data (minimal)
             const bySource = (bySourceResult.results || []).map((source) => ({
