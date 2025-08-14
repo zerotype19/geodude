@@ -552,11 +552,14 @@ export default {
 
       // 3.1) Create Organization
       if (url.pathname === "/api/onboarding/organization" && request.method === "POST") {
+        console.log('🏢 Organization creation request received');
         try {
           const body = await request.json();
+          console.log('📥 Request body:', body);
           const { name } = body;
 
           if (!name) {
+            console.log('❌ Missing organization name');
             const response = new Response(JSON.stringify({ error: "Organization name is required" }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
@@ -567,12 +570,15 @@ export default {
           // Generate organization ID
           const orgId = `org_${generateToken().substring(0, 12)}`;
           const now = Date.now();
+          console.log('🔧 Generated org ID:', orgId, 'timestamp:', now);
 
           // Store organization in database
+          console.log('💾 Inserting organization into database...');
           await env.OPTIVIEW_DB.prepare(`
             INSERT INTO organization (id, name, created_ts)
             VALUES (?, ?, ?)
           `).bind(orgId, name, now).run();
+          console.log('✅ Organization inserted successfully');
 
           // Get current user from session to create org_member record
           const sessionCookie = request.headers.get("cookie");
