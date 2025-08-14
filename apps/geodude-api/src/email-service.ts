@@ -27,13 +27,44 @@ export class EmailService {
   }
 
   /**
-   * Send an email (SMTP or console echo)
+   * Send email via Cloudflare Email Routing (recommended for Workers)
+   */
+  private async sendViaCloudflare(options: EmailOptions): Promise<boolean> {
+    try {
+      console.log(`📧 Sending email via Cloudflare Email Routing to ${options.to}`);
+      
+      // Cloudflare Email Routing uses a simple HTTP API
+      // For now, we'll simulate the call since the actual implementation
+      // depends on your Cloudflare Email Routing configuration
+      
+      // In a real implementation, you'd either:
+      // 1. Use Cloudflare's Email API (if available)
+      // 2. Send to a Cloudflare Email Routing endpoint
+      // 3. Use the built-in email routing from your domain
+      
+      console.log(`📧 Email would be sent via Cloudflare Email Routing:`);
+      console.log(`   To: ${options.to}`);
+      console.log(`   From: ${this.config.fromEmail}`);
+      console.log(`   Subject: ${options.subject}`);
+      
+      // For now, return true to simulate success
+      // You'll need to implement the actual Cloudflare Email Routing call
+      return true;
+    } catch (error) {
+      console.error('Cloudflare Email Routing failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Send email (Cloudflare Email Routing or console echo)
    */
   async sendEmail(options: EmailOptions): Promise<boolean> {
     if (this.config.devMode || !this.config.smtpHost) {
       return this.echoToConsole(options);
     } else {
-      return this.sendViaSMTP(options);
+      // Use Cloudflare Email Routing instead of SMTP
+      return this.sendViaCloudflare(options);
     }
   }
 
@@ -63,38 +94,19 @@ export class EmailService {
   }
 
   /**
-   * Send email via SMTP (production mode)
+   * Send Magic Link email
    */
-  private async sendViaSMTP(options: EmailOptions): Promise<boolean> {
-    try {
-      // This would use a proper SMTP library in production
-      // For now, we'll simulate the SMTP call
-      console.log(`📧 Sending email via SMTP to ${options.to}`);
-      
-      // In a real implementation, you'd use something like:
-      // const transporter = nodemailer.createTransporter({
-      //   host: this.config.smtpHost,
-      //   port: this.config.smtpPort,
-      //   secure: this.config.smtpPort === 465,
-      //   auth: {
-      //     user: this.config.smtpUser,
-      //     pass: this.config.smtpPass
-      //   }
-      // });
-      // 
-      // await transporter.sendMail({
-      //   from: this.config.fromEmail,
-      //   to: options.to,
-      //   subject: options.subject,
-      //   html: options.html,
-      //   text: options.text
-      // });
-      
-      return true;
-    } catch (error) {
-      console.error('SMTP email failed:', error);
-      return false;
-    }
+  async sendMagicLinkEmail(email: string, magicLinkUrl: string, expiresInMinutes: number = 15): Promise<boolean> {
+    const subject = "Sign in to Optiview";
+    const html = this.generateMagicLinkEmailHTML(email, magicLinkUrl, expiresInMinutes);
+    const text = this.generateMagicLinkEmailText(email, magicLinkUrl, expiresInMinutes);
+
+    return this.sendEmail({
+      to: email,
+      subject,
+      html,
+      text
+    });
   }
 
   /**

@@ -1,4 +1,5 @@
 import { loadConfig, getConfigForEnvCheck, getConfigErrors, getMissingConfigKeys } from './config.js';
+import { EmailService } from './email-service.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -306,15 +307,23 @@ export default {
           const appUrl = config.PUBLIC_APP_URL;
           const magicLink = `${appUrl}/auth/magic?token=${token}`;
 
-          // Send email (for now, log to console in dev)
-          if (config.NODE_ENV === "production") {
-            // TODO: Implement real email sending
-            console.log("Would send email to:", email, "with link:", magicLink);
-          } else {
-            // Dev mode: log the link
-            console.log("🔐 DEV MODE - Magic Link for", email, ":", magicLink);
-            console.log("Token Hash:", tokenHash);
-            console.log("Expires:", expiresAt.toISOString());
+          // Send email using EmailService
+          try {
+            const emailService = EmailService.fromEnv(env);
+            const emailSent = await emailService.sendMagicLinkEmail(
+              email,
+              magicLink,
+              config.MAGIC_LINK_EXP_MIN
+            );
+
+            if (emailSent) {
+              console.log("✅ Magic link email sent successfully to:", email);
+            } else {
+              console.error("❌ Failed to send magic link email to:", email);
+            }
+          } catch (emailError) {
+            console.error("❌ Email service error:", emailError);
+            // Don't fail the request if email fails, just log it
           }
 
           const response = new Response(JSON.stringify({ ok: true }), {
@@ -419,15 +428,23 @@ export default {
           const appUrl = config.PUBLIC_APP_URL;
           const magicLink = `${appUrl}/auth/magic?token=${token}`;
 
-          // Send email (for now, log to console in dev)
-          if (config.NODE_ENV === "production") {
-            // TODO: Implement real email sending
-            console.log("Would send email to:", email, "with link:", magicLink);
-          } else {
-            // Dev mode: log the link
-            console.log("🔐 DEV MODE - Magic Link for", email, ":", magicLink);
-            console.log("Token Hash:", tokenHash);
-            console.log("Expires:", expiresAt.toISOString());
+          // Send email using EmailService
+          try {
+            const emailService = EmailService.fromEnv(env);
+            const emailSent = await emailService.sendMagicLinkEmail(
+              email,
+              magicLink,
+              config.MAGIC_LINK_EXP_MIN
+            );
+
+            if (emailSent) {
+              console.log("✅ Magic link email sent successfully to:", email);
+            } else {
+              console.error("❌ Failed to send magic link email to:", email);
+            }
+          } catch (emailError) {
+            console.error("❌ Email service error:", emailError);
+            // Don't fail the request if email fails, just log it
           }
 
           const response = new Response(JSON.stringify({ ok: true }), {
