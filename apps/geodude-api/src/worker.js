@@ -474,21 +474,33 @@ export default {
                 headers: { 'Content-Type': 'application/json' }
               });
             }
+          } else {
+            // Update last_login_ts for existing user
+            const now = Math.floor(Date.now() / 1000);
+            await env.OPTIVIEW_DB.prepare(`
+              UPDATE user SET last_login_ts = ? WHERE id = ?
+            `).bind(now, userRecord.id).run();
+            console.log('✅ Updated last_login_ts for existing user:', userRecord.id);
           }
 
           // Create session (store in existing D1 session table)
           const sessionId = generateToken();
 
+          // Get user agent for ua_hash
+          const userAgent = request.headers.get("user-agent") || "unknown";
+          const uaHash = await hashString(userAgent);
+
           // Store session in existing session table
           const sessionExpiresAt = new Date(Date.now() + config.SESSION_TTL_HOURS * 60 * 60 * 1000);
           await env.OPTIVIEW_DB.prepare(`
-            INSERT INTO session (user_id, session_id, expires_at, ip_hash)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO session (user_id, session_id, expires_at, ip_hash, ua_hash)
+            VALUES (?, ?, ?, ?, ?)
           `).bind(
             userRecord.id,
             sessionId,
             sessionExpiresAt.toISOString(),
-            await hashString(clientIP)
+            await hashString(clientIP),
+            uaHash
           ).run();
 
           console.log('✅ Session created in existing session table');
@@ -602,7 +614,9 @@ export default {
           const response = new Response(JSON.stringify({
             id: orgId,
             name: name,
-            created_at: now
+            created_at: now,
+            user_id: userId,
+            org_member_created: !!userId
           }), {
             headers: { "Content-Type": "application/json" }
           });
