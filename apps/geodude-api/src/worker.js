@@ -1339,14 +1339,21 @@ export default {
       // Onboarding endpoints
       if (url.pathname === "/api/onboarding/organization" && request.method === "POST") {
         try {
-          const { name, slug } = await request.json();
+          const { name } = await request.json();
           
-          if (!name || !slug) {
-            return new Response(JSON.stringify({ error: "Name and slug are required" }), {
+          if (!name) {
+            return new Response(JSON.stringify({ error: "Name is required" }), {
               status: 400,
               headers: { 'Content-Type': 'application/json' }
             });
           }
+
+          // Auto-generate slug from name
+          const slug = name.toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/-+/g, '-') // Replace multiple hyphens with single
+            .trim('-'); // Remove leading/trailing hyphens
 
           // Check if organization already exists
           const existingOrg = await env.OPTIVIEW_DB.prepare(`
@@ -1371,10 +1378,14 @@ export default {
 
           console.log('✅ Organization created:', { id: orgId, name, slug });
 
-          return new Response(JSON.stringify({ 
+          const responseData = { 
             success: true, 
             organization: { id: orgId, name, slug } 
-          }), {
+          };
+          
+          console.log('📤 Sending response:', responseData);
+
+          return new Response(JSON.stringify(responseData), {
             status: 201,
             headers: { 'Content-Type': 'application/json' }
           });

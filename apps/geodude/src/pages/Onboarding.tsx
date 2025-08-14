@@ -6,7 +6,6 @@ interface OnboardingState {
   step: number;
   organization: {
     name: string;
-    slug: string;
     id?: string;
   };
   project: {
@@ -21,7 +20,7 @@ interface OnboardingState {
 export default function Onboarding() {
   const [state, setState] = useState<OnboardingState>({
     step: 1,
-    organization: { name: '', slug: '' },
+    organization: { name: '' },
     project: { name: '', description: '' },
     loading: false,
     error: ''
@@ -44,8 +43,8 @@ export default function Onboarding() {
   };
 
   const createOrganization = async () => {
-    if (!state.organization.name.trim() || !state.organization.slug.trim()) {
-      setState(prev => ({ ...prev, error: 'Organization name and slug are required' }));
+    if (!state.organization.name.trim()) {
+      setState(prev => ({ ...prev, error: 'Organization name is required' }));
       return;
     }
 
@@ -56,32 +55,32 @@ export default function Onboarding() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: state.organization.name.trim(),
-          slug: state.organization.slug.trim()
+          name: state.organization.name.trim()
+          // slug will be auto-generated on the backend
         })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setState(prev => ({ 
-          ...prev, 
-          step: 2, 
+        setState(prev => ({
+          ...prev,
+          step: 2,
           organization: { ...prev.organization, id: data.organization.id },
-          loading: false 
+          loading: false
         }));
       } else {
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           error: data.error || 'Failed to create organization',
-          loading: false 
+          loading: false
         }));
       }
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
+      setState(prev => ({
+        ...prev,
         error: 'Network error. Please try again.',
-        loading: false 
+        loading: false
       }));
     }
   };
@@ -108,28 +107,28 @@ export default function Onboarding() {
       const data = await response.json();
 
       if (response.ok) {
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           project: { ...prev.project, id: data.project.id },
-          loading: false 
+          loading: false
         }));
-        
+
         // Complete onboarding and redirect to main app
         setTimeout(() => {
           window.location.href = '/';
         }, 1000);
       } else {
-        setState(prev => ({ 
-          ...prev, 
+        setState(prev => ({
+          ...prev,
           error: data.error || 'Failed to create project',
-          loading: false 
+          loading: false
         }));
       }
     } catch (error) {
-      setState(prev => ({ 
-        ...prev, 
+      setState(prev => ({
+        ...prev,
         error: 'Network error. Please try again.',
-        loading: false 
+        loading: false
       }));
     }
   };
@@ -152,7 +151,7 @@ export default function Onboarding() {
 
   const canProceed = () => {
     if (state.step === 1) {
-      return state.organization.name.trim() && state.organization.slug.trim() && !state.loading;
+      return state.organization.name.trim() && !state.loading;
     }
     if (state.step === 2) {
       return state.project.name.trim() && !state.loading;
@@ -174,19 +173,17 @@ export default function Onboarding() {
           <div className="flex space-x-4">
             {[1, 2].map((step) => (
               <div key={step} className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
-                  step < state.step 
-                    ? 'bg-green-500 text-white' 
-                    : step === state.step 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${step < state.step
+                    ? 'bg-green-500 text-white'
+                    : step === state.step
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}>
                   {step < state.step ? '✓' : step}
                 </div>
                 {step < 2 && (
-                  <div className={`w-16 h-1 mx-2 ${
-                    step < state.step ? 'bg-green-500' : 'bg-gray-200'
-                  }`} />
+                  <div className={`w-16 h-1 mx-2 ${step < state.step ? 'bg-green-500' : 'bg-gray-200'
+                    }`} />
                 )}
               </div>
             ))}
@@ -227,22 +224,6 @@ export default function Onboarding() {
                     placeholder="Enter your organization name"
                     disabled={state.loading}
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Organization Slug
-                  </label>
-                  <input
-                    type="text"
-                    value={state.organization.slug}
-                    onChange={(e) => updateOrganization('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="your-org-slug"
-                    disabled={state.loading}
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    This will be used in URLs and API endpoints
-                  </p>
                 </div>
               </div>
             </div>
@@ -287,22 +268,20 @@ export default function Onboarding() {
             <button
               onClick={handlePrevious}
               disabled={state.step === 1 || state.loading}
-              className={`px-6 py-2 rounded-md font-medium ${
-                state.step === 1 || state.loading
+              className={`px-6 py-2 rounded-md font-medium ${state.step === 1 || state.loading
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+                }`}
             >
               Previous
             </button>
             <button
               onClick={handleNext}
               disabled={!canProceed()}
-              className={`px-6 py-2 rounded-md font-medium ${
-                canProceed()
+              className={`px-6 py-2 rounded-md font-medium ${canProceed()
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
+                }`}
             >
               {state.loading ? 'Creating...' : state.step === 2 ? 'Complete Setup' : 'Next'}
             </button>
