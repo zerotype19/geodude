@@ -1676,7 +1676,7 @@ export default {
               CASE 
                 WHEN COALESCE(a.ai_events,0) + COALESCE(r.ai_referrals,0) = 0 THEN 0
                 ELSE CAST(ROUND(100.0 * (COALESCE(a.ai_events,0) + 2*COALESCE(r.ai_referrals,0)) / 
-                  GREATEST((SELECT MAX(COALESCE(a2.ai_events,0) + 2*COALESCE(r2.ai_referrals,0)) 
+                  COALESCE((SELECT MAX(COALESCE(a2.ai_events,0) + 2*COALESCE(r2.ai_referrals,0)) 
                     FROM ai_by_content_rollup a2 
                     LEFT JOIN ref_by_content r2 ON r2.content_id = a2.content_id), 1)) AS INT)
               END AS coverage_score
