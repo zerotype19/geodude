@@ -8,7 +8,7 @@ PUBLIC_APP_URL = "https://optiview.ai"
 PUBLIC_BASE_URL = "https://api.optiview.ai"
 CSP_MODE = "production"
 NODE_ENV = "production"
-TEST_MODE = "0"
+TEST_MODE = "false"
 DEV_MAIL_ECHO = "false"
 
 # Auth & limits (production defaults)
@@ -47,7 +47,7 @@ PUBLIC_APP_URL = "https://optiview.ai"
 PUBLIC_BASE_URL = "https://api.optiview.ai"
 CSP_MODE = "production"
 NODE_ENV = "production"
-TEST_MODE = "0"
+TEST_MODE = "false"
 DEV_MAIL_ECHO = "false"
 
 # Auth & limits (production defaults)
