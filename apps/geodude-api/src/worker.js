@@ -493,7 +493,7 @@ export default {
 
           // Redirect to appropriate page
           const redirectUrl = `${env.PUBLIC_APP_URL}${redirectPath}`;
-          return new Response(JSON.stringify({
+          const response = new Response(JSON.stringify({
             success: true,
             redirect_to: redirectPath,
             user_id: userRecord.id,
@@ -505,6 +505,7 @@ export default {
               "Set-Cookie": `optiview_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
             }
           });
+          return addCorsHeaders(response);
 
         } catch (e) {
           console.error("Magic link consumption error:", e);
