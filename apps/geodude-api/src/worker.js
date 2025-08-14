@@ -223,6 +223,29 @@ export default {
             SELECT value FROM metrics WHERE key = ?
           `).bind(`content_asset_updated_5m:${current5MinWindow}`).first();
 
+          // Get referrals metrics
+          const referralsTotal24h = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count
+            FROM ai_referrals
+            WHERE detected_at >= datetime('now','-1 day')
+          `).first();
+
+          const referralsActiveContents24h = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(DISTINCT content_id) as count
+            FROM ai_referrals
+            WHERE detected_at >= datetime('now','-1 day')
+          `).first();
+
+          const referralsBySource24h = await env.OPTIVIEW_DB.prepare(`
+            SELECT s.slug, COUNT(*) as count
+            FROM ai_referrals ar
+            JOIN ai_sources s ON s.id = ar.ai_source_id
+            WHERE ar.detected_at >= datetime('now','-1 day')
+            GROUP BY ar.ai_source_id, s.slug
+            ORDER BY count DESC
+            LIMIT 5
+          `).all();
+
           const response = new Response(JSON.stringify({
             status: "healthy",
             timestamp: new Date().toISOString(),
@@ -257,6 +280,11 @@ export default {
                 asset_created: assetCreatedMetric?.value || 0,
                 asset_updated: assetUpdatedMetric?.value || 0
               }
+            },
+            referrals: {
+              total_24h: referralsTotal24h?.count || 0,
+              active_contents_24h: referralsActiveContents24h?.count || 0,
+              by_source_24h: referralsBySource24h?.results || []
             }
           }), {
             status: 200,
@@ -285,6 +313,11 @@ export default {
                 asset_created: 0,
                 asset_updated: 0
               }
+            },
+            referrals: {
+              total_24h: 0,
+              active_contents_24h: 0,
+              by_source_24h: []
             }
           }), {
             status: 200,
@@ -2715,6 +2748,50 @@ export default {
             now
           ).run();
 
+          // If this is AI traffic with content_id, also insert into ai_referrals
+          if (aiSourceId && contentId) {
+            try {
+              // Extract ref_url from metadata.r (if present) and sanitize
+              let refUrl = null;
+              if (metadata && metadata.r) {
+                refUrl = metadata.r.substring(0, 512); // Limit to 512 chars
+                // Remove control characters
+                refUrl = refUrl.replace(/[\x00-\x1F\x7F]/g, '');
+              }
+
+              // Prepare metadata for ai_referrals (sanitized & limited)
+              let aiReferralMetadata = null;
+              if (metadata) {
+                const cleanMetadata = { ...metadata };
+                // Remove sensitive fields
+                delete cleanMetadata.ip;
+                delete cleanMetadata.ua;
+                const metadataStr = JSON.stringify(cleanMetadata);
+                if (metadataStr.length <= 512) {
+                  aiReferralMetadata = metadataStr;
+                }
+              }
+
+              await env.OPTIVIEW_DB.prepare(`
+                INSERT INTO ai_referrals (
+                  project_id, ai_source_id, content_id, ref_type, 
+                  detected_at, ref_url, metadata
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                projectId,
+                aiSourceId,
+                contentId,
+                'assistant', // Default ref_type
+                now,
+                refUrl,
+                aiReferralMetadata
+              ).run();
+            } catch (e) {
+              console.warn("Failed to insert AI referral:", e);
+              // Don't fail the main event insertion
+            }
+          }
+
           // Update last_used timestamp for API key
           await env.OPTIVIEW_DB.prepare(`
             UPDATE api_key SET last_used_ts = ? WHERE id = ?
@@ -2751,6 +2828,537 @@ export default {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response, origin);
+      }
+
+      // 7.1) Referrals summary endpoint
+      if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
+        try {
+          // Rate limiting: 60 rpm per user
+          const rateLimitKey = `referrals_summary:${request.headers.get('x-optiview-request-id') || 'anonymous'}`;
+          const rateLimitResult = await checkRateLimit(env, rateLimitKey, 60, 60);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const projectId = url.searchParams.get("project_id");
+          const window = url.searchParams.get("window") || "24h";
+
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          let timeFilter;
+          let bucketFormat;
+          if (window === '15m') {
+            timeFilter = "datetime('now','-15 minutes')";
+            bucketFormat = "datetime(?, 'unixepoch')";
+          } else if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+            bucketFormat = "strftime('%Y-%m-%d %H:00:00', datetime(?, 'unixepoch'))";
+          } else { // 7d
+            timeFilter = "datetime('now','-7 days')";
+            bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
+          }
+
+          // Get totals
+          const totals = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              COUNT(*) as referrals,
+              COUNT(DISTINCT content_id) as contents,
+              COUNT(DISTINCT ai_source_id) as sources
+            FROM ai_referrals 
+            WHERE project_id = ? AND detected_at >= ${timeFilter}
+          `).bind(projectId).first();
+
+          // Get by source
+          const bySource = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              s.slug,
+              s.name,
+              COUNT(*) as count
+            FROM ai_referrals ar
+            JOIN ai_sources s ON s.id = ar.ai_source_id
+            WHERE ar.project_id = ? AND ar.detected_at >= ${timeFilter}
+            GROUP BY ar.ai_source_id, s.slug, s.name
+            ORDER BY count DESC
+          `).bind(projectId).all();
+
+          // Get top content
+          const topContent = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              ar.content_id,
+              ca.url,
+              COUNT(*) as count
+            FROM ai_referrals ar
+            JOIN content_assets ca ON ca.id = ar.content_id
+            WHERE ar.project_id = ? AND ar.detected_at >= ${timeFilter}
+            GROUP BY ar.content_id, ca.url
+            ORDER BY count DESC
+            LIMIT 10
+          `).bind(projectId).all();
+
+          // Get timeseries
+          let timeseries = [];
+          if (window === '15m') {
+            // For 15m, show 15 buckets of 1 minute each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 14; i >= 0; i--) {
+              const bucketStart = now - (i * 60);
+              const bucketEnd = bucketStart + 60;
+              const count = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count
+                FROM ai_referrals
+                WHERE project_id = ? 
+                  AND detected_at >= datetime(?, 'unixepoch')
+                  AND detected_at < datetime(?, 'unixepoch')
+              `).bind(projectId, bucketStart, bucketEnd).first();
+
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          } else if (window === '24h') {
+            // For 24h, show 24 buckets of 1 hour each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 23; i >= 0; i--) {
+              const bucketStart = now - (i * 3600);
+              const bucketEnd = bucketStart + 3600;
+              const count = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count
+                FROM ai_referrals
+                WHERE project_id = ? 
+                  AND detected_at >= datetime(?, 'unixepoch')
+                  AND detected_at < datetime(?, 'unixepoch')
+              `).bind(projectId, bucketStart, bucketEnd).first();
+
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          } else { // 7d
+            // For 7d, show 7 buckets of 1 day each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 6; i >= 0; i--) {
+              const bucketStart = now - (i * 86400);
+              const bucketEnd = bucketStart + 86400;
+              const count = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count
+                FROM ai_referrals
+                WHERE project_id = ? 
+                  AND detected_at >= datetime(?, 'unixepoch')
+                  AND detected_at < datetime(?, 'unixepoch')
+              `).bind(projectId, bucketStart, bucketEnd).first();
+
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          }
+
+          const response = new Response(JSON.stringify({
+            totals: {
+              referrals: totals?.referrals || 0,
+              contents: totals?.contents || 0,
+              sources: totals?.sources || 0
+            },
+            by_source: bySource?.results || [],
+            top_content: topContent?.results || [],
+            timeseries: timeseries
+          }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Referrals summary error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to get referrals summary" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.2) Referrals list endpoint
+      if (url.pathname === "/api/referrals" && request.method === "GET") {
+        try {
+          // Rate limiting: 60 rpm per user
+          const rateLimitKey = `referrals_list:${request.headers.get('x-optiview-request-id') || 'anonymous'}`;
+          const rateLimitResult = await checkRateLimit(env, rateLimitKey, 60, 60);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const projectId = url.searchParams.get("project_id");
+          const window = url.searchParams.get("window") || "24h";
+          const source = url.searchParams.get("source");
+          const q = url.searchParams.get("q");
+          const page = parseInt(url.searchParams.get("page") || "1");
+          const pageSize = Math.min(parseInt(url.searchParams.get("pageSize") || "50"), 100);
+
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          let timeFilter;
+          if (window === '15m') {
+            timeFilter = "datetime('now','-15 minutes')";
+          } else if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+          } else { // 7d
+            timeFilter = "datetime('now','-7 days')";
+          }
+
+          // Build WHERE clause
+          let whereConditions = [`ar.project_id = ?`, `ar.detected_at >= ${timeFilter}`];
+          let params = [projectId];
+
+          if (source) {
+            whereConditions.push(`s.slug = ?`);
+            params.push(source);
+          }
+
+          if (q) {
+            whereConditions.push(`ca.url LIKE ?`);
+            params.push(`%${q}%`);
+          }
+
+          const whereClause = whereConditions.join(" AND ");
+
+          // Get total count
+          const totalQuery = `
+            SELECT COUNT(DISTINCT ar.content_id, ar.ai_source_id) as count
+            FROM ai_referrals ar
+            JOIN ai_sources s ON s.id = ar.ai_source_id
+            JOIN content_assets ca ON ca.id = ar.content_id
+            WHERE ${whereClause}
+          `;
+          const totalResult = await env.OPTIVIEW_DB.prepare(totalQuery).bind(...params).first();
+          const total = totalResult?.count || 0;
+
+          // Get paginated results
+          const offset = (page - 1) * pageSize;
+          const listQuery = `
+            SELECT 
+              ar.content_id,
+              ca.url,
+              s.slug as source_slug,
+              s.name as source_name,
+              MAX(ar.detected_at) as last_seen,
+              SUM(CASE WHEN ar.detected_at >= datetime('now','-15 minutes') THEN 1 ELSE 0 END) as referrals_15m,
+              SUM(CASE WHEN ar.detected_at >= datetime('now','-1 day') THEN 1 ELSE 0 END) as referrals_24h
+            FROM ai_referrals ar
+            JOIN ai_sources s ON s.id = ar.ai_source_id
+            JOIN content_assets ca ON ca.id = ar.content_id
+            WHERE ${whereClause}
+            GROUP BY ar.content_id, ar.ai_source_id, ca.url, s.slug, s.name
+            ORDER BY referrals_24h DESC, last_seen DESC
+            LIMIT ? OFFSET ?
+          `;
+          const listResult = await env.OPTIVIEW_DB.prepare(listQuery).bind(...params, pageSize, offset).all();
+
+          // Calculate share_of_ai for each row
+          const items = await Promise.all(listResult.results.map(async (row) => {
+            // Get total AI events for this content in the window
+            const totalAIEvents = await env.OPTIVIEW_DB.prepare(`
+              SELECT COUNT(*) as count
+              FROM interaction_events
+              WHERE project_id = ? AND content_id = ? AND ai_source_id IS NOT NULL AND occurred_at >= ${timeFilter}
+            `).bind(projectId, row.content_id).first();
+
+            const shareOfAI = totalAIEvents?.count > 0 ? (row.referrals_24h / totalAIEvents.count) : 0;
+
+            return {
+              content_id: row.content_id,
+              url: row.url,
+              source_slug: row.source_slug,
+              source_name: row.source_name,
+              last_seen: row.last_seen,
+              referrals_15m: row.referrals_15m,
+              referrals_24h: row.referrals_24h,
+              share_of_ai: Math.round(shareOfAI * 100) / 100 // Round to 2 decimal places
+            };
+          }));
+
+          const response = new Response(JSON.stringify({
+            items: items,
+            page: page,
+            pageSize: pageSize,
+            total: total
+          }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Referrals list error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to get referrals list" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.3) Referrals detail endpoint
+      if (url.pathname === "/api/referrals/detail" && request.method === "GET") {
+        try {
+          // Rate limiting: 60 rpm per user
+          const rateLimitKey = `referrals_detail:${request.headers.get('x-optiview-request-id') || 'anonymous'}`;
+          const rateLimitResult = await checkRateLimit(env, rateLimitKey, 60, 60);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({ 
+              error: "Rate limit exceeded", 
+              retry_after: rateLimitResult.retryAfter 
+            }), {
+              status: 429,
+              headers: { 
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const projectId = url.searchParams.get("project_id");
+          const contentId = url.searchParams.get("content_id");
+          const aiSourceId = url.searchParams.get("ai_source_id");
+          const window = url.searchParams.get("window") || "24h";
+
+          if (!projectId || !contentId || !aiSourceId) {
+            const response = new Response(JSON.stringify({ error: "project_id, content_id, and ai_source_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          let timeFilter;
+          if (window === '15m') {
+            timeFilter = "datetime('now','-15 minutes')";
+          } else if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+          } else { // 7d
+            timeFilter = "datetime('now','-7 days')";
+          }
+
+          // Get content info
+          const content = await env.OPTIVIEW_DB.prepare(`
+            SELECT id, url FROM content_assets 
+            WHERE id = ? AND project_id = ?
+          `).bind(contentId, projectId).first();
+
+          if (!content) {
+            const response = new Response(JSON.stringify({ error: "Content not found or not accessible" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get source info
+          const source = await env.OPTIVIEW_DB.prepare(`
+            SELECT id, slug, name FROM ai_sources WHERE id = ?
+          `).bind(aiSourceId).first();
+
+          if (!source) {
+            const response = new Response(JSON.stringify({ error: "AI source not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get summary stats
+          const summary = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              SUM(CASE WHEN detected_at >= datetime('now','-15 minutes') THEN 1 ELSE 0 END) as referrals_15m,
+              SUM(CASE WHEN detected_at >= datetime('now','-1 day') THEN 1 ELSE 0 END) as referrals_24h,
+              MAX(detected_at) as last_seen
+            FROM ai_referrals
+            WHERE project_id = ? AND content_id = ? AND ai_source_id = ? AND detected_at >= ${timeFilter}
+          `).bind(projectId, contentId, aiSourceId).first();
+
+          // Get timeseries
+          let timeseries = [];
+          if (window === '15m') {
+            // For 15m, show 15 buckets of 1 minute each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 14; i >= 0; i--) {
+              const bucketStart = now - (i * 60);
+              const bucketEnd = bucketStart + 60;
+              const count = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count
+                FROM ai_referrals
+                WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
+                  AND detected_at >= datetime(?, 'unixepoch')
+                  AND detected_at < datetime(?, 'unixepoch')
+              `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
+              
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          } else if (window === '24h') {
+            // For 24h, show 24 buckets of 1 hour each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 23; i >= 0; i--) {
+              const bucketStart = now - (i * 3600);
+              const bucketEnd = bucketStart + 3600;
+              const count = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count
+                FROM ai_referrals
+                WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
+                  AND detected_at >= datetime(?, 'unixepoch')
+                  AND detected_at < datetime(?, 'unixepoch')
+              `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
+              
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          } else { // 7d
+            // For 7d, show 7 buckets of 1 day each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 6; i >= 0; i--) {
+              const bucketStart = now - (i * 86400);
+              const bucketEnd = bucketStart + 86400;
+              const count = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count
+                FROM ai_referrals
+                WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
+                  AND detected_at >= datetime(?, 'unixepoch')
+                  AND detected_at < datetime(?, 'unixepoch')
+              `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
+              
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          }
+
+          // Get recent referrals (last 10)
+          const recent = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              detected_at,
+              ref_url,
+              metadata
+            FROM ai_referrals
+            WHERE project_id = ? AND content_id = ? AND ai_source_id = ? AND detected_at >= ${timeFilter}
+            ORDER BY detected_at DESC
+            LIMIT 10
+          `).bind(projectId, contentId, aiSourceId).all();
+
+          const response = new Response(JSON.stringify({
+            content: {
+              id: content.id,
+              url: content.url
+            },
+            source: {
+              id: source.id,
+              slug: source.slug,
+              name: source.name
+            },
+            summary: {
+              referrals_15m: summary?.referrals_15m || 0,
+              referrals_24h: summary?.referrals_24h || 0,
+              last_seen: summary?.last_seen || null
+            },
+            timeseries: timeseries,
+            recent: recent.results.map(row => ({
+              detected_at: row.detected_at,
+              ref_url: row.ref_url,
+              metadata: row.metadata ? JSON.parse(row.metadata) : {}
+            }))
+          }), {
+            status: 200,
+            headers: { 
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=120"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Referrals detail error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to get referrals detail" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
       }
 
       // 7.5) Events last-seen endpoint (for install verification)
