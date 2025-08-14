@@ -4104,7 +4104,7 @@ export default {
                          AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
                        ORDER BY ar.detected_at DESC
                        LIMIT 1)
-                     ) * 24 * 60 AS INTEGER
+                     ) * 24 * 60
                    )
                    ORDER BY c.occurred_at
                  ) as ttc_minutes
@@ -4410,7 +4410,7 @@ export default {
                          AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
                        ORDER BY ar.detected_at DESC
                        LIMIT 1)
-                     ) * 24 * 60 AS INTEGER
+                     ) * 24 * 60
                    )
                    ORDER BY c.occurred_at
                  ) as ttc_minutes
@@ -4701,7 +4701,7 @@ export default {
                          AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
                        ORDER BY ar.detected_at DESC
                        LIMIT 1)
-                     ) * 24 * 60 AS INTEGER
+                     ) * 24 * 60
                    )
                    ORDER BY c.occurred_at
                  ) as ttc_minutes
@@ -4834,7 +4834,7 @@ export default {
                 c.occurred_at as conversion_at,
                 c.ref_detected_at,
                 CAST(
-                  (julianday(c.occurred_at) - julianday(c.ref_detected_at)) * 24 * 60 AS INTEGER
+                  (julianday(c.occurred_at) - julianday(c.ref_detected_at)) * 24 * 60
                 ) as ttc_minutes
               FROM convs c
               WHERE c.ref_detected_at IS NOT NULL
