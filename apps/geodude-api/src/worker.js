@@ -343,8 +343,8 @@ export default {
           console.log('✅ Magic link stored in D1 database');
 
           // Generate magic link
-          const appUrl = config.PUBLIC_APP_URL;
-          const magicLink = `${appUrl}/auth/magic?token=${token}`;
+          const apiUrl = config.PUBLIC_BASE_URL;
+          const magicLink = `${apiUrl}/auth/magic?token=${token}`;
 
           // Send email using EmailService
           try {
