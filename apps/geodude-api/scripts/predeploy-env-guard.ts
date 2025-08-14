@@ -108,7 +108,8 @@ function getEnvCheckUrl(environment: string): string {
   const baseUrls = {
     production: 'https://api.optiview.ai',
     staging: 'https://staging.api.optiview.ai',
-    test: 'http://127.0.0.1:8787'
+    test: 'http://127.0.0.1:8787',
+    dev: 'http://127.0.0.1:8787'  // dev maps to same as test
   };
 
   const baseUrl = baseUrls[environment as keyof typeof baseUrls];

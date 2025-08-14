@@ -6,6 +6,7 @@
     "dev": "wrangler dev --env=test --local --port=8787",
     "dev:remote": "wrangler dev --env=test --remote --port=8787",
     "deploy:test": "wrangler deploy --env=test",
+    "deploy:dev": "wrangler deploy --env=dev",
     "deploy:staging": "pnpm predeploy:staging && wrangler deploy --env=staging",
     "deploy:prod": "pnpm predeploy:prod && wrangler deploy --env=production",
     "predeploy:staging": "tsx scripts/predeploy-env-guard.ts staging",

@@ -40,6 +40,16 @@ RULES_REFRESH_TTL_SEC = "300"
 EMAIL_SENDER_NAME = "Optiview"
 EMAIL_FROM = "noreply@optiview.ai"
 
+# Production environment bindings
+[[env.production.d1_databases]]
+binding = "OPTIVIEW_DB"
+database_name = "optiview_db"
+database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+
+[[env.production.kv_namespaces]]
+binding = "AI_FINGERPRINTS"
+id = "571e1b9f739c4d0a9027b350cf091d20"
+
 # Staging environment
 [env.staging.vars]
 PUBLIC_APP_URL = "https://staging.app.optiview.ai"
@@ -68,6 +78,16 @@ RULES_REFRESH_TTL_SEC = "300"
 # Email settings (non-secret)
 EMAIL_SENDER_NAME = "Optiview"
 EMAIL_FROM = "noreply@optiview.ai"
+
+# Staging environment bindings
+[[env.staging.d1_databases]]
+binding = "OPTIVIEW_DB"
+database_name = "optiview_db"
+database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+
+[[env.staging.kv_namespaces]]
+binding = "AI_FINGERPRINTS"
+id = "571e1b9f739c4d0a9027b350cf091d20"
 
 # Test/Development environment
 [env.test.vars]
@@ -98,13 +118,53 @@ RULES_REFRESH_TTL_SEC = "30"
 EMAIL_SENDER_NAME = "Optiview (Test)"
 EMAIL_FROM = "test@optiview.ai"
 
-# Database and KV bindings (shared across all environments)
-[[d1_databases]]
+# Test environment bindings
+[[env.test.d1_databases]]
 binding = "OPTIVIEW_DB"
 database_name = "optiview_db"
 database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
 
-[[kv_namespaces]]
+[[env.test.kv_namespaces]]
+binding = "AI_FINGERPRINTS"
+id = "571e1b9f739c4d0a9027b350cf091d20"
+preview_id = "dev_ai_fingerprints"
+
+# Dev environment (alias for test, used by deployment system)
+[env.dev.vars]
+PUBLIC_APP_URL = "http://localhost:3000"
+PUBLIC_BASE_URL = "http://127.0.0.1:8787"
+CSP_MODE = "development"
+NODE_ENV = "development"
+TEST_MODE = "1"
+DEV_MAIL_ECHO = "true"
+
+# Auth & limits (dev defaults - more permissive)
+SESSION_TTL_HOURS = "24"
+OTP_EXP_MIN = "60"
+MAGIC_LINK_EXP_MIN = "60"
+MAGIC_LINK_RPM_PER_IP = "50"
+MAGIC_LINK_RPD_PER_EMAIL = "200"
+INVITE_EXP_DAYS = "7"
+ADMIN_RPM_PER_IP = "300"
+
+# Ingest limits (dev defaults - more permissive)
+INGEST_RATE_LIMIT_RPS = "100"
+INGEST_RATE_LIMIT_BURST = "500"
+RATE_LIMIT_RETRY_AFTER = "1"
+CSV_EXPORT_RATE_LIMIT_RPS = "20"
+RULES_REFRESH_TTL_SEC = "30"
+
+# Email settings (dev defaults)
+EMAIL_SENDER_NAME = "Optiview (Dev)"
+EMAIL_FROM = "dev@optiview.ai"
+
+# Dev environment bindings
+[[env.dev.d1_databases]]
+binding = "OPTIVIEW_DB"
+database_name = "optiview_db"
+database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+
+[[env.dev.kv_namespaces]]
 binding = "AI_FINGERPRINTS"
 id = "571e1b9f739c4d0a9027b350cf091d20"
 preview_id = "dev_ai_fingerprints"
