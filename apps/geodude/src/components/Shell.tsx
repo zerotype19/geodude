@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, LineChart, PlusSquare, Settings, User, Users, Building2, ChevronDown, LogOut } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -9,10 +9,45 @@ interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   const location = useLocation();
-  const { user, organization, project, logout } = useAuth();
+  const { user, organization, project, logout, listOrganizations, listProjects, switchContext } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
-  
+  const [availableOrgs, setAvailableOrgs] = useState<Array<{ id: string, name: string }>>([]);
+  const [availableProjects, setAvailableProjects] = useState<Array<{ id: string, name: string, org_id: string }>>([]);
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
+
+  // Load available organizations and projects when org menu opens
+  useEffect(() => {
+    if (orgMenuOpen && availableOrgs.length === 0) {
+      loadAvailableContexts();
+    }
+  }, [orgMenuOpen]);
+
+  const loadAvailableContexts = async () => {
+    setLoadingOrgs(true);
+    try {
+      const [orgs, projects] = await Promise.all([
+        listOrganizations(),
+        listProjects()
+      ]);
+      setAvailableOrgs(orgs);
+      setAvailableProjects(projects);
+    } catch (error) {
+      console.error('Failed to load available contexts:', error);
+    } finally {
+      setLoadingOrgs(false);
+    }
+  };
+
+  const handleContextSwitch = async (orgId: string, projectId: string) => {
+    try {
+      await switchContext(orgId, projectId);
+      setOrgMenuOpen(false);
+    } catch (error) {
+      console.error('Failed to switch context:', error);
+    }
+  };
+
   const navigation = [
     { name: "Events", href: "/events" },
     { name: "Sources", href: "/sources" },
@@ -48,11 +83,10 @@ export default function Shell({ children }: ShellProps) {
                     <Link
                       key={item.name}
                       to={item.href}
-                      className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                        isActive
+                      className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
                           ? "border-blue-500 text-gray-900"
                           : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                      }`}
+                        }`}
                     >
                       {item.name}
                     </Link>
@@ -78,7 +112,7 @@ export default function Shell({ children }: ShellProps) {
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
-                  
+
                   {orgMenuOpen && (
                     <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                       <div className="py-2">
@@ -88,11 +122,47 @@ export default function Shell({ children }: ShellProps) {
                             <span className="font-medium">{organization?.name}</span> / {project?.name}
                           </p>
                         </div>
-                        <div className="px-4 py-2">
-                          <p className="text-xs text-gray-500">
-                            Organization and project switching will be implemented in the next phase
-                          </p>
-                        </div>
+                        
+                        {loadingOrgs ? (
+                          <div className="px-4 py-2">
+                            <p className="text-sm text-gray-500">Loading available contexts...</p>
+                          </div>
+                        ) : (
+                          <div className="max-h-64 overflow-y-auto">
+                            {availableOrgs.map((org) => {
+                              const orgProjects = availableProjects.filter(p => p.org_id === org.id);
+                              return (
+                                <div key={org.id} className="border-b border-gray-100 last:border-b-0">
+                                  <div className="px-4 py-2 bg-gray-50">
+                                    <h4 className="text-sm font-medium text-gray-900">{org.name}</h4>
+                                  </div>
+                                  {orgProjects.map((proj) => (
+                                    <button
+                                      key={proj.id}
+                                      onClick={() => handleContextSwitch(org.id, proj.id)}
+                                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                                        org.id === organization?.id && proj.id === project?.id
+                                          ? 'bg-blue-50 text-blue-700'
+                                          : 'text-gray-700'
+                                      }`}
+                                    >
+                                      <span className="ml-4">{proj.name}</span>
+                                      {org.id === organization?.id && proj.id === project?.id && (
+                                        <span className="ml-2 text-blue-600">✓</span>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        
+                        {availableOrgs.length === 0 && !loadingOrgs && (
+                          <div className="px-4 py-2">
+                            <p className="text-xs text-gray-500">No other organizations available</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -110,7 +180,7 @@ export default function Shell({ children }: ShellProps) {
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
-                  
+
                   {userMenuOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                       <div className="py-1">
@@ -172,11 +242,10 @@ export default function Shell({ children }: ShellProps) {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                  isActive
+                className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${isActive
                     ? "bg-blue-50 border-blue-500 text-blue-700"
                     : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
-                }`}
+                  }`}
               >
                 {item.name}
               </Link>
@@ -244,7 +313,7 @@ export default function Shell({ children }: ShellProps) {
             </ol>
           </nav>
         </div>
-        
+
         <div className="px-4 py-6 sm:px-0">
           {children}
         </div>

@@ -32,6 +32,9 @@ interface AuthContextType {
   login: (userData: User, orgData: Organization, projectData: Project) => void;
   logout: () => void;
   refreshUserData: () => Promise<void>;
+  listOrganizations: () => Promise<Organization[]>;
+  listProjects: () => Promise<Project[]>;
+  switchContext: (organizationId: string, projectId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -66,8 +69,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setOrganization(null);
     setProject(null);
-    // Clear session cookie by setting it to expire
     document.cookie = 'optiview_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  };
+
+  const listOrganizations = async (): Promise<Organization[]> => {
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/organizations`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch organizations');
+      const data = await response.json();
+      return data.organizations || [];
+    } catch (err) {
+      console.error('Failed to list organizations:', err);
+      return [];
+    }
+  };
+
+  const listProjects = async (): Promise<Project[]> => {
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/projects`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      const data = await response.json();
+      return data.projects || [];
+    } catch (err) {
+      console.error('Failed to list projects:', err);
+      return [];
+    }
+  };
+
+  const switchContext = async (organizationId: string, projectId: string): Promise<void> => {
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/switch-context`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization_id: organizationId, project_id: projectId })
+      });
+
+      if (!response.ok) throw new Error('Failed to switch context');
+
+      // Refresh user data to get the new context
+      await refreshUserData();
+    } catch (err) {
+      console.error('Failed to switch context:', err);
+      throw err;
+    }
   };
 
   const refreshUserData = async () => {
@@ -154,6 +199,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     refreshUserData,
+    listOrganizations,
+    listProjects,
+    switchContext,
   };
 
   return (

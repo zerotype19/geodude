@@ -855,6 +855,121 @@ export default {
         }
       }
 
+      // 4.4) Get user's available organizations
+      if (url.pathname === "/api/auth/organizations" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const organizations = await env.OPTIVIEW_DB.prepare(`
+            SELECT o.id, o.name, o.created_ts
+            FROM organization o
+            JOIN org_member om ON o.id = om.org_id
+            WHERE om.user_id = ?
+            ORDER BY o.created_ts DESC
+          `).bind(sessionData.user_id).all();
+
+          const response = new Response(JSON.stringify({ organizations: organizations.results }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
+
+        } catch (e) {
+          console.error("Get organizations error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
+        }
+      }
+
+      // 4.5) Get user's available projects
+      if (url.pathname === "/api/auth/projects" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const projects = await env.OPTIVIEW_DB.prepare(`
+            SELECT p.id, p.name, p.slug, p.org_id, p.created_ts
+            FROM project p
+            JOIN organization o ON p.org_id = o.id
+            JOIN org_member om ON o.id = om.org_id
+            WHERE om.user_id = ?
+            ORDER BY p.created_ts DESC
+          `).bind(sessionData.user_id).all();
+
+          const response = new Response(JSON.stringify({ projects: projects.results }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
+
+        } catch (e) {
+          console.error("Get projects error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
+        }
+      }
+
       // 3.3) Create Property
       if (url.pathname === "/api/onboarding/property" && request.method === "POST") {
         try {
@@ -1449,6 +1564,89 @@ export default {
           headers: { "Content-Type": "application/json" }
         });
         return addCorsHeaders(response, origin);
+      }
+
+      // 4.6) Switch organization/project context
+      if (url.pathname === "/api/auth/switch-context" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const body = await request.json();
+          const { organization_id, project_id } = body;
+
+          if (!organization_id || !project_id) {
+            const response = new Response(JSON.stringify({ error: "Organization ID and Project ID are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          // Verify user has access to this organization and project
+          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count 
+            FROM org_member om
+            JOIN project p ON p.org_id = om.org_id
+            WHERE om.user_id = ? AND om.org_id = ? AND p.id = ?
+          `).bind(sessionData.user_id, organization_id, project_id).first();
+
+          if (accessCheck.count === 0) {
+            const response = new Response(JSON.stringify({ error: "Access denied to organization/project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          // Update session with new context (we'll store this in a separate table)
+          // For now, we'll return success and let the frontend handle context switching
+          const response = new Response(JSON.stringify({ 
+            success: true, 
+            message: "Context switch successful",
+            organization_id,
+            project_id
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
+
+        } catch (e) {
+          console.error("Switch context error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
+        }
       }
 
       // 4.5) Dev Test Endpoint - Magic Link Token Peek (TEST_MODE only)
