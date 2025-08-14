@@ -186,6 +186,11 @@ export default {
             SELECT COUNT(*) as count FROM rules_suggestions WHERE status = 'pending'
           `).first();
 
+          // Get content assets total count
+          const contentAssetsTotal = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count FROM content_assets
+          `).first();
+
           const response = new Response(JSON.stringify({
             status: "healthy",
             timestamp: new Date().toISOString(),
@@ -209,6 +214,9 @@ export default {
             },
             sources: {
               rules_suggestions_pending: pendingSuggestions?.count || 0
+            },
+            content: {
+              assets_total: contentAssetsTotal?.count || 0
             }
           }), {
             status: 200,
@@ -226,6 +234,9 @@ export default {
             message: error.message,
             sources: {
               rules_suggestions_pending: 0
+            },
+            content: {
+              assets_total: 0
             }
           }), {
             status: 200,
@@ -1567,31 +1578,155 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // For now, return sample content since we don't have a content table yet
-          // TODO: Implement content management when we add the content table
-          const sampleContent = [
-            {
-              id: "cnt_sample_001",
-              name: "Homepage",
-              url: "https://example.com",
-              type: "page",
-              project_id: projectId,
-              created_at: Date.now() - 86400000, // 1 day ago
-              status: "active"
-            },
-            {
-              id: "cnt_sample_002",
-              name: "Blog Post",
-              url: "https://example.com/blog",
-              type: "article", 
-              project_id: projectId,
-              created_at: Date.now() - 172800000, // 2 days ago
-              status: "active"
-            }
-          ];
+          // Rate limiting: 60 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const userKey = `rate_limit:content_list:user:${sessionData.user_id}`;
+          const userLimit = await checkRateLimit(userKey, 60, 60 * 1000); // 60 rpm
 
-          const response = new Response(JSON.stringify({ content: sampleContent }), {
-            headers: { "Content-Type": "application/json" }
+          if (!userLimit.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limited",
+              retry_after: Math.ceil(userLimit.retryAfter / 1000)
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": Math.ceil(userLimit.retryAfter / 1000).toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get query parameters
+          const window = urlObj.searchParams.get("window") || "24h";
+          const q = urlObj.searchParams.get("q") || "";
+          const page = parseInt(urlObj.searchParams.get("page") || "1");
+          const pageSize = Math.min(Math.max(parseInt(urlObj.searchParams.get("pageSize") || "50"), 10), 100); // Clamp 10-100
+          const type = urlObj.searchParams.get("type") || "";
+          const aiOnly = urlObj.searchParams.get("aiOnly") === "true";
+
+          // Calculate time window
+          let sinceTime;
+          if (window === "15m") {
+            sinceTime = "datetime('now','-15 minutes')";
+          } else if (window === "24h") {
+            sinceTime = "datetime('now','-1 day')";
+          } else if (window === "7d") {
+            sinceTime = "datetime('now','-7 days')";
+          } else {
+            sinceTime = "datetime('now','-1 day')"; // Default to 24h
+          }
+
+          // Build base filters
+          let baseFilters = "ca.project_id = ?";
+          let baseParams = [projectId];
+
+          if (q) {
+            baseFilters += " AND ca.url LIKE ?";
+            baseParams.push(`%${q}%`);
+          }
+
+          if (type) {
+            baseFilters += " AND ca.type = ?";
+            baseParams.push(type);
+          }
+
+          // Get total count first
+          const countQuery = `
+            SELECT COUNT(*) as total
+            FROM content_assets ca
+            WHERE ${baseFilters}
+          `;
+          const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...baseParams).first();
+          const total = totalResult?.total || 0;
+
+          // Main query with CTEs for performance
+          const mainQuery = `
+            WITH ai_by_content AS (
+              SELECT ie.content_id, ie.ai_source_id, COUNT(*) AS n
+              FROM interaction_events ie
+              WHERE ie.project_id = ? AND ie.occurred_at >= ${sinceTime} AND ie.ai_source_id IS NOT NULL
+              GROUP BY ie.content_id, ie.ai_source_id
+            ),
+            ai_by_content_rollup AS (
+              SELECT content_id, SUM(n) AS ai_events
+              FROM ai_by_content
+              GROUP BY content_id
+            ),
+            ref_by_content AS (
+              SELECT ar.content_id, COUNT(*) AS ai_referrals
+              FROM ai_referrals ar
+              WHERE ar.project_id = ? AND ar.detected_at >= ${sinceTime}
+              GROUP BY ar.content_id
+            ),
+            last_seen AS (
+              SELECT content_id, MAX(occurred_at) AS last_seen
+              FROM interaction_events ie
+              WHERE ie.project_id = ?
+              GROUP BY content_id
+            ),
+            max_ai AS (
+              SELECT COALESCE(MAX(ai_events + 2*COALESCE(r.ai_referrals,0)), 1) AS denom
+              FROM ai_by_content_rollup a
+              LEFT JOIN ref_by_content r ON r.content_id = a.content_id
+            )
+            SELECT
+              ca.id, ca.url, ca.type,
+              ls.last_seen,
+              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=${sinceTime}) AS events_window,
+              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')) AS events_15m,
+              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')) AS events_24h,
+              COALESCE(r.ai_referrals,0) AS ai_referrals_24h,
+              CAST(ROUND(100.0 * (COALESCE(a.ai_events,0) + 2*COALESCE(r.ai_referrals,0)) / (SELECT denom FROM max_ai)) AS INT) AS coverage_score
+            FROM content_assets ca
+            LEFT JOIN ai_by_content_rollup a ON a.content_id = ca.id
+            LEFT JOIN ref_by_content r ON r.content_id = ca.id
+            LEFT JOIN last_seen ls ON ls.content_id = ca.id
+            WHERE ${baseFilters}
+              AND (? = 0 OR (COALESCE(a.ai_events,0) + COALESCE(r.ai_referrals,0)) > 0)
+            ORDER BY ls.last_seen DESC NULLS LAST, ca.url ASC
+            LIMIT ? OFFSET ?
+          `;
+
+          const mainParams = [...baseParams, aiOnly ? 1 : 0, pageSize, (page - 1) * pageSize];
+          const mainResult = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...mainParams).all();
+
+          // Get by-source breakdown for the returned items
+          const items = [];
+          for (const row of mainResult.results) {
+            // Get by-source breakdown for 24h
+            const bySourceResult = await env.OPTIVIEW_DB.prepare(`
+              SELECT s.slug, COUNT(*) as events
+              FROM interaction_events ie
+              JOIN ai_sources s ON s.id = ie.ai_source_id
+              WHERE ie.project_id = ? AND ie.content_id = ? AND ie.occurred_at >= datetime('now','-1 day')
+              GROUP BY s.slug
+              ORDER BY events DESC
+            `).bind(projectId, row.id).all();
+
+            items.push({
+              id: row.id,
+              url: row.url,
+              type: row.type,
+              last_seen: row.last_seen,
+              events_15m: row.events_15m,
+              events_24h: row.events_24h,
+              ai_referrals_24h: row.ai_referrals_24h,
+              by_source_24h: bySourceResult.results,
+              coverage_score: row.coverage_score
+            });
+          }
+
+          const response = new Response(JSON.stringify({
+            items,
+            page,
+            total,
+            pageSize
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
           });
           return addCorsHeaders(response, origin);
 
@@ -1665,26 +1800,388 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // For now, return success since we don't have a content table yet
-          // TODO: Implement content storage when we add the content table
-          const response = new Response(JSON.stringify({
-            success: true,
-            message: "Content created successfully",
-            content: {
-              id: `cnt_${generateToken().substring(0, 12)}`,
-              name,
-              url,
-              type,
-              project_id,
-              created_at: Date.now()
+          // Rate limiting: 30 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const userKey = `rate_limit:content_create:user:${sessionData.user_id}`;
+          const userLimit = await checkRateLimit(userKey, 30, 60 * 1000); // 30 rpm
+
+          if (!userLimit.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limited",
+              retry_after: Math.ceil(userLimit.retryAfter / 1000)
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": Math.ceil(userLimit.retryAfter / 1000).toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get property_id from the request
+          const { property_id } = body;
+
+          if (!property_id) {
+            const response = new Response(JSON.stringify({ error: "property_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify the property belongs to the project
+          const propertyCheck = await env.OPTIVIEW_DB.prepare(`
+            SELECT id FROM properties WHERE id = ? AND project_id = ?
+          `).bind(property_id, project_id).first();
+
+          if (!propertyCheck) {
+            const response = new Response(JSON.stringify({ error: "Property not found or access denied" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Sanitize metadata (limit to 1KB, remove PII)
+          let sanitizedMetadata = null;
+          if (body.metadata) {
+            const metadataStr = JSON.stringify(body.metadata);
+            if (metadataStr.length > 1024) {
+              const response = new Response(JSON.stringify({ error: "Metadata too large (max 1KB)" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
             }
+            sanitizedMetadata = metadataStr;
+          }
+
+          // Upsert content asset (property_id + url should be unique)
+          const now = new Date().toISOString();
+          const result = await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO content_assets (property_id, project_id, url, type, metadata, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(property_id, url) DO UPDATE SET
+              type = excluded.type,
+              metadata = excluded.metadata,
+              created_at = excluded.created_at
+            RETURNING id
+          `).bind(property_id, project_id, url, type, sanitizedMetadata, now).run();
+
+          const contentId = result.meta.last_row_id || result.results?.[0]?.id;
+
+          const response = new Response(JSON.stringify({
+            id: contentId,
+            url,
+            type,
+            property_id,
+            project_id
           }), {
+            status: 201,
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
 
         } catch (e) {
           console.error("Create content error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 4.5) Content update endpoint
+      if (url.pathname.match(/^\/api\/content\/\d+$/) && request.method === "PATCH") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Extract content ID from URL
+          const contentId = url.pathname.split('/').pop();
+          const body = await request.json();
+          const { type, metadata } = body;
+
+          // Get the content asset and verify access
+          const contentAsset = await env.OPTIVIEW_DB.prepare(`
+            SELECT ca.id, ca.project_id, ca.property_id
+            FROM content_assets ca
+            JOIN properties p ON p.id = ca.property_id
+            JOIN org_member om ON om.org_id = p.org_id
+            WHERE ca.id = ? AND om.user_id = ?
+          `).bind(contentId, sessionData.user_id).first();
+
+          if (!contentAsset) {
+            const response = new Response(JSON.stringify({ error: "Content not found or access denied" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 30 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const userKey = `rate_limit:content_update:user:${sessionData.user_id}`;
+          const userLimit = await checkRateLimit(userKey, 30, 60 * 1000); // 30 rpm
+          
+          if (!userLimit.allowed) {
+            const response = new Response(JSON.stringify({ 
+              error: "Rate limited",
+              retry_after: Math.ceil(userLimit.retryAfter / 1000)
+            }), {
+              status: 429,
+              headers: { 
+                "Content-Type": "application/json",
+                "Retry-After": Math.ceil(userLimit.retryAfter / 1000).toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Build update query
+          let updateFields = [];
+          let updateParams = [];
+
+          if (type !== undefined) {
+            updateFields.push("type = ?");
+            updateParams.push(type);
+          }
+
+          if (metadata !== undefined) {
+            // Sanitize metadata (limit to 1KB)
+            const metadataStr = JSON.stringify(metadata);
+            if (metadataStr.length > 1024) {
+              const response = new Response(JSON.stringify({ error: "Metadata too large (max 1KB)" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+            updateFields.push("metadata = ?");
+            updateParams.push(metadataStr);
+          }
+
+          if (updateFields.length === 0) {
+            const response = new Response(JSON.stringify({ error: "No fields to update" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Update the content asset
+          updateParams.push(contentId);
+          const result = await env.OPTIVIEW_DB.prepare(`
+            UPDATE content_assets 
+            SET ${updateFields.join(', ')}
+            WHERE id = ?
+          `).bind(...updateParams).run();
+
+          const response = new Response(JSON.stringify({
+            id: contentId,
+            updated: true
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Update content error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 4.6) Content detail endpoint
+      if (url.pathname.match(/^\/api\/content\/\d+\/detail$/) && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Extract content ID from URL
+          const contentId = url.pathname.split('/')[3]; // /api/content/{id}/detail
+          const window = url.searchParams.get("window") || "7d";
+
+          // Get the content asset and verify access
+          const contentAsset = await env.OPTIVIEW_DB.prepare(`
+            SELECT ca.id, ca.url, ca.type, ca.metadata
+            FROM content_assets ca
+            JOIN properties p ON p.id = ca.property_id
+            JOIN org_member om ON om.org_id = p.org_id
+            WHERE ca.id = ? AND om.user_id = ?
+          `).bind(contentId, sessionData.user_id).first();
+
+          if (!contentAsset) {
+            const response = new Response(JSON.stringify({ error: "Content not found or access denied" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const userKey = `rate_limit:content_detail:user:${sessionData.user_id}`;
+          const userLimit = await checkRateLimit(userKey, 60, 60 * 1000); // 60 rpm
+          
+          if (!userLimit.allowed) {
+            const response = new Response(JSON.stringify({ 
+              error: "Rate limited",
+              retry_after: Math.ceil(userLimit.retryAfter / 1000)
+            }), {
+              status: 429,
+              headers: { 
+                "Content-Type": "application/json",
+                "Retry-After": Math.ceil(userLimit.retryAfter / 1000).toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get by-source breakdown for the window
+          const bySourceResult = await env.OPTIVIEW_DB.prepare(`
+            SELECT s.slug, COUNT(*) as events
+            FROM interaction_events ie
+            JOIN ai_sources s ON s.id = ie.ai_source_id
+            WHERE ie.project_id = (SELECT project_id FROM content_assets WHERE id = ?) 
+              AND ie.content_id = ? 
+              AND ie.occurred_at >= ?
+            GROUP BY s.slug
+            ORDER BY events DESC
+          `).bind(contentId, contentId, window === "7d" ? "datetime('now','-7 days')" : "datetime('now','-1 day')").all();
+
+          // Get timeseries data
+          let timeseriesQuery;
+          let timeseriesParams;
+
+          if (window === "7d") {
+            timeseriesQuery = `
+              SELECT 
+                date(occurred_at) as ts,
+                COUNT(*) as events,
+                COUNT(CASE WHEN ai_source_id IS NOT NULL THEN 1 END) as ai_events
+              FROM interaction_events
+              WHERE content_id = ? AND occurred_at >= datetime('now','-7 days')
+              GROUP BY date(occurred_at)
+              ORDER BY ts DESC
+            `;
+            timeseriesParams = [contentId];
+          } else {
+            timeseriesQuery = `
+              SELECT 
+                strftime('%Y-%m-%d %H:00:00', occurred_at) as ts,
+                COUNT(*) as events,
+                COUNT(CASE WHEN ai_source_id IS NOT NULL THEN 1 END) as ai_events
+              FROM interaction_events
+              WHERE content_id = ? AND occurred_at >= datetime('now','-1 day')
+              GROUP BY strftime('%Y-%m-%d %H:00:00', occurred_at)
+              ORDER BY ts DESC
+            `;
+            timeseriesParams = [contentId];
+          }
+
+          const timeseriesResult = await env.OPTIVIEW_DB.prepare(timeseriesQuery).bind(...timeseriesParams).all();
+
+          // Get recent events (last 10)
+          const recentEventsResult = await env.OPTIVIEW_DB.prepare(`
+            SELECT 
+              ie.occurred_at,
+              ie.event_type,
+              s.slug as source,
+              COALESCE(ie.metadata->>'$.p', '') as path
+            FROM interaction_events ie
+            LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
+            WHERE ie.content_id = ?
+            ORDER BY ie.occurred_at DESC
+            LIMIT 10
+          `).bind(contentId).all();
+
+          const response = new Response(JSON.stringify({
+            asset: {
+              id: contentAsset.id,
+              url: contentAsset.url,
+              type: contentAsset.type
+            },
+            by_source: bySourceResult.results,
+            timeseries: timeseriesResult.results.map(row => ({
+              ts: row.ts,
+              events: row.events,
+              ai_referrals: row.ai_events
+            })),
+            recent_events: recentEventsResult.results.map(row => ({
+              occurred_at: row.occurred_at,
+              event_type: row.event_type,
+              source: row.source || 'unknown',
+              path: row.path
+            }))
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Content detail error:", e);
           const response = new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
@@ -1808,17 +2305,17 @@ export default {
                 ORDER BY n DESC
                 LIMIT 5
               `;
-              
+
               const topContent = await env.OPTIVIEW_DB.prepare(topContentQuery)
                 .bind(projectId, source.id)
                 .all();
-              
+
               source.top_content = topContent.results;
             }
           }
 
           const response = new Response(JSON.stringify(sources.results), {
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
             }
@@ -2101,13 +2598,13 @@ export default {
 
           // Determine project_id and validate property_id scope
           const projectId = apiKey.project_id;
-          
+
           // Verify property belongs to project (if property_id provided)
           if (property_id) {
             const propertyCheck = await env.OPTIVIEW_DB.prepare(`
               SELECT id FROM properties WHERE id = ? AND project_id = ?
             `).bind(property_id, projectId).first();
-            
+
             if (!propertyCheck) {
               const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
                 status: 403,
@@ -2121,7 +2618,7 @@ export default {
           let aiSourceId = null;
           if (metadata && metadata.r) {
             const referer = metadata.r.toLowerCase();
-            
+
             // Simple classification logic - can be enhanced later
             if (referer.includes('chat.openai.com') || referer.includes('openai.com')) {
               aiSourceId = 10; // ChatGPT
@@ -2141,7 +2638,7 @@ export default {
             const existingContent = await env.OPTIVIEW_DB.prepare(`
               SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
             `).bind(`%${metadata.p}%`, projectId).first();
-            
+
             if (existingContent) {
               contentId = existingContent.id;
             }
@@ -2149,7 +2646,7 @@ export default {
 
           // Store event in interaction_events table
           const now = new Date().toISOString();
-          
+
           const result = await env.OPTIVIEW_DB.prepare(`
             INSERT INTO interaction_events (
               project_id, property_id, content_id, ai_source_id, 
