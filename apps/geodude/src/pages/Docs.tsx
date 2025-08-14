@@ -488,6 +488,68 @@ Export events as CSV.
 - Historical performance trends
 - Error rate by endpoint
 - Resource utilization`
+  },
+  {
+    id: 'sources',
+    title: 'AI Sources',
+    path: '/docs/sources',
+    content: `# AI Sources
+
+## What counts as a "source"?
+
+AI sources are platforms, tools, or services that interact with your content and can be detected 
+through various patterns. These include:
+
+- Chat Assistants: ChatGPT, Claude, Gemini, and other AI chat tools
+- Search Engines: Perplexity, AI-powered search platforms
+- Crawlers: AI web crawlers and content scrapers
+- Browser AI: Browser-based AI assistants and extensions
+- Model APIs: Direct AI model API calls to your content
+
+## How enable/disable affects dashboards
+
+<strong>Important:</strong> Enabling or disabling sources does not change data ingestion. 
+All AI interactions are still logged and stored. The enable/disable setting only affects:
+
+- Whether the source appears in your main dashboard
+- Whether you receive alerts for that source
+- Whether the source is included in analytics and reports
+
+## Suggesting patterns vs admin-managed rules
+
+<strong>Non-admin users:</strong> Can suggest detection patterns for existing sources. 
+These suggestions are reviewed by administrators and may be incorporated into the global 
+detection system.
+
+<strong>Admin users:</strong> Can create new global sources, edit existing ones, and 
+manage the detection rules that power the entire system.
+
+## Top content definition & window
+
+Top content shows the most frequently accessed URLs for each AI source over the last 24 hours. 
+This helps you understand which content is most valuable to AI platforms and users.
+
+<strong>Data window:</strong> 24 hours from the current time<br/>
+<strong>Maximum results:</strong> Top 5 URLs per source<br/>
+<strong>Update frequency:</strong> Real-time (refreshed when viewing details)
+
+## Pattern schema
+
+When suggesting patterns, use this JSON structure:
+
+\`\`\`json
+{
+  "ua_regex": ["pattern1", "pattern2"],
+  "referer_domains": ["domain1.com", "domain2.com"],
+  "header_contains": {
+    "header_name": "value_pattern"
+  }
+}
+\`\`\`
+
+<strong>ua_regex:</strong> User agent patterns to match<br/>
+<strong>referer_domains:</strong> Referrer domains that indicate AI usage<br/>
+<strong>header_contains:</strong> HTTP headers that suggest AI interaction`
   }
 ];
 
