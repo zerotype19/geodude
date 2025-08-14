@@ -562,8 +562,42 @@ export default {
             VALUES (?, ?, ?)
           `).bind(orgId, name, now).run();
 
-          // Note: User creation is handled separately in the magic link flow
-          // Organization creation only creates the organization itself
+          // Get current user from session to create org_member record
+          const sessionCookie = request.headers.get("cookie");
+          let userId = null;
+
+          if (sessionCookie) {
+            // Extract session ID from cookie
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (sessionMatch) {
+              const sessionId = sessionMatch[1];
+              console.log('🔍 Found session ID:', sessionId.substring(0, 8) + '...');
+              
+              // Get user ID from session
+              const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+              `).bind(sessionId, new Date().toISOString()).first();
+              
+              if (sessionData) {
+                userId = sessionData.user_id;
+                console.log('👤 Found user ID from session:', userId);
+                
+                // Create org_member record linking user to organization
+                await env.OPTIVIEW_DB.prepare(`
+                  INSERT INTO org_member (org_id, user_id, role)
+                  VALUES (?, ?, 'admin')
+                `).bind(orgId, userId).run();
+                
+                console.log('✅ Created org_member record:', { orgId, userId, role: 'admin' });
+              } else {
+                console.log('⚠️ No valid session found for session ID');
+              }
+            } else {
+              console.log('⚠️ No session cookie found in request');
+            }
+          } else {
+            console.log('⚠️ No cookie header in request');
+          }
 
           const response = new Response(JSON.stringify({
             id: orgId,
@@ -1367,7 +1401,9 @@ export default {
           const responseData = {
             id: orgId,
             name: name,
-            created_at: now
+            created_at: now,
+            user_id: userId,
+            org_member_created: !!userId
           };
 
           console.log('📤 Sending response:', responseData);
