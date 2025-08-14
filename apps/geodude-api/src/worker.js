@@ -562,40 +562,13 @@ export default {
             VALUES (?, ?, ?)
           `).bind(orgId, name, now).run();
 
-          // Create user if they don't exist
-          const sessionCookie = request.headers.get("cookie");
-          let userEmail = "unknown@example.com"; // Default fallback
-
-          if (sessionCookie) {
-            // Extract session ID and get user email
-            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-            if (sessionMatch) {
-              const sessionId = sessionMatch[1];
-              const sessionData = await env.AI_FINGERPRINTS.get(`session:${sessionId}`, { type: "json" });
-              if (sessionData && sessionData.user_email) {
-                userEmail = sessionData.user_email;
-              }
-            }
-          }
-
-          // Create user
-          const userId = `usr_${generateToken().substring(0, 12)}`;
-          await env.OPTIVIEW_DB.prepare(`
-            INSERT OR IGNORE INTO user (id, email, created_ts)
-            VALUES (?, ?, ?)
-          `).bind(userId, userEmail, now).run();
-
-          // Make user admin of the organization
-          await env.OPTIVIEW_DB.prepare(`
-            INSERT INTO org_member (org_id, user_id, role)
-            VALUES (?, ?, 'admin')
-          `).bind(orgId, userId).run();
+          // Note: User creation is handled separately in the magic link flow
+          // Organization creation only creates the organization itself
 
           const response = new Response(JSON.stringify({
             id: orgId,
             name: name,
-            created_at: now,
-            user_id: userId
+            created_at: now
           }), {
             headers: { "Content-Type": "application/json" }
           });
@@ -636,11 +609,8 @@ export default {
             VALUES (?, ?, ?, ?, ?)
           `).bind(projectId, org_id, name, slug, now).run();
 
-          // Create default project settings
-          await env.OPTIVIEW_DB.prepare(`
-            INSERT INTO project_settings (project_id, retention_days_events, retention_days_referrals, plan_tier, xray_trace_enabled, created_at, updated_at)
-            VALUES (?, 180, 365, 'free', 0, ?, ?)
-          `).bind(projectId, now, now).run();
+          // Note: Project settings are not currently implemented
+          // The project is created with basic information only
 
           const response = new Response(JSON.stringify({
             id: projectId,
@@ -1393,10 +1363,11 @@ export default {
           console.log('✅ Organization created:', { id: orgId, name, slug });
 
           const responseData = {
-            success: true,
-            organization: { id: orgId, name, slug }
+            id: orgId,
+            name: name,
+            created_at: now
           };
-
+          
           console.log('📤 Sending response:', responseData);
 
           return new Response(JSON.stringify(responseData), {
