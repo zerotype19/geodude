@@ -180,32 +180,59 @@ export default {
 
       // 1.5) Admin health check
       if (url.pathname === "/admin/health") {
-        const response = new Response(JSON.stringify({
-          status: "healthy",
-          timestamp: new Date().toISOString(),
-          version: "1.0.0",
-          kv_ok: true,
-          d1_ok: true,
-          last_cron_ts: new Date().toISOString(),
-          ingest: {
-            total_5m: 0,
-            error_rate_5m: 0,
-            p50_ms_5m: 0,
-            p95_ms_5m: 0,
-            by_error_5m: {},
-            top_error_keys_5m: [],
-            top_error_projects_5m: []
-          },
-          auth: {
-            continue_sanitized_5m: 0,
-            magic_links_requested_5m: 0,
-            magic_links_consumed_5m: 0
-          }
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-        return addCorsHeaders(response, origin);
+        try {
+          // Get pending rules suggestions count
+          const pendingSuggestions = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count FROM rules_suggestions WHERE status = 'pending'
+          `).first();
+
+          const response = new Response(JSON.stringify({
+            status: "healthy",
+            timestamp: new Date().toISOString(),
+            version: "1.0.0",
+            kv_ok: true,
+            d1_ok: true,
+            last_cron_ts: new Date().toISOString(),
+            ingest: {
+              total_5m: 0,
+              error_rate_5m: 0,
+              p50_ms_5m: 0,
+              p95_ms_5m: 0,
+              by_error_5m: {},
+              top_error_keys_5m: [],
+              top_error_projects_5m: []
+            },
+            auth: {
+              continue_sanitized_5m: 0,
+              magic_links_requested_5m: 0,
+              magic_links_consumed_5m: 0
+            },
+            sources: {
+              rules_suggestions_pending: pendingSuggestions?.count || 0
+            }
+          }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (error) {
+          const response = new Response(JSON.stringify({
+            status: "degraded",
+            timestamp: new Date().toISOString(),
+            version: "1.0.0",
+            kv_ok: true,
+            d1_ok: false,
+            error: "Failed to query database",
+            message: error.message,
+            sources: {
+              rules_suggestions_pending: 0
+            }
+          }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
       }
 
       // 1.6) Admin environment check (for debugging)
@@ -1700,9 +1727,9 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // Get project_id from query params
-          const urlObj = new URL(request.url);
-          const projectId = urlObj.searchParams.get("project_id");
+          // GET /api/sources - List sources with activity for a project
+          const projectId = url.searchParams.get('project_id');
+          const includeTop = url.searchParams.get('includeTop') === 'true';
 
           if (!projectId) {
             const response = new Response(JSON.stringify({ error: "project_id is required" }), {
@@ -1728,31 +1755,73 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // For now, return sample sources since we don't have a sources table yet
-          // TODO: Implement sources management when we add the sources table
-          const sampleSources = [
-            {
-              id: "src_sample_001",
-              name: "ChatGPT",
-              category: "chat",
-              fingerprint: "chatgpt_v1",
-              project_id: projectId,
-              created_at: Date.now() - 86400000, // 1 day ago
-              status: "active"
-            },
-            {
-              id: "src_sample_002", 
-              name: "Claude",
-              category: "chat",
-              fingerprint: "claude_v2",
-              project_id: projectId,
-              created_at: Date.now() - 172800000, // 2 days ago
-              status: "active"
-            }
-          ];
+          // Build the main query with activity CTEs
+          const sourcesQuery = `
+            WITH
+            ev15 AS (
+              SELECT ai_source_id, COUNT(*) AS n
+              FROM interaction_events
+              WHERE project_id = ? AND occurred_at >= datetime('now','-15 minutes')
+              GROUP BY ai_source_id
+            ),
+            ev24 AS (
+              SELECT ai_source_id, COUNT(*) AS n, MAX(occurred_at) AS last_seen
+              FROM interaction_events
+              WHERE project_id = ? AND occurred_at >= datetime('now','-1 day')
+              GROUP BY ai_source_id
+            ),
+            ref24 AS (
+              SELECT ai_source_id, COUNT(*) AS n
+              FROM ai_referrals
+              WHERE project_id = ? AND detected_at >= datetime('now','-1 day')
+              GROUP BY ai_source_id
+            )
+            SELECT s.id, s.slug, s.name, s.category,
+                   COALESCE(p.enabled, 0) AS enabled,
+                   e24.last_seen,
+                   COALESCE(e15.n,0) AS events_15m,
+                   COALESCE(e24.n,0) AS events_24h,
+                   COALESCE(r24.n,0) AS referrals_24h
+            FROM ai_sources s
+            LEFT JOIN project_ai_sources p
+              ON p.ai_source_id = s.id AND p.project_id = ?
+            LEFT JOIN ev15 e15 ON e15.ai_source_id = s.id
+            LEFT JOIN ev24 e24 ON e24.ai_source_id = s.id
+            LEFT JOIN ref24 r24 ON r24.ai_source_id = s.id
+            WHERE s.is_active = 1
+            ORDER BY COALESCE(e24.last_seen, '0000-01-01') DESC, s.name ASC
+          `;
 
-          const response = new Response(JSON.stringify(sampleSources), {
-            headers: { "Content-Type": "application/json" }
+          const sources = await env.OPTIVIEW_DB.prepare(sourcesQuery)
+            .bind(projectId, projectId, projectId, projectId)
+            .all();
+
+          // Add top content if requested
+          if (includeTop) {
+            for (const source of sources.results) {
+              const topContentQuery = `
+                SELECT ca.url AS content_url, COUNT(*) AS n
+                FROM interaction_events ie
+                JOIN content_assets ca ON ca.id = ie.content_id
+                WHERE ie.project_id = ? AND ie.ai_source_id = ? AND ie.occurred_at >= datetime('now','-1 day')
+                GROUP BY ca.url
+                ORDER BY n DESC
+                LIMIT 5
+              `;
+              
+              const topContent = await env.OPTIVIEW_DB.prepare(topContentQuery)
+                .bind(projectId, source.id)
+                .all();
+              
+              source.top_content = topContent.results;
+            }
+          }
+
+          const response = new Response(JSON.stringify(sources.results), {
+            headers: { 
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
           });
           return addCorsHeaders(response, origin);
 
@@ -1800,10 +1869,19 @@ export default {
           }
 
           const body = await request.json();
-          const { name, category, fingerprint, project_id } = body;
+          const { project_id, ai_source_id, enabled, notes, suggested_pattern_json } = body;
 
-          if (!name || !category || !project_id) {
-            const response = new Response(JSON.stringify({ error: "Name, category, and project_id are required" }), {
+          if (!project_id || !ai_source_id || enabled === undefined) {
+            const response = new Response(JSON.stringify({ error: "project_id, ai_source_id, and enabled are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate suggested_pattern_json size if provided
+          if (suggested_pattern_json && JSON.stringify(suggested_pattern_json).length > 2048) {
+            const response = new Response(JSON.stringify({ error: "suggested_pattern_json too large (max 2KB)" }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
@@ -1826,26 +1904,147 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // For now, return success since we don't have a sources table yet
-          // TODO: Implement source storage when we add the sources table
+          // Verify ai_source exists and is active
+          const sourceCheck = await env.OPTIVIEW_DB.prepare(`
+            SELECT id FROM ai_sources WHERE id = ? AND is_active = 1
+          `).bind(ai_source_id).first();
+
+          if (!sourceCheck) {
+            const response = new Response(JSON.stringify({ error: "AI source not found or inactive" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Upsert project_ai_sources
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO project_ai_sources (project_id, ai_source_id, enabled, notes, suggested_pattern_json, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(project_id, ai_source_id) DO UPDATE SET
+              enabled = excluded.enabled,
+              notes = excluded.notes,
+              suggested_pattern_json = excluded.suggested_pattern_json,
+              updated_at = CURRENT_TIMESTAMP
+          `).bind(project_id, ai_source_id, enabled ? 1 : 0, notes || null, suggested_pattern_json ? JSON.stringify(suggested_pattern_json) : null).run();
+
+          // Create rules_suggestions if pattern provided
+          if (suggested_pattern_json) {
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO rules_suggestions (project_id, ai_source_id, author_user_id, suggestion_json, status)
+              VALUES (?, ?, ?, ?, 'pending')
+            `).bind(project_id, ai_source_id, sessionData.user_id, JSON.stringify(suggested_pattern_json)).run();
+          }
+
+          // TODO: Increment metrics counters
+          // sources_enable_clicked_5m or sources_disable_clicked_5m
+          // rules_suggestion_created_5m (if pattern provided)
+
           const response = new Response(JSON.stringify({
             success: true,
-            message: "Source created successfully",
-            source: {
-              id: `src_${generateToken().substring(0, 12)}`,
-              name,
-              category,
-              fingerprint: fingerprint || null,
-              project_id,
-              created_at: Date.now()
-            }
+            message: `Source ${enabled ? 'enabled' : 'disabled'} successfully`,
+            project_id,
+            ai_source_id,
+            enabled: !!enabled
           }), {
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
 
         } catch (e) {
-          console.error("Create source error:", e);
+          console.error("Enable/disable source error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // DELETE /api/sources/enable - Disable a source for a project
+      if (url.pathname === "/api/sources/enable" && request.method === "DELETE") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const body = await request.json();
+          const { project_id, ai_source_id } = body;
+
+          if (!project_id || !ai_source_id) {
+            const response = new Response(JSON.stringify({ error: "project_id and ai_source_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user has access to this project
+          const accessCheck = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count 
+            FROM org_member om
+            JOIN project p ON p.org_id = om.org_id
+            WHERE om.user_id = ? AND p.id = ?
+          `).bind(sessionData.user_id, project_id).first();
+
+          if (accessCheck.count === 0) {
+            const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Set enabled=0 for the project_ai_sources row
+          await env.OPTIVIEW_DB.prepare(`
+            UPDATE project_ai_sources 
+            SET enabled = 0, updated_at = CURRENT_TIMESTAMP
+            WHERE project_id = ? AND ai_source_id = ?
+          `).bind(project_id, ai_source_id).run();
+
+          // TODO: Increment metrics counter
+          // sources_disable_clicked_5m
+
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: "Source disabled successfully",
+            project_id,
+            ai_source_id,
+            enabled: false
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Disable source error:", e);
           const response = new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
@@ -2086,6 +2285,382 @@ export default {
 
         } catch (e) {
           console.error("Admin purge error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 9) Admin Sources endpoints
+      if (url.pathname === "/admin/sources" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Check if user is admin
+          const userData = await env.OPTIVIEW_DB.prepare(`
+            SELECT is_admin FROM user WHERE id = ?
+          `).bind(sessionData.user_id).first();
+
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const body = await request.json();
+          const { slug, name, category, is_active } = body;
+
+          if (!slug || !name || !category) {
+            const response = new Response(JSON.stringify({ error: "slug, name, and category are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate category enum
+          const validCategories = ['chat_assistant', 'search_engine', 'crawler', 'browser_ai', 'model_api', 'other'];
+          if (!validCategories.includes(category)) {
+            const response = new Response(JSON.stringify({ error: "Invalid category" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Create new ai_source
+          const result = await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO ai_sources (slug, name, category, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `).bind(slug, name, category, is_active !== false ? 1 : 0).run();
+
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: "AI source created successfully",
+            id: result.meta.last_row_id,
+            slug,
+            name,
+            category,
+            is_active: is_active !== false
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Admin create source error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      if (url.pathname.startsWith("/admin/sources/") && request.method === "PATCH") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Check if user is admin
+          const userData = await env.OPTIVIEW_DB.prepare(`
+            SELECT is_admin FROM user WHERE id = ?
+          `).bind(sessionData.user_id).first();
+
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sourceId = url.pathname.split('/').pop();
+          const body = await request.json();
+          const { name, category, is_active } = body;
+
+          // Validate category if provided
+          if (category) {
+            const validCategories = ['chat_assistant', 'search_engine', 'crawler', 'browser_ai', 'model_api', 'other'];
+            if (!validCategories.includes(category)) {
+              const response = new Response(JSON.stringify({ error: "Invalid category" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+          }
+
+          // Build update query dynamically
+          const updates = [];
+          const values = [];
+          if (name !== undefined) {
+            updates.push("name = ?");
+            values.push(name);
+          }
+          if (category !== undefined) {
+            updates.push("category = ?");
+            values.push(category);
+          }
+          if (is_active !== undefined) {
+            updates.push("is_active = ?");
+            values.push(is_active ? 1 : 0);
+          }
+          updates.push("updated_at = CURRENT_TIMESTAMP");
+          values.push(sourceId);
+
+          if (updates.length === 1) { // Only updated_at
+            const response = new Response(JSON.stringify({ error: "No fields to update" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const updateQuery = `UPDATE ai_sources SET ${updates.join(', ')} WHERE id = ?`;
+          await env.OPTIVIEW_DB.prepare(updateQuery).bind(...values).run();
+
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: "AI source updated successfully",
+            id: sourceId
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Admin update source error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 10) Admin Rules Suggestions endpoints
+      if (url.pathname === "/admin/rules/suggestions" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Check if user is admin
+          const userData = await env.OPTIVIEW_DB.prepare(`
+            SELECT is_admin FROM user WHERE id = ?
+          `).bind(sessionData.user_id).first();
+
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const status = url.searchParams.get('status') || 'pending';
+
+          const suggestions = await env.OPTIVIEW_DB.prepare(`
+            SELECT rs.*, p.name as project_name, s.name as source_name, s.slug as source_slug, u.email as author_email
+            FROM rules_suggestions rs
+            JOIN project p ON p.id = rs.project_id
+            JOIN ai_sources s ON s.id = rs.ai_source_id
+            JOIN user u ON u.id = rs.author_user_id
+            WHERE rs.status = ?
+            ORDER BY rs.created_at DESC
+          `).bind(status).all();
+
+          const response = new Response(JSON.stringify(suggestions.results), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Admin get suggestions error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      if (url.pathname.startsWith("/admin/rules/suggestions/") && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Check if user is admin
+          const userData = await env.OPTIVIEW_DB.prepare(`
+            SELECT is_admin FROM user WHERE id = ?
+          `).bind(sessionData.user_id).first();
+
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const suggestionId = url.pathname.split('/').pop();
+          const body = await request.json();
+          const { status, admin_comment, manifest_patch } = body;
+
+          if (!status || !['approved', 'rejected'].includes(status)) {
+            const response = new Response(JSON.stringify({ error: "status must be 'approved' or 'rejected'" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Update suggestion status
+          await env.OPTIVIEW_DB.prepare(`
+            UPDATE rules_suggestions 
+            SET status = ?, admin_comment = ?, decided_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).bind(status, admin_comment || null, suggestionId).run();
+
+          // If approved with manifest_patch, update KV manifest
+          if (status === 'approved' && manifest_patch) {
+            // TODO: Implement KV manifest update logic
+            // Load current manifest, validate patch, merge, increment version, write back
+            console.log("Manifest patch would be applied:", manifest_patch);
+          }
+
+          // TODO: Increment metrics counter
+          // rules_suggestion_approved_5m
+
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: `Suggestion ${status} successfully`,
+            suggestion_id: suggestionId,
+            status
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Admin decide suggestion error:", e);
           const response = new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
