@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface HealthMetrics {
   kv_ok: boolean;
@@ -19,18 +21,28 @@ interface HealthMetrics {
 }
 
 export default function AdminHealth() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [health, setHealth] = useState<HealthMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshCountdown, setRefreshCountdown] = useState(120); // 2 minutes
   const [autoRefresh, setAutoRefresh] = useState(true);
 
+  // Check if user is admin
   useEffect(() => {
-    loadHealth();
-  }, []);
+    if (user && !user.is_admin) {
+      navigate('/');
+      return;
+    }
+
+    if (user?.is_admin) {
+      loadHealth();
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || !user?.is_admin) return;
 
     const interval = setInterval(() => {
       setRefreshCountdown(prev => {
@@ -43,19 +55,21 @@ export default function AdminHealth() {
     }, 10000); // Update every 10 seconds
 
     return () => clearInterval(interval);
-  }, [autoRefresh]);
+  }, [autoRefresh, user]);
 
   useEffect(() => {
-    if (autoRefresh) {
+    if (autoRefresh && user?.is_admin) {
       const interval = setInterval(() => {
         loadHealth();
       }, 10000); // Refresh every 10 seconds
 
       return () => clearInterval(interval);
     }
-  }, [autoRefresh]);
+  }, [autoRefresh, user]);
 
   async function loadHealth() {
+    if (!user?.is_admin) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -75,6 +89,8 @@ export default function AdminHealth() {
   }
 
   function handleManualRefresh() {
+    if (!user?.is_admin) return;
+
     setRefreshCountdown(120);
     setAutoRefresh(true);
     loadHealth();
@@ -100,6 +116,31 @@ export default function AdminHealth() {
     } catch {
       return "Invalid";
     }
+  }
+
+  // Show loading while checking admin status
+  if (!user) {
+    return (
+      <Shell>
+        <div className="flex items-center justify-center min-h-64">
+          <div className="text-lg">Loading user data...</div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // Show access denied for non-admin users
+  if (!user.is_admin) {
+    return (
+      <Shell>
+        <div className="flex items-center justify-center min-h-64">
+          <div className="text-center">
+            <div className="text-red-600 text-lg mb-2">Access Denied</div>
+            <div className="text-gray-600">Admin privileges required to view this page.</div>
+          </div>
+        </div>
+      </Shell>
+    );
   }
 
   if (loading && !health) {
@@ -130,6 +171,32 @@ export default function AdminHealth() {
           <p className="mt-2 text-gray-600">
             Real-time system health and ingestion metrics
           </p>
+
+          {/* Current User Context */}
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="text-blue-600">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Admin User: {user.email}
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    User ID: {user.id}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-blue-700">
+                  Last Login: {user.last_login_ts ? new Date(user.last_login_ts * 1000).toLocaleString() : 'Unknown'}
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Auto-refresh status */}
           <div className="mt-4 flex items-center space-x-4">
