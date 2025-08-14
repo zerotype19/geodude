@@ -71,7 +71,7 @@ interface FunnelDetail {
 const API_BASE = 'https://api.optiview.ai';
 
 export default function Funnels() {
-  const { user } = useAuth();
+  const { user, project } = useAuth();
   const [summary, setSummary] = useState<FunnelSummary | null>(null);
   const [items, setItems] = useState<FunnelItem[]>([]);
   const [loading, setLoading] = useState(true);
