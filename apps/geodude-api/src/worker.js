@@ -4106,7 +4106,6 @@ export default {
                        LIMIT 1)
                      ) * 24 * 60
                    )
-                   ORDER BY c.occurred_at
                  ) as ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id IS NOT NULL
@@ -4412,7 +4411,6 @@ export default {
                        LIMIT 1)
                      ) * 24 * 60
                    )
-                   ORDER BY c.occurred_at
                  ) as ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id IS NOT NULL
@@ -4703,7 +4701,6 @@ export default {
                        LIMIT 1)
                      ) * 24 * 60
                    )
-                   ORDER BY c.occurred_at
                  ) as ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id = ?
