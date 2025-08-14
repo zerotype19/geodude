@@ -279,7 +279,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.occurred_at >= datetime('now','-7 days')
             ),
@@ -325,7 +325,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.occurred_at >= datetime('now','-7 days')
             ),
@@ -452,12 +452,6 @@ export default {
               total_24h: 0,
               active_contents_24h: 0,
               by_source_24h: []
-            },
-            conversions: {
-              total_7d: 0,
-              ai_attributed_7d: 0,
-              revenue_cents_7d: 0,
-              by_source_7d: []
             }
           }), {
             status: 200,
@@ -3204,7 +3198,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
             ),
@@ -3255,7 +3249,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
             ),
@@ -3325,7 +3319,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
             ),
@@ -3463,26 +3457,11 @@ export default {
             params.push(`%${q}%`);
           }
 
-          // Get total count
+          // Get total count - simplified to match main query structure
           const countQuery = `
-            SELECT COUNT(DISTINCT ce.content_id, COALESCE(ais.slug, 'non_ai')) as total
+            SELECT COUNT(DISTINCT ce.content_id) as total
             FROM conversion_event ce
             JOIN content_assets ca ON ce.content_id = ca.id
-            LEFT JOIN (
-              SELECT DISTINCT 
-                ce2.content_id,
-                ar.ai_source_id,
-                ais.slug
-              FROM conversion_event ce2
-              LEFT JOIN ai_referrals ar ON 
-                ce2.project_id = ar.project_id 
-                AND ce2.content_id = ar.content_id 
-                AND ar.detected_at >= ce2.occurred_at - interval '7 days'
-                AND ar.detected_at <= ce2.occurred_at
-              LEFT JOIN ai_sources ais ON ar.ai_source_id = ais.id
-              WHERE ce2.project_id = ? AND ce2.occurred_at >= ${timeFilter}
-            ) attribution ON ce.content_id = attribution.content_id
-            LEFT JOIN ai_sources ais ON attribution.ai_source_id = ais.id
             WHERE ${whereClause}
           `;
 
@@ -3510,7 +3489,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
             ),
@@ -3581,7 +3560,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
             )
@@ -3594,7 +3573,7 @@ export default {
             JOIN ai_referrals ar ON 
               ce.project_id = ar.project_id 
               AND ce.content_id = ar.content_id 
-              AND ar.detected_at >= ce.occurred_at - interval '7 days'
+              AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
               AND ar.detected_at <= ce.occurred_at
             JOIN ai_sources ais ON ar.ai_source_id = ais.id
             WHERE ce.project_id = ? AND ce.occurred_at >= ${timeFilter}
@@ -3731,7 +3710,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.project_id = ? AND ce.content_id = ? AND ce.occurred_at >= ${timeFilter}
             ),
@@ -3773,7 +3752,7 @@ export default {
               LEFT JOIN ai_referrals ar ON 
                 ce.project_id = ar.project_id 
                 AND ce.content_id = ar.content_id 
-                AND ar.detected_at >= ce.occurred_at - interval '7 days'
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
                 AND ar.detected_at <= ce.occurred_at
               WHERE ce.project_id = ? AND ce.content_id = ? AND ce.occurred_at >= ${timeFilter}
             ),
@@ -3812,7 +3791,7 @@ export default {
               currency,
               metadata
             FROM conversion_event
-            WHERE project_id = ? AND content_id = ? AND occurred_at >= ${timeFilter}
+            WHERE project_id = ? AND content_id = ? AND ce.occurred_at >= ${timeFilter}
             ORDER BY occurred_at DESC
             LIMIT 10
           `).bind(project_id, content_id).all();
@@ -3826,7 +3805,7 @@ export default {
             JOIN ai_referrals ar ON 
               ce.project_id = ar.project_id 
               AND ce.content_id = ar.content_id 
-              AND ar.detected_at >= ce.occurred_at - interval '7 days'
+              AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
               AND ar.detected_at <= ce.occurred_at
             JOIN ai_sources ais ON ar.ai_source_id = ais.id
             WHERE ce.project_id = ? AND ce.content_id = ? AND ce.occurred_at >= ${timeFilter}
