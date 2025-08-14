@@ -91,7 +91,8 @@ export default function Onboarding() {
       if (response.ok) {
         console.log('✅ Organization creation successful, data:', data);
         
-        if (!data.organization || !data.organization.id) {
+        // The API returns organization data directly, not wrapped in an organization object
+        if (!data.id) {
           console.error('❌ Response missing organization.id:', data);
           setState(prev => ({ 
             ...prev, 
@@ -104,7 +105,7 @@ export default function Onboarding() {
         setState(prev => ({ 
           ...prev, 
           step: 2, 
-          organization: { ...prev.organization, id: data.organization.id },
+          organization: { ...prev.organization, id: data.id },
           loading: false 
         }));
       } else {
@@ -147,12 +148,25 @@ export default function Onboarding() {
       const data = await response.json();
 
       if (response.ok) {
-        setState(prev => ({
-          ...prev,
-          project: { ...prev.project, id: data.project.id },
-          loading: false
-        }));
+        console.log('✅ Project creation successful, data:', data);
+        
+        // The API returns project data directly, not wrapped in a project object
+        if (!data.id) {
+          console.error('❌ Response missing project.id:', data);
+          setState(prev => ({ 
+            ...prev, 
+            error: 'Server response missing project ID',
+            loading: false 
+          }));
+          return;
+        }
 
+        setState(prev => ({ 
+          ...prev, 
+          project: { ...prev.project, id: data.id },
+          loading: false 
+        }));
+        
         // Complete onboarding and redirect to main app
         setTimeout(() => {
           window.location.href = '/';
