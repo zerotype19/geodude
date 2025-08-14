@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Onboarding from "./pages/Onboarding";
+import Funnels from "./pages/Funnels";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -54,6 +55,7 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="/sources" element={<ProtectedRoute><Sources /></ProtectedRoute>} />
       <Route path="/content" element={<ProtectedRoute><Content /></ProtectedRoute>} />
+      <Route path="/funnels" element={<ProtectedRoute><Funnels /></ProtectedRoute>} />
       <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

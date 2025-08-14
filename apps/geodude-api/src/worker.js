@@ -358,6 +358,46 @@ export default {
             LIMIT 5
           `).all();
 
+          // Get funnels metrics for admin health
+          const funnelsReferrals24h = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count
+            FROM ai_referrals
+            WHERE detected_at >= datetime('now','-1 day')
+          `).first();
+
+          const funnelsConversions24h = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count
+            FROM conversion_event
+            WHERE occurred_at >= datetime('now','-1 day')
+          `).first();
+
+          // Calculate average p50 TTC for funnels in last 24h
+          const funnelsAvgP50TTC24h = await env.OPTIVIEW_DB.prepare(`
+            WITH last_touch AS (
+              SELECT 
+                ce.id,
+                ce.occurred_at,
+                (SELECT MAX(ar.detected_at) 
+                 FROM ai_referrals ar 
+                 WHERE ar.project_id = ce.project_id 
+                 AND ar.content_id = ce.content_id 
+                 AND ar.detected_at <= ce.occurred_at
+                 AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')) as last_referral
+              FROM conversion_event ce
+              WHERE ce.occurred_at >= datetime('now','-1 day')
+              AND EXISTS (
+                SELECT 1 FROM ai_referrals ar 
+                WHERE ar.project_id = ce.project_id 
+                AND ar.content_id = ce.content_id 
+                AND ar.detected_at <= ce.occurred_at
+                AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
+              )
+            )
+            SELECT AVG(CAST((julianday(occurred_at) - julianday(last_referral)) * 24 * 60 AS INTEGER)) as avg_p50_ttc_min
+            FROM last_touch
+            WHERE last_referral IS NOT NULL
+          `).first();
+
           const response = new Response(JSON.stringify({
             status: "healthy",
             timestamp: new Date().toISOString(),
@@ -408,6 +448,11 @@ export default {
               total_24h: referralsTotal24h?.count || 0,
               active_contents_24h: referralsActiveContents24h?.count || 0,
               by_source_24h: referralsBySource24h?.results || []
+            },
+            funnels: {
+              referrals_24h: funnelsReferrals24h?.count || 0,
+              conversions_24h: funnelsConversions24h?.count || 0,
+              avg_p50_ttc_min_24h: funnelsAvgP50TTC24h?.avg_p50_ttc_min || null
             }
           }), {
             status: 200,
@@ -452,6 +497,11 @@ export default {
               total_24h: 0,
               active_contents_24h: 0,
               by_source_24h: []
+            },
+            funnels: {
+              referrals_24h: 0,
+              conversions_24h: 0,
+              avg_p50_ttc_min_24h: null
             }
           }), {
             status: 200,
@@ -3907,6 +3957,909 @@ export default {
 
         } catch (e) {
           console.error("Conversions detail error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.0.4) Funnels Summary endpoint
+      if (url.pathname === "/api/funnels/summary" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `funnels_summary:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          const now = new Date();
+          let sinceISO;
+          if (window === "15m") {
+            sinceISO = new Date(now.getTime() - 15*60*1000).toISOString();
+          } else if (window === "24h") {
+            sinceISO = new Date(now.getTime() - 24*3600*1000).toISOString();
+          } else { // 7d
+            sinceISO = new Date(now.getTime() - 7*86400*1000).toISOString();
+          }
+
+          // Get funnels summary data
+          const summaryQuery = `
+            WITH params AS (
+              SELECT ? AS pid, ? AS since, '-7 days' AS lookback
+            ),
+            refs AS (
+              SELECT 
+                ar.ai_source_id,
+                COUNT(*) as referrals,
+                MAX(ar.detected_at) as last_referral
+              FROM ai_referrals ar, params p
+              WHERE ar.project_id = p.pid
+                AND ar.detected_at >= p.since
+              GROUP BY ar.ai_source_id
+            ),
+            convs AS (
+              SELECT 
+                ce.content_id,
+                ce.amount_cents,
+                ce.occurred_at,
+                (
+                  SELECT ar.ai_source_id
+                  FROM ai_referrals ar, params p
+                  WHERE ar.project_id = ce.project_id
+                    AND ar.content_id = ce.content_id
+                    AND ar.detected_at <= ce.occurred_at
+                    AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
+                  ORDER BY ar.detected_at DESC
+                  LIMIT 1
+                ) AS attributed_source_id
+              FROM conversion_event ce, params p
+              WHERE ce.project_id = p.pid
+                AND ce.occurred_at >= p.since
+            ),
+            attributed AS (
+              SELECT 
+                c.attributed_source_id,
+                COUNT(*) as conversions,
+                GROUP_CONCAT(
+                  CAST(
+                    (julianday(c.occurred_at) - julianday(
+                      (SELECT ar.detected_at
+                       FROM ai_referrals ar, params p
+                       WHERE ar.project_id = c.project_id
+                         AND ar.content_id = c.content_id
+                         AND ar.detected_at <= c.occurred_at
+                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                       ORDER BY ar.detected_at DESC
+                       LIMIT 1)
+                     ) * 24 * 60 AS INTEGER
+                   )
+                   ORDER BY c.occurred_at
+                 ) as ttc_minutes
+               FROM convs c
+               WHERE c.attributed_source_id IS NOT NULL
+               GROUP BY c.attributed_source_id
+             )
+             SELECT 
+               r.ai_source_id,
+               r.referrals,
+               COALESCE(a.conversions, 0) as conversions,
+               CASE 
+                 WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
+                 ELSE 0 
+               END as conv_rate,
+               a.ttc_minutes
+             FROM refs r
+             LEFT JOIN attributed a ON r.ai_source_id = a.attributed_source_id
+             ORDER BY r.referrals DESC
+           `;
+
+          const summaryResult = await env.OPTIVIEW_DB.prepare(summaryQuery).bind(project_id, sinceISO).all();
+
+          // Get totals
+          const totalsQuery = `
+            WITH params AS (
+              SELECT ? AS pid, ? AS since
+            )
+            SELECT 
+              (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND ar.detected_at >= p.since) as referrals,
+              (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND ce.occurred_at >= p.since) as conversions
+          `;
+
+          const totalsResult = await env.OPTIVIEW_DB.prepare(totalsQuery).bind(project_id, sinceISO).first();
+          const totalReferrals = totalsResult?.referrals || 0;
+          const totalConversions = totalsResult?.conversions || 0;
+          const totalConvRate = totalReferrals > 0 ? totalConversions / totalReferrals : 0;
+
+          // Process TTC data and get source names
+          const bySource = [];
+          for (const row of summaryResult.results || []) {
+            const sourceQuery = `SELECT slug, name FROM ai_sources WHERE id = ?`;
+            const sourceResult = await env.OPTIVIEW_DB.prepare(sourceQuery).bind(row.ai_source_id).first();
+            
+            if (sourceResult) {
+              // Calculate TTC percentiles
+              let p50_ttc_min = 0;
+              let p90_ttc_min = 0;
+              
+              if (row.ttc_minutes) {
+                const ttcArray = row.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
+                if (ttcArray.length > 0) {
+                  ttcArray.sort((a, b) => a - b);
+                  p50_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.5)];
+                  p90_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.9)];
+                }
+              }
+
+              bySource.push({
+                slug: sourceResult.slug,
+                name: sourceResult.name,
+                referrals: row.referrals,
+                conversions: row.conversions,
+                conv_rate: Math.round(row.conv_rate * 100) / 100,
+                p50_ttc_min,
+                p90_ttc_min
+              });
+            }
+          }
+
+          // Get timeseries data (daily buckets for 7d, hourly for 24h, 15-min for 15m)
+          let timeseriesQuery;
+          if (window === "15m") {
+            timeseriesQuery = `
+              WITH params AS (
+                SELECT ? AS pid, ? AS since
+              ),
+              time_buckets AS (
+                SELECT 
+                  strftime('%Y-%m-%d %H:%M', datetime(ar.detected_at, 'start of hour', '+' || (strftime('%M', ar.detected_at) / 15) * 15 || ' minutes')) as ts
+                FROM ai_referrals ar, params p
+                WHERE ar.project_id = p.pid AND ar.detected_at >= p.since
+                GROUP BY ts
+              )
+              SELECT 
+                tb.ts,
+                (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND strftime('%Y-%m-%d %H:%M', datetime(ar.detected_at, 'start of hour', '+' || (strftime('%M', ar.detected_at) / 15) * 15 || ' minutes')) = tb.ts) as referrals,
+                (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND strftime('%Y-%m-%d %H:%M', datetime(ce.occurred_at, 'start of hour', '+' || (strftime('%M', ce.occurred_at) / 15) * 15 || ' minutes')) = tb.ts) as conversions
+              FROM time_buckets tb
+              ORDER BY tb.ts
+            `;
+          } else if (window === "24h") {
+            timeseriesQuery = `
+              WITH params AS (
+                SELECT ? AS pid, ? AS since
+              ),
+              time_buckets AS (
+                SELECT 
+                  strftime('%Y-%m-%d %H:00', ar.detected_at) as ts
+                FROM ai_referrals ar, params p
+                WHERE ar.project_id = p.pid AND ar.detected_at >= p.since
+                GROUP BY ts
+              )
+              SELECT 
+                tb.ts,
+                (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND strftime('%Y-%m-%d %H:00', ar.detected_at) = tb.ts) as referrals,
+                (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND strftime('%Y-%m-%d %H:00', ce.occurred_at) = tb.ts) as conversions
+              FROM time_buckets tb
+              ORDER BY tb.ts
+            `;
+          } else { // 7d
+            timeseriesQuery = `
+              WITH params AS (
+                SELECT ? AS pid, ? AS since
+              ),
+              time_buckets AS (
+                SELECT 
+                  date(ar.detected_at) as ts
+                FROM ai_referrals ar, params p
+                WHERE ar.project_id = p.pid AND ar.detected_at >= p.since
+                GROUP BY ts
+              )
+              SELECT 
+                tb.ts,
+                (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND date(ar.detected_at) = tb.ts) as referrals,
+                (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND date(ce.occurred_at) = tb.ts) as conversions
+              FROM time_buckets tb
+              ORDER BY tb.ts
+            `;
+          }
+
+          const timeseriesResult = await env.OPTIVIEW_DB.prepare(timeseriesQuery).bind(project_id, sinceISO).all();
+
+          // Record metrics: funnels summary viewed
+          try {
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `funnels_summary_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record funnels summary view metric:", e);
+          }
+
+          const response = new Response(JSON.stringify({
+            totals: {
+              referrals: totalReferrals,
+              conversions: totalConversions,
+              conv_rate: Math.round(totalConvRate * 100) / 100
+            },
+            by_source: bySource,
+            timeseries: timeseriesResult.results || []
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Funnels summary error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.0.5) Funnels List endpoint
+      if (url.pathname === "/api/funnels" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d", source, q, sort = "conv_rate_desc", page = "1", pageSize = "50" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate sort parameter
+          if (!['conv_rate_desc', 'conversions_desc', 'referrals_desc', 'last_conversion_desc'].includes(sort)) {
+            const response = new Response(JSON.stringify({ error: "Invalid sort. Must be one of: conv_rate_desc, conversions_desc, referrals_desc, last_conversion_desc" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `funnels_list:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const pageNum = Math.max(1, parseInt(page, 10));
+          const pageSizeNum = Math.min(100, Math.max(10, parseInt(pageSize, 10)));
+          const offset = (pageNum - 1) * pageSizeNum;
+
+          // Calculate time window
+          const now = new Date();
+          let sinceISO;
+          if (window === "15m") {
+            sinceISO = new Date(now.getTime() - 15*60*1000).toISOString();
+          } else if (window === "24h") {
+            sinceISO = new Date(now.getTime() - 24*3600*1000).toISOString();
+          } else { // 7d
+            sinceISO = new Date(now.getTime() - 7*86400*1000).toISOString();
+          }
+
+          // SAFE sort whitelist
+          const sortSql = (() => {
+            switch (sort) {
+              case "conversions_desc": return "conversions DESC, conv_rate DESC";
+              case "referrals_desc": return "referrals DESC, conv_rate DESC";
+              case "last_conversion_desc": return "last_conversion DESC, conv_rate DESC";
+              case "conv_rate_desc": 
+              default: return "conv_rate DESC, conversions DESC";
+            }
+          })();
+
+          // Main query with CTEs
+          const mainQuery = `
+            WITH params AS (
+              SELECT ? AS pid, ? AS since, '-7 days' AS lookback
+            ),
+            refs AS (
+              SELECT 
+                ar.project_id,
+                ar.content_id,
+                ar.ai_source_id,
+                COUNT(*) as referrals,
+                MAX(ar.detected_at) as last_referral
+              FROM ai_referrals ar, params p
+              WHERE ar.project_id = p.pid
+                AND ar.detected_at >= p.since
+              GROUP BY ar.project_id, ar.content_id, ar.ai_source_id
+            ),
+            convs AS (
+              SELECT 
+                ce.project_id,
+                ce.content_id,
+                ce.amount_cents,
+                ce.occurred_at,
+                (
+                  SELECT ar.ai_source_id
+                  FROM ai_referrals ar, params p
+                  WHERE ar.project_id = ce.project_id
+                    AND ar.content_id = ce.content_id
+                    AND ar.detected_at <= ce.occurred_at
+                    AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
+                  ORDER BY ar.detected_at DESC
+                  LIMIT 1
+                ) AS attributed_source_id
+              FROM conversion_event ce, params p
+              WHERE ce.project_id = p.pid
+                AND ce.occurred_at >= p.since
+            ),
+            attributed AS (
+              SELECT 
+                c.content_id,
+                c.attributed_source_id,
+                COUNT(*) as conversions,
+                MAX(c.occurred_at) as last_conversion,
+                GROUP_CONCAT(
+                  CAST(
+                    (julianday(c.occurred_at) - julianday(
+                      (SELECT ar.detected_at
+                       FROM ai_referrals ar, params p
+                       WHERE ar.project_id = c.project_id
+                         AND ar.content_id = c.content_id
+                         AND ar.detected_at <= c.occurred_at
+                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                       ORDER BY ar.detected_at DESC
+                       LIMIT 1)
+                     ) * 24 * 60 AS INTEGER
+                   )
+                   ORDER BY c.occurred_at
+                 ) as ttc_minutes
+               FROM convs c
+               WHERE c.attributed_source_id IS NOT NULL
+               GROUP BY c.content_id, c.attributed_source_id
+             ),
+             funnel_data AS (
+               SELECT 
+                 r.project_id,
+                 r.content_id,
+                 r.ai_source_id,
+                 r.referrals,
+                 COALESCE(a.conversions, 0) as conversions,
+                 CASE 
+                   WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
+                   ELSE 0 
+                 END as conv_rate,
+                 r.last_referral,
+                 a.last_conversion,
+                 a.ttc_minutes
+               FROM refs r
+               LEFT JOIN attributed a ON r.content_id = a.content_id AND r.ai_source_id = a.attributed_source_id
+             ),
+             with_urls AS (
+               SELECT 
+                 f.*,
+                 ca.url,
+                 ais.slug as source_slug,
+                 ais.name as source_name
+               FROM funnel_data f
+               JOIN content_assets ca ON f.content_id = ca.id
+               JOIN ai_sources ais ON f.ai_source_id = ais.id
+               WHERE f.project_id = ? AND f.last_referral >= ?
+                 ${source ? 'AND ais.slug = ?' : ''}
+                 ${q ? 'AND ca.url LIKE ?' : ''}
+             )
+             SELECT 
+               content_id,
+               url,
+               source_slug,
+               source_name,
+               referrals,
+               conversions,
+               conv_rate,
+               last_referral,
+               last_conversion,
+               ttc_minutes
+             FROM with_urls
+             ORDER BY ${sortSql}
+             LIMIT ? OFFSET ?
+           `;
+
+          // Build bind parameters
+          let bindParams = [project_id, sinceISO];
+          if (source) bindParams.push(source);
+          if (q) bindParams.push(`%${q}%`);
+          bindParams.push(pageSizeNum, offset);
+
+          const items = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...bindParams).all();
+
+          // Process TTC data for each item
+          const itemsWithTTC = items.results?.map(item => {
+            let p50_ttc_min = 0;
+            let p90_ttc_min = 0;
+            
+            if (item.ttc_minutes) {
+              const ttcArray = item.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
+              if (ttcArray.length > 0) {
+                ttcArray.sort((a, b) => a - b);
+                p50_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.5)];
+                p90_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.9)];
+              }
+            }
+
+            return {
+              ...item,
+              conv_rate: Math.round(item.conv_rate * 100) / 100,
+              p50_ttc_min,
+              p90_ttc_min
+            };
+          }) || [];
+
+          // Count query
+          const countQuery = `
+            WITH params AS (
+              SELECT ? AS pid, ? AS since, '-7 days' AS lookback
+            ),
+            refs AS (
+              SELECT 
+                ar.project_id,
+                ar.content_id,
+                ar.ai_source_id,
+                COUNT(*) as referrals
+              FROM ai_referrals ar, params p
+              WHERE ar.project_id = p.pid
+                AND ar.detected_at >= p.since
+              GROUP BY ar.project_id, ar.content_id, ar.ai_source_id
+            ),
+            funnel_data AS (
+              SELECT 
+                r.project_id,
+                r.content_id,
+                r.ai_source_id
+              FROM refs r
+            ),
+            with_urls AS (
+              SELECT 
+                f.*,
+                ca.url,
+                ais.slug as source_slug
+              FROM funnel_data f
+              JOIN content_assets ca ON f.content_id = ca.id
+              JOIN ai_sources ais ON f.ai_source_id = ais.id
+              WHERE f.project_id = ? AND f.last_referral >= ?
+                ${source ? 'AND ais.slug = ?' : ''}
+                ${q ? 'AND ca.url LIKE ?' : ''}
+            )
+            SELECT COUNT(*) as total
+            FROM with_urls
+          `;
+
+          const countBind = [project_id, sinceISO];
+          if (source) countBind.push(source);
+          if (q) countBind.push(`%${q}%`);
+
+          const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...countBind).first();
+          const total = totalResult?.total || 0;
+
+          // Record metrics: funnels list viewed
+          try {
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `funnels_list_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record funnels list view metric:", e);
+          }
+
+          const response = new Response(JSON.stringify({
+            items: itemsWithTTC,
+            page: pageNum,
+            pageSize: pageSizeNum,
+            total
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Funnels list error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.0.6) Funnels Detail endpoint
+      if (url.pathname === "/api/funnels/detail" && request.method === "GET") {
+        try {
+          const { project_id, content_id, source, window = "7d" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id || !content_id || !source) {
+            const response = new Response(JSON.stringify({ error: "project_id, content_id, and source are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `funnels_detail:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          const now = new Date();
+          let sinceISO;
+          if (window === "15m") {
+            sinceISO = new Date(now.getTime() - 15*60*1000).toISOString();
+          } else if (window === "24h") {
+            sinceISO = new Date(now.getTime() - 24*3600*1000).toISOString();
+          } else { // 7d
+            sinceISO = new Date(now.getTime() - 7*86400*1000).toISOString();
+          }
+
+          // Get content info
+          const contentQuery = `SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?`;
+          const contentResult = await env.OPTIVIEW_DB.prepare(contentQuery).bind(content_id, project_id).first();
+          
+          if (!contentResult) {
+            const response = new Response(JSON.stringify({ error: "Content not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get source info
+          const sourceQuery = `SELECT id, slug, name FROM ai_sources WHERE slug = ?`;
+          const sourceResult = await env.OPTIVIEW_DB.prepare(sourceQuery).bind(source).first();
+          
+          if (!sourceResult) {
+            const response = new Response(JSON.stringify({ error: "Source not found" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get summary data
+          const summaryQuery = `
+            WITH params AS (
+              SELECT ? AS pid, ? AS cid, ? AS since, '-7 days' AS lookback
+            ),
+            refs AS (
+              SELECT COUNT(*) as referrals
+              FROM ai_referrals ar, params p
+              WHERE ar.project_id = p.pid
+                AND ar.content_id = p.cid
+                AND ar.ai_source_id = ?
+                AND ar.detected_at >= p.since
+            ),
+            convs AS (
+              SELECT 
+                ce.amount_cents,
+                ce.occurred_at,
+                (
+                  SELECT ar.ai_source_id
+                  FROM ai_referrals ar, params p
+                  WHERE ar.project_id = ce.project_id
+                    AND ar.content_id = ce.content_id
+                    AND ar.detected_at <= ce.occurred_at
+                    AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
+                  ORDER BY ar.detected_at DESC
+                  LIMIT 1
+                ) AS attributed_source_id
+              FROM conversion_event ce, params p
+              WHERE ce.project_id = p.pid
+                AND ce.content_id = p.cid
+                AND ce.occurred_at >= p.since
+            ),
+            attributed AS (
+              SELECT 
+                COUNT(*) as conversions,
+                GROUP_CONCAT(
+                  CAST(
+                    (julianday(c.occurred_at) - julianday(
+                      (SELECT ar.detected_at
+                       FROM ai_referrals ar, params p
+                       WHERE ar.project_id = c.project_id
+                         AND ar.content_id = c.content_id
+                         AND ar.detected_at <= c.occurred_at
+                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                       ORDER BY ar.detected_at DESC
+                       LIMIT 1)
+                     ) * 24 * 60 AS INTEGER
+                   )
+                   ORDER BY c.occurred_at
+                 ) as ttc_minutes
+               FROM convs c
+               WHERE c.attributed_source_id = ?
+             )
+             SELECT 
+               r.referrals,
+               a.conversions,
+               CASE 
+                 WHEN r.referrals > 0 THEN CAST(a.conversions AS REAL) / r.referrals
+                 ELSE 0 
+               END as conv_rate,
+               a.ttc_minutes
+             FROM refs r
+             LEFT JOIN attributed a ON 1=1
+           `;
+
+          const summaryResult = await env.OPTIVIEW_DB.prepare(summaryQuery).bind(
+            project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
+          ).first();
+
+          // Calculate TTC percentiles
+          let p50_ttc_min = 0;
+          let p90_ttc_min = 0;
+          
+          if (summaryResult?.ttc_minutes) {
+            const ttcArray = summaryResult.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
+            if (ttcArray.length > 0) {
+              ttcArray.sort((a, b) => a - b);
+              p50_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.5)];
+              p90_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.9)];
+            }
+          }
+
+          // Get timeseries data
+          let timeseriesQuery;
+          if (window === "15m") {
+            timeseriesQuery = `
+              WITH params AS (
+                SELECT ? AS pid, ? AS cid, ? AS since
+              ),
+              time_buckets AS (
+                SELECT 
+                  strftime('%Y-%m-%d %H:%M', datetime(ar.detected_at, 'start of hour', '+' || (strftime('%M', ar.detected_at) / 15) * 15 || ' minutes')) as ts
+                FROM ai_referrals ar, params p
+                WHERE ar.project_id = p.pid AND ar.content_id = p.cid AND ar.ai_source_id = ? AND ar.detected_at >= p.since
+                GROUP BY ts
+              )
+              SELECT 
+                tb.ts,
+                (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND ar.content_id = p.cid AND ar.ai_source_id = ? AND strftime('%Y-%m-%d %H:%M', datetime(ar.detected_at, 'start of hour', '+' || (strftime('%M', ar.detected_at) / 15) * 15 || ' minutes')) = tb.ts) as referrals,
+                (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND ar.content_id = p.cid AND strftime('%Y-%m-%d %H:%M', datetime(ce.occurred_at, 'start of hour', '+' || (strftime('%M', ce.occurred_at) / 15) * 15 || ' minutes')) = tb.ts) as conversions
+              FROM time_buckets tb
+              ORDER BY tb.ts
+            `;
+          } else if (window === "24h") {
+            timeseriesQuery = `
+              WITH params AS (
+                SELECT ? AS pid, ? AS cid, ? AS since
+              ),
+              time_buckets AS (
+                SELECT 
+                  strftime('%Y-%m-%d %H:00', ar.detected_at) as ts
+                FROM ai_referrals ar, params p
+                WHERE ar.project_id = p.pid AND ar.content_id = p.cid AND ar.ai_source_id = ? AND ar.detected_at >= p.since
+                GROUP BY ts
+              )
+              SELECT 
+                tb.ts,
+                (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND ar.content_id = p.cid AND ar.ai_source_id = ? AND strftime('%Y-%m-%d %H:00', ar.detected_at) = tb.ts) as referrals,
+                (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND ar.content_id = p.cid AND strftime('%Y-%m-%d %H:00', ce.occurred_at) = tb.ts) as conversions
+              FROM time_buckets tb
+              ORDER BY tb.ts
+            `;
+          } else { // 7d
+            timeseriesQuery = `
+              WITH params AS (
+                SELECT ? AS pid, ? AS cid, ? AS since
+              ),
+              time_buckets AS (
+                SELECT 
+                  date(ar.detected_at) as ts
+                FROM ai_referrals ar, params p
+                WHERE ar.project_id = p.pid AND ar.content_id = p.cid AND ar.ai_source_id = ? AND ar.detected_at >= p.since
+                GROUP BY ts
+              )
+              SELECT 
+                tb.ts,
+                (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND ar.content_id = p.cid AND ar.ai_source_id = ? AND date(ar.detected_at) = tb.ts) as referrals,
+                (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND ce.content_id = p.cid AND date(ce.occurred_at) = tb.ts) as conversions
+              FROM time_buckets tb
+              ORDER BY tb.ts
+            `;
+          }
+
+          const timeseriesResult = await env.OPTIVIEW_DB.prepare(timeseriesQuery).bind(
+            project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
+          ).all();
+
+          // Get recent referral-conversion pairs
+          const recentQuery = `
+            WITH params AS (
+              SELECT ? AS pid, ? AS cid, ? AS since, '-7 days' AS lookback
+            ),
+            convs AS (
+              SELECT 
+                ce.amount_cents,
+                ce.currency,
+                ce.occurred_at,
+                (
+                  SELECT ar.detected_at
+                  FROM ai_referrals ar, params p
+                  WHERE ar.project_id = ce.project_id
+                    AND ar.content_id = ce.content_id
+                    AND ar.detected_at <= ce.occurred_at
+                    AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
+                  ORDER BY ar.detected_at DESC
+                  LIMIT 1
+                ) AS ref_detected_at
+              FROM conversion_event ce, params p
+              WHERE ce.project_id = p.pid
+                AND ce.content_id = p.cid
+                AND ce.occurred_at >= p.since
+            ),
+            attributed AS (
+              SELECT 
+                c.amount_cents,
+                c.currency,
+                c.occurred_at as conversion_at,
+                c.ref_detected_at,
+                CAST(
+                  (julianday(c.occurred_at) - julianday(c.ref_detected_at)) * 24 * 60 AS INTEGER
+                ) as ttc_minutes
+              FROM convs c
+              WHERE c.ref_detected_at IS NOT NULL
+              ORDER BY c.occurred_at DESC
+              LIMIT 10
+            )
+            SELECT * FROM attributed
+          `;
+
+          const recentResult = await env.OPTIVIEW_DB.prepare(recentQuery).bind(
+            project_id, content_id, sinceISO
+          ).all();
+
+          // Record metrics: funnels detail viewed
+          try {
+            await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `funnels_detail_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record funnels detail view metric:", e);
+          }
+
+          const response = new Response(JSON.stringify({
+            content: {
+              id: parseInt(content_id),
+              url: contentResult.url
+            },
+            source: {
+              slug: sourceResult.slug,
+              name: sourceResult.name
+            },
+            summary: {
+              referrals: summaryResult?.referrals || 0,
+              conversions: summaryResult?.conversions || 0,
+              conv_rate: Math.round((summaryResult?.conv_rate || 0) * 100) / 100,
+              p50_ttc_min,
+              p90_ttc_min
+            },
+            timeseries: timeseriesResult.results || [],
+            recent: recentResult.results?.map(r => ({
+              ref_detected_at: r.ref_detected_at,
+              conversion_at: r.conversion_at,
+              ttc_minutes: r.ttc_minutes,
+              amount_cents: r.amount_cents,
+              currency: r.currency
+            })) || []
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=120"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Funnels detail error:", e);
           const response = new Response(JSON.stringify({
             error: "Internal server error",
             message: e.message
