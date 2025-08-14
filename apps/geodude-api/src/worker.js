@@ -588,9 +588,11 @@ export default {
       if (url.pathname === "/api/onboarding/project" && request.method === "POST") {
         try {
           const body = await request.json();
-          const { name, org_id } = body;
+          console.log('📥 Project creation request body:', body);
+          const { name, organizationId } = body;
 
-          if (!name || !org_id) {
+          if (!name || !organizationId) {
+            console.log('❌ Missing required fields:', { name, organizationId });
             const response = new Response(JSON.stringify({ error: "Project name and organization ID are required" }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
@@ -607,7 +609,7 @@ export default {
           await env.OPTIVIEW_DB.prepare(`
             INSERT INTO project (id, org_id, name, slug, created_ts)
             VALUES (?, ?, ?, ?, ?)
-          `).bind(projectId, org_id, name, slug, now).run();
+          `).bind(projectId, organizationId, name, slug, now).run();
 
           // Note: Project settings are not currently implemented
           // The project is created with basic information only
@@ -616,7 +618,7 @@ export default {
             id: projectId,
             name: name,
             slug: slug,
-            org_id: org_id,
+            org_id: organizationId,
             created_at: now
           }), {
             headers: { "Content-Type": "application/json" }
@@ -1367,7 +1369,7 @@ export default {
             name: name,
             created_at: now
           };
-          
+
           console.log('📤 Sending response:', responseData);
 
           return new Response(JSON.stringify(responseData), {

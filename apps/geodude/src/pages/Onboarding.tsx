@@ -320,17 +320,7 @@ export default function Onboarding() {
           )}
 
           {/* Navigation */}
-          <div className="flex justify-between mt-8">
-            <button
-              onClick={handlePrevious}
-              disabled={state.step === 1 || state.loading}
-              className={`px-6 py-2 rounded-md font-medium ${state.step === 1 || state.loading
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-            >
-              Previous
-            </button>
+          <div className="flex justify-end mt-8">
             <button
               onClick={handleNext}
               disabled={!canProceed()}
