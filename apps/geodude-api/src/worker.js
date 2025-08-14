@@ -2076,6 +2076,15 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
+          // Validate event_type
+          if (!['view', 'click', 'custom'].includes(event_type)) {
+            const response = new Response(JSON.stringify({ error: "Invalid event_type. Must be one of: view, click, custom" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
           // Validate API key
           const keyHash = await hashToken(key_id);
           const apiKey = await env.OPTIVIEW_DB.prepare(`
@@ -2090,22 +2099,67 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // Store event in database
-          const now = Date.now();
-          const eventId = `evt_${generateToken().substring(0, 12)}`;
+          // Determine project_id and validate property_id scope
+          const projectId = apiKey.project_id;
+          
+          // Verify property belongs to project (if property_id provided)
+          if (property_id) {
+            const propertyCheck = await env.OPTIVIEW_DB.prepare(`
+              SELECT id FROM properties WHERE id = ? AND project_id = ?
+            `).bind(property_id, projectId).first();
+            
+            if (!propertyCheck) {
+              const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+          }
 
-          await env.OPTIVIEW_DB.prepare(`
-            INSERT INTO edge_click_event (
-              id, org_id, project_id, property_id, 
-              timestamp, event_type, metadata, 
-              created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          // Classify AI source from metadata
+          let aiSourceId = null;
+          if (metadata && metadata.r) {
+            const referer = metadata.r.toLowerCase();
+            
+            // Simple classification logic - can be enhanced later
+            if (referer.includes('chat.openai.com') || referer.includes('openai.com')) {
+              aiSourceId = 10; // ChatGPT
+            } else if (referer.includes('claude.ai') || referer.includes('anthropic.com')) {
+              aiSourceId = 11; // Claude
+            } else if (referer.includes('perplexity.ai')) {
+              aiSourceId = 12; // Perplexity
+            } else if (referer.includes('gemini.google.com') || referer.includes('google.com')) {
+              aiSourceId = 13; // Gemini
+            }
+          }
+
+          // Simple content mapping - just use existing content assets for now
+          let contentId = null;
+          if (metadata && metadata.p) {
+            // Try to find existing content asset by path
+            const existingContent = await env.OPTIVIEW_DB.prepare(`
+              SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
+            `).bind(`%${metadata.p}%`, projectId).first();
+            
+            if (existingContent) {
+              contentId = existingContent.id;
+            }
+          }
+
+          // Store event in interaction_events table
+          const now = new Date().toISOString();
+          
+          const result = await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO interaction_events (
+              project_id, property_id, content_id, ai_source_id, 
+              event_type, metadata, occurred_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
           `).bind(
-            eventId,
-            apiKey.org_id || null,
-            apiKey.project_id,
+            projectId,
             property_id,
-            now,
+            contentId,
+            aiSourceId,
             event_type,
             JSON.stringify(metadata || {}),
             now
@@ -2114,13 +2168,14 @@ export default {
           // Update last_used timestamp for API key
           await env.OPTIVIEW_DB.prepare(`
             UPDATE api_key SET last_used_ts = ? WHERE id = ?
-          `).bind(now, apiKey.id).run();
+          `).bind(Date.now(), apiKey.id).run();
 
           const response = new Response(JSON.stringify({
             ok: true,
-            event_id: eventId,
+            id: result.meta.last_row_id,
             timestamp: now
           }), {
+            status: 201,
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
