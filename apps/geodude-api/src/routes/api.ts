@@ -302,12 +302,12 @@ export async function handleApiRoutes(
             }
 
             // Get total referrals and conversions in window (simplified to avoid subquery issues)
-                        const referralsResult = await env.OPTIVIEW_DB.prepare(`
+            const referralsResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT COUNT(*) referrals
                 FROM ai_referrals 
                 WHERE project_id = ? AND detected_at >= ?
             `).bind(project_id, since).first<any>();
-            
+
             const conversionsResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT COUNT(*) conversions
                 FROM conversion_event 
@@ -318,24 +318,23 @@ export async function handleApiRoutes(
             const conversions = conversionsResult?.conversions || 0;
             const conv_rate = referrals > 0 ? conversions / referrals : 0;
 
-            // Get breakdown by source (simplified)
+            // Get breakdown by source (simplified - no JOIN to avoid syntax issues)
             const bySourceResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    s.id, s.slug, s.name,
+                    ar.ai_source_id,
                     COUNT(*) referrals,
                     0 conversions,
                     0 conv_rate
                 FROM ai_referrals ar
-                JOIN ai_sources s ON s.id = ar.ai_source_id
                 WHERE ar.project_id = ? AND ar.detected_at >= ?
-                GROUP BY s.id, s.slug, s.name
+                GROUP BY ar.ai_source_id
                 ORDER BY referrals DESC
             `).bind(project_id, since).all<any>();
 
-            // Simplified source data
+            // Simplified source data (using ai_source_id for now)
             const bySource = (bySourceResult.results || []).map((source) => ({
-                slug: source.slug,
-                name: source.name,
+                slug: `source_${source.ai_source_id}`,
+                name: `AI Source ${source.ai_source_id}`,
                 referrals: source.referrals,
                 conversions: source.conversions,
                 conv_rate: source.conv_rate,
