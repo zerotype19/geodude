@@ -1336,6 +1336,110 @@ export default {
         }
       }
 
+      // Onboarding endpoints
+      if (url.pathname === "/api/onboarding/organization" && request.method === "POST") {
+        try {
+          const { name, slug } = await request.json();
+          
+          if (!name || !slug) {
+            return new Response(JSON.stringify({ error: "Name and slug are required" }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Check if organization already exists
+          const existingOrg = await env.OPTIVIEW_DB.prepare(`
+            SELECT id FROM organization WHERE name = ?
+          `).bind(name).first();
+
+          if (existingOrg) {
+            return new Response(JSON.stringify({ error: "Organization with this name already exists" }), {
+              status: 409,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Create organization
+          const orgId = generateToken();
+          const now = Math.floor(Date.now() / 1000);
+          
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO organization (id, name, created_ts)
+            VALUES (?, ?, ?)
+          `).bind(orgId, name, now).run();
+
+          console.log('✅ Organization created:', { id: orgId, name, slug });
+
+          return new Response(JSON.stringify({ 
+            success: true, 
+            organization: { id: orgId, name, slug } 
+          }), {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          console.error('❌ Organization creation error:', error);
+          return new Response(JSON.stringify({ error: "Failed to create organization" }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      if (url.pathname === "/api/onboarding/project" && request.method === "POST") {
+        try {
+          const { name, description, organizationId } = await request.json();
+          
+          if (!name || !organizationId) {
+            return new Response(JSON.stringify({ error: "Name and organization ID are required" }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Verify organization exists
+          const org = await env.OPTIVIEW_DB.prepare(`
+            SELECT id, name FROM organization WHERE id = ?
+          `).bind(organizationId).first();
+
+          if (!org) {
+            return new Response(JSON.stringify({ error: "Organization not found" }), {
+              status: 404,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Create project
+          const projectId = generateToken();
+          const now = Math.floor(Date.now() / 1000);
+          const projectSlug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+          
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO project (id, name, slug, org_id, created_ts)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(projectId, name, projectSlug, organizationId, now).run();
+
+          console.log('✅ Project created:', { id: projectId, name, slug: projectSlug, orgId: organizationId });
+
+          return new Response(JSON.stringify({ 
+            success: true, 
+            project: { id: projectId, name, slug: projectSlug, organizationId } 
+          }), {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          console.error('❌ Project creation error:', error);
+          return new Response(JSON.stringify({ error: "Failed to create project" }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // 8) Fallback response for any unmatched routes
       const fallbackResponse = new Response("Not Found", { status: 404 });
       return addCorsHeaders(fallbackResponse);
