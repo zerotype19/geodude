@@ -487,11 +487,14 @@ export default {
           
           console.log("🔄 Redirecting to frontend:", redirectUrl);
           
+          // Extract domain from frontend URL for cookie
+          const frontendDomain = new URL(frontendUrl).hostname;
+          
           const response = new Response("", {
             status: 302,
             headers: {
               "Location": redirectUrl,
-              "Set-Cookie": `optiview_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
+              "Set-Cookie": `optiview_session=${sessionId}; Domain=${frontendDomain}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
             }
           });
           
