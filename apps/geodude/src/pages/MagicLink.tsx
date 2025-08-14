@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../config';
 
 export default function MagicLink() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user, refreshUserData } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    const consumeMagicLink = async () => {
+    const handleMagicLink = async () => {
       try {
         const token = searchParams.get('token');
 
@@ -22,17 +24,37 @@ export default function MagicLink() {
         // Call the API to consume the magic link
         const response = await fetch(`${API_BASE}/auth/magic?token=${token}`, {
           method: 'GET',
-          credentials: 'include', // Include cookies for session
+          credentials: 'include',
         });
 
         if (response.ok) {
-          // Magic link consumed successfully
-          setStatus('success');
-
-          // Redirect to onboarding after a brief delay
-          setTimeout(() => {
-            navigate('/onboarding');
-          }, 1500);
+          const data = await response.json();
+          
+          if (data.success) {
+            setStatus('success');
+            
+            // Refresh user data to get the latest state
+            await refreshUserData();
+            
+            // Redirect based on whether user has organization
+            if (data.has_organization) {
+              // User has completed onboarding, go to main app
+              setTimeout(() => {
+                navigate('/');
+              }, 1000);
+            } else {
+              // New user, go to onboarding
+              setTimeout(() => {
+                navigate('/onboarding');
+              }, 1000);
+            }
+          } else {
+            setError('Magic link validation failed');
+            setStatus('error');
+            setTimeout(() => {
+              navigate('/login');
+            }, 2000);
+          }
         } else {
           // Handle different error cases
           if (response.status === 400) {
@@ -43,16 +65,22 @@ export default function MagicLink() {
             setError('Failed to validate magic link');
           }
           setStatus('error');
+          setTimeout(() => {
+            navigate('/login');
+          }, 2000);
         }
       } catch (err) {
-        console.error('Magic link consumption error:', err);
+        console.error('Magic link handling error:', err);
         setError('Network error. Please try again.');
         setStatus('error');
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
       }
     };
 
-    consumeMagicLink();
-  }, [searchParams, navigate]);
+    handleMagicLink();
+  }, [searchParams, navigate, refreshUserData]);
 
   if (status === 'loading') {
     return (
@@ -78,8 +106,8 @@ export default function MagicLink() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900">Magic link validated!</h2>
-            <p className="text-gray-600 mt-2">Redirecting you to onboarding...</p>
+            <h2 className="text-xl font-semibold text-gray-900">Welcome back!</h2>
+            <p className="text-gray-600 mt-2">Redirecting you to the dashboard...</p>
           </div>
         </div>
       </div>
@@ -100,7 +128,7 @@ export default function MagicLink() {
           <div className="mt-6">
             <button
               onClick={() => navigate('/login')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Back to Login
             </button>

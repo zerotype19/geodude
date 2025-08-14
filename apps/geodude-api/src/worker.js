@@ -493,10 +493,15 @@ export default {
 
           // Redirect to appropriate page
           const redirectUrl = `${env.PUBLIC_APP_URL}${redirectPath}`;
-          return new Response(null, {
-            status: 302,
+          return new Response(JSON.stringify({
+            success: true,
+            redirect_to: redirectPath,
+            user_id: userRecord.id,
+            has_organization: hasOrganization.count > 0
+          }), {
+            status: 200,
             headers: {
-              "Location": redirectUrl,
+              "Content-Type": "application/json",
               "Set-Cookie": `optiview_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
             }
           });
