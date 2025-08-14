@@ -300,11 +300,14 @@ export async function handleApiRoutes(
             }
 
             // Return minimal test data with no SQL queries
-
             const summary = {
-                totals: { referrals, conversions, conv_rate },
-                by_source: bySource,
-                timeseries: timeseriesResult.results || []
+                totals: { 
+                    referrals: 0, 
+                    conversions: 0, 
+                    conv_rate: 0.0 
+                },
+                by_source: [],
+                timeseries: []
             };
 
             const response = new Response(JSON.stringify(summary), {
