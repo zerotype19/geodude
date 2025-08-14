@@ -9,11 +9,11 @@ export function addCorsHeaders(response: Response, origin?: string): Response {
   // Always allow preflight requests
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-optiview-key-id, x-optiview-signature, x-optiview-timestamp');
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
   
-  // Set origin based on request
-  if (origin) {
-    response.headers.set('Access-Control-Allow-Origin', origin);
-  }
+  // Set origin based on request, default to frontend origin
+  const allowedOrigin = origin || 'https://optiview.ai';
+  response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
   
   return response;
 }

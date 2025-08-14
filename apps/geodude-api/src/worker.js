@@ -1,5 +1,6 @@
 import { loadConfig, getConfigForEnvCheck, getConfigErrors, getMissingConfigKeys } from './config.js';
 import { EmailService } from './email-service.js';
+import { addCorsHeaders } from './cors';
 
 export default {
   async fetch(request, env, ctx) {
@@ -21,7 +22,7 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return response;
+          return addCorsHeaders(response, request.headers.get("origin"));
         }
 
         // In development, continue with defaults
@@ -37,23 +38,8 @@ export default {
       // Handle CORS preflight requests
       if (request.method === "OPTIONS") {
         const response = new Response(null, { status: 204 });
-        response.headers.set("Access-Control-Allow-Origin", origin || "*");
-        response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        response.headers.set("Access-Control-Allow-Credentials", "true");
-        return response;
+        return addCorsHeaders(response, origin);
       }
-
-      // Helper function to add CORS headers
-      const addCorsHeaders = (response, origin) => {
-        // Always allow the frontend origin
-        const allowedOrigin = origin || "https://optiview.ai";
-        response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
-        response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-        response.headers.set("Access-Control-Allow-Credentials", "true");
-        return response;
-      };
 
       // Helper function to record continue path sanitization metrics
       const recordContinueSanitized = (phase, reason) => {
@@ -403,16 +389,17 @@ export default {
           const continuePath = urlObj.searchParams.get("continue") || "/onboarding";
 
           if (!token) {
-            return new Response("Missing token", { status: 400 });
+            const response = new Response("Missing token", { status: 400 });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           console.log("🔐 Magic link consumption for token:", token.substring(0, 12) + "...");
 
           // Get client IP for session
-          const clientIP = request.headers.get("cf-connecting-ip") || 
-                          request.headers.get("x-forwarded-for") || 
-                          request.headers.get("x-real-ip") || 
-                          "unknown";
+          const clientIP = request.headers.get("cf-connecting-ip") ||
+            request.headers.get("x-forwarded-for") ||
+            request.headers.get("x-real-ip") ||
+            "unknown";
           console.log("📍 Client IP:", clientIP);
 
           // Find and validate magic link
@@ -423,7 +410,8 @@ export default {
           `).bind(tokenHash, new Date().toISOString()).first();
 
           if (!magicLinkData) {
-            return new Response("Invalid or expired magic link", { status: 400 });
+            const response = new Response("Invalid or expired magic link", { status: 400 });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           // Check if user exists
@@ -436,12 +424,12 @@ export default {
             // Create new user
             const userId = `usr_${generateToken().substring(0, 12)}`;
             const now = Math.floor(Date.now() / 1000);
-            
+
             await env.OPTIVIEW_DB.prepare(`
               INSERT INTO user (id, email, is_admin, created_ts, last_login_ts)
               VALUES (?, ?, 0, ?, ?)
             `).bind(userId, magicLinkData.email, now, now).run();
-            
+
             userRecord = { id: userId, email: magicLinkData.email, is_admin: 0, created_ts: now };
             console.log("✅ New user created with ID:", userId);
           } else {
@@ -471,10 +459,10 @@ export default {
           const sessionId = generateToken();
           const sessionExpiresAt = new Date();
           sessionExpiresAt.setHours(sessionExpiresAt.getHours() + parseInt(env.SESSION_TTL_HOURS || "720"));
-          
+
           const userAgent = request.headers.get("user-agent") || "unknown";
           const uaHash = await hashString(userAgent);
-          
+
           await env.OPTIVIEW_DB.prepare(`
             INSERT INTO session (user_id, session_id, expires_at, ip_hash, ua_hash)
             VALUES (?, ?, ?, ?, ?)
@@ -510,7 +498,10 @@ export default {
           
           // Get origin from request headers for CORS
           const origin = request.headers.get("origin");
-          return addCorsHeaders(response, origin);
+          console.log("🔧 Adding CORS headers for origin:", origin);
+          const corsResponse = addCorsHeaders(response, origin);
+          console.log("🔧 CORS headers added:", corsResponse.headers.get("Access-Control-Allow-Origin"));
+          return corsResponse;
 
         } catch (e) {
           console.error("Magic link consumption error:", e);
@@ -569,22 +560,22 @@ export default {
             if (sessionMatch) {
               const sessionId = sessionMatch[1];
               console.log('🔍 Found session ID:', sessionId.substring(0, 8) + '...');
-              
+
               // Get user ID from session
               const sessionData = await env.OPTIVIEW_DB.prepare(`
                 SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
               `).bind(sessionId, new Date().toISOString()).first();
-              
+
               if (sessionData) {
                 userId = sessionData.user_id;
                 console.log('👤 Found user ID from session:', userId);
-                
+
                 // Create org_member record linking user to organization
                 await env.OPTIVIEW_DB.prepare(`
                   INSERT INTO org_member (org_id, user_id, role)
                   VALUES (?, ?, 'admin')
                 `).bind(orgId, userId).run();
-                
+
                 console.log('✅ Created org_member record:', { orgId, userId, role: 'admin' });
               } else {
                 console.log('⚠️ No valid session found for session ID');
