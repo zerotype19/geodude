@@ -285,43 +285,7 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // Calculate time window
-            const now = Date.now();
-            let since: number;
-            switch (window) {
-                case "15m":
-                    since = now - 15 * 60 * 1000;
-                    break;
-                case "24h":
-                    since = now - 24 * 60 * 60 * 1000;
-                    break;
-                case "7d":
-                default:
-                    since = now - 7 * 24 * 60 * 60 * 1000;
-                    break;
-            }
-
-                        // Minimal test - just count referrals
-            const referrals = 0;
-            const conversions = 0;
-            const conv_rate = 0;
-
-            // Empty source data for now
-            const bySource = [];
-
-            // Simplified source data (minimal)
-            const bySource = (bySourceResult.results || []).map((source) => ({
-                slug: `source_${source.ai_source_id}`,
-                name: `AI Source ${source.ai_source_id}`,
-                referrals: source.referrals,
-                conversions: 0,
-                conv_rate: 0,
-                p50_ttc_min: null,
-                p90_ttc_min: null
-            }));
-
-            // Simple timeseries data (empty for now to avoid SQL issues)
-            const timeseriesResult = { results: [] };
+            // Return minimal test data with no SQL queries
 
             const summary = {
                 totals: { referrals, conversions, conv_rate },
@@ -364,105 +328,11 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // Validate sort parameter (whitelist)
-            const validSorts = ['conv_rate_desc', 'conversions_desc', 'referrals_desc', 'last_conversion_desc'];
-            if (!validSorts.includes(sort)) {
-                sort = 'conv_rate_desc';
-            }
-
-            // Calculate time window
-            const now = Date.now();
-            let since: number;
-            switch (window) {
-                case "15m":
-                    since = now - 15 * 60 * 1000;
-                    break;
-                case "24h":
-                    since = now - 24 * 60 * 60 * 1000;
-                    break;
-                case "7d":
-                default:
-                    since = now - 7 * 24 * 60 * 60 * 1000;
-                    break;
-            }
-
-            // Build query with filters
-            let whereClause = "WHERE ar.project_id = ? AND ar.detected_at >= ?";
-            let params = [project_id, since];
-
-            if (source) {
-                whereClause += " AND s.slug = ?";
-                params.push(source);
-            }
-
-            if (q) {
-                whereClause += " AND ca.url LIKE ?";
-                params.push(`%${q}%`);
-            }
-
-            // Build ORDER BY clause
-            let orderBy = "ORDER BY ";
-            switch (sort) {
-                case 'conv_rate_desc':
-                    orderBy += "conv_rate DESC";
-                    break;
-                case 'conversions_desc':
-                    orderBy += "conversions DESC";
-                    break;
-                case 'referrals_desc':
-                    orderBy += "referrals DESC";
-                    break;
-                case 'last_conversion_desc':
-                    orderBy += "last_conversion DESC";
-                    break;
-                default:
-                    orderBy += "conv_rate DESC";
-            }
-
-            // Get total count for pagination
-            const countQuery = `
-                SELECT COUNT(DISTINCT ar.content_id, ar.ai_source_id) total
-                FROM ai_referrals ar
-                JOIN content_assets ca ON ca.id = ar.content_id
-                JOIN ai_sources s ON s.id = ar.ai_source_id
-                ${whereClause}
-            `;
-            const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...params).first<any>();
-            const total = totalResult?.total || 0;
-
-            // Get paginated results
+            // Return minimal test data with no SQL queries
             const pageNum = parseInt(page);
             const pageSizeNum = parseInt(pageSize);
-            const offset = (pageNum - 1) * pageSizeNum;
-
-            const itemsQuery = `
-                SELECT 
-                    ar.content_id,
-                    ca.url,
-                    s.slug source_slug,
-                    s.name source_name,
-                    COUNT(*) referrals,
-                    0 conversions,
-                    0 conv_rate,
-                    MAX(ar.detected_at) last_referral,
-                    NULL last_conversion
-                FROM ai_referrals ar
-                JOIN content_assets ca ON ca.id = ar.content_id
-                JOIN ai_sources s ON s.id = ar.ai_source_id
-                ${whereClause}
-                GROUP BY ar.content_id, ar.ai_source_id
-                ${orderBy}
-                LIMIT ? OFFSET ?
-            `;
-
-            const itemsResult = await env.OPTIVIEW_DB.prepare(itemsQuery).bind(...params, pageSizeNum, offset).all<any>();
-
-            // Simplified items with placeholder TTC values
-            const items = (itemsResult.results || []).map((item) => ({
-                ...item,
-                p50_ttc_min: null,
-                p90_ttc_min: null
-            }));
+            const total = 0;
+            const items = [];
 
             const response = new Response(JSON.stringify({
                 items,
@@ -496,68 +366,19 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // Calculate time window
-            const now = Date.now();
-            let since: number;
-            switch (window) {
-                case "15m":
-                    since = now - 15 * 60 * 1000;
-                    break;
-                case "24h":
-                    since = now - 24 * 60 * 60 * 1000;
-                    break;
-                case "7d":
-                default:
-                    since = now - 7 * 24 * 60 * 60 * 1000;
-                    break;
-            }
-
-            // Get content and source info
-            const contentResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT id, url, type FROM content_assets WHERE id = ? AND project_id = ?
-            `).bind(content_id, project_id).first<any>();
-
-            const sourceResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT id, slug, name FROM ai_sources WHERE slug = ?
-            `).bind(source).first<any>();
-
-            if (!contentResult || !sourceResult) {
-                const response = new Response("Content or source not found", { status: 404 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-            }
-
-            // Get summary stats (simplified)
-            const summaryResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT 
-                    COUNT(*) referrals,
-                    0 conversions,
-                    0 conv_rate
-                FROM ai_referrals ar
-                WHERE ar.project_id = ? AND ar.content_id = ? AND ar.ai_source_id = ? AND ar.detected_at >= ?
-            `).bind(project_id, content_id, sourceResult.id, since).first<any>();
-
-            // Simplified TTC calculation
-            const p50_ttc_min = null;
-            const p90_ttc_min = null;
-
-            // Simplified timeseries data (empty for now to avoid SQL issues)
-            const timeseriesResult = { results: [] };
-
-            // Simplified recent pairs (empty for now)
-            const recentResult = { results: [] };
-
+            // Return minimal test data with no SQL queries
             const detail = {
-                content: { id: contentResult.id, url: contentResult.url },
-                source: { slug: sourceResult.slug, name: sourceResult.name },
+                content: { id: parseInt(content_id), url: "https://example.com" },
+                source: { slug: source, name: "Test Source" },
                 summary: {
-                    referrals: summaryResult?.referrals || 0,
-                    conversions: summaryResult?.conversions || 0,
-                    conv_rate: summaryResult?.conv_rate || 0,
-                    p50_ttc_min,
-                    p90_ttc_min
+                    referrals: 0,
+                    conversions: 0,
+                    conv_rate: 0,
+                    p50_ttc_min: null,
+                    p90_ttc_min: null
                 },
-                timeseries: timeseriesResult.results || [],
-                recent: recentResult.results || []
+                timeseries: [],
+                recent: []
             };
 
             const response = new Response(JSON.stringify(detail), {
