@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Shell from '../components/Shell';
-import Card from '../components/ui/Card';
+import { Card } from '../components/ui/Card';
 
 interface ReferralSummary {
   totals: {
@@ -40,7 +40,7 @@ const Referrals: React.FC = () => {
   const [referrals, setReferrals] = useState<ReferralItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Filters
   const [window, setWindow] = useState<'15m' | '24h' | '7d'>('24h');
   const [source, setSource] = useState<string>('');
@@ -73,7 +73,7 @@ const Referrals: React.FC = () => {
         page: page.toString(),
         pageSize: pageSize.toString()
       });
-      
+
       if (source) params.append('source', source);
       if (searchQuery) params.append('q', searchQuery);
 
@@ -220,11 +220,10 @@ const Referrals: React.FC = () => {
                 <button
                   key={w}
                   onClick={() => handleWindowChange(w)}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                    window === w
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${window === w
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                    }`}
                 >
                   {w}
                 </button>

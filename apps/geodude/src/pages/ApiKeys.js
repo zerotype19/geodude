@@ -5,20 +5,26 @@ import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import KeyRotationModal from "../components/KeyRotationModal";
 import { RotateCcw, Trash2, AlertTriangle, Clock, CheckCircle, XCircle } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 export default function ApiKeys() {
+    const { project } = useAuth();
     const [keys, setKeys] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [rotationModal, setRotationModal] = useState(null);
     const [newKey, setNewKey] = useState({ domain: "", name: "" });
     useEffect(() => {
-        loadKeys();
-    }, []);
+        if (project?.id) {
+            loadKeys();
+        }
+    }, [project]);
     async function loadKeys() {
+        if (!project?.id)
+            return;
         try {
             setLoading(true);
             setError(null);
-            const response = await fetch(`${API_BASE}/api/keys`, FETCH_OPTS);
+            const response = await fetch(`${API_BASE}/api/keys?project_id=${project.id}`, FETCH_OPTS);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -33,7 +39,7 @@ export default function ApiKeys() {
         }
     }
     async function createApiKey() {
-        if (!newKey.domain || !newKey.name)
+        if (!project?.id || !newKey.domain || !newKey.name)
             return;
         try {
             setLoading(true);
@@ -42,8 +48,8 @@ export default function ApiKeys() {
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    project_id: 1, // Default project ID for now
-                    property_id: 1, // Default property ID for now
+                    project_id: parseInt(project.id),
+                    property_id: 1, // We'll need to get this from the domain
                     name: newKey.name,
                     domain: newKey.domain
                 })
@@ -144,7 +150,7 @@ export default function ApiKeys() {
     if (error) {
         return (_jsx(Shell, { children: _jsx("div", { className: "flex items-center justify-center min-h-64", children: _jsx("div", { className: "text-red-600 text-lg", children: error }) }) }));
     }
-    return (_jsx(Shell, { children: _jsxs("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8", children: [_jsxs("div", { className: "mb-8", children: [_jsx("h1", { className: "text-3xl font-bold text-gray-900", children: "API Keys" }), _jsx("p", { className: "mt-2 text-gray-600", children: "Manage your API keys for data ingestion" })] }), keys.length === 0 ? (_jsx(Card, { title: "No API Keys", children: _jsxs("div", { className: "text-center py-8", children: [_jsx("p", { className: "text-gray-500 mb-6", children: "No API keys found. Create your first key to start collecting data." }), _jsx("div", { className: "max-w-md mx-auto", children: _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { children: [_jsx("label", { htmlFor: "property-domain", className: "block text-sm font-medium text-gray-700 mb-1", children: "Property Domain" }), _jsx("input", { id: "property-domain", type: "text", placeholder: "example.com", className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", value: newKey.domain || "", onChange: (e) => setNewKey({ ...newKey, domain: e.target.value }) })] }), _jsxs("div", { children: [_jsx("label", { htmlFor: "key-name", className: "block text-sm font-medium text-gray-700 mb-1", children: "Key Name" }), _jsx("input", { id: "key-name", type: "text", placeholder: "Production Key", className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", value: newKey.name || "", onChange: (e) => setNewKey({ ...newKey, name: e.target.value }) })] }), _jsx("button", { onClick: createApiKey, disabled: !newKey.domain || !newKey.name, className: "w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors", children: "Create API Key" })] }) })] }) })) : (_jsx("div", { className: "space-y-6", children: keys.map((key) => {
+    return (_jsx(Shell, { children: _jsxs("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8", children: [_jsxs("div", { className: "mb-8", children: [_jsx("h1", { className: "text-3xl font-bold text-gray-900", children: "API Keys" }), _jsx("p", { className: "mt-2 text-gray-600", children: "Manage your API keys for data ingestion" })] }), keys.length === 0 ? (_jsx(Card, { title: "No API Keys", children: _jsxs("div", { className: "text-center py-8", children: [_jsx("p", { className: "text-gray-500 mb-6", children: "No API keys found. Create your first key to start collecting data." }), _jsx("div", { className: "max-w-md mx-auto", children: _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { children: [_jsx("label", { htmlFor: "property-domain", className: "block text-sm font-medium text-gray-700 mb-1", children: "Property Domain" }), _jsx("input", { id: "property-domain", type: "text", placeholder: "example.com", className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", value: newKey.domain || "", onChange: (e) => setNewKey({ ...newKey, domain: e.target.value }) })] }), _jsxs("div", { children: [_jsx("label", { htmlFor: "key-name", className: "block text-sm font-medium text-gray-700 mb-1", children: "Key Name" }), _jsx("input", { id: "key-name", type: "text", placeholder: "Production Key", className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500", value: newKey.name || "", onChange: (e) => setNewKey({ ...newKey, name: e.target.value }) })] }), _jsx("button", { onClick: createApiKey, disabled: !project?.id || !newKey.domain || !newKey.name, className: "w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors", children: "Create API Key" })] }) })] }) })) : (_jsx("div", { className: "space-y-6", children: keys.map((key) => {
                         const status = getKeyStatus(key);
                         const graceCountdown = getGraceCountdown(key);
                         return (_jsx(Card, { title: `${key.name} (${key.domain})`, children: _jsxs("div", { className: "p-6", children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4", children: [_jsxs("div", { children: [_jsx("p", { className: "text-sm font-medium text-gray-500", children: "Key ID" }), _jsx("p", { className: "text-sm text-gray-900 font-mono", children: key.key_id })] }), _jsxs("div", { children: [_jsx("p", { className: "text-sm font-medium text-gray-500", children: "Status" }), _jsxs("div", { className: "flex items-center space-x-2", children: [status.icon, _jsx("span", { className: `text-sm ${status.status === 'active' ? 'text-green-600' :

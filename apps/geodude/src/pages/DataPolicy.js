@@ -4,7 +4,9 @@ import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { Shield, Database, Clock, AlertTriangle, Edit3, Save, X } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 export default function DataPolicy() {
+    const { project } = useAuth();
     const [settings, setSettings] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -14,16 +16,17 @@ export default function DataPolicy() {
     const [purgeResult, setPurgeResult] = useState(null);
     const [purging, setPurging] = useState(false);
     useEffect(() => {
-        loadSettings();
-    }, []);
+        if (project?.id) {
+            loadSettings();
+        }
+    }, [project]);
     async function loadSettings() {
+        if (!project?.id)
+            return;
         try {
             setLoading(true);
             setError(null);
-            // For now, we'll use a placeholder project ID
-            // In a real app, this would come from the user's session
-            const projectId = 1;
-            const response = await fetch(`${API_BASE}/api/projects/${projectId}/settings`, FETCH_OPTS);
+            const response = await fetch(`${API_BASE}/api/projects/${project.id}/settings`, FETCH_OPTS);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -148,7 +151,7 @@ export default function DataPolicy() {
     const defaultRetention = getDefaultRetention(settings.plan_tier);
     const canEdit = canEditRetention(settings.plan_tier);
     const validationErrors = validateRetention(editForm.events, editForm.referrals);
-    return (_jsx(Shell, { children: _jsxs("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8", children: [_jsxs("div", { className: "mb-8", children: [_jsx("h1", { className: "text-3xl font-bold text-gray-900", children: "Data Policy" }), _jsx("p", { className: "mt-2 text-gray-600", children: "Manage your data retention policies and storage settings" })] }), _jsx("div", { className: "mb-6", children: _jsx(Card, { title: "Current Plan", children: _jsx("div", { className: "p-6", children: _jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { className: "flex items-center space-x-3", children: [_jsx("div", { className: `p-2 rounded-lg ${planInfo.bgColor}`, children: _jsx(Shield, { className: `h-6 w-6 ${planInfo.color}` }) }), _jsxs("div", { children: [_jsxs("h3", { className: "text-lg font-medium text-gray-900", children: [planInfo.name, " Plan"] }), _jsx("p", { className: "text-sm text-gray-500", children: canEdit ? "Customizable retention policies" : "Standard retention policies" })] })] }), canEdit && (_jsxs("button", { onClick: () => setEditing(!editing), className: "flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors", children: [editing ? _jsx(X, { size: 16 }) : _jsx(Edit3, { size: 16 }), _jsx("span", { children: editing ? "Cancel" : "Edit" })] }))] }) }) }) }), _jsx("div", { className: "mb-6", children: _jsx(Card, { title: "Data Retention Policies", children: _jsxs("div", { className: "p-6", children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [_jsxs("div", { children: [_jsxs("div", { className: "flex items-center space-x-2 mb-3", children: [_jsx(Database, { className: "h-5 w-5 text-blue-600" }), _jsx("h4", { className: "text-lg font-medium text-gray-900", children: "Interaction Events" })] }), editing && canEdit ? (_jsxs("div", { children: [_jsx("input", { type: "number", min: "7", max: "3650", value: editForm.events, onChange: (e) => setEditForm(prev => ({ ...prev, events: parseInt(e.target.value) || 0 })), className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }), _jsx("p", { className: "text-sm text-gray-500 mt-1", children: "Days to retain event data (7-3650)" })] })) : (_jsxs("div", { children: [_jsxs("div", { className: "text-2xl font-bold text-gray-900", children: [settings.retention_days_events, " days"] }), _jsx("p", { className: "text-sm text-gray-500", children: settings.retention_days_events === defaultRetention.events
+    return (_jsx(Shell, { children: _jsxs("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8", children: [_jsxs("div", { className: "mb-8", children: [_jsx("h1", { className: "text-3xl font-bold text-gray-900", children: "Data Policy" }), _jsxs("p", { className: "mt-2 text-gray-600", children: ["Manage your ", project?.name || 'project', " data retention policies and storage settings"] })] }), _jsx("div", { className: "mb-6", children: _jsx(Card, { title: "Current Plan", children: _jsx("div", { className: "p-6", children: _jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { className: "flex items-center space-x-3", children: [_jsx("div", { className: `p-2 rounded-lg ${planInfo.bgColor}`, children: _jsx(Shield, { className: `h-6 w-6 ${planInfo.color}` }) }), _jsxs("div", { children: [_jsxs("h3", { className: "text-lg font-medium text-gray-900", children: [planInfo.name, " Plan"] }), _jsx("p", { className: "text-sm text-gray-500", children: canEdit ? "Customizable retention policies" : "Standard retention policies" })] })] }), canEdit && (_jsxs("button", { onClick: () => setEditing(!editing), className: "flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors", children: [editing ? _jsx(X, { size: 16 }) : _jsx(Edit3, { size: 16 }), _jsx("span", { children: editing ? "Cancel" : "Edit" })] }))] }) }) }) }), _jsx("div", { className: "mb-6", children: _jsx(Card, { title: "Data Retention Policies", children: _jsxs("div", { className: "p-6", children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [_jsxs("div", { children: [_jsxs("div", { className: "flex items-center space-x-2 mb-3", children: [_jsx(Database, { className: "h-5 w-5 text-blue-600" }), _jsx("h4", { className: "text-lg font-medium text-gray-900", children: "Interaction Events" })] }), editing && canEdit ? (_jsxs("div", { children: [_jsx("input", { type: "number", min: "7", max: "3650", value: editForm.events, onChange: (e) => setEditForm(prev => ({ ...prev, events: parseInt(e.target.value) || 0 })), className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }), _jsx("p", { className: "text-sm text-gray-500 mt-1", children: "Days to retain event data (7-3650)" })] })) : (_jsxs("div", { children: [_jsxs("div", { className: "text-2xl font-bold text-gray-900", children: [settings.retention_days_events, " days"] }), _jsx("p", { className: "text-sm text-gray-500", children: settings.retention_days_events === defaultRetention.events
                                                                 ? "Default for your plan"
                                                                 : "Custom setting" })] }))] }), _jsxs("div", { children: [_jsxs("div", { className: "flex items-center space-x-2 mb-3", children: [_jsx(Clock, { className: "h-5 w-5 text-green-600" }), _jsx("h4", { className: "text-lg font-medium text-gray-900", children: "AI Referrals" })] }), editing && canEdit ? (_jsxs("div", { children: [_jsx("input", { type: "number", min: "30", max: "3650", value: editForm.referrals, onChange: (e) => setEditForm(prev => ({ ...prev, referrals: parseInt(e.target.value) || 0 })), className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }), _jsx("p", { className: "text-sm text-gray-500 mt-1", children: "Days to retain referral data (30-3650)" })] })) : (_jsxs("div", { children: [_jsxs("div", { className: "text-2xl font-bold text-gray-900", children: [settings.retention_days_referrals, " days"] }), _jsx("p", { className: "text-sm text-gray-500", children: settings.retention_days_referrals === defaultRetention.referrals
                                                                 ? "Default for your plan"
