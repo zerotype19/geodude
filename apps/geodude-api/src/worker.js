@@ -1640,56 +1640,24 @@ export default {
           const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...baseParams).first();
           const total = totalResult?.total || 0;
 
-          // Main query with CTEs for performance
+          // Simplified main query - just get content assets with basic activity counts
           const mainQuery = `
-            WITH ai_by_content AS (
-              SELECT ie.content_id, ie.ai_source_id, COUNT(*) AS n
-              FROM interaction_events ie
-              WHERE ie.project_id = ? AND ie.occurred_at >= ? AND ie.ai_source_id IS NOT NULL
-              GROUP BY ie.content_id, ie.ai_source_id
-            ),
-            ai_by_content_rollup AS (
-              SELECT content_id, SUM(n) AS ai_events
-              FROM ai_by_content
-              GROUP BY content_id
-            ),
-            ref_by_content AS (
-              SELECT ar.content_id, COUNT(*) AS ai_referrals
-              FROM ai_referrals ar
-              WHERE ar.project_id = ? AND ar.detected_at >= ?
-              GROUP BY ar.content_id
-            ),
-            last_seen AS (
-              SELECT content_id, MAX(occurred_at) AS last_seen
-              FROM interaction_events ie
-              WHERE ie.project_id = ?
-              GROUP BY content_id
-            )
             SELECT
               ca.id, ca.url, ca.type,
-              ls.last_seen,
+              (SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id) AS last_seen,
               (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=?) AS events_window,
               (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')) AS events_15m,
               (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')) AS events_24h,
-              COALESCE(r.ai_referrals,0) AS ai_referrals_24h,
-              COALESCE(a.ai_events,0) AS ai_events_24h,
-              CASE 
-                WHEN COALESCE(a.ai_events,0) + COALESCE(r.ai_referrals,0) = 0 THEN 0
-                ELSE CAST(ROUND(100.0 * (COALESCE(a.ai_events,0) + 2*COALESCE(r.ai_referrals,0)) / 
-                  COALESCE((SELECT MAX(COALESCE(a2.ai_events,0) + 2*COALESCE(r2.ai_referrals,0)) 
-                    FROM ai_by_content_rollup a2 
-                    LEFT JOIN ref_by_content r2 ON r2.content_id = a2.content_id), 1)) AS INT)
-              END AS coverage_score
+              (SELECT COUNT(*) FROM ai_referrals ar WHERE ar.project_id=ca.project_id AND ar.content_id=ca.id AND ar.detected_at>=datetime('now','-1 day')) AS ai_referrals_24h,
+              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day') AND ie.ai_source_id IS NOT NULL) AS ai_events_24h,
+              0 AS coverage_score
             FROM content_assets ca
-            LEFT JOIN ai_by_content_rollup a ON a.content_id = ca.id
-            LEFT JOIN ref_by_content r ON r.content_id = ca.id
-            LEFT JOIN last_seen ls ON ls.content_id = ca.id
             WHERE ${baseFilters}
-            ORDER BY COALESCE(ls.last_seen, '1970-01-01') ASC, ca.url ASC
+            ORDER BY ca.url ASC
             LIMIT ? OFFSET ?
           `;
 
-          const mainParams = [...baseParams, projectId, sinceTime, projectId, sinceTime, projectId, sinceTime, pageSize, (page - 1) * pageSize];
+          const mainParams = [...baseParams, sinceTime, pageSize, (page - 1) * pageSize];
           const mainResult = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...mainParams).all();
 
           // Get by-source breakdown for the returned items
