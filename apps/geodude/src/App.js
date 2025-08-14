@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Sources from "./pages/Sources";
 import Content from "./pages/Content";
 import Events from "./pages/Events";
-import Conversions from "./pages/Conversions";
+import Conversions from "./pages/Conversions.tsx";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
 import AdminHealth from "./pages/AdminHealth";
