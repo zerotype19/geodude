@@ -6,12 +6,17 @@ import { API_BASE } from '../config';
 export default function MagicLink() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, refreshUserData } = useAuth();
+  const { refreshUserData } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [error, setError] = useState<string>('');
+  const [hasProcessed, setHasProcessed] = useState(false);
 
   useEffect(() => {
     const handleMagicLink = async () => {
+      // Prevent multiple API calls
+      if (hasProcessed) return;
+      setHasProcessed(true);
+
       try {
         const token = searchParams.get('token');
 
@@ -80,7 +85,7 @@ export default function MagicLink() {
     };
 
     handleMagicLink();
-  }, [searchParams, navigate, refreshUserData]);
+  }, [searchParams, navigate, refreshUserData, hasProcessed]);
 
   if (status === 'loading') {
     return (
