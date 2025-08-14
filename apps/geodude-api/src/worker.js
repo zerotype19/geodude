@@ -2015,12 +2015,11 @@ export default {
           const contentId = url.pathname.split('/')[3]; // /api/content/{id}/detail
           const window = url.searchParams.get("window") || "7d";
 
-          // Get the content asset and verify access
+          // Get the content asset and verify access via project_id
           const contentAsset = await env.OPTIVIEW_DB.prepare(`
-            SELECT ca.id, ca.url, ca.type, ca.metadata
+            SELECT ca.id, ca.url, ca.type, ca.metadata, ca.project_id
             FROM content_assets ca
-            JOIN properties p ON p.id = ca.property_id
-            JOIN org_member om ON om.org_id = p.org_id
+            JOIN org_member om ON om.org_id = (SELECT org_id FROM project WHERE id = ca.project_id)
             WHERE ca.id = ? AND om.user_id = ?
           `).bind(contentId, sessionData.user_id).first();
 
