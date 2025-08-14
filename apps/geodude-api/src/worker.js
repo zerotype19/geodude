@@ -181,7 +181,7 @@ export default {
       }
 
       // 2) Magic Link Authentication (M3)
-      if (url.pathname === "/auth/request-link" && request.method === "POST") {
+      if (url.pathname === "/auth/request-code" && request.method === "POST") {
         try {
           const body = await request.json();
           const { email, continue_path } = body;
@@ -200,7 +200,7 @@ export default {
           const emailKey = `rate_limit:magic_link:email:${email}`;
 
           const ipLimit = await checkRateLimit(ipKey, 10, 60 * 1000); // 10 per minute per IP
-          const emailLimit = await checkRateLimit(emailKey, 5, 24 * 60 * 60 * 1000); // 5 per day per email
+          const emailLimit = await checkRateLimit(emailKey, 50, 24 * 60 * 60 * 1000); // 50 per day per email
 
           if (!ipLimit.allowed) {
             const response = new Response(JSON.stringify({ error: "Too many requests from this IP" }), {
@@ -261,7 +261,7 @@ export default {
           });
 
           // Generate magic link
-          const appUrl = env.PUBLIC_APP_URL || "https://optiview.ai";
+          const appUrl = env.PUBLIC_APP_URL || "https://app.optiview.ai";
           const magicLink = `${appUrl}/auth/magic?token=${token}`;
 
           // Send email (for now, log to console in dev)
@@ -345,18 +345,23 @@ export default {
           // Clean up used magic link
           await env.AI_FINGERPRINTS.delete(`magic_link:${tokenHash}`);
 
-          // Re-sanitize continue path before redirect (defense-in-depth)
-          const sanitizedRedirectUrl = sanitizeContinuePath(storedData.continue_path);
+          // Default to /onboarding if no continue_path or if it's invalid
+          let redirectPath = "/onboarding";
+          if (storedData.continue_path && storedData.continue_path !== "/onboarding") {
+            // Re-sanitize continue path before redirect (defense-in-depth)
+            const sanitizedRedirectUrl = sanitizeContinuePath(storedData.continue_path);
+            redirectPath = sanitizedRedirectUrl.value;
 
-          // Record sanitization metrics if sanitized
-          if (sanitizedRedirectUrl.sanitized) {
-            recordContinueSanitized("consume", sanitizedRedirectUrl.reason);
+            // Record sanitization metrics if sanitized
+            if (sanitizedRedirectUrl.sanitized) {
+              recordContinueSanitized("consume", sanitizedRedirectUrl.reason);
+            }
           }
 
           const response = new Response(null, {
             status: 302,
             headers: {
-              "Location": sanitizedRedirectUrl.value,
+              "Location": redirectPath,
               "Set-Cookie": `optiview_session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${24 * 60 * 60}`
             }
           });
@@ -378,6 +383,289 @@ export default {
           headers: { "Content-Type": "text/html" }
         });
         return addCorsHeaders(response);
+      }
+
+      // 3.1) Create Organization
+      if (url.pathname === "/api/onboarding/organization" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { name } = body;
+
+          if (!name) {
+            const response = new Response(JSON.stringify({ error: "Organization name is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Generate organization ID
+          const orgId = `org_${generateToken().substring(0, 12)}`;
+          const now = Date.now();
+
+          // Store organization in database
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO organization (id, name, created_ts)
+            VALUES (?, ?, ?)
+          `).bind(orgId, name, now).run();
+
+          // Create user if they don't exist
+          const sessionCookie = request.headers.get("cookie");
+          let userEmail = "unknown@example.com"; // Default fallback
+
+          if (sessionCookie) {
+            // Extract session ID and get user email
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (sessionMatch) {
+              const sessionId = sessionMatch[1];
+              const sessionData = await env.AI_FINGERPRINTS.get(`session:${sessionId}`, { type: "json" });
+              if (sessionData && sessionData.user_email) {
+                userEmail = sessionData.user_email;
+              }
+            }
+          }
+
+          // Create user
+          const userId = `usr_${generateToken().substring(0, 12)}`;
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT OR IGNORE INTO user (id, email, created_ts)
+            VALUES (?, ?, ?)
+          `).bind(userId, userEmail, now).run();
+
+          // Make user admin of the organization
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO org_member (org_id, user_id, role)
+            VALUES (?, ?, 'admin')
+          `).bind(orgId, userId).run();
+
+          const response = new Response(JSON.stringify({
+            id: orgId,
+            name: name,
+            created_at: now,
+            user_id: userId
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("Organization creation error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to create organization" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+      }
+
+      // 3.2) Create Project
+      if (url.pathname === "/api/onboarding/project" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { name, org_id } = body;
+
+          if (!name || !org_id) {
+            const response = new Response(JSON.stringify({ error: "Project name and organization ID are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Generate project ID and slug
+          const projectId = `prj_${generateToken().substring(0, 12)}`;
+          const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+          const now = Date.now();
+
+          // Store project in database
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO project (id, org_id, name, slug, created_ts)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(projectId, org_id, name, slug, now).run();
+
+          // Create default project settings
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO project_settings (project_id, retention_days_events, retention_days_referrals, plan_tier, xray_trace_enabled, created_at, updated_at)
+            VALUES (?, 180, 365, 'free', 0, ?, ?)
+          `).bind(projectId, now, now).run();
+
+          const response = new Response(JSON.stringify({
+            id: projectId,
+            name: name,
+            slug: slug,
+            org_id: org_id,
+            created_at: now
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("Project creation error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to create project" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+      }
+
+      // 3.3) Create Property
+      if (url.pathname === "/api/onboarding/property" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { domain, project_id } = body;
+
+          if (!domain || !project_id) {
+            const response = new Response(JSON.stringify({ error: "Domain and project ID are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Generate property ID
+          const propertyId = `prop_${generateToken().substring(0, 12)}`;
+          const now = Date.now();
+
+          // Store property in database
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO property (id, project_id, domain, name, created_ts, updated_ts)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).bind(propertyId, project_id, domain, domain, now, now).run();
+
+          const response = new Response(JSON.stringify({
+            id: propertyId,
+            domain: domain,
+            project_id: project_id,
+            created_at: now
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("Property creation error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to create property" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+      }
+
+      // 3.4) Create API Key
+      if (url.pathname === "/api/onboarding/api-key" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { name, project_id, property_id } = body;
+
+          if (!name || !project_id || !property_id) {
+            const response = new Response(JSON.stringify({ error: "Name, project ID, and property ID are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Generate API key ID and secret
+          const keyId = `key_${generateToken().substring(0, 12)}`;
+          const secret = generateToken();
+          const secretHash = await hashToken(secret);
+          const now = Date.now();
+
+          // Store API key in database
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO api_key (id, project_id, name, hash, created_ts)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(keyId, project_id, name, secretHash, now).run();
+
+          const response = new Response(JSON.stringify({
+            id: keyId,
+            key_id: keyId,
+            secret_once: secret, // Show only once
+            name: name,
+            project_id: project_id,
+            property_id: property_id,
+            created_at: now
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("API key creation error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to create API key" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+      }
+
+      // 3.5) JS Tag for Installation
+      if (url.pathname === "/v1/tag.js" && request.method === "GET") {
+        try {
+          const pid = url.searchParams.get("pid");
+          const kid = url.searchParams.get("kid");
+
+          if (!pid || !kid) {
+            const response = new Response("Missing pid or kid parameters", { status: 400 });
+            return addCorsHeaders(response);
+          }
+
+          // Generate the JS tag
+          const jsTag = `// Optiview Analytics Tag v1.0
+!function(){
+  try{
+    var pid = "${pid}"; 
+    var kid = "${kid}";
+    var ep = "${env.PUBLIC_BASE_URL || 'https://api.optiview.ai'}/api/events";
+    
+    var payload = {
+      property_id: pid,
+      key_id: kid,
+      event_type: "view",
+      metadata: {
+        p: location.pathname,
+        r: document.referrer ? new URL(document.referrer).hostname : "",
+        t: document.title.slice(0,120),
+        ua: navigator.userAgent.slice(0,100)
+      }
+    };
+    
+    var body = JSON.stringify(payload);
+    var timestamp = Math.floor(Date.now() / 1000);
+    
+    fetch(ep, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-optiview-key-id": kid,
+        "x-optiview-timestamp": timestamp
+      },
+      body: body
+    }).catch(function(e) {
+      // Silent fail for analytics
+    });
+  }catch(e){
+    // Silent fail for analytics
+  }
+}();`;
+
+          const response = new Response(jsTag, {
+            headers: {
+              "Content-Type": "application/javascript",
+              "Cache-Control": "public, max-age=3600"
+            }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("JS tag generation error:", e);
+          const response = new Response("Internal server error", { status: 500 });
+          return addCorsHeaders(response);
+        }
       }
 
       // 3.5) Onboarding Invites (M5)
@@ -565,6 +853,80 @@ export default {
         return addCorsHeaders(response);
       }
 
+      // 6.1) Events POST endpoint (for JS tag)
+      if (url.pathname === "/api/events" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { property_id, key_id, event_type, metadata } = body;
+
+          // Validate required fields
+          if (!property_id || !key_id || !event_type) {
+            const response = new Response(JSON.stringify({ error: "Missing required fields" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Validate API key
+          const keyHash = await hashToken(key_id);
+          const apiKey = await env.OPTIVIEW_DB.prepare(`
+            SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
+          `).bind(keyHash).first();
+
+          if (!apiKey) {
+            const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          // Store event in database
+          const now = Date.now();
+          const eventId = `evt_${generateToken().substring(0, 12)}`;
+
+          await env.OPTIVIEW_DB.prepare(`
+            INSERT INTO edge_click_event (
+              id, org_id, project_id, property_id, 
+              timestamp, event_type, metadata, 
+              created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            eventId,
+            apiKey.org_id || null,
+            apiKey.project_id,
+            property_id,
+            now,
+            event_type,
+            JSON.stringify(metadata || {}),
+            now
+          ).run();
+
+          // Update last_used timestamp for API key
+          await env.OPTIVIEW_DB.prepare(`
+            UPDATE api_key SET last_used_ts = ? WHERE id = ?
+          `).bind(now, apiKey.id).run();
+
+          const response = new Response(JSON.stringify({
+            ok: true,
+            event_id: eventId,
+            timestamp: now
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("Event creation error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to create event" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
+      }
+
       // 7) Events summary endpoint
       if (url.pathname === "/api/events/summary" && request.method === "GET") {
         const response = new Response(JSON.stringify({
@@ -580,20 +942,65 @@ export default {
 
       // 7.5) Events last-seen endpoint (for install verification)
       if (url.pathname === "/api/events/last-seen" && request.method === "GET") {
-        const response = new Response(JSON.stringify({
-          property_id: 1,
-          events_15m: 0,
-          by_class_15m: {
-            direct_human: 0,
-            human_via_ai: 0,
-            ai_agent_crawl: 0,
-            unknown_ai_like: 0
-          },
-          last_event_ts: null
-        }), {
-          headers: { "Content-Type": "application/json" }
-        });
-        return addCorsHeaders(response);
+        try {
+          const propertyId = url.searchParams.get("property_id");
+
+          if (!propertyId) {
+            const response = new Response(JSON.stringify({ error: "property_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
+
+          const now = Date.now();
+          const fifteenMinutesAgo = now - (15 * 60 * 1000);
+
+          // Get events in the last 15 minutes for this property
+          const recentEvents = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count, event_type, metadata
+            FROM edge_click_event 
+            WHERE property_id = ? AND timestamp > ?
+            GROUP BY event_type
+          `).bind(propertyId, fifteenMinutesAgo).all();
+
+          // Get the last event timestamp
+          const lastEvent = await env.OPTIVIEW_DB.prepare(`
+            SELECT timestamp FROM edge_click_event 
+            WHERE property_id = ? 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+          `).bind(propertyId).first();
+
+          // Count total events in last 15 minutes
+          const totalEvents = await env.OPTIVIEW_DB.prepare(`
+            SELECT COUNT(*) as count FROM edge_click_event 
+            WHERE property_id = ? AND timestamp > ?
+          `).bind(propertyId, fifteenMinutesAgo).first();
+
+          const response = new Response(JSON.stringify({
+            property_id: propertyId,
+            events_15m: totalEvents?.count || 0,
+            by_class_15m: {
+              direct_human: 0, // TODO: Implement traffic classification
+              human_via_ai: 0,
+              ai_agent_crawl: 0,
+              unknown_ai_like: 0
+            },
+            last_event_ts: lastEvent?.timestamp || null
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+
+        } catch (e) {
+          console.error("Last-seen query error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to query events" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
       }
 
       // 8) Properties endpoint (might be missing)
