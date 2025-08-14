@@ -4,7 +4,51 @@ compatibility_date = "2025-08-01"
 
 # Default/production values (used when no environment specified)
 [vars]
-PUBLIC_APP_URL = "https://app.optiview.ai"
+PUBLIC_APP_URL = "https://optiview.ai"
+PUBLIC_BASE_URL = "https://api.optiview.ai"
+CSP_MODE = "production"
+NODE_ENV = "production"
+TEST_MODE = "1"
+DEV_MAIL_ECHO = "true"
+
+# Auth & limits (production defaults)
+SESSION_TTL_HOURS = "720"
+OTP_EXP_MIN = "10"
+MAGIC_LINK_EXP_MIN = "15"
+MAGIC_LINK_RPM_PER_IP = "10"
+MAGIC_LINK_RPD_PER_EMAIL = "50"
+INVITE_EXP_DAYS = "14"
+ADMIN_RPM_PER_IP = "30"
+
+# Ingest limits (production defaults)
+INGEST_RATE_LIMIT_RPS = "10"
+INGEST_RATE_LIMIT_BURST = "50"
+RATE_LIMIT_RETRY_AFTER = "5"
+CSV_EXPORT_RATE_LIMIT_RPS = "1"
+RULES_REFRESH_TTL_SEC = "300"
+
+# Email settings (production defaults)
+EMAIL_SENDER_NAME = "Optiview"
+EMAIL_FROM = "noreply@optiview.ai"
+
+# Database and KV bindings (shared across all environments)
+[[d1_databases]]
+binding = "OPTIVIEW_DB"
+database_name = "optiview_db"
+database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+
+[[kv_namespaces]]
+binding = "AI_FINGERPRINTS"
+id = "571e1b9f739c4d0a9027b350cf091d20"
+preview_id = "dev_ai_fingerprints"
+
+# Email settings (non-secret)
+EMAIL_SENDER_NAME = "Optiview"
+EMAIL_FROM = "noreply@optiview.ai"
+
+# Production environment (for specific production deployments)
+[env.production.vars]
+PUBLIC_APP_URL = "https://optiview.ai"
 PUBLIC_BASE_URL = "https://api.optiview.ai"
 CSP_MODE = "production"
 NODE_ENV = "production"
@@ -43,12 +87,8 @@ id = "571e1b9f739c4d0a9027b350cf091d20"
 
 # Staging environment
 [env.staging.vars]
-PUBLIC_APP_URL = "https://staging.app.optiview.ai"
+PUBLIC_APP_URL = "https://staging.optiview.ai"
 PUBLIC_BASE_URL = "https://staging.api.optiview.ai"
-CSP_MODE = "production"
-NODE_ENV = "production"
-TEST_MODE = "0"
-DEV_MAIL_ECHO = "false"
 
 # Auth & limits (staging defaults)
 SESSION_TTL_HOURS = "720"

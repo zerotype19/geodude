@@ -1181,21 +1181,57 @@ export default {
           // For now, we'll search through KV storage for magic links
           console.log("🔍 TEST MODE - Looking for magic link token for:", email);
 
-          // Search for magic links by email (this is a simplified approach)
-          // In production, we'd have proper database queries with indexes
+          // Search for magic links by email in KV storage
           let foundToken = null;
+          let foundData = null;
 
-          // For now, we'll return a placeholder response indicating the endpoint is working
-          // TODO: Implement proper token lookup from database
-          const response = new Response(JSON.stringify({
-            message: "Test endpoint active - token lookup not yet implemented",
-            email: email,
-            note: "This endpoint is for development/testing only",
-            status: "working"
-          }), {
-            headers: { "Content-Type": "application/json" }
-          });
-          return addCorsHeaders(response);
+          // List all magic link keys and find ones for this email
+          // This is a simplified approach - in production we'd have proper database queries
+          const magicLinkKeys = await env.AI_FINGERPRINTS.list({ prefix: "magic_link:" });
+
+          for (const key of magicLinkKeys.keys) {
+            try {
+              const magicLinkData = await env.AI_FINGERPRINTS.get(key.name);
+              if (magicLinkData) {
+                const parsed = JSON.parse(magicLinkData);
+                if (parsed.email === email && !parsed.consumed) {
+                  // Found a valid magic link for this email
+                  foundToken = key.name.replace("magic_link:", "");
+                  foundData = parsed;
+                  break;
+                }
+              }
+            } catch (e) {
+              console.error("Error parsing magic link data:", e);
+            }
+          }
+
+          if (foundToken && foundData) {
+            const response = new Response(JSON.stringify({
+              message: "Magic link found",
+              email: email,
+              token: foundToken,
+              token_hash: foundData.token_hash,
+              continue_path: foundData.continue_path,
+              expires_at: foundData.expires_at,
+              created_at: foundData.created_at,
+              consumed: foundData.consumed || false,
+              status: "found"
+            }), {
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          } else {
+            const response = new Response(JSON.stringify({
+              message: "No active magic link found for this email",
+              email: email,
+              note: "Try requesting a new magic link first",
+              status: "not_found"
+            }), {
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response);
+          }
 
         } catch (e) {
           console.error("Test magic link peek error:", e);
