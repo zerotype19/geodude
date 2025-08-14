@@ -393,7 +393,7 @@ export default {
                 AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
               )
             )
-            SELECT AVG(CAST((julianday(occurred_at) - julianday(last_referral)) * 24 * 60 AS INTEGER)) as avg_p50_ttc_min
+            SELECT AVG((julianday(occurred_at) - julianday(last_referral)) * 24 * 60) as avg_p50_ttc_min
             FROM last_touch
             WHERE last_referral IS NOT NULL
           `).first();
@@ -3486,9 +3486,9 @@ export default {
           // window → since (ISO). Keep attribution lookback = 7d for v1 (constant).
           const now = new Date();
           const sinceISO = (() => {
-            if (window === "24h") return new Date(now.getTime() - 24*3600e3).toISOString();
-            if (window === "30d") return new Date(now.getTime() - 30*86400e3).toISOString();
-            return new Date(now.getTime() - 7*86400e3).toISOString(); // 7d default
+            if (window === "24h") return new Date(now.getTime() - 24 * 3600e3).toISOString();
+            if (window === "30d") return new Date(now.getTime() - 30 * 86400e3).toISOString();
+            return new Date(now.getTime() - 7 * 86400e3).toISOString(); // 7d default
           })();
           const lookbackMod = "-7 days"; // SQLite datetime(c.occurred_at, ?)
 
@@ -3496,7 +3496,7 @@ export default {
           const sortSql = (() => {
             switch (sort) {
               case "conversions_desc": return "conversions DESC, last_seen DESC";
-              case "last_seen_desc": 
+              case "last_seen_desc":
               default: return "last_seen DESC, conversions DESC";
             }
           })();
@@ -4008,11 +4008,11 @@ export default {
           const now = new Date();
           let sinceISO;
           if (window === "15m") {
-            sinceISO = new Date(now.getTime() - 15*60*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
           } else if (window === "24h") {
-            sinceISO = new Date(now.getTime() - 24*3600*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
           } else { // 7d
-            sinceISO = new Date(now.getTime() - 7*86400*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
           }
 
           // Get funnels summary data
@@ -4108,12 +4108,12 @@ export default {
           for (const row of summaryResult.results || []) {
             const sourceQuery = `SELECT slug, name FROM ai_sources WHERE id = ?`;
             const sourceResult = await env.OPTIVIEW_DB.prepare(sourceQuery).bind(row.ai_source_id).first();
-            
+
             if (sourceResult) {
               // Calculate TTC percentiles
               let p50_ttc_min = 0;
               let p90_ttc_min = 0;
-              
+
               if (row.ttc_minutes) {
                 const ttcArray = row.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
                 if (ttcArray.length > 0) {
@@ -4298,11 +4298,11 @@ export default {
           const now = new Date();
           let sinceISO;
           if (window === "15m") {
-            sinceISO = new Date(now.getTime() - 15*60*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
           } else if (window === "24h") {
-            sinceISO = new Date(now.getTime() - 24*3600*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
           } else { // 7d
-            sinceISO = new Date(now.getTime() - 7*86400*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
           }
 
           // SAFE sort whitelist
@@ -4311,7 +4311,7 @@ export default {
               case "conversions_desc": return "conversions DESC, conv_rate DESC";
               case "referrals_desc": return "referrals DESC, conv_rate DESC";
               case "last_conversion_desc": return "last_conversion DESC, conv_rate DESC";
-              case "conv_rate_desc": 
+              case "conv_rate_desc":
               default: return "conv_rate DESC, conversions DESC";
             }
           })();
@@ -4436,7 +4436,7 @@ export default {
           const itemsWithTTC = items.results?.map(item => {
             let p50_ttc_min = 0;
             let p90_ttc_min = 0;
-            
+
             if (item.ttc_minutes) {
               const ttcArray = item.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
               if (ttcArray.length > 0) {
@@ -4584,17 +4584,17 @@ export default {
           const now = new Date();
           let sinceISO;
           if (window === "15m") {
-            sinceISO = new Date(now.getTime() - 15*60*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
           } else if (window === "24h") {
-            sinceISO = new Date(now.getTime() - 24*3600*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
           } else { // 7d
-            sinceISO = new Date(now.getTime() - 7*86400*1000).toISOString();
+            sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
           }
 
           // Get content info
           const contentQuery = `SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?`;
           const contentResult = await env.OPTIVIEW_DB.prepare(contentQuery).bind(content_id, project_id).first();
-          
+
           if (!contentResult) {
             const response = new Response(JSON.stringify({ error: "Content not found" }), {
               status: 404,
@@ -4606,7 +4606,7 @@ export default {
           // Get source info
           const sourceQuery = `SELECT id, slug, name FROM ai_sources WHERE slug = ?`;
           const sourceResult = await env.OPTIVIEW_DB.prepare(sourceQuery).bind(source).first();
-          
+
           if (!sourceResult) {
             const response = new Response(JSON.stringify({ error: "Source not found" }), {
               status: 400,
@@ -4687,7 +4687,7 @@ export default {
           // Calculate TTC percentiles
           let p50_ttc_min = 0;
           let p90_ttc_min = 0;
-          
+
           if (summaryResult?.ttc_minutes) {
             const ttcArray = summaryResult.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
             if (ttcArray.length > 0) {
