@@ -13,7 +13,6 @@ import Login from "./pages/Login";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Onboarding from "./pages/Onboarding";
-import MagicLink from "./pages/MagicLink";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -50,7 +49,6 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/onboarding" element={<Onboarding />} />
-      <Route path="/auth/magic" element={<MagicLink />} />
       
       {/* Protected Routes */}
       <Route path="/" element={<ProtectedRoute><Events /></ProtectedRoute>} />

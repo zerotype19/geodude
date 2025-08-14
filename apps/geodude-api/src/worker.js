@@ -481,17 +481,16 @@ export default {
             DELETE FROM magic_link WHERE token_hash = ?
           `).bind(tokenHash).run();
 
-          // Redirect to appropriate page
-          const redirectUrl = `${env.PUBLIC_APP_URL}${redirectPath}`;
-          const response = new Response(JSON.stringify({
-            success: true,
-            redirect_to: redirectPath,
-            user_id: userRecord.id,
-            has_organization: hasOrganization.count > 0
-          }), {
-            status: 200,
+          // Redirect to frontend with session cookie
+          const frontendUrl = env.PUBLIC_APP_URL || "https://optiview.ai";
+          const redirectUrl = `${frontendUrl}${redirectPath}`;
+          
+          console.log("🔄 Redirecting to frontend:", redirectUrl);
+          
+          const response = new Response("", {
+            status: 302,
             headers: {
-              "Content-Type": "application/json",
+              "Location": redirectUrl,
               "Set-Cookie": `optiview_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
             }
           });
