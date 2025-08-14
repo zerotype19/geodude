@@ -1664,11 +1664,6 @@ export default {
               FROM interaction_events ie
               WHERE ie.project_id = ?
               GROUP BY content_id
-            ),
-            max_ai AS (
-              SELECT COALESCE(MAX(ai_events + 2*COALESCE(r.ai_referrals,0)), 1) AS denom
-              FROM ai_by_content_rollup a
-              LEFT JOIN ref_by_content r ON r.content_id = a.content_id
             )
             SELECT
               ca.id, ca.url, ca.type,
@@ -1677,13 +1672,20 @@ export default {
               (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')) AS events_15m,
               (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')) AS events_24h,
               COALESCE(r.ai_referrals,0) AS ai_referrals_24h,
-              CAST(ROUND(100.0 * (COALESCE(a.ai_events,0) + 2*COALESCE(r.ai_referrals,0)) / (SELECT denom FROM max_ai)) AS INT) AS coverage_score
+              COALESCE(a.ai_events,0) AS ai_events_24h,
+              CASE 
+                WHEN COALESCE(a.ai_events,0) + COALESCE(r.ai_referrals,0) = 0 THEN 0
+                ELSE CAST(ROUND(100.0 * (COALESCE(a.ai_events,0) + 2*COALESCE(r.ai_referrals,0)) / 
+                  GREATEST((SELECT MAX(COALESCE(a2.ai_events,0) + 2*COALESCE(r2.ai_referrals,0)) 
+                    FROM ai_by_content_rollup a2 
+                    LEFT JOIN ref_by_content r2 ON r2.content_id = a2.content_id), 1)) AS INT)
+              END AS coverage_score
             FROM content_assets ca
             LEFT JOIN ai_by_content_rollup a ON a.content_id = ca.id
             LEFT JOIN ref_by_content r ON r.content_id = ca.id
             LEFT JOIN last_seen ls ON ls.content_id = ca.id
             WHERE ${baseFilters}
-            ORDER BY ls.last_seen DESC NULLS LAST, ca.url ASC
+            ORDER BY COALESCE(ls.last_seen, '1970-01-01') ASC, ca.url ASC
             LIMIT ? OFFSET ?
           `;
 
