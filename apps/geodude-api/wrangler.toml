@@ -1,4 +1,4 @@
-name = "optiview"
+name = "geodude-api"
 main = "src/worker.js"
 compatibility_date = "2025-08-01"
 
