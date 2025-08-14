@@ -51,6 +51,11 @@ export default function Onboarding() {
     setState(prev => ({ ...prev, loading: true, error: '' }));
 
     try {
+      console.log('🚀 Sending organization creation request:', {
+        url: `${API_BASE}/api/onboarding/organization`,
+        data: { name: state.organization.name.trim() }
+      });
+
       const response = await fetch(`${API_BASE}/api/onboarding/organization`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,27 +65,62 @@ export default function Onboarding() {
         })
       });
 
-      const data = await response.json();
+      console.log('📥 Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
+      const responseText = await response.text();
+      console.log('📄 Response body (raw):', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('📊 Parsed response data:', data);
+      } catch (parseError) {
+        console.error('❌ Failed to parse response as JSON:', parseError);
+        setState(prev => ({ 
+          ...prev, 
+          error: 'Invalid response from server',
+          loading: false 
+        }));
+        return;
+      }
 
       if (response.ok) {
-        setState(prev => ({
-          ...prev,
-          step: 2,
+        console.log('✅ Organization creation successful, data:', data);
+        
+        if (!data.organization || !data.organization.id) {
+          console.error('❌ Response missing organization.id:', data);
+          setState(prev => ({ 
+            ...prev, 
+            error: 'Server response missing organization ID',
+            loading: false 
+          }));
+          return;
+        }
+
+        setState(prev => ({ 
+          ...prev, 
+          step: 2, 
           organization: { ...prev.organization, id: data.organization.id },
-          loading: false
+          loading: false 
         }));
       } else {
-        setState(prev => ({
-          ...prev,
+        console.error('❌ Organization creation failed:', data);
+        setState(prev => ({ 
+          ...prev, 
           error: data.error || 'Failed to create organization',
-          loading: false
+          loading: false 
         }));
       }
     } catch (error) {
-      setState(prev => ({
-        ...prev,
+      console.error('❌ Network error:', error);
+      setState(prev => ({ 
+        ...prev, 
         error: 'Network error. Please try again.',
-        loading: false
+        loading: false 
       }));
     }
   };
