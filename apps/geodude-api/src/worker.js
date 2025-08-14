@@ -667,18 +667,20 @@ export default {
         try {
           const sessionCookie = request.headers.get("cookie");
           if (!sessionCookie) {
-            return new Response(JSON.stringify({ error: "Not authenticated" }), {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
           if (!sessionMatch) {
-            return new Response(JSON.stringify({ error: "Invalid session" }), {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const sessionId = sessionMatch[1];
@@ -687,10 +689,11 @@ export default {
           `).bind(sessionId, new Date().toISOString()).first();
 
           if (!sessionData) {
-            return new Response(JSON.stringify({ error: "Session expired" }), {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const userData = await env.OPTIVIEW_DB.prepare(`
@@ -698,22 +701,25 @@ export default {
           `).bind(sessionData.user_id).first();
 
           if (!userData) {
-            return new Response(JSON.stringify({ error: "User not found" }), {
+            const response = new Response(JSON.stringify({ error: "User not found" }), {
               status: 404,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          return new Response(JSON.stringify(userData), {
+          const response = new Response(JSON.stringify(userData), {
             headers: { "Content-Type": "application/json" }
           });
+          return addCorsHeaders(response, request.headers.get("origin"));
 
         } catch (e) {
           console.error("Get user error:", e);
-          return new Response(JSON.stringify({ error: "Internal server error" }), {
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
+          return addCorsHeaders(response, request.headers.get("origin"));
         }
       }
 
@@ -722,18 +728,20 @@ export default {
         try {
           const sessionCookie = request.headers.get("cookie");
           if (!sessionCookie) {
-            return new Response(JSON.stringify({ error: "Not authenticated" }), {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
           if (!sessionMatch) {
-            return new Response(JSON.stringify({ error: "Invalid session" }), {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const sessionId = sessionMatch[1];
@@ -742,10 +750,11 @@ export default {
           `).bind(sessionId, new Date().toISOString()).first();
 
           if (!sessionData) {
-            return new Response(JSON.stringify({ error: "Session expired" }), {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const orgData = await env.OPTIVIEW_DB.prepare(`
@@ -757,22 +766,25 @@ export default {
           `).bind(sessionData.user_id).first();
 
           if (!orgData) {
-            return new Response(JSON.stringify({ error: "No organization found" }), {
+            const response = new Response(JSON.stringify({ error: "No organization found" }), {
               status: 404,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          return new Response(JSON.stringify(orgData), {
+          const response = new Response(JSON.stringify(orgData), {
             headers: { "Content-Type": "application/json" }
           });
+          return addCorsHeaders(response, request.headers.get("origin"));
 
         } catch (e) {
           console.error("Get organization error:", e);
-          return new Response(JSON.stringify({ error: "Internal server error" }), {
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
+          return addCorsHeaders(response, request.headers.get("origin"));
         }
       }
 
@@ -781,18 +793,20 @@ export default {
         try {
           const sessionCookie = request.headers.get("cookie");
           if (!sessionCookie) {
-            return new Response(JSON.stringify({ error: "Not authenticated" }), {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
           if (!sessionMatch) {
-            return new Response(JSON.stringify({ error: "Invalid session" }), {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const sessionId = sessionMatch[1];
@@ -801,10 +815,11 @@ export default {
           `).bind(sessionId, new Date().toISOString()).first();
 
           if (!sessionData) {
-            return new Response(JSON.stringify({ error: "Session expired" }), {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
           const projectData = await env.OPTIVIEW_DB.prepare(`
@@ -818,22 +833,25 @@ export default {
           `).bind(sessionData.user_id).first();
 
           if (!projectData) {
-            return new Response(JSON.stringify({ error: "No project found" }), {
+            const response = new Response(JSON.stringify({ error: "No project found" }), {
               status: 404,
               headers: { "Content-Type": "application/json" }
             });
+            return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          return new Response(JSON.stringify(projectData), {
+          const response = new Response(JSON.stringify(projectData), {
             headers: { "Content-Type": "application/json" }
           });
+          return addCorsHeaders(response, request.headers.get("origin"));
 
         } catch (e) {
           console.error("Get project error:", e);
-          return new Response(JSON.stringify({ error: "Internal server error" }), {
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
+          return addCorsHeaders(response, request.headers.get("origin"));
         }
       }
 
