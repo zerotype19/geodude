@@ -7,7 +7,7 @@ interface ShellProps {
   children: ReactNode;
 }
 
-export default function Shell({ children }: ReactNode) {
+export default function Shell({ children }: ShellProps) {
   const location = useLocation();
   const { user, organization, project, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
