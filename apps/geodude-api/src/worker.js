@@ -158,14 +158,14 @@ export default {
             if (current.count >= limit) {
               return { allowed: false, remaining: 0, resetTime: new Date(current.reset_time).getTime() };
             }
-            
+
             // Increment count
             await env.OPTIVIEW_DB.prepare(`
               UPDATE rate_limiting 
               SET count = count + 1, updated_at = ? 
               WHERE key_name = ?
             `).bind(new Date().toISOString(), key).run();
-            
+
             return { allowed: true, remaining: limit - current.count - 1, resetTime: new Date(current.reset_time).getTime() };
           } else {
             // Create new rate limit record
@@ -174,7 +174,7 @@ export default {
               INSERT INTO rate_limiting (key_name, count, reset_time) 
               VALUES (?, 1, ?)
             `).bind(key, resetTime.toISOString()).run();
-            
+
             return { allowed: true, remaining: limit - 1, resetTime: resetTime.getTime() };
           }
         } catch (error) {
@@ -255,7 +255,7 @@ export default {
       // 2) Magic Link Authentication (M3)
       if (url.pathname === "/auth/request-code" && request.method === "POST") {
         // Redirect OTP requests to magic link endpoint for backward compatibility
-        const response = new Response(JSON.stringify({ 
+        const response = new Response(JSON.stringify({
           message: "OTP login codes are deprecated. Please use magic links instead.",
           redirect_to: "/auth/request-link"
         }), {
@@ -402,8 +402,17 @@ export default {
             return addCorsHeaders(response);
           }
 
-          // Hash the token to compare with stored hash
-          const tokenHash = await hashToken(token);
+          // Extract client IP from request headers
+          const clientIP = request.headers.get("cf-connecting-ip") || 
+                         request.headers.get("x-forwarded-for") || 
+                         request.headers.get("x-real-ip") || 
+                         "unknown";
+
+          console.log('🔐 Magic link consumption for token:', token.substring(0, 8) + '...');
+          console.log('📍 Client IP:', clientIP);
+
+          // Hash the token for comparison
+          const tokenHash = await hashString(token);
 
           // Get stored magic link data
           const storedData = await env.OPTIVIEW_DB.prepare(`
@@ -438,21 +447,37 @@ export default {
             // TODO: Implement session cookie parsing
           }
 
+          // Get or create user (auto-create if first time)
+          let userRecord = await env.OPTIVIEW_DB.prepare(`
+            SELECT id, email, is_admin FROM user WHERE email = ?
+          `).bind(storedData.email).first();
+
+          if (!userRecord) {
+            console.log('👤 Creating new user for:', storedData.email);
+
+            // Create new user
+            const userId = generateToken(); // Generate unique ID
+            const now = Math.floor(Date.now() / 1000); // Unix timestamp
+
+            const insertResult = await env.OPTIVIEW_DB.prepare(`
+              INSERT INTO user (id, email, created_ts, is_admin)
+              VALUES (?, ?, ?, 0)
+            `).bind(userId, storedData.email, now).run();
+
+            if (insertResult.success) {
+              userRecord = { id: userId, email: storedData.email, is_admin: 0 };
+              console.log('✅ New user created with ID:', userId);
+            } else {
+              console.error('❌ Failed to create user');
+              return new Response(JSON.stringify({ error: 'Failed to create user account' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+          }
+
           // Create session (store in existing D1 session table)
           const sessionId = generateToken();
-          
-          // Get user_id from the user table
-          const userRecord = await env.OPTIVIEW_DB.prepare(`
-            SELECT id FROM user WHERE email = ?
-          `).bind(storedData.email).first();
-          
-          if (!userRecord) {
-            console.error('❌ User not found for session creation');
-            return new Response(JSON.stringify({ error: 'User not found' }), {
-              status: 404,
-              headers: { 'Content-Type': 'application/json' }
-            });
-          }
 
           // Store session in existing session table
           const sessionExpiresAt = new Date(Date.now() + config.SESSION_TTL_HOURS * 60 * 60 * 1000);
