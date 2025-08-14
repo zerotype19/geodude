@@ -159,8 +159,8 @@ export async function handleApiRoutes(
             // Get breakdown by traffic class
             const classBreakdown = await env.OPTIVIEW_DB.prepare(`
         SELECT 
-          metadata as traffic_class,
-          COUNT(*) as count
+          metadata traffic_class,
+          COUNT(*) count
         FROM interaction_events
         WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
         GROUP BY metadata
@@ -171,7 +171,7 @@ export async function handleApiRoutes(
             const topSources = await env.OPTIVIEW_DB.prepare(`
         SELECT 
           ai_source_id,
-          COUNT(*) as count
+          COUNT(*) count
         FROM interaction_events
         WHERE project_id = ? AND occurred_at BETWEEN ? AND ? AND ai_source_id IS NOT NULL
         GROUP BY ai_source_id
@@ -182,9 +182,9 @@ export async function handleApiRoutes(
             // Get timeseries data - simplified for D1 compatibility
             const timeseries = await env.OPTIVIEW_DB.prepare(`
         SELECT 
-          occurred_at as day,
-          COUNT(*) as count,
-          metadata as traffic_class
+          occurred_at day,
+          COUNT(*) count,
+          metadata traffic_class
         FROM interaction_events
         WHERE project_id = ? AND occurred_at BETWEEN ? AND ?
         GROUP BY metadata
@@ -552,9 +552,9 @@ export async function handleApiRoutes(
             // Get summary stats (simplified)
             const summaryResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    COUNT(*) as referrals,
-                    0 as conversions,
-                    0.0 as conv_rate
+                    COUNT(*) referrals,
+                    0 conversions,
+                    0 conv_rate
                 FROM ai_referrals ar
                 WHERE ar.project_id = ? AND ar.content_id = ? AND ar.ai_source_id = ? AND ar.detected_at >= ?
             `).bind(project_id, content_id, sourceResult.id, since).first<any>();
