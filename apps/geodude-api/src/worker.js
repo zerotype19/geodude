@@ -1640,13 +1640,13 @@ export default {
           const totalResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...baseParams).first();
           const total = totalResult?.total || 0;
 
-          // Add back real metrics step by step
+          // Bulletproof query with explicit column aliases
           const mainQuery = `
             SELECT 
               ca.id, ca.url, ca.type,
-              (SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id) AS last_seen,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')) AS events_24h,
-              (SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')) AS events_15m
+              COALESCE((SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id), '1970-01-01') AS last_seen,
+              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')), 0) AS events_24h,
+              COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')), 0) AS events_15m
             FROM content_assets ca
             WHERE ${baseFilters}
             ORDER BY ca.url ASC
