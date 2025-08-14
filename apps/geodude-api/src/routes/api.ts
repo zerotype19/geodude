@@ -322,9 +322,9 @@ export async function handleApiRoutes(
             const bySourceResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
                     s.id, s.slug, s.name,
-                    COUNT(*) as referrals,
-                    0 as conversions,
-                    0.0 as conv_rate
+                    COUNT(*) referrals,
+                    0 conversions,
+                    0 conv_rate
                 FROM ai_referrals ar
                 JOIN ai_sources s ON s.id = ar.ai_source_id
                 WHERE ar.project_id = ? AND ar.detected_at >= ?
@@ -444,7 +444,7 @@ export async function handleApiRoutes(
 
             // Get total count for pagination
             const countQuery = `
-                SELECT COUNT(DISTINCT ar.content_id, ar.ai_source_id) as total
+                SELECT COUNT(DISTINCT ar.content_id, ar.ai_source_id) total
                 FROM ai_referrals ar
                 JOIN content_assets ca ON ca.id = ar.content_id
                 JOIN ai_sources s ON s.id = ar.ai_source_id
@@ -462,13 +462,13 @@ export async function handleApiRoutes(
                 SELECT 
                     ar.content_id,
                     ca.url,
-                    s.slug as source_slug,
-                    s.name as source_name,
-                    COUNT(*) as referrals,
-                    0 as conversions,
-                    0.0 as conv_rate,
-                    MAX(ar.detected_at) as last_referral,
-                    NULL as last_conversion
+                    s.slug source_slug,
+                    s.name source_name,
+                    COUNT(*) referrals,
+                    0 conversions,
+                    0 conv_rate,
+                    MAX(ar.detected_at) last_referral,
+                    NULL last_conversion
                 FROM ai_referrals ar
                 JOIN content_assets ca ON ca.id = ar.content_id
                 JOIN ai_sources s ON s.id = ar.ai_source_id
