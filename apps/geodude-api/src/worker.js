@@ -4094,18 +4094,16 @@ export default {
                 c.attributed_source_id,
                 COUNT(*) as conversions,
                 GROUP_CONCAT(
-                  CAST(
-                    (julianday(c.occurred_at) - julianday(
-                      (SELECT ar.detected_at
-                       FROM ai_referrals ar, params p
-                       WHERE ar.project_id = c.project_id
-                         AND ar.content_id = c.content_id
-                         AND ar.detected_at <= c.occurred_at
-                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
-                       ORDER BY ar.detected_at DESC
-                       LIMIT 1)
-                     ) * 24 * 60
-                   )
+                  (julianday(c.occurred_at) - julianday(
+                    (SELECT ar.detected_at
+                     FROM ai_referrals ar, params p
+                     WHERE ar.project_id = c.project_id
+                       AND ar.content_id = c.content_id
+                       AND ar.detected_at <= c.occurred_at
+                       AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                     ORDER BY ar.detected_at DESC
+                     LIMIT 1)
+                   ) * 24 * 60
                  ) as ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id IS NOT NULL
@@ -4399,18 +4397,16 @@ export default {
                 COUNT(*) as conversions,
                 MAX(c.occurred_at) as last_conversion,
                 GROUP_CONCAT(
-                  CAST(
-                    (julianday(c.occurred_at) - julianday(
-                      (SELECT ar.detected_at
-                       FROM ai_referrals ar, params p
-                       WHERE ar.project_id = c.project_id
-                         AND ar.content_id = c.content_id
-                         AND ar.detected_at <= c.occurred_at
-                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
-                       ORDER BY ar.detected_at DESC
-                       LIMIT 1)
-                     ) * 24 * 60
-                   )
+                  (julianday(c.occurred_at) - julianday(
+                    (SELECT ar.detected_at
+                     FROM ai_referrals ar, params p
+                     WHERE ar.project_id = c.project_id
+                       AND ar.content_id = c.content_id
+                       AND ar.detected_at <= c.occurred_at
+                       AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                     ORDER BY ar.detected_at DESC
+                     LIMIT 1)
+                   ) * 24 * 60
                  ) as ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id IS NOT NULL
@@ -4689,18 +4685,16 @@ export default {
               SELECT 
                 COUNT(*) as conversions,
                 GROUP_CONCAT(
-                  CAST(
-                    (julianday(c.occurred_at) - julianday(
-                      (SELECT ar.detected_at
-                       FROM ai_referrals ar, params p
-                       WHERE ar.project_id = c.project_id
-                         AND ar.content_id = c.content_id
-                         AND ar.detected_at <= c.occurred_at
-                         AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
-                       ORDER BY ar.detected_at DESC
-                       LIMIT 1)
-                     ) * 24 * 60
-                   )
+                  (julianday(c.occurred_at) - julianday(
+                    (SELECT ar.detected_at
+                     FROM ai_referrals ar, params p
+                     WHERE ar.project_id = c.project_id
+                       AND ar.content_id = c.content_id
+                       AND ar.detected_at <= c.occurred_at
+                       AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
+                     ORDER BY ar.detected_at DESC
+                     LIMIT 1)
+                   ) * 24 * 60
                  ) as ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id = ?
