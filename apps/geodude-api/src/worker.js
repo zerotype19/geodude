@@ -1683,12 +1683,11 @@ export default {
             LEFT JOIN ref_by_content r ON r.content_id = ca.id
             LEFT JOIN last_seen ls ON ls.content_id = ca.id
             WHERE ${baseFilters}
-              AND (? = 0 OR (COALESCE(a.ai_events,0) + COALESCE(r.ai_referrals,0)) > 0)
             ORDER BY ls.last_seen DESC NULLS LAST, ca.url ASC
             LIMIT ? OFFSET ?
           `;
 
-          const mainParams = [...baseParams, projectId, sinceTime, projectId, sinceTime, projectId, sinceTime, aiOnly ? 1 : 0, pageSize, (page - 1) * pageSize];
+          const mainParams = [...baseParams, projectId, sinceTime, projectId, sinceTime, projectId, sinceTime, pageSize, (page - 1) * pageSize];
           const mainResult = await env.OPTIVIEW_DB.prepare(mainQuery).bind(...mainParams).all();
 
           // Get by-source breakdown for the returned items
