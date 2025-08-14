@@ -689,6 +689,182 @@ export default {
         }
       }
 
+      // 4) Authentication API Endpoints
+      // 4.1) Get current user
+      if (url.pathname === "/api/auth/me" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            return new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            return new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            return new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const userData = await env.OPTIVIEW_DB.prepare(`
+            SELECT id, email, is_admin, created_ts, last_login_ts FROM user WHERE id = ?
+          `).bind(sessionData.user_id).first();
+
+          if (!userData) {
+            return new Response(JSON.stringify({ error: "User not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          return new Response(JSON.stringify(userData), {
+            headers: { "Content-Type": "application/json" }
+          });
+
+        } catch (e) {
+          console.error("Get user error:", e);
+          return new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      }
+
+      // 4.2) Get user's organization
+      if (url.pathname === "/api/auth/organization" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            return new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            return new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            return new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const orgData = await env.OPTIVIEW_DB.prepare(`
+            SELECT o.id, o.name, o.created_ts 
+            FROM organization o
+            JOIN org_member om ON o.id = om.org_id
+            WHERE om.user_id = ?
+            LIMIT 1
+          `).bind(sessionData.user_id).first();
+
+          if (!orgData) {
+            return new Response(JSON.stringify({ error: "No organization found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          return new Response(JSON.stringify(orgData), {
+            headers: { "Content-Type": "application/json" }
+          });
+
+        } catch (e) {
+          console.error("Get organization error:", e);
+          return new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      }
+
+      // 4.3) Get user's project
+      if (url.pathname === "/api/auth/project" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            return new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            return new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await env.OPTIVIEW_DB.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            return new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const projectData = await env.OPTIVIEW_DB.prepare(`
+            SELECT p.id, p.name, p.slug, p.org_id, p.created_ts
+            FROM project p
+            JOIN organization o ON p.org_id = o.id
+            JOIN org_member om ON o.id = om.org_id
+            WHERE om.user_id = ?
+            ORDER BY p.created_ts DESC
+            LIMIT 1
+          `).bind(sessionData.user_id).first();
+
+          if (!projectData) {
+            return new Response(JSON.stringify({ error: "No project found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          return new Response(JSON.stringify(projectData), {
+            headers: { "Content-Type": "application/json" }
+          });
+
+        } catch (e) {
+          console.error("Get project error:", e);
+          return new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+      }
+
       // 3.3) Create Property
       if (url.pathname === "/api/onboarding/property" && request.method === "POST") {
         try {

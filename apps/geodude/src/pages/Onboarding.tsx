@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Card } from '../components/ui/Card';
+import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../config';
+import Card from '../components/ui/Card';
 
 interface OnboardingState {
   step: number;
@@ -18,20 +19,24 @@ interface OnboardingState {
 }
 
 export default function Onboarding() {
+  const { login } = useAuth();
   const [state, setState] = useState<OnboardingState>({
     step: 1,
-    organization: { name: '' },
-    project: { name: '', description: '' },
+    organization: {
+      name: 'Rhythm90',
+    },
+    project: {
+      name: 'Rhythm90 Blog',
+      description: 'This is the thought leadership blog',
+    },
     loading: false,
-    error: ''
+    error: '',
   });
 
   const handleNext = async () => {
     if (state.step === 1) {
-      // Create organization
       await createOrganization();
     } else if (state.step === 2) {
-      // Create project
       await createProject();
     }
   };
@@ -62,7 +67,6 @@ export default function Onboarding() {
         credentials: 'include',
         body: JSON.stringify({
           name: state.organization.name.trim()
-          // slug will be auto-generated on the backend
         })
       });
 
@@ -81,48 +85,47 @@ export default function Onboarding() {
         console.log('📊 Parsed response data:', data);
       } catch (parseError) {
         console.error('❌ Failed to parse response as JSON:', parseError);
-        setState(prev => ({
-          ...prev,
+        setState(prev => ({ 
+          ...prev, 
           error: 'Invalid response from server',
-          loading: false
+          loading: false 
         }));
         return;
       }
 
       if (response.ok) {
         console.log('✅ Organization creation successful, data:', data);
-
-        // The API returns organization data directly, not wrapped in an organization object
+        
         if (!data.id) {
           console.error('❌ Response missing organization.id:', data);
-          setState(prev => ({
-            ...prev,
+          setState(prev => ({ 
+            ...prev, 
             error: 'Server response missing organization ID',
-            loading: false
+            loading: false 
           }));
           return;
         }
 
-        setState(prev => ({
-          ...prev,
-          step: 2,
+        setState(prev => ({ 
+          ...prev, 
+          step: 2, 
           organization: { ...prev.organization, id: data.id },
-          loading: false
+          loading: false 
         }));
       } else {
         console.error('❌ Organization creation failed:', data);
-        setState(prev => ({
-          ...prev,
+        setState(prev => ({ 
+          ...prev, 
           error: data.error || 'Failed to create organization',
-          loading: false
+          loading: false 
         }));
       }
     } catch (error) {
       console.error('❌ Network error:', error);
-      setState(prev => ({
-        ...prev,
+      setState(prev => ({ 
+        ...prev, 
         error: 'Network error. Please try again.',
-        loading: false
+        loading: false 
       }));
     }
   };
@@ -151,28 +154,25 @@ export default function Onboarding() {
 
       if (response.ok) {
         console.log('✅ Project creation successful, data:', data);
-
-        // The API returns project data directly, not wrapped in a project object
+        
         if (!data.id) {
           console.error('❌ Response missing project.id:', data);
-          setState(prev => ({
-            ...prev,
+          setState(prev => ({ 
+            ...prev, 
             error: 'Server response missing project ID',
-            loading: false
+            loading: false 
           }));
           return;
         }
 
-        setState(prev => ({
-          ...prev,
+        setState(prev => ({ 
+          ...prev, 
           project: { ...prev.project, id: data.id },
-          loading: false
+          loading: false 
         }));
-
-        // Complete onboarding and redirect to main app
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1000);
+        
+        // Complete onboarding and automatically log the user in
+        await completeOnboarding();
       } else {
         setState(prev => ({
           ...prev,
@@ -186,6 +186,39 @@ export default function Onboarding() {
         error: 'Network error. Please try again.',
         loading: false
       }));
+    }
+  };
+
+  const completeOnboarding = async () => {
+    try {
+      // Get the user, organization, and project data to log them in
+      const [userResponse, orgResponse, projectResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/auth/organization`, { credentials: 'include' }),
+        fetch(`${API_BASE}/api/auth/project`, { credentials: 'include' })
+      ]);
+
+      if (userResponse.ok && orgResponse.ok && projectResponse.ok) {
+        const [userData, orgData, projectData] = await Promise.all([
+          userResponse.json(),
+          orgResponse.json(),
+          projectResponse.json()
+        ]);
+
+        // Log the user in with all their data
+        login(userData, orgData, projectData);
+        
+        // Redirect to main app
+        window.location.href = '/';
+      } else {
+        console.error('Failed to get user data for login');
+        // Still redirect, the auth context will handle loading the data
+        window.location.href = '/';
+      }
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      // Still redirect, the auth context will handle loading the data
+      window.location.href = '/';
     }
   };
 
