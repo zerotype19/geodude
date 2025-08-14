@@ -75,19 +75,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       setError(null);
 
-      // Check if user is authenticated by looking for session cookie
-      const sessionCookie = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('optiview_session='));
-      
-      console.log('🔍 AuthContext: Session cookie found:', !!sessionCookie);
-      console.log('🔍 AuthContext: Full cookies:', document.cookie);
-      
-      if (!sessionCookie) {
-        console.log('❌ AuthContext: No session cookie found');
-        setLoading(false);
-        return;
-      }
+      // Always attempt to get user data - the HttpOnly cookie will be sent automatically
+      console.log('🔍 AuthContext: Attempting to fetch user data...');
 
       // Get current user data
       console.log('🔍 AuthContext: Calling /api/auth/me...');
@@ -99,7 +88,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!userResponse.ok) {
         console.log('❌ AuthContext: /api/auth/me failed:', userResponse.status, userResponse.statusText);
-        throw new Error('Failed to fetch user data');
+        // User is not authenticated
+        setUser(null);
+        setOrganization(null);
+        setProject(null);
+        setLoading(false);
+        return;
       }
 
       const userData = await userResponse.json();
@@ -139,7 +133,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('❌ AuthContext: Failed to refresh user data:', err);
       setError(err instanceof Error ? err.message : 'Failed to refresh user data');
       // If we can't get user data, they might be logged out
-      logout();
+      setUser(null);
+      setOrganization(null);
+      setProject(null);
     } finally {
       setLoading(false);
     }
