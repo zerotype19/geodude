@@ -20,7 +20,7 @@ interface Invite {
 export default function SettingsMembers() {
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
-  const [newInvite, setNewInvite] = useState({ email: "", role: "member" as const });
+  const [newInvite, setNewInvite] = useState({ email: "", role: "member" as "member" | "owner" });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
