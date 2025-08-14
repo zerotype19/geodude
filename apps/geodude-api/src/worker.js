@@ -26,56 +26,64 @@ export default {
         return response;
       };
 
+      // Helper function to record continue path sanitization metrics
+      const recordContinueSanitized = (phase, reason) => {
+        // For now, just log the sanitization event
+        // In production, this would increment counters in a metrics system
+        console.log(JSON.stringify({
+          event: "continue_sanitized",
+          phase: phase,
+          reason: reason,
+          timestamp: new Date().toISOString()
+        }));
+      };
+
       // Helper function to sanitize continue path (single source of truth)
       const sanitizeContinuePath = (input) => {
         const fallback = "/onboarding";
+
         if (typeof input !== "string") {
-          console.log(JSON.stringify({ event: "continue_sanitized", reason: "not_string" }));
-          return fallback;
+          recordContinueSanitized("sanitize", "non_string");
+          return { value: fallback, sanitized: true, reason: "non_string" };
         }
 
         const s = input.trim();
 
-        // Must start with a single '/' (internal path). Reject protocol-relative (`//`) and absolute URLs.
         if (!s.startsWith("/") || s.startsWith("//")) {
-          console.log(JSON.stringify({ event: "continue_sanitized", reason: "not_internal_path" }));
-          return fallback;
+          recordContinueSanitized("sanitize", "not_internal_path");
+          return { value: fallback, sanitized: true, reason: "not_internal_path" };
         }
 
-        // Reject backslashes and control chars
         if (/[\\\u0000-\u001F]/.test(s)) {
-          console.log(JSON.stringify({ event: "continue_sanitized", reason: "control_chars" }));
-          return fallback;
+          recordContinueSanitized("sanitize", "control_or_backslash");
+          return { value: fallback, sanitized: true, reason: "control_or_backslash" };
         }
 
-        // Parse with a dummy base to normalize path+query; ignore fragments
         let candidate;
         try {
-          const u = new URL(s, "http://local"); // ensures "/..." parses as path on same-origin
-          // Only accept same-origin relative paths.
+          const u = new URL(s, "http://local");
           if (u.origin !== "http://local") {
-            console.log(JSON.stringify({ event: "continue_sanitized", reason: "not_same_origin" }));
-            return fallback;
+            recordContinueSanitized("sanitize", "absolute_url");
+            return { value: fallback, sanitized: true, reason: "absolute_url" };
           }
-          candidate = u.pathname + u.search; // drop hash if present
+          candidate = u.pathname + u.search; // drop fragment
         } catch {
-          console.log(JSON.stringify({ event: "continue_sanitized", reason: "url_parse_failed" }));
-          return fallback;
+          recordContinueSanitized("sanitize", "url_parse_error");
+          return { value: fallback, sanitized: true, reason: "url_parse_error" };
         }
 
-        // Allow only URL-path-safe characters (conservative)
         if (!/^\/[A-Za-z0-9\-._~!$&'()*+,;=:@/%?]*$/.test(candidate)) {
-          console.log(JSON.stringify({ event: "continue_sanitized", reason: "unsafe_chars" }));
-          return fallback;
+          recordContinueSanitized("sanitize", "invalid_chars");
+          return { value: fallback, sanitized: true, reason: "invalid_chars" };
         }
 
-        // Cap length to prevent abuse
         if (candidate.length > 512) {
-          console.log(JSON.stringify({ event: "continue_sanitized", reason: "too_long" }));
-          return fallback;
+          recordContinueSanitized("sanitize", "too_long");
+          return { value: fallback, sanitized: true, reason: "too_long" };
         }
 
-        return candidate;
+        recordContinueSanitized("sanitize", "success");
+        return { value: candidate, sanitized: false };
       };
 
       // Helper function to generate secure tokens
@@ -201,12 +209,19 @@ export default {
           }
 
           // Validate continue path
-          const validatedContinuePath = sanitizeContinuePath(continue_path);
-
+          const sanitizeResult = sanitizeContinuePath(continue_path);
+          
+          // Record sanitization metrics if sanitized
+          if (sanitizeResult.sanitized) {
+            recordContinueSanitized("request", sanitizeResult.reason);
+          }
+          
           // Debug logging to see what's being stored
           console.log("🔍 Magic Link Request Debug:");
           console.log("  Original continue_path:", continue_path);
-          console.log("  Sanitized continue_path:", validatedContinuePath);
+          console.log("  Sanitized continue_path:", sanitizeResult.value);
+          console.log("  Was sanitized:", sanitizeResult.sanitized);
+          console.log("  Reason:", sanitizeResult.reason);
           console.log("  Email:", email);
 
           // Generate secure token
@@ -220,7 +235,7 @@ export default {
           const magicLinkData = {
             email,
             token_hash: tokenHash,
-            continue_path: validatedContinuePath, // Store only the sanitized value
+            continue_path: sanitizeResult.value, // Store only the sanitized value
             expires_at: expiresAt.toISOString(),
             created_at: new Date().toISOString()
           };
@@ -317,10 +332,15 @@ export default {
           // Re-sanitize continue path before redirect (defense-in-depth)
           const sanitizedRedirectUrl = sanitizeContinuePath(storedData.continue_path);
 
+          // Record sanitization metrics if sanitized
+          if (sanitizedRedirectUrl.sanitized) {
+            recordContinueSanitized("consume", sanitizedRedirectUrl.reason);
+          }
+
           const response = new Response(null, {
             status: 302,
             headers: {
-              "Location": sanitizedRedirectUrl,
+              "Location": sanitizedRedirectUrl.value,
               "Set-Cookie": `optiview_session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${24 * 60 * 60}`
             }
           });
