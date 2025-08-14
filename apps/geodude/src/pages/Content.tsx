@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE, FETCH_OPTS } from '../config';
+import Shell from '../components/Shell';
 
 interface ContentAsset {
   id: number;
@@ -155,20 +156,21 @@ const Content: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Content Assets</h1>
-          <p className="text-gray-600">Track AI visibility and engagement across your content</p>
-        </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Add Content
-        </button>
-      </div>
+    <Shell>
+      <div className="p-6 space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Content Assets</h1>
+            <p className="text-gray-600">Track AI visibility and engagement across your content</p>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Add Content
+          </button>
+          </div>
 
       {/* Filters */}
       <Card title="Filters">
@@ -433,7 +435,8 @@ const Content: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </Shell>
   );
 };
 
