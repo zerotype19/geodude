@@ -1,6 +1,32 @@
+import { loadConfig, getConfigForEnvCheck, getConfigErrors, getMissingConfigKeys } from './config.js';
+
 export default {
   async fetch(request, env, ctx) {
     try {
+      // Load and validate configuration
+      let config;
+      try {
+        config = loadConfig(env);
+      } catch (configError) {
+        console.error('Configuration error:', configError.message);
+
+        // Return 500 for configuration errors in production
+        if (env.NODE_ENV === 'production') {
+          const response = new Response(JSON.stringify({
+            error: 'Configuration Error',
+            message: configError.message,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return response;
+        }
+
+        // In development, continue with defaults
+        config = loadConfig({ ...env, NODE_ENV: 'development' });
+      }
+
       const url = new URL(request.url);
       const origin = request.headers.get("origin");
 
@@ -166,18 +192,34 @@ export default {
 
       // 1.6) Admin environment check (for debugging)
       if (url.pathname === "/admin/env-check") {
-        const response = new Response(JSON.stringify({
-          TEST_MODE: env.TEST_MODE,
-          NODE_ENV: env.NODE_ENV,
-          MAGIC_LINK_RPM_PER_IP: env.MAGIC_LINK_RPM_PER_IP,
-          MAGIC_LINK_RPD_PER_EMAIL: env.MAGIC_LINK_RPD_PER_EMAIL,
-          PUBLIC_APP_URL: env.PUBLIC_APP_URL,
-          timestamp: new Date().toISOString()
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
-        return addCorsHeaders(response);
+        try {
+          const configForEnvCheck = getConfigForEnvCheck(config);
+          const missingKeys = getMissingConfigKeys(config);
+          const configErrors = getConfigErrors(config);
+
+          const response = new Response(JSON.stringify({
+            environment: config.NODE_ENV,
+            config: configForEnvCheck,
+            missing: missingKeys,
+            errors: configErrors,
+            timestamp: new Date().toISOString(),
+            worker_version: "1.0.0"
+          }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        } catch (error) {
+          const response = new Response(JSON.stringify({
+            error: "Failed to generate environment check",
+            message: error.message,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response);
+        }
       }
 
       // 2) Magic Link Authentication (M3)
@@ -199,8 +241,8 @@ export default {
           const ipKey = `rate_limit:magic_link:ip:${clientIP}`;
           const emailKey = `rate_limit:magic_link:email:${email}`;
 
-          const ipLimit = await checkRateLimit(ipKey, 10, 60 * 1000); // 10 per minute per IP
-          const emailLimit = await checkRateLimit(emailKey, 50, 24 * 60 * 60 * 1000); // 50 per day per email
+          const ipLimit = await checkRateLimit(ipKey, config.MAGIC_LINK_RPM_PER_IP, 60 * 1000); // per minute per IP
+          const emailLimit = await checkRateLimit(emailKey, config.MAGIC_LINK_RPD_PER_EMAIL, 24 * 60 * 60 * 1000); // per day per email
 
           if (!ipLimit.allowed) {
             const response = new Response(JSON.stringify({ error: "Too many requests from this IP" }), {
@@ -245,7 +287,7 @@ export default {
           const tokenHash = await hashToken(token);
 
           // Store token in database (for now, use KV as temporary storage)
-          const expirationMinutes = parseInt(env.MAGIC_LINK_EXP_MIN) || 15;
+          const expirationMinutes = config.MAGIC_LINK_EXP_MIN;
           const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
 
           const magicLinkData = {
@@ -261,11 +303,11 @@ export default {
           });
 
           // Generate magic link
-          const appUrl = env.PUBLIC_APP_URL || "https://app.optiview.ai";
+          const appUrl = config.PUBLIC_APP_URL;
           const magicLink = `${appUrl}/auth/magic?token=${token}`;
 
           // Send email (for now, log to console in dev)
-          if (env.NODE_ENV === "production") {
+          if (config.NODE_ENV === "production") {
             // TODO: Implement real email sending
             console.log("Would send email to:", email, "with link:", magicLink);
           } else {
@@ -339,7 +381,7 @@ export default {
 
           // Store session in KV (temporary until we implement proper sessions)
           await env.AI_FINGERPRINTS.put(`session:${sessionId}`, JSON.stringify(sessionData), {
-            expirationTtl: 24 * 60 * 60 // 24 hours
+            expirationTtl: config.SESSION_TTL_HOURS * 60 * 60 // Convert hours to seconds
           });
 
           // Clean up used magic link
@@ -362,7 +404,7 @@ export default {
             status: 302,
             headers: {
               "Location": redirectPath,
-              "Set-Cookie": `optiview_session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${24 * 60 * 60}`
+              "Set-Cookie": `optiview_session=${sessionId}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${config.SESSION_TTL_HOURS * 60 * 60}`
             }
           });
           return addCorsHeaders(response);
@@ -620,7 +662,7 @@ export default {
   try{
     var pid = "${pid}"; 
     var kid = "${kid}";
-    var ep = "${env.PUBLIC_BASE_URL || 'https://api.optiview.ai'}/api/events";
+    var ep = "${config.PUBLIC_BASE_URL}/api/events";
     
     var payload = {
       property_id: pid,
@@ -716,7 +758,7 @@ export default {
           const inviteTokenHash = await hashToken(inviteToken);
 
           // Store invite data
-          const inviteExpiryDays = parseInt(env.INVITE_EXP_DAYS) || 7;
+          const inviteExpiryDays = config.INVITE_EXP_DAYS;
           const expiresAt = new Date(Date.now() + inviteExpiryDays * 24 * 60 * 60 * 1000);
 
           const inviteData = {
@@ -734,11 +776,11 @@ export default {
           });
 
           // Generate invite link
-          const appUrl = env.PUBLIC_APP_URL || "https://optiview.ai";
+          const appUrl = config.PUBLIC_APP_URL || "https://optiview.ai";
           const inviteLink = `${appUrl}/invite/accept?token=${inviteToken}`;
 
           // Send invite email (for now, log to console in dev)
-          if (env.NODE_ENV === "production") {
+          if (config.NODE_ENV === "production") {
             // TODO: Implement real email sending
             console.log("Would send invite email to:", email, "with link:", inviteLink);
           } else {
@@ -1107,7 +1149,7 @@ export default {
       }
 
       // 4.5) Dev Test Endpoint - Magic Link Token Peek (TEST_MODE only)
-      if (url.pathname === "/_test/magic-link" && request.method === "GET" && env.TEST_MODE === "1") {
+      if (url.pathname === "/_test/magic-link" && request.method === "GET" && config.TEST_MODE) {
         try {
           const email = url.searchParams.get("email");
           if (!email) {
@@ -1118,10 +1160,10 @@ export default {
             return addCorsHeaders(response);
           }
 
-          // Rate limit this endpoint even in dev
+          // Rate limiting for test endpoint
           const clientIP = request.headers.get("cf-connecting-ip") || "unknown";
           const ipKey = `rate_limit:test_magic_link:ip:${clientIP}`;
-          const ipLimit = await checkRateLimit(ipKey, 10, 60 * 1000); // 10 per minute per IP
+          const ipLimit = await checkRateLimit(ipKey, config.ADMIN_RPM_PER_IP, 60 * 1000); // per minute per IP
 
           if (!ipLimit.allowed) {
             const response = new Response(JSON.stringify({ error: "Too many test requests from this IP" }), {

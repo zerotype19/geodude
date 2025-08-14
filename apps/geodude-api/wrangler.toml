@@ -2,6 +2,103 @@ name = "geodude-api"
 main = "src/worker.js"
 compatibility_date = "2025-08-01"
 
+# Default/local fallback (rarely used)
+[vars]
+PUBLIC_APP_URL = "http://localhost:3000"
+PUBLIC_BASE_URL = "http://127.0.0.1:8787"
+CSP_MODE = "development"
+NODE_ENV = "development"
+TEST_MODE = "1"
+DEV_MAIL_ECHO = "true"
+
+# Production environment
+[env.production.vars]
+PUBLIC_APP_URL = "https://app.optiview.ai"
+PUBLIC_BASE_URL = "https://api.optiview.ai"
+CSP_MODE = "production"
+NODE_ENV = "production"
+TEST_MODE = "0"
+DEV_MAIL_ECHO = "false"
+
+# Auth & limits (prod defaults)
+SESSION_TTL_HOURS = "720"
+OTP_EXP_MIN = "10"
+MAGIC_LINK_EXP_MIN = "15"
+MAGIC_LINK_RPM_PER_IP = "10"
+MAGIC_LINK_RPD_PER_EMAIL = "50"
+INVITE_EXP_DAYS = "14"
+ADMIN_RPM_PER_IP = "30"
+
+# Ingest limits (prod defaults)
+INGEST_RATE_LIMIT_RPS = "10"
+INGEST_RATE_LIMIT_BURST = "50"
+RATE_LIMIT_RETRY_AFTER = "5"
+CSV_EXPORT_RATE_LIMIT_RPS = "1"
+RULES_REFRESH_TTL_SEC = "300"
+
+# Email settings (non-secret)
+EMAIL_SENDER_NAME = "Optiview"
+EMAIL_FROM = "noreply@optiview.ai"
+
+# Staging environment
+[env.staging.vars]
+PUBLIC_APP_URL = "https://staging.app.optiview.ai"
+PUBLIC_BASE_URL = "https://staging.api.optiview.ai"
+CSP_MODE = "production"
+NODE_ENV = "production"
+TEST_MODE = "0"
+DEV_MAIL_ECHO = "false"
+
+# Auth & limits (staging defaults)
+SESSION_TTL_HOURS = "720"
+OTP_EXP_MIN = "10"
+MAGIC_LINK_EXP_MIN = "15"
+MAGIC_LINK_RPM_PER_IP = "10"
+MAGIC_LINK_RPD_PER_EMAIL = "50"
+INVITE_EXP_DAYS = "14"
+ADMIN_RPM_PER_IP = "30"
+
+# Ingest limits (staging defaults)
+INGEST_RATE_LIMIT_RPS = "10"
+INGEST_RATE_LIMIT_BURST = "50"
+RATE_LIMIT_RETRY_AFTER = "5"
+CSV_EXPORT_RATE_LIMIT_RPS = "1"
+RULES_REFRESH_TTL_SEC = "300"
+
+# Email settings (non-secret)
+EMAIL_SENDER_NAME = "Optiview"
+EMAIL_FROM = "noreply@optiview.ai"
+
+# Test/Development environment
+[env.test.vars]
+PUBLIC_APP_URL = "http://localhost:3000"
+PUBLIC_BASE_URL = "http://127.0.0.1:8787"
+CSP_MODE = "development"
+NODE_ENV = "development"
+TEST_MODE = "1"
+DEV_MAIL_ECHO = "true"
+
+# Auth & limits (test defaults - more permissive)
+SESSION_TTL_HOURS = "24"
+OTP_EXP_MIN = "60"
+MAGIC_LINK_EXP_MIN = "60"
+MAGIC_LINK_RPM_PER_IP = "50"
+MAGIC_LINK_RPD_PER_EMAIL = "200"
+INVITE_EXP_DAYS = "7"
+ADMIN_RPM_PER_IP = "300"
+
+# Ingest limits (test defaults - more permissive)
+INGEST_RATE_LIMIT_RPS = "100"
+INGEST_RATE_LIMIT_BURST = "500"
+RATE_LIMIT_RETRY_AFTER = "1"
+CSV_EXPORT_RATE_LIMIT_RPS = "20"
+RULES_REFRESH_TTL_SEC = "30"
+
+# Email settings (test defaults)
+EMAIL_SENDER_NAME = "Optiview (Test)"
+EMAIL_FROM = "test@optiview.ai"
+
+# Database and KV bindings (shared across all environments)
 [[d1_databases]]
 binding = "OPTIVIEW_DB"
 database_name = "optiview_db"
@@ -10,53 +107,8 @@ database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
 [[kv_namespaces]]
 binding = "AI_FINGERPRINTS"
 id = "571e1b9f739c4d0a9027b350cf091d20"
+preview_id = "dev_ai_fingerprints"
 
+# Triggers (uncomment to enable after testing)
 [triggers]
-# Uncomment to enable after testing
 # crons = ["*/30 * * * *"]
-
-[env.production]
-CSP_MODE = "production"
-NODE_ENV = "production"
-PUBLIC_APP_URL = "https://optiview.ai"
-MAGIC_LINK_EXP_MIN = "15"
-MAGIC_LINK_RPM_PER_IP = "10"
-MAGIC_LINK_RPD_PER_EMAIL = "5"
-INVITE_EXP_DAYS = "7"
-EMAIL_FROM = "support@optiview.ai"
-EMAIL_SENDER_NAME = "Optiview"
-TEST_MODE = "1"
-
-[env.development]
-CSP_MODE = "development"
-NODE_ENV = "development"
-PUBLIC_APP_URL = "https://optiview.ai"
-MAGIC_LINK_EXP_MIN = "15"
-MAGIC_LINK_RPM_PER_IP = "10"
-MAGIC_LINK_RPD_PER_EMAIL = "50"
-INVITE_EXP_DAYS = "7"
-EMAIL_FROM = "support@optiview.ai"
-EMAIL_SENDER_NAME = "Optiview"
-TEST_MODE = "1"
-
-[env.dev]
-name = "geodude-api"
-CSP_MODE = "development"
-NODE_ENV = "development"
-PUBLIC_APP_URL = "https://optiview.ai"
-MAGIC_LINK_EXP_MIN = "15"
-MAGIC_LINK_RPM_PER_IP = "10"
-MAGIC_LINK_RPD_PER_EMAIL = "50"
-INVITE_EXP_DAYS = "7"
-EMAIL_FROM = "support@optiview.ai"
-EMAIL_SENDER_NAME = "Optiview"
-TEST_MODE = "1"
-
-[[env.dev.d1_databases]]
-binding = "OPTIVIEW_DB"
-database_name = "optiview_db"
-database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
-
-[[env.dev.kv_namespaces]]
-binding = "AI_FINGERPRINTS"
-id = "571e1b9f739c4d0a9027b350cf091d20"
