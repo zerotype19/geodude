@@ -234,128 +234,15 @@ export default {
 
       // 2) Magic Link Authentication (M3)
       if (url.pathname === "/auth/request-code" && request.method === "POST") {
-        try {
-          const body = await request.json();
-          const { email, continue_path } = body;
-
-          if (!email) {
-            const response = new Response(JSON.stringify({ error: "Email is required" }), {
-              status: 400,
-              headers: { "Content-Type": "application/json" }
-            });
-            return addCorsHeaders(response);
-          }
-
-          // Rate limiting per IP and per email
-          const clientIP = request.headers.get("cf-connecting-ip") || "unknown";
-          const ipKey = `rate_limit:magic_link:ip:${clientIP}`;
-          const emailKey = `rate_limit:magic_link:email:${email}`;
-
-          const ipLimit = await checkRateLimit(ipKey, config.MAGIC_LINK_RPM_PER_IP, 60 * 1000); // per minute per IP
-          const emailLimit = await checkRateLimit(emailKey, config.MAGIC_LINK_RPD_PER_EMAIL, 24 * 60 * 60 * 1000); // per day per email
-
-          if (!ipLimit.allowed) {
-            const response = new Response(JSON.stringify({ error: "Too many requests from this IP" }), {
-              status: 429,
-              headers: {
-                "Content-Type": "application/json",
-                "Retry-After": Math.ceil((ipLimit.resetTime - Date.now()) / 1000)
-              }
-            });
-            return addCorsHeaders(response);
-          }
-
-          if (!emailLimit.allowed) {
-            const response = new Response(JSON.stringify({ error: "Too many requests for this email" }), {
-              status: 429,
-              headers: {
-                "Content-Type": "application/json",
-                "Retry-After": Math.ceil((emailLimit.resetTime - Date.now()) / 1000)
-              }
-            });
-            return addCorsHeaders(response);
-          }
-
-          // Validate continue path
-          const sanitizeResult = sanitizeContinuePath(continue_path);
-
-          // Record sanitization metrics if sanitized
-          if (sanitizeResult.sanitized) {
-            recordContinueSanitized("request", sanitizeResult.reason);
-          }
-
-          // Debug logging to see what's being stored
-          console.log("🔍 Magic Link Request Debug:");
-          console.log("  Original continue_path:", continue_path);
-          console.log("  Sanitized continue_path:", sanitizeResult.value);
-          console.log("  Was sanitized:", sanitizeResult.sanitized);
-          console.log("  Reason:", sanitizeResult.reason);
-          console.log("  Email:", email);
-
-          // Generate secure token
-          const token = generateToken();
-          const tokenHash = await hashToken(token);
-
-          // Store token in database (use D1 instead of KV)
-          const expirationMinutes = config.MAGIC_LINK_EXP_MIN;
-          const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000);
-
-          // Insert into D1 magic_link table
-          const insertResult = await env.OPTIVIEW_DB.prepare(`
-            INSERT INTO magic_link (email, token_hash, expires_at, continue_path, requester_ip_hash)
-            VALUES (?, ?, ?, ?, ?)
-          `).bind(
-            email,
-            tokenHash,
-            expiresAt.toISOString(),
-            sanitizeResult.value,
-            await hashString(clientIP)
-          ).run();
-
-          if (!insertResult.success) {
-            console.error('Failed to insert magic link into D1:', insertResult.error);
-            throw new Error('Database error');
-          }
-
-          console.log('✅ Magic link stored in D1 database');
-
-          // Generate magic link
-          const appUrl = config.PUBLIC_APP_URL;
-          const magicLink = `${appUrl}/auth/magic?token=${token}`;
-
-          // Send email using EmailService
-          try {
-            const emailService = EmailService.fromEnv(env);
-            const emailSent = await emailService.sendMagicLinkEmail(
-              email,
-              magicLink,
-              config.MAGIC_LINK_EXP_MIN
-            );
-
-            if (emailSent) {
-              console.log("✅ Magic link email sent successfully to:", email);
-            } else {
-              console.error("❌ Failed to send magic link email to:", email);
-            }
-          } catch (emailError) {
-            console.error("❌ Email service error:", emailError);
-            // Don't fail the request if email fails, just log it
-          }
-
-          const response = new Response(JSON.stringify({ ok: true }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          });
-          return addCorsHeaders(response);
-
-        } catch (e) {
-          console.error("Magic link request error:", e);
-          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json" }
-          });
-          return addCorsHeaders(response);
-        }
+        // Redirect OTP requests to magic link endpoint for backward compatibility
+        const response = new Response(JSON.stringify({ 
+          message: "OTP login codes are deprecated. Please use magic links instead.",
+          redirect_to: "/auth/request-link"
+        }), {
+          status: 308, // Permanent Redirect
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response);
       }
 
       // 2.1) Frontend-compatible Magic Link endpoint (for optiview.ai frontend)

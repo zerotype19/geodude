@@ -13,7 +13,6 @@ DEV_MAIL_ECHO = "false"
 
 # Auth & limits (production defaults)
 SESSION_TTL_HOURS = "720"
-OTP_EXP_MIN = "10"
 MAGIC_LINK_EXP_MIN = "15"
 MAGIC_LINK_RPM_PER_IP = "10"
 MAGIC_LINK_RPD_PER_EMAIL = "50"
@@ -53,7 +52,6 @@ DEV_MAIL_ECHO = "false"
 
 # Auth & limits (production defaults)
 SESSION_TTL_HOURS = "720"
-OTP_EXP_MIN = "10"
 MAGIC_LINK_EXP_MIN = "15"
 MAGIC_LINK_RPM_PER_IP = "10"
 MAGIC_LINK_RPD_PER_EMAIL = "50"
@@ -88,7 +86,6 @@ PUBLIC_BASE_URL = "https://staging.api.optiview.ai"
 
 # Auth & limits (staging defaults)
 SESSION_TTL_HOURS = "720"
-OTP_EXP_MIN = "10"
 MAGIC_LINK_EXP_MIN = "15"
 MAGIC_LINK_RPM_PER_IP = "10"
 MAGIC_LINK_RPD_PER_EMAIL = "50"
@@ -123,7 +120,6 @@ DEV_MAIL_ECHO = "true"
 
 # Auth & limits (test defaults - more permissive)
 SESSION_TTL_HOURS = "24"
-OTP_EXP_MIN = "60"
 MAGIC_LINK_EXP_MIN = "60"
 MAGIC_LINK_RPM_PER_IP = "50"
 MAGIC_LINK_RPD_PER_EMAIL = "200"
@@ -163,7 +159,6 @@ DEV_MAIL_ECHO = "true"
 
 # Auth & limits (dev defaults - more permissive)
 SESSION_TTL_HOURS = "24"
-OTP_EXP_MIN = "60"
 MAGIC_LINK_EXP_MIN = "60"
 MAGIC_LINK_RPM_PER_IP = "50"
 MAGIC_LINK_RPD_PER_EMAIL = "200"
