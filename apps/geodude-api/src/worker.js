@@ -4745,9 +4745,7 @@ export default {
                 c.currency,
                 c.occurred_at as conversion_at,
                 c.ref_detected_at,
-                CAST(
-                  (julianday(c.occurred_at) - julianday(c.ref_detected_at)) * 24 * 60
-                ) as ttc_minutes
+                ((julianday(c.occurred_at) - julianday(c.ref_detected_at)) * 24 * 60) as ttc_minutes
               FROM convs c
               WHERE c.ref_detected_at IS NOT NULL
               ORDER BY c.occurred_at DESC
