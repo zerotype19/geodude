@@ -3957,8 +3957,9 @@ export default {
               UPDATE api_key SET last_used_ts = unixepoch() WHERE id = ?
             `).bind(apiKey.id).run();
 
-            // Increment metrics
-            await incrementCounter(env.AI_FINGERPRINTS, 'tag_events_5m', events.length);
+            // Increment metrics (with proper TTL)
+            const metricsKey = `tag_events_5m:${Math.floor(Date.now() / 300000)}`;
+            await incrementCounter(env.AI_FINGERPRINTS, metricsKey, 300);
 
             const response = new Response(JSON.stringify({
               success: true,
