@@ -4337,8 +4337,8 @@ export default {
                 ar.project_id,
                 ar.content_id,
                 ar.ai_source_id,
-                COUNT(*) referrals,
-                MAX(ar.detected_at) last_referral
+                COUNT(*) AS referrals,
+                MAX(ar.detected_at) AS last_referral
               FROM ai_referrals ar, params p
               WHERE ar.project_id = p.pid
                 AND ar.detected_at >= p.since
@@ -4346,9 +4346,11 @@ export default {
             ),
             convs AS (
               SELECT 
+                ce.id,
                 ce.project_id,
                 ce.content_id,
                 ce.amount_cents,
+                ce.currency,
                 ce.occurred_at,
                 (
                   SELECT ar.ai_source_id
@@ -4359,7 +4361,7 @@ export default {
                     AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
                   ORDER BY ar.detected_at DESC
                   LIMIT 1
-                ) attributed_source_id
+                ) AS attributed_source_id
               FROM conversion_event ce, params p
               WHERE ce.project_id = p.pid
                 AND ce.occurred_at >= p.since
@@ -4374,52 +4376,53 @@ export default {
               WHERE c.attributed_source_id IS NOT NULL
               GROUP BY c.content_id, c.attributed_source_id
             ),
-             funnel_data AS (
-               SELECT 
-                 r.project_id,
-                 r.content_id,
-                 r.ai_source_id,
-                 r.referrals,
-                 COALESCE(a.conversions, 0) conversions,
-                 CASE 
-                   WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
-                   ELSE 0 
-                 END conv_rate,
-                 r.last_referral,
-                 a.last_conversion
-               FROM refs r
-               LEFT JOIN attributed a ON r.content_id = a.content_id AND r.ai_source_id = a.attributed_source_id
-             ),
-             with_urls AS (
-               SELECT 
-                 f.*,
-                 ca.url,
-                 ais.slug source_slug,
-                 ais.name source_name
-               FROM funnel_data f
-               JOIN content_assets ca ON f.content_id = ca.id
-               JOIN ai_sources ais ON f.ai_source_id = ais.id
-               WHERE f.project_id = ? AND f.last_referral >= ?
-                 ${source ? 'AND ais.slug = ?' : ''}
-                 ${q ? 'AND ca.url LIKE ?' : ''}
-             )
-             SELECT 
-               content_id,
-               url,
-               source_slug,
-               source_name,
-               referrals,
-               conversions,
-               conv_rate,
-               last_referral,
-               last_conversion
-             FROM with_urls
-             ORDER BY ${sortSql}
-             LIMIT ? OFFSET ?
+            funnel_data AS (
+              SELECT
+                r.project_id,
+                r.content_id,
+                r.ai_source_id,
+                r.referrals,
+                COALESCE(a.conversions, 0) AS conversions,
+                CASE 
+                  WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
+                  ELSE 0
+                END AS conv_rate,
+                r.last_referral,
+                a.last_conversion
+              FROM refs r
+              LEFT JOIN attributed a
+                ON r.content_id = a.content_id AND r.ai_source_id = a.attributed_source_id
+            ),
+            with_urls AS (
+              SELECT 
+                f.*,
+                ca.url,
+                s.slug AS source_slug,
+                s.name AS source_name
+              FROM funnel_data f
+              JOIN content_assets ca ON f.content_id = ca.id
+              JOIN ai_sources s ON f.ai_source_id = s.id
+              WHERE f.project_id = ? AND f.last_referral >= ?
+                ${source ? 'AND s.slug = ?' : ''}
+                ${q ? 'AND ca.url LIKE ?' : ''}
+            )
+            SELECT 
+              content_id,
+              url,
+              source_slug,
+              source_name,
+              referrals,
+              conversions,
+              conv_rate,
+              last_referral,
+              last_conversion
+            FROM with_urls
+            ORDER BY ${sortSql}
+            LIMIT ? OFFSET ?
            `;
 
           // Build bind parameters
-          let bindParams = [project_id, sinceISO];
+          let bindParams = [project_id, sinceISO, project_id, sinceISO];
           if (source) bindParams.push(source);
           if (q) bindParams.push(`%${q}%`);
           bindParams.push(pageSizeNum, offset);
