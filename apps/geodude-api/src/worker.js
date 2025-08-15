@@ -3708,35 +3708,190 @@ export default {
         return addCorsHeaders(response, origin);
       }
 
-      // 6.1) Events POST endpoint (for JS tag)
+      // 6.1) Events POST endpoint (for JS tag) - Batched format
       if (url.pathname === "/api/events" && request.method === "POST") {
         try {
           const body = await request.json();
-          const { property_id, key_id, event_type, metadata } = body;
+          
+          // Handle both single event and batched event formats
+          const isBatch = body.events && Array.isArray(body.events);
+          
+          if (isBatch) {
+            // Batched format from tag runtime
+            const { project_id, property_id, events } = body;
+            
+            // Validate required fields for batch
+            if (!project_id || !property_id || !events || !Array.isArray(events)) {
+              const response = new Response(JSON.stringify({ error: "Missing required fields for batch: project_id, property_id, events" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
 
-          // Validate required fields
-          if (!property_id || !key_id || !event_type) {
-            const response = new Response(JSON.stringify({ error: "Missing required fields" }), {
-              status: 400,
+            // Validate API key from header
+            const keyId = request.headers.get('x-optiview-key-id');
+            if (!keyId) {
+              const response = new Response(JSON.stringify({ error: "Missing API key header: x-optiview-key-id" }), {
+                status: 401,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            const keyHash = await hashToken(keyId);
+            const apiKey = await d1.prepare(`
+              SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
+            `).bind(keyHash).first();
+
+            if (!apiKey) {
+              const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
+                status: 401,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            // Validate project_id matches API key
+            const actualProjectId = apiKey.project_id;
+            if (project_id !== actualProjectId) {
+              const response = new Response(JSON.stringify({ error: "Project ID mismatch" }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            // Verify property belongs to project
+            const propertyCheck = await d1.prepare(`
+              SELECT id FROM properties WHERE id = ? AND project_id = ?
+            `).bind(property_id, project_id).first();
+
+            if (!propertyCheck) {
+              const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            // Process each event in the batch
+            const now = new Date().toISOString();
+            const insertResults = [];
+
+            for (const event of events) {
+              const { event_type, metadata, occurred_at } = event;
+              
+              // Validate event_type
+              if (!['pageview', 'click', 'custom'].includes(event_type)) {
+                continue; // Skip invalid events instead of failing the whole batch
+              }
+
+              // Classify AI source from metadata
+              let aiSourceId = null;
+              if (metadata && metadata.referrer) {
+                const referer = metadata.referrer.toLowerCase();
+                if (referer.includes('chat.openai.com') || referer.includes('openai.com')) {
+                  aiSourceId = 10; // ChatGPT
+                } else if (referer.includes('claude.ai') || referer.includes('anthropic.com')) {
+                  aiSourceId = 11; // Claude
+                } else if (referer.includes('perplexity.ai')) {
+                  aiSourceId = 12; // Perplexity
+                } else if (referer.includes('gemini.google.com') || referer.includes('google.com')) {
+                  aiSourceId = 13; // Gemini
+                }
+              }
+
+              // Simple content mapping
+              let contentId = null;
+              if (metadata && (metadata.url || metadata.pathname)) {
+                const urlToMatch = metadata.url || metadata.pathname;
+                const existingContent = await d1.prepare(`
+                  SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
+                `).bind(`%${urlToMatch}%`, project_id).first();
+
+                if (existingContent) {
+                  contentId = existingContent.id;
+                }
+              }
+
+              // Store event in interaction_events table
+              try {
+                const result = await d1.prepare(`
+                  INSERT INTO interaction_events (
+                    project_id, property_id, content_id, ai_source_id, 
+                    event_type, metadata, occurred_at
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                `).bind(
+                  project_id,
+                  property_id,
+                  contentId,
+                  aiSourceId,
+                  event_type,
+                  JSON.stringify(metadata || {}),
+                  occurred_at || now
+                ).run();
+
+                insertResults.push(result);
+
+                // If this is AI traffic with content_id, also insert into ai_referrals
+                if (aiSourceId && contentId && event_type === 'pageview') {
+                  await d1.prepare(`
+                    INSERT INTO ai_referrals (project_id, content_id, ai_source_id, detected_at)
+                    VALUES (?, ?, ?, ?)
+                  `).bind(project_id, contentId, aiSourceId, occurred_at || now).run();
+                }
+              } catch (error) {
+                console.error('Error inserting event:', error);
+                // Continue processing other events
+              }
+            }
+
+            // Update API key last_used_ts
+            await d1.prepare(`
+              UPDATE api_key SET last_used_ts = unixepoch() WHERE id = ?
+            `).bind(apiKey.id).run();
+
+            // Increment metrics
+            await incrementCounter(env.AI_FINGERPRINTS, 'tag_events_5m', events.length);
+
+            const response = new Response(JSON.stringify({ 
+              success: true, 
+              processed: insertResults.length,
+              total: events.length 
+            }), {
+              status: 200,
               headers: { "Content-Type": "application/json" }
             });
             return addCorsHeaders(response, origin);
-          }
 
-          // Validate event_type
-          if (!['view', 'click', 'custom'].includes(event_type)) {
-            const response = new Response(JSON.stringify({ error: "Invalid event_type. Must be one of: view, click, custom" }), {
-              status: 400,
-              headers: { "Content-Type": "application/json" }
-            });
-            return addCorsHeaders(response, origin);
-          }
+          } else {
+            // Legacy single event format
+            const { property_id, key_id, event_type, metadata } = body;
 
-          // Validate API key
-          const keyHash = await hashToken(key_id);
-          const apiKey = await d1.prepare(`
-            SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
-          `).bind(keyHash).first();
+            // Validate required fields
+            if (!property_id || !key_id || !event_type) {
+              const response = new Response(JSON.stringify({ error: "Missing required fields" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            // Validate event_type
+            if (!['view', 'click', 'custom'].includes(event_type)) {
+              const response = new Response(JSON.stringify({ error: "Invalid event_type. Must be one of: view, click, custom" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            // Validate API key
+            const keyHash = await hashToken(key_id);
+            const apiKey = await d1.prepare(`
+              SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
+            `).bind(keyHash).first();
 
           if (!apiKey) {
             const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
@@ -3870,6 +4025,7 @@ export default {
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
+          }
 
         } catch (e) {
           console.error("Event creation error:", e);
