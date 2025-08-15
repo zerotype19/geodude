@@ -224,7 +224,7 @@ export default function InstallWizard() {
         setProperties(prev => [newProperty, ...prev]);
         setSelectedProperty(newProperty);
         setNewPropertyDomain('');
-        addToast('Property created successfully!', 'success');
+        addToast(`Domain added: ${newProperty.domain}`, 'success');
       } else {
         const error = await response.json();
         if (response.status === 409) {
@@ -437,16 +437,43 @@ export default function InstallWizard() {
           <div className="flex items-start space-x-4">
             <StepIcon step={steps[0]} />
             <div className="flex-1">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Choose Your Domain</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-medium text-gray-900">Choose Your Domain</h3>
+                <a
+                  href="/settings#properties"
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Manage domains
+                </a>
+              </div>
               <p className="text-sm text-gray-600 mb-4">
                 Your site's domain must be allow-listed for CORS. Use the exact domain where you'll install the tag.
               </p>
 
-              {properties.length > 0 ? (
-                <div className="space-y-4">
+              {/* Preselect error notice */}
+              {preselectedPropertyId && !selectedProperty && properties.length > 0 && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ Preselected property not found; please choose or add a domain.
+                  </p>
+                </div>
+              )}
+
+              {/* Test domain notice */}
+              {properties.length > 0 && properties.every(p => p.domain.includes('test') || p.domain.includes('localhost') || p.domain.includes('dev')) && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    💡 Add your real domain to allow CORS from your site.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                {/* Existing Properties Dropdown */}
+                {properties.length > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Property
+                      Select Existing Domain
                     </label>
                     <select
                       value={selectedProperty?.id || ''}
@@ -464,9 +491,14 @@ export default function InstallWizard() {
                       ))}
                     </select>
                   </div>
+                )}
 
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Or add a new domain:</h4>
+                {/* Add New Property - Always Visible */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {properties.length > 0 ? 'Or Add New Domain' : 'Add Your Domain'}
+                  </label>
+                  <div className="space-y-3">
                     <div className="flex space-x-3">
                       <input
                         type="text"
@@ -483,31 +515,19 @@ export default function InstallWizard() {
                         {isCreatingProperty ? 'Adding...' : 'Add Property'}
                       </button>
                     </div>
+                    
+                    {/* Help Text */}
+                    <p className="text-sm text-gray-600">
+                      Enter the exact hostname where you'll install the tag (no http/https, no path). Example: www.example.com or example.com.
+                    </p>
+                    
+                    {/* Rules */}
+                    <p className="text-xs text-gray-500">
+                      Exact host match only • Subdomains are separate • IPs/localhost not allowed
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex space-x-3">
-                    <input
-                      type="text"
-                      placeholder="example.com"
-                      value={newPropertyDomain}
-                      onChange={(e) => setNewPropertyDomain(e.target.value)}
-                      className="flex-1 max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                      onClick={createProperty}
-                      disabled={isCreatingProperty || !newPropertyDomain.trim()}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {isCreatingProperty ? 'Adding...' : 'Add Property'}
-                    </button>
-                  </div>
-                  <p className="text-sm text-orange-600">
-                    No properties found. Add your first domain to continue.
-                  </p>
-                </div>
-              )}
+              </div>
 
               {propertyError && (
                 <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
