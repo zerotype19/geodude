@@ -1739,17 +1739,13 @@ export default {
   });
 })();`;
 
-            // Return minified version unless debug mode
+            // Return debug version for now to avoid minification issues
             if (debug) {
               return runtime;
             } else {
-              // Basic minification - remove comments, extra whitespace, and console.info
-              // Note: Skip // comment removal as it breaks URLs like https://
-              return runtime
-                .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
-                .replace(/\s+/g, ' ') // Collapse whitespace
-                .replace(/;\s*}/g, ';}') // Remove spaces before closing braces
-                .trim();
+              // Temporarily disable minification due to // comment issues
+              // TODO: Implement proper AST-based minification
+              return runtime;
             }
           };
 
