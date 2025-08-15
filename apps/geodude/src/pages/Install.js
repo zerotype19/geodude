@@ -3,10 +3,111 @@ import { useState, useEffect } from "react";
 import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
-import { CheckCircle, Clock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Eye, EyeOff, Copy } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+// Hosted Tag Builder Component
+function HostedTagBuilder({ properties, apiKeys, projectId }) {
+    const [selectedProperty, setSelectedProperty] = useState(properties[0] || null);
+    const [selectedApiKey, setSelectedApiKey] = useState(null);
+    const [showKeyId, setShowKeyId] = useState(false);
+    const [config, setConfig] = useState({
+        clicks: true,
+        spa: true,
+        batchSize: 10,
+        flushMs: 3000
+    });
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [copiedSnippet, setCopiedSnippet] = useState(false);
+    const [copiedGtm, setCopiedGtm] = useState(false);
+    // Auto-select the first API key for the selected property
+    useEffect(() => {
+        if (selectedProperty && apiKeys.length > 0) {
+            const propertyApiKey = apiKeys.find(key => key.property_id === selectedProperty.id);
+            setSelectedApiKey(propertyApiKey || apiKeys[0]);
+        }
+    }, [selectedProperty, apiKeys]);
+    const generateSnippet = () => {
+        if (!selectedProperty || !selectedApiKey)
+            return '';
+        return `<script async src="https://api.optiview.ai/v1/tag.js"
+  data-key-id="${selectedApiKey.key_id}"
+  data-project-id="${projectId}"
+  data-property-id="${selectedProperty.id}"
+  data-clicks="${config.clicks ? '1' : '0'}"
+  data-spa="${config.spa ? '1' : '0'}"
+  data-batch-size="${config.batchSize}"
+  data-flush-ms="${config.flushMs}"></script>`;
+    };
+    const generateGtmSnippet = () => {
+        if (!selectedProperty || !selectedApiKey)
+            return '';
+        return `<!-- Use as Custom HTML tag; trigger on All Pages -->
+<script async src="https://api.optiview.ai/v1/tag.js"
+  data-key-id="${selectedApiKey.key_id}"
+  data-project-id="${projectId}"
+  data-property-id="${selectedProperty.id}"
+  data-clicks="${config.clicks ? '1' : '0'}"
+  data-spa="${config.spa ? '1' : '0'}"
+  data-batch-size="${config.batchSize}"
+  data-flush-ms="${config.flushMs}"></script>`;
+    };
+    const generateTestCurls = () => {
+        if (!selectedProperty || !selectedApiKey)
+            return { pageview: '', conversion: '' };
+        const pageviewCurl = `curl -X POST "https://api.optiview.ai/api/events" \\
+  -H "Content-Type: application/json" \\
+  -H "x-optiview-key-id: ${selectedApiKey.key_id}" \\
+  -d '{
+    "project_id": "${projectId}",
+    "property_id": ${selectedProperty.id},
+    "events": [{
+      "event_type": "pageview",
+      "metadata": {
+        "url": "https://${selectedProperty.domain}/test",
+        "pathname": "/test",
+        "title": "Test Page"
+      },
+      "occurred_at": "'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"
+    }]
+  }'`;
+        const conversionCurl = `curl -X POST "https://api.optiview.ai/api/conversions" \\
+  -H "Content-Type: application/json" \\
+  -H "x-optiview-key-id: ${selectedApiKey.key_id}" \\
+  -d '{
+    "project_id": "${projectId}",
+    "property_id": ${selectedProperty.id},
+    "amount_cents": 1299,
+    "currency": "USD",
+    "metadata": {
+      "order_id": "test-order-123"
+    }
+  }'`;
+        return { pageview: pageviewCurl, conversion: conversionCurl };
+    };
+    const copyToClipboard = async (text, type) => {
+        await navigator.clipboard.writeText(text);
+        if (type === 'snippet') {
+            setCopiedSnippet(true);
+            setTimeout(() => setCopiedSnippet(false), 2000);
+        }
+        else {
+            setCopiedGtm(true);
+            setTimeout(() => setCopiedGtm(false), 2000);
+        }
+    };
+    if (properties.length === 0 || apiKeys.length === 0) {
+        return (_jsxs("div", { className: "text-center py-8", children: [_jsx("p", { className: "text-gray-500 mb-4", children: properties.length === 0
+                        ? "Create a property first to use the hosted tag builder."
+                        : "Create an API key first to use the hosted tag builder." }), _jsx("a", { href: "/api-keys", className: "text-blue-600 hover:text-blue-800 underline", children: "Manage API Keys \u2192" })] }));
+    }
+    const snippet = generateSnippet();
+    const gtmSnippet = generateGtmSnippet();
+    const testCurls = generateTestCurls();
+    return (_jsxs("div", { className: "space-y-6", children: [_jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-gray-700 mb-2", children: "Property" }), _jsx("select", { value: selectedProperty?.id || '', onChange: (e) => setSelectedProperty(properties.find(p => p.id === parseInt(e.target.value)) || null), className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500", children: properties.map((property) => (_jsx("option", { value: property.id, children: property.domain }, property.id))) })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-gray-700 mb-2", children: "API Key" }), _jsxs("div", { className: "relative", children: [_jsx("select", { value: selectedApiKey?.id || '', onChange: (e) => setSelectedApiKey(apiKeys.find(k => k.id === parseInt(e.target.value)) || null), className: "w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500", children: apiKeys.map((apiKey) => (_jsx("option", { value: apiKey.id, children: apiKey.name }, apiKey.id))) }), _jsx("button", { onClick: () => setShowKeyId(!showKeyId), className: "absolute right-2 top-2 p-1 text-gray-400 hover:text-gray-600", children: showKeyId ? _jsx(EyeOff, { size: 16 }) : _jsx(Eye, { size: 16 }) })] }), showKeyId && selectedApiKey && (_jsxs("div", { className: "mt-1 text-xs text-gray-600 font-mono", children: ["Key ID: ", selectedApiKey.key_id] }))] })] }), _jsx("div", { className: "bg-gray-50 p-4 rounded-md", children: _jsxs("div", { className: "grid grid-cols-2 gap-4 text-sm", children: [_jsxs("div", { children: [_jsx("span", { className: "font-medium text-gray-700", children: "Project ID:" }), _jsx("span", { className: "ml-2 font-mono text-gray-600", children: projectId })] }), _jsxs("div", { children: [_jsx("span", { className: "font-medium text-gray-700", children: "Property ID:" }), _jsx("span", { className: "ml-2 font-mono text-gray-600", children: selectedProperty?.id })] })] }) }), _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex items-center space-x-6", children: [_jsxs("label", { className: "flex items-center", children: [_jsx("input", { type: "checkbox", checked: config.clicks, onChange: (e) => setConfig({ ...config, clicks: e.target.checked }), className: "rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" }), _jsx("span", { className: "ml-2 text-sm text-gray-700", children: "Click tracking" })] }), _jsxs("label", { className: "flex items-center", children: [_jsx("input", { type: "checkbox", checked: config.spa, onChange: (e) => setConfig({ ...config, spa: e.target.checked }), className: "rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50" }), _jsx("span", { className: "ml-2 text-sm text-gray-700", children: "SPA route tracking" })] })] }), _jsxs("div", { children: [_jsxs("button", { onClick: () => setShowAdvanced(!showAdvanced), className: "flex items-center text-sm text-blue-600 hover:text-blue-800", children: [showAdvanced ? _jsx(ChevronUp, { size: 16 }) : _jsx(ChevronDown, { size: 16 }), _jsx("span", { className: "ml-1", children: "Advanced Settings" })] }), showAdvanced && (_jsxs("div", { className: "mt-3 grid grid-cols-2 gap-4", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-gray-700 mb-1", children: "Batch size (1-50)" }), _jsx("input", { type: "number", min: "1", max: "50", value: config.batchSize, onChange: (e) => setConfig({ ...config, batchSize: Math.min(Math.max(parseInt(e.target.value) || 10, 1), 50) }), className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" })] }), _jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-gray-700 mb-1", children: "Flush interval (500-10000ms)" }), _jsx("input", { type: "number", min: "500", max: "10000", step: "100", value: config.flushMs, onChange: (e) => setConfig({ ...config, flushMs: Math.min(Math.max(parseInt(e.target.value) || 3000, 500), 10000) }), className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500" })] })] }))] })] }), _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { children: [_jsx("h4", { className: "font-medium text-gray-700 mb-2", children: "HTML Snippet" }), _jsxs("div", { className: "relative", children: [_jsx("div", { className: "bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto", children: snippet }), _jsx("button", { onClick: () => copyToClipboard(snippet, 'snippet'), className: "absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-200 bg-gray-800 rounded", children: _jsx(Copy, { size: 16 }) })] }), copiedSnippet && (_jsx("div", { className: "text-xs text-green-600 mt-1", children: "Copied to clipboard!" }))] }), _jsxs("div", { children: [_jsx("h4", { className: "font-medium text-gray-700 mb-2", children: "Google Tag Manager" }), _jsxs("div", { className: "relative", children: [_jsx("div", { className: "bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto", children: gtmSnippet }), _jsx("button", { onClick: () => copyToClipboard(gtmSnippet, 'gtm'), className: "absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-200 bg-gray-800 rounded", children: _jsx(Copy, { size: 16 }) })] }), copiedGtm && (_jsx("div", { className: "text-xs text-green-600 mt-1", children: "Copied to clipboard!" })), _jsx("div", { className: "text-xs text-gray-600 mt-2", children: "Use as Custom HTML tag; trigger on All Pages" })] })] }), _jsxs("div", { className: "bg-blue-50 border border-blue-200 rounded-md p-4", children: [_jsx("h4", { className: "font-medium text-blue-800 mb-2", children: "Test Calls" }), _jsxs("div", { className: "space-y-3", children: [_jsxs("div", { children: [_jsx("h5", { className: "text-sm font-medium text-blue-700 mb-1", children: "Pageview Test:" }), _jsx("div", { className: "bg-blue-900 text-blue-100 p-2 rounded text-xs font-mono overflow-x-auto", children: testCurls.pageview })] }), _jsxs("div", { children: [_jsx("h5", { className: "text-sm font-medium text-blue-700 mb-1", children: "Conversion Test:" }), _jsx("div", { className: "bg-blue-900 text-blue-100 p-2 rounded text-xs font-mono overflow-x-auto", children: testCurls.conversion })] })] })] }), _jsxs("div", { className: "bg-yellow-50 border border-yellow-200 rounded-md p-4", children: [_jsx("h4", { className: "font-medium text-yellow-800 mb-2", children: "Troubleshooting" }), _jsxs("div", { className: "text-sm text-yellow-700 space-y-2", children: [_jsxs("p", { children: ["\u2022 To exclude elements from click tracking, add ", _jsx("code", { className: "bg-yellow-100 px-1 rounded", children: "data-optiview=\"ignore\"" })] }), _jsxs("p", { children: ["\u2022 Call ", _jsxs("code", { className: "bg-yellow-100 px-1 rounded", children: ["window.optiview.conversion(", "{amount_cents: 1299, currency: 'USD', metadata: {order_id: 'A123'}", ")"] }), " for conversions"] }), _jsxs("p", { children: ["\u2022 Use ", _jsx("code", { className: "bg-yellow-100 px-1 rounded", children: "window.optiview.track('custom_event', metadata)" }), " for custom events"] }), _jsx("p", { children: "\u2022 Check browser console for errors if events aren't appearing" })] }), _jsx("div", { className: "mt-3", children: _jsx("a", { href: "/docs/install", className: "text-yellow-800 hover:text-yellow-900 underline text-sm", children: "View full documentation \u2192" }) })] })] }));
+}
 // Installation Verification Banner Component
 function InstallVerificationBanner({ properties, apiKeys }) {
+    const { project } = useAuth();
     const [verificationData, setVerificationData] = useState({});
     const [loading, setLoading] = useState({});
     const [error, setError] = useState({});
@@ -29,10 +130,12 @@ function InstallVerificationBanner({ properties, apiKeys }) {
         }
     }, [autoRefresh]);
     async function verifyProperty(propertyId) {
+        if (!project?.id)
+            return;
         try {
             setLoading(prev => ({ ...prev, [propertyId]: true }));
             setError(prev => ({ ...prev, [propertyId]: "" }));
-            const response = await fetch(`${API_BASE}/api/events/last-seen?property_id=${propertyId}`, FETCH_OPTS);
+            const response = await fetch(`${API_BASE}/api/events/last-seen?project_id=${project.id}&property_id=${propertyId}`, FETCH_OPTS);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
@@ -147,6 +250,7 @@ export default function Install() {
         if (project?.id) {
             setNewProperty(prev => ({ ...prev, project_id: project.id }));
             loadProperties();
+            loadApiKeys();
         }
     }, [project]);
     async function loadProperties() {
@@ -168,6 +272,23 @@ export default function Install() {
         }
         catch (error) {
             console.error("Error loading properties:", error);
+        }
+    }
+    async function loadApiKeys() {
+        if (!project?.id)
+            return;
+        try {
+            const response = await fetch(`${API_BASE}/api/keys?project_id=${project.id}`, FETCH_OPTS);
+            if (response.ok) {
+                const data = await response.json();
+                setApiKeys(data);
+            }
+        }
+        catch (error) {
+            console.error("Error loading API keys:", error);
+        }
+        finally {
+            setLoading(false);
         }
     }
     async function addProperty() {
@@ -197,15 +318,5 @@ export default function Install() {
             console.error("Error adding property:", error);
         }
     }
-    function getInstallationSnippet(propertyId) {
-        return `<script async src="https://app.optiview.io/v1/tag.js?pid=${propertyId}"></script>`;
-    }
-    function getGtmTemplate(propertyId) {
-        return `{
-  "name": "Optiview Analytics",
-  "type": "html",
-  "code": "<script async src=\\"https://app.optiview.io/v1/tag.js?pid=${propertyId}\\"></script>"
-}`;
-    }
-    return (_jsx(Shell, { children: _jsxs("div", { className: "space-y-6", children: [_jsxs("div", { children: [_jsx("h1", { className: "text-3xl font-bold text-slate-900", children: "Installation & Setup" }), _jsxs("p", { className: "text-slate-600 mt-2", children: ["Get Optiview tracking on your ", project?.name || 'project', " website with our easy installation options"] })] }), _jsx(Card, { title: "Properties", children: _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex gap-4", children: [_jsx("input", { type: "text", value: newProperty.domain, onChange: (e) => setNewProperty({ ...newProperty, domain: e.target.value }), placeholder: "example.com", className: "flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }), _jsx("button", { onClick: addProperty, disabled: !newProperty.domain, className: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2", children: "Add Property" })] }), properties.length > 0 && (_jsxs("div", { className: "space-y-2", children: [_jsx("h4", { className: "font-medium text-slate-700", children: "Your Properties:" }), properties.map((property) => (_jsxs("div", { className: "flex items-center justify-between p-3 bg-gray-50 rounded-md", children: [_jsx("span", { className: "font-mono text-sm", children: property.domain }), _jsxs("span", { className: "text-xs text-gray-500", children: ["ID: ", property.id] })] }, property.id)))] }))] }) }), _jsx(Card, { title: "API Keys", children: _jsx("div", { className: "space-y-4", children: _jsxs("div", { className: "text-center py-8", children: [_jsx("p", { className: "text-gray-500 mb-4", children: "Create and manage your API keys on the dedicated API Keys page." }), _jsx("a", { href: "/api-keys", className: "inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors", children: "Manage API Keys" })] }) }) }), _jsx(Card, { title: "Installation Instructions", children: _jsxs("div", { className: "space-y-6", children: [_jsxs("div", { children: [_jsx("h4", { className: "font-medium text-slate-700 mb-2", children: "1. JavaScript Tag (Recommended)" }), _jsx("p", { className: "text-sm text-gray-600 mb-3", children: "Add this script tag to your website's <head> section. It will automatically track page views and AI traffic." }), properties.length > 0 ? (_jsx("div", { className: "space-y-3", children: properties.map((property) => (_jsxs("div", { className: "space-y-2", children: [_jsxs("div", { className: "text-sm font-medium text-slate-600", children: [property.domain, ":"] }), _jsx("div", { className: "bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto", children: getInstallationSnippet(property.id.toString()) }), _jsx("button", { onClick: () => navigator.clipboard.writeText(getInstallationSnippet(property.id.toString())), className: "text-xs text-blue-600 hover:text-blue-800 focus:outline-none", children: "Copy to clipboard" })] }, property.id))) })) : (_jsx("div", { className: "text-sm text-gray-500 italic", children: "Create a property first to see installation snippets." }))] }), _jsxs("div", { children: [_jsx("h4", { className: "font-medium text-slate-700 mb-2", children: "2. Google Tag Manager" }), _jsx("p", { className: "text-sm text-gray-600 mb-3", children: "If you use GTM, create a new HTML tag with this template:" }), properties.length > 0 ? (_jsx("div", { className: "space-y-3", children: properties.map((property) => (_jsxs("div", { className: "space-y-2", children: [_jsxs("div", { className: "text-sm font-medium text-slate-600", children: [property.domain, ":"] }), _jsx("div", { className: "bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto", children: getGtmTemplate(property.id.toString()) }), _jsx("button", { onClick: () => navigator.clipboard.writeText(getGtmTemplate(property.id.toString())), className: "text-xs text-blue-600 hover:text-blue-800 focus:outline-none", children: "Copy to clipboard" })] }, property.id))) })) : (_jsx("div", { className: "text-sm text-gray-500 italic", children: "Create a property first to see GTM templates." }))] }), _jsxs("div", { children: [_jsx("h4", { className: "font-medium text-slate-700 mb-2", children: "3. Cloudflare Worker (Advanced)" }), _jsx("p", { className: "text-sm text-gray-600 mb-3", children: "For high-traffic sites, deploy our worker template on your own zone for edge-level classification." }), _jsxs("div", { className: "bg-blue-50 border border-blue-200 rounded-md p-4", children: [_jsxs("div", { className: "text-sm text-blue-800", children: [_jsx("strong", { children: "Download:" }), " ", _jsx("a", { href: "/examples/customer-worker.js", download: true, className: "text-blue-600 hover:text-blue-800 underline", children: "customer-worker.js" })] }), _jsx("div", { className: "text-xs text-blue-700 mt-2", children: "Deploy this to your Cloudflare zone and set environment variables for your Optiview credentials." })] })] }), _jsxs("div", { children: [_jsx("h4", { className: "font-medium text-slate-700 mb-2", children: "4. Verify Installation" }), _jsx("p", { className: "text-sm text-gray-600 mb-3", children: "After installing, visit your website and check the Optiview dashboard for incoming events." }), _jsxs("div", { className: "bg-green-50 border border-green-200 rounded-md p-4", children: [_jsx("div", { className: "text-sm text-green-800", children: _jsx("strong", { children: "Success indicators:" }) }), _jsxs("ul", { className: "text-xs text-green-700 mt-2 space-y-1", children: [_jsx("li", { children: "\u2022 Page views appear in your Events dashboard" }), _jsx("li", { children: "\u2022 AI traffic is classified automatically" }), _jsx("li", { children: "\u2022 No console errors in browser dev tools" })] })] })] })] }) }), properties.length > 0 && (_jsx(Card, { title: "Installation Status", children: _jsx(InstallVerificationBanner, { properties: properties, apiKeys: [] }) })), _jsx(Card, { title: "Troubleshooting", children: _jsx(TroubleshootingGuide, { properties: properties, apiKeys: [] }) })] }) }));
+    return (_jsx(Shell, { children: _jsxs("div", { className: "space-y-6", children: [_jsxs("div", { children: [_jsx("h1", { className: "text-3xl font-bold text-slate-900", children: "Installation & Setup" }), _jsxs("p", { className: "text-slate-600 mt-2", children: ["Get Optiview tracking on your ", project?.name || 'project', " website with our easy installation options"] })] }), _jsx(Card, { title: "Properties", children: _jsxs("div", { className: "space-y-4", children: [_jsxs("div", { className: "flex gap-4", children: [_jsx("input", { type: "text", value: newProperty.domain, onChange: (e) => setNewProperty({ ...newProperty, domain: e.target.value }), placeholder: "example.com", className: "flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" }), _jsx("button", { onClick: addProperty, disabled: !newProperty.domain, className: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2", children: "Add Property" })] }), properties.length > 0 && (_jsxs("div", { className: "space-y-2", children: [_jsx("h4", { className: "font-medium text-slate-700", children: "Your Properties:" }), properties.map((property) => (_jsxs("div", { className: "flex items-center justify-between p-3 bg-gray-50 rounded-md", children: [_jsx("span", { className: "font-mono text-sm", children: property.domain }), _jsxs("span", { className: "text-xs text-gray-500", children: ["ID: ", property.id] })] }, property.id)))] }))] }) }), _jsx(Card, { title: "API Keys", children: _jsx("div", { className: "space-y-4", children: _jsxs("div", { className: "text-center py-8", children: [_jsx("p", { className: "text-gray-500 mb-4", children: "Create and manage your API keys on the dedicated API Keys page." }), _jsx("a", { href: "/api-keys", className: "inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors", children: "Manage API Keys" })] }) }) }), _jsx(Card, { title: "Hosted Tag Builder", children: _jsx(HostedTagBuilder, { properties: properties, apiKeys: apiKeys, projectId: project?.id || "" }) }), properties.length > 0 && (_jsx(Card, { title: "Installation Status", children: _jsx(InstallVerificationBanner, { properties: properties, apiKeys: [] }) })), _jsx(Card, { title: "Troubleshooting", children: _jsx(TroubleshootingGuide, { properties: properties, apiKeys: [] }) })] }) }));
 }

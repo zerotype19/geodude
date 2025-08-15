@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
-import { CheckCircle, Clock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, Eye, EyeOff, Copy } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 interface ApiKey {
@@ -44,8 +44,347 @@ interface TroubleshootingGuideProps {
   apiKeys: ApiKey[];
 }
 
+interface HostedTagBuilderProps {
+  properties: Property[];
+  apiKeys: ApiKey[];
+  projectId: string;
+}
+
+// Hosted Tag Builder Component
+function HostedTagBuilder({ properties, apiKeys, projectId }: HostedTagBuilderProps) {
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(properties[0] || null);
+  const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
+  const [showKeyId, setShowKeyId] = useState(false);
+  const [config, setConfig] = useState({
+    clicks: true,
+    spa: true,
+    batchSize: 10,
+    flushMs: 3000
+  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const [copiedGtm, setCopiedGtm] = useState(false);
+
+  // Auto-select the first API key for the selected property
+  useEffect(() => {
+    if (selectedProperty && apiKeys.length > 0) {
+      const propertyApiKey = apiKeys.find(key => key.property_id === selectedProperty.id);
+      setSelectedApiKey(propertyApiKey || apiKeys[0]);
+    }
+  }, [selectedProperty, apiKeys]);
+
+  const generateSnippet = () => {
+    if (!selectedProperty || !selectedApiKey) return '';
+    
+    return `<script async src="https://api.optiview.ai/v1/tag.js"
+  data-key-id="${selectedApiKey.key_id}"
+  data-project-id="${projectId}"
+  data-property-id="${selectedProperty.id}"
+  data-clicks="${config.clicks ? '1' : '0'}"
+  data-spa="${config.spa ? '1' : '0'}"
+  data-batch-size="${config.batchSize}"
+  data-flush-ms="${config.flushMs}"></script>`;
+  };
+
+  const generateGtmSnippet = () => {
+    if (!selectedProperty || !selectedApiKey) return '';
+    
+    return `<!-- Use as Custom HTML tag; trigger on All Pages -->
+<script async src="https://api.optiview.ai/v1/tag.js"
+  data-key-id="${selectedApiKey.key_id}"
+  data-project-id="${projectId}"
+  data-property-id="${selectedProperty.id}"
+  data-clicks="${config.clicks ? '1' : '0'}"
+  data-spa="${config.spa ? '1' : '0'}"
+  data-batch-size="${config.batchSize}"
+  data-flush-ms="${config.flushMs}"></script>`;
+  };
+
+  const generateTestCurls = () => {
+    if (!selectedProperty || !selectedApiKey) return { pageview: '', conversion: '' };
+    
+    const pageviewCurl = `curl -X POST "https://api.optiview.ai/api/events" \\
+  -H "Content-Type: application/json" \\
+  -H "x-optiview-key-id: ${selectedApiKey.key_id}" \\
+  -d '{
+    "project_id": "${projectId}",
+    "property_id": ${selectedProperty.id},
+    "events": [{
+      "event_type": "pageview",
+      "metadata": {
+        "url": "https://${selectedProperty.domain}/test",
+        "pathname": "/test",
+        "title": "Test Page"
+      },
+      "occurred_at": "'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'"
+    }]
+  }'`;
+
+    const conversionCurl = `curl -X POST "https://api.optiview.ai/api/conversions" \\
+  -H "Content-Type: application/json" \\
+  -H "x-optiview-key-id: ${selectedApiKey.key_id}" \\
+  -d '{
+    "project_id": "${projectId}",
+    "property_id": ${selectedProperty.id},
+    "amount_cents": 1299,
+    "currency": "USD",
+    "metadata": {
+      "order_id": "test-order-123"
+    }
+  }'`;
+
+    return { pageview: pageviewCurl, conversion: conversionCurl };
+  };
+
+  const copyToClipboard = async (text: string, type: 'snippet' | 'gtm') => {
+    await navigator.clipboard.writeText(text);
+    if (type === 'snippet') {
+      setCopiedSnippet(true);
+      setTimeout(() => setCopiedSnippet(false), 2000);
+    } else {
+      setCopiedGtm(true);
+      setTimeout(() => setCopiedGtm(false), 2000);
+    }
+  };
+
+  if (properties.length === 0 || apiKeys.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-500 mb-4">
+          {properties.length === 0 
+            ? "Create a property first to use the hosted tag builder."
+            : "Create an API key first to use the hosted tag builder."}
+        </p>
+        <a
+          href="/api-keys"
+          className="text-blue-600 hover:text-blue-800 underline"
+        >
+          Manage API Keys →
+        </a>
+      </div>
+    );
+  }
+
+  const snippet = generateSnippet();
+  const gtmSnippet = generateGtmSnippet();
+  const testCurls = generateTestCurls();
+
+  return (
+    <div className="space-y-6">
+      {/* Configuration */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Property
+          </label>
+          <select
+            value={selectedProperty?.id || ''}
+            onChange={(e) => setSelectedProperty(properties.find(p => p.id === parseInt(e.target.value)) || null)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          >
+            {properties.map((property) => (
+              <option key={property.id} value={property.id}>
+                {property.domain}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            API Key
+          </label>
+          <div className="relative">
+            <select
+              value={selectedApiKey?.id || ''}
+              onChange={(e) => setSelectedApiKey(apiKeys.find(k => k.id === parseInt(e.target.value)) || null)}
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {apiKeys.map((apiKey) => (
+                <option key={apiKey.id} value={apiKey.id}>
+                  {apiKey.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setShowKeyId(!showKeyId)}
+              className="absolute right-2 top-2 p-1 text-gray-400 hover:text-gray-600"
+            >
+              {showKeyId ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {showKeyId && selectedApiKey && (
+            <div className="mt-1 text-xs text-gray-600 font-mono">
+              Key ID: {selectedApiKey.key_id}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Read-only information */}
+      <div className="bg-gray-50 p-4 rounded-md">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="font-medium text-gray-700">Project ID:</span>
+            <span className="ml-2 font-mono text-gray-600">{projectId}</span>
+          </div>
+          <div>
+            <span className="font-medium text-gray-700">Property ID:</span>
+            <span className="ml-2 font-mono text-gray-600">{selectedProperty?.id}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Toggles */}
+      <div className="space-y-4">
+        <div className="flex items-center space-x-6">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={config.clicks}
+              onChange={(e) => setConfig({...config, clicks: e.target.checked})}
+              className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+            />
+            <span className="ml-2 text-sm text-gray-700">Click tracking</span>
+          </label>
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={config.spa}
+              onChange={(e) => setConfig({...config, spa: e.target.checked})}
+              className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+            />
+            <span className="ml-2 text-sm text-gray-700">SPA route tracking</span>
+          </label>
+        </div>
+
+        {/* Advanced Settings */}
+        <div>
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center text-sm text-blue-600 hover:text-blue-800"
+          >
+            {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            <span className="ml-1">Advanced Settings</span>
+          </button>
+          
+          {showAdvanced && (
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Batch size (1-50)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={config.batchSize}
+                  onChange={(e) => setConfig({...config, batchSize: Math.min(Math.max(parseInt(e.target.value) || 10, 1), 50)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Flush interval (500-10000ms)
+                </label>
+                <input
+                  type="number"
+                  min="500"
+                  max="10000"
+                  step="100"
+                  value={config.flushMs}
+                  onChange={(e) => setConfig({...config, flushMs: Math.min(Math.max(parseInt(e.target.value) || 3000, 500), 10000)})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Snippet Output */}
+      <div className="space-y-4">
+        <div>
+          <h4 className="font-medium text-gray-700 mb-2">HTML Snippet</h4>
+          <div className="relative">
+            <div className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
+              {snippet}
+            </div>
+            <button
+              onClick={() => copyToClipboard(snippet, 'snippet')}
+              className="absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-200 bg-gray-800 rounded"
+            >
+              <Copy size={16} />
+            </button>
+          </div>
+          {copiedSnippet && (
+            <div className="text-xs text-green-600 mt-1">Copied to clipboard!</div>
+          )}
+        </div>
+
+        <div>
+          <h4 className="font-medium text-gray-700 mb-2">Google Tag Manager</h4>
+          <div className="relative">
+            <div className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
+              {gtmSnippet}
+            </div>
+            <button
+              onClick={() => copyToClipboard(gtmSnippet, 'gtm')}
+              className="absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-200 bg-gray-800 rounded"
+            >
+              <Copy size={16} />
+            </button>
+          </div>
+          {copiedGtm && (
+            <div className="text-xs text-green-600 mt-1">Copied to clipboard!</div>
+          )}
+          <div className="text-xs text-gray-600 mt-2">
+            Use as Custom HTML tag; trigger on All Pages
+          </div>
+        </div>
+      </div>
+
+      {/* Test Calls */}
+      <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+        <h4 className="font-medium text-blue-800 mb-2">Test Calls</h4>
+        <div className="space-y-3">
+          <div>
+            <h5 className="text-sm font-medium text-blue-700 mb-1">Pageview Test:</h5>
+            <div className="bg-blue-900 text-blue-100 p-2 rounded text-xs font-mono overflow-x-auto">
+              {testCurls.pageview}
+            </div>
+          </div>
+          <div>
+            <h5 className="text-sm font-medium text-blue-700 mb-1">Conversion Test:</h5>
+            <div className="bg-blue-900 text-blue-100 p-2 rounded text-xs font-mono overflow-x-auto">
+              {testCurls.conversion}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Troubleshooting */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <h4 className="font-medium text-yellow-800 mb-2">Troubleshooting</h4>
+        <div className="text-sm text-yellow-700 space-y-2">
+          <p>• To exclude elements from click tracking, add <code className="bg-yellow-100 px-1 rounded">data-optiview="ignore"</code></p>
+          <p>• Call <code className="bg-yellow-100 px-1 rounded">window.optiview.conversion({"{amount_cents: 1299, currency: 'USD', metadata: {order_id: 'A123'}"})</code> for conversions</p>
+          <p>• Use <code className="bg-yellow-100 px-1 rounded">window.optiview.track('custom_event', metadata)</code> for custom events</p>
+          <p>• Check browser console for errors if events aren't appearing</p>
+        </div>
+        <div className="mt-3">
+          <a href="/docs/install" className="text-yellow-800 hover:text-yellow-900 underline text-sm">
+            View full documentation →
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Installation Verification Banner Component
 function InstallVerificationBanner({ properties, apiKeys }: InstallVerificationBannerProps) {
+  const { project } = useAuth();
   const [verificationData, setVerificationData] = useState<Record<number, VerificationData>>({});
   const [loading, setLoading] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<Record<number, string>>({});
@@ -72,11 +411,13 @@ function InstallVerificationBanner({ properties, apiKeys }: InstallVerificationB
   }, [autoRefresh]);
 
   async function verifyProperty(propertyId: number) {
+    if (!project?.id) return;
+
     try {
       setLoading(prev => ({ ...prev, [propertyId]: true }));
       setError(prev => ({ ...prev, [propertyId]: "" }));
 
-      const response = await fetch(`${API_BASE}/api/events/last-seen?property_id=${propertyId}`, FETCH_OPTS);
+      const response = await fetch(`${API_BASE}/api/events/last-seen?project_id=${project.id}&property_id=${propertyId}`, FETCH_OPTS);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -553,6 +894,7 @@ export default function Install() {
     if (project?.id) {
       setNewProperty(prev => ({ ...prev, project_id: project.id }));
       loadProperties();
+      loadApiKeys();
     }
   }, [project]);
 
@@ -574,6 +916,22 @@ export default function Install() {
       }
     } catch (error) {
       console.error("Error loading properties:", error);
+    }
+  }
+
+  async function loadApiKeys() {
+    if (!project?.id) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/keys?project_id=${project.id}`, FETCH_OPTS);
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeys(data);
+      }
+    } catch (error) {
+      console.error("Error loading API keys:", error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -604,17 +962,7 @@ export default function Install() {
     }
   }
 
-  function getInstallationSnippet(propertyId: string) {
-    return `<script async src="https://app.optiview.io/v1/tag.js?pid=${propertyId}"></script>`;
-  }
 
-  function getGtmTemplate(propertyId: string) {
-    return `{
-  "name": "Optiview Analytics",
-  "type": "html",
-  "code": "<script async src=\\"https://app.optiview.io/v1/tag.js?pid=${propertyId}\\"></script>"
-}`;
-  }
 
   return (
     <Shell>
@@ -677,105 +1025,13 @@ export default function Install() {
           </div>
         </Card>
 
-        {/* Installation Instructions */}
-        <Card title="Installation Instructions">
-          <div className="space-y-6">
-            <div>
-              <h4 className="font-medium text-slate-700 mb-2">1. JavaScript Tag (Recommended)</h4>
-              <p className="text-sm text-gray-600 mb-3">
-                Add this script tag to your website's &lt;head&gt; section. It will automatically track page views and AI traffic.
-              </p>
-              {properties.length > 0 ? (
-                <div className="space-y-3">
-                  {properties.map((property) => (
-                    <div key={property.id} className="space-y-2">
-                      <div className="text-sm font-medium text-slate-600">{property.domain}:</div>
-                      <div className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
-                        {getInstallationSnippet(property.id.toString())}
-                      </div>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(getInstallationSnippet(property.id.toString()))}
-                        className="text-xs text-blue-600 hover:text-blue-800 focus:outline-none"
-                      >
-                        Copy to clipboard
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500 italic">
-                  Create a property first to see installation snippets.
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h4 className="font-medium text-slate-700 mb-2">2. Google Tag Manager</h4>
-              <p className="text-sm text-gray-600 mb-3">
-                If you use GTM, create a new HTML tag with this template:
-              </p>
-              {properties.length > 0 ? (
-                <div className="space-y-3">
-                  {properties.map((property) => (
-                    <div key={property.id} className="space-y-2">
-                      <div className="text-sm font-medium text-slate-600">{property.domain}:</div>
-                      <div className="bg-gray-900 text-green-400 p-3 rounded-md font-mono text-sm overflow-x-auto">
-                        {getGtmTemplate(property.id.toString())}
-                      </div>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(getGtmTemplate(property.id.toString()))}
-                        className="text-xs text-blue-600 hover:text-blue-800 focus:outline-none"
-                      >
-                        Copy to clipboard
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500 italic">
-                  Create a property first to see GTM templates.
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h4 className="font-medium text-slate-700 mb-2">3. Cloudflare Worker (Advanced)</h4>
-              <p className="text-sm text-gray-600 mb-3">
-                For high-traffic sites, deploy our worker template on your own zone for edge-level classification.
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                <div className="text-sm text-blue-800">
-                  <strong>Download:</strong> <a
-                    href="/examples/customer-worker.js"
-                    download
-                    className="text-blue-600 hover:text-blue-800 underline"
-                  >
-                    customer-worker.js
-                  </a>
-                </div>
-                <div className="text-xs text-blue-700 mt-2">
-                  Deploy this to your Cloudflare zone and set environment variables for your Optiview credentials.
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-medium text-slate-700 mb-2">4. Verify Installation</h4>
-              <p className="text-sm text-gray-600 mb-3">
-                After installing, visit your website and check the Optiview dashboard for incoming events.
-              </p>
-              <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                <div className="text-sm text-green-800">
-                  <strong>Success indicators:</strong>
-                </div>
-                <ul className="text-xs text-green-700 mt-2 space-y-1">
-                  <li>• Page views appear in your Events dashboard</li>
-                  <li>• AI traffic is classified automatically</li>
-                  <li>• No console errors in browser dev tools</li>
-                </ul>
-              </div>
-            </div>
-          </div>
+        {/* Hosted Tag Builder */}
+        <Card title="Hosted Tag Builder">
+          <HostedTagBuilder
+            properties={properties}
+            apiKeys={apiKeys}
+            projectId={project?.id || ""}
+          />
         </Card>
 
         {/* Installation Verification Banner */}
