@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
@@ -6,14 +7,13 @@ import { CheckCircle, Clock, AlertTriangle, RefreshCw, ChevronDown, ChevronUp, E
 import { useAuth } from "../contexts/AuthContext";
 
 interface ApiKey {
-  id: number;
+  id: string;
   name: string;
-  key_id: string;
-  property_id: number;
+  status: string;
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
-  property_domain: string;
+  grace_expires_at: string | null;
 }
 
 interface Property {
@@ -48,10 +48,12 @@ interface HostedTagBuilderProps {
   properties: Property[];
   apiKeys: ApiKey[];
   projectId: string;
+  preselectedKeyId?: string;
+  preselectedPropertyId?: string;
 }
 
 // Hosted Tag Builder Component
-function HostedTagBuilder({ properties, apiKeys, projectId }: HostedTagBuilderProps) {
+function HostedTagBuilder({ properties, apiKeys, projectId, preselectedKeyId, preselectedPropertyId }: HostedTagBuilderProps) {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(properties[0] || null);
   const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
   const [showKeyId, setShowKeyId] = useState(false);
@@ -65,19 +67,38 @@ function HostedTagBuilder({ properties, apiKeys, projectId }: HostedTagBuilderPr
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [copiedGtm, setCopiedGtm] = useState(false);
 
-  // Auto-select the first API key for the selected property
+  // Handle preselection from URL params
   useEffect(() => {
-    if (selectedProperty && apiKeys.length > 0) {
-      const propertyApiKey = apiKeys.find(key => key.property_id === selectedProperty.id);
-      setSelectedApiKey(propertyApiKey || apiKeys[0]);
+    if (preselectedKeyId && apiKeys.length > 0) {
+      const keyToSelect = apiKeys.find(key => key.id === preselectedKeyId);
+      if (keyToSelect) {
+        setSelectedApiKey(keyToSelect);
+      }
     }
-  }, [selectedProperty, apiKeys]);
+  }, [preselectedKeyId, apiKeys]);
+
+  useEffect(() => {
+    if (preselectedPropertyId && properties.length > 0) {
+      const propertyToSelect = properties.find(prop => prop.id.toString() === preselectedPropertyId);
+      if (propertyToSelect) {
+        setSelectedProperty(propertyToSelect);
+      }
+    }
+  }, [preselectedPropertyId, properties]);
+
+  // Auto-select the first API key for the selected property (only if not preselected)
+  useEffect(() => {
+    if (selectedProperty && apiKeys.length > 0 && !preselectedKeyId) {
+      // Since API keys are now project-scoped, just select the first one
+      setSelectedApiKey(apiKeys[0]);
+    }
+  }, [selectedProperty, apiKeys, preselectedKeyId]);
 
   const generateSnippet = () => {
     if (!selectedProperty || !selectedApiKey) return '';
     
     return `<script async src="https://api.optiview.ai/v1/tag.js"
-  data-key-id="${selectedApiKey.key_id}"
+  data-key-id="${selectedApiKey.id}"
   data-project-id="${projectId}"
   data-property-id="${selectedProperty.id}"
   data-clicks="${config.clicks ? '1' : '0'}"
@@ -91,7 +112,7 @@ function HostedTagBuilder({ properties, apiKeys, projectId }: HostedTagBuilderPr
     
     return `<!-- Use as Custom HTML tag; trigger on All Pages -->
 <script async src="https://api.optiview.ai/v1/tag.js"
-  data-key-id="${selectedApiKey.key_id}"
+  data-key-id="${selectedApiKey.id}"
   data-project-id="${projectId}"
   data-property-id="${selectedProperty.id}"
   data-clicks="${config.clicks ? '1' : '0'}"
@@ -105,7 +126,7 @@ function HostedTagBuilder({ properties, apiKeys, projectId }: HostedTagBuilderPr
     
     const pageviewCurl = `curl -X POST "https://api.optiview.ai/api/events" \\
   -H "Content-Type: application/json" \\
-  -H "x-optiview-key-id: ${selectedApiKey.key_id}" \\
+  -H "x-optiview-key-id: ${selectedApiKey.id}" \\
   -d '{
     "project_id": "${projectId}",
     "property_id": ${selectedProperty.id},
@@ -122,7 +143,7 @@ function HostedTagBuilder({ properties, apiKeys, projectId }: HostedTagBuilderPr
 
     const conversionCurl = `curl -X POST "https://api.optiview.ai/api/conversions" \\
   -H "Content-Type: application/json" \\
-  -H "x-optiview-key-id: ${selectedApiKey.key_id}" \\
+  -H "x-optiview-key-id: ${selectedApiKey.id}" \\
   -d '{
     "project_id": "${projectId}",
     "property_id": ${selectedProperty.id},
@@ -197,7 +218,7 @@ function HostedTagBuilder({ properties, apiKeys, projectId }: HostedTagBuilderPr
           <div className="relative">
             <select
               value={selectedApiKey?.id || ''}
-              onChange={(e) => setSelectedApiKey(apiKeys.find(k => k.id === parseInt(e.target.value)) || null)}
+              onChange={(e) => setSelectedApiKey(apiKeys.find(k => k.id === e.target.value) || null)}
               className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             >
               {apiKeys.map((apiKey) => (
@@ -215,7 +236,7 @@ function HostedTagBuilder({ properties, apiKeys, projectId }: HostedTagBuilderPr
           </div>
           {showKeyId && selectedApiKey && (
             <div className="mt-1 text-xs text-gray-600 font-mono">
-              Key ID: {selectedApiKey.key_id}
+              Key ID: {selectedApiKey.id}
             </div>
           )}
         </div>
@@ -882,6 +903,7 @@ curl -X POST ${API_BASE}/api/events \\
 
 export default function Install() {
   const { project } = useAuth();
+  const location = useLocation();
   const [properties, setProperties] = useState<Property[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
@@ -889,6 +911,11 @@ export default function Install() {
     project_id: project?.id || "",
     domain: ""
   });
+
+  // Parse URL parameters for preselection
+  const urlParams = new URLSearchParams(location.search);
+  const preselectedKeyId = urlParams.get('key_id');
+  const preselectedPropertyId = urlParams.get('property_id');
 
   useEffect(() => {
     if (project?.id) {
@@ -1031,6 +1058,8 @@ export default function Install() {
             properties={properties}
             apiKeys={apiKeys}
             projectId={project?.id || ""}
+            preselectedKeyId={preselectedKeyId || undefined}
+            preselectedPropertyId={preselectedPropertyId || undefined}
           />
         </Card>
 

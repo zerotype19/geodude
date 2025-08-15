@@ -1,0 +1,6 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { CheckCircle, ArrowRight } from 'lucide-react';
+import MaskedKey from './MaskedKey';
+export default function ApiKeySuccessPanel({ keyId, keyName, projectId, onGoToInstall, className = "" }) {
+    return (_jsx("div", { className: `bg-green-50 border border-green-200 rounded-lg p-4 ${className}`, children: _jsxs("div", { className: "flex items-start space-x-3", children: [_jsx(CheckCircle, { className: "text-green-600 mt-0.5 flex-shrink-0", size: 20 }), _jsxs("div", { className: "flex-1 min-w-0", children: [_jsx("h3", { className: "text-sm font-medium text-green-800 mb-2", children: "API Key created" }), _jsxs("div", { className: "space-y-3", children: [_jsxs("div", { children: [_jsx("label", { className: "block text-xs font-medium text-green-700 mb-1", children: "Key ID:" }), _jsx(MaskedKey, { value: keyId, className: "text-green-800" })] }), _jsx("div", { className: "flex flex-wrap gap-2", children: _jsxs("button", { onClick: onGoToInstall, className: "inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors", children: [_jsx(ArrowRight, { size: 14 }), _jsx("span", { children: "Go to Install" })] }) })] })] })] }) }));
+}

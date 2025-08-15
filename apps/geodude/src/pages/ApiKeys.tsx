@@ -1,9 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import KeyRotationModal from "../components/KeyRotationModal";
-import { RotateCcw, Trash2, AlertTriangle, Clock, CheckCircle, XCircle } from "lucide-react";
+import CreateApiKeyModal from "../components/CreateApiKeyModal";
+import MaskedKey from "../components/MaskedKey";
+import ApiKeySuccessPanel from "../components/ApiKeySuccessPanel";
+import { ToastContainer, ToastData } from "../components/Toast";
+import { RotateCcw, Trash2, AlertTriangle, Clock, CheckCircle, XCircle, Plus } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 interface ApiKey {
@@ -14,6 +19,11 @@ interface ApiKey {
   last_used_at: string | null;
   revoked_at: string | null;
   grace_expires_at: string | null;
+}
+
+interface KeyWithHighlight extends ApiKey {
+  isHighlighted?: boolean;
+  showSuccessPanel?: boolean;
 }
 
 function getKeyStatus(key: ApiKey) {
@@ -64,18 +74,41 @@ function formatDate(dateString: string) {
 
 export default function ApiKeys() {
   const { project } = useAuth();
-  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const navigate = useNavigate();
+  const [keys, setKeys] = useState<KeyWithHighlight[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rotationModal, setRotationModal] = useState<{ isOpen: boolean; keyId: string; keyName: string } | null>(null);
-  const [newKey, setNewKey] = useState({ name: "" });
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [toasts, setToasts] = useState<ToastData[]>([]);
+  const newKeyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (project?.id) {
       loadKeys();
     }
   }, [project]);
+
+  // Toast management
+  const addToast = (message: string, type: 'success' | 'error' | 'info') => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, message, type }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
+  // Listen for toast events from MaskedKey component
+  useEffect(() => {
+    const handleToastEvent = (event: any) => {
+      addToast(event.detail.message, event.detail.type);
+    };
+
+    window.addEventListener('show-toast', handleToastEvent);
+    return () => window.removeEventListener('show-toast', handleToastEvent);
+  }, []);
 
   async function loadKeys() {
     if (!project?.id) return;
@@ -98,37 +131,80 @@ export default function ApiKeys() {
     }
   }
 
-  async function createApiKey() {
-    if (!project?.id || !newKey.name) return;
+  const createApiKey = async (formData: { name: string; note?: string }) => {
+    if (!project?.id) return;
 
+    setIsCreating(true);
     try {
-      setLoading(true);
-
       const response = await fetch(`${API_BASE}/api/keys`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_id: project.id,
-          name: newKey.name
+          // Combine name and note if note exists
+          name: formData.note ? `${formData.name} (${formData.note})` : formData.name
         })
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        alert(`API Key created! Key ID: ${data.id}\n\n⚠️ Use this Key ID in your hosted tag implementation.`);
-        setNewKey({ name: "" });
-        setShowCreateForm(false);
-        await loadKeys();
-      } else {
-        console.error("Failed to create API key");
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      const newKey = await response.json();
+      
+      // Close modal
+      setShowCreateModal(false);
+      
+      // Add new key to the top of the list with highlight and success panel
+      setKeys(prev => [{
+        ...newKey,
+        isHighlighted: true,
+        showSuccessPanel: true
+      }, ...prev.map(k => ({ ...k, isHighlighted: false, showSuccessPanel: false }))]);
+
+      // Show success toast
+      addToast('API Key created. Click "Reveal" to view the Key ID.', 'success');
+
+      // Scroll to new key after a brief delay
+      setTimeout(() => {
+        newKeyRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 100);
+
+      // Remove highlight after 3 seconds
+      setTimeout(() => {
+        setKeys(prev => prev.map(k => ({ 
+          ...k, 
+          isHighlighted: false 
+        })));
+      }, 3000);
+
+      // Remove success panel after 10 seconds
+      setTimeout(() => {
+        setKeys(prev => prev.map(k => ({ 
+          ...k, 
+          showSuccessPanel: false 
+        })));
+      }, 10000);
+
     } catch (error) {
       console.error("Error creating API key:", error);
+      throw error; // Re-throw so modal can show error
     } finally {
-      setLoading(false);
+      setIsCreating(false);
     }
-  }
+  };
+
+  const handleGoToInstall = (keyId: string) => {
+    const params = new URLSearchParams({
+      key_id: keyId,
+      project_id: project?.id || ''
+    });
+    navigate(`/install?${params.toString()}`);
+  };
 
   async function handleRotate(keyId: string, immediate: boolean) {
     try {
@@ -218,106 +294,62 @@ export default function ApiKeys() {
               Manage your API keys for data ingestion
             </p>
           </div>
-          {keys.length > 0 && (
-            <button
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-            >
-              Create New Key
-            </button>
-          )}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+          >
+            <Plus size={20} />
+            <span>New API Key</span>
+          </button>
         </div>
 
         {keys.length === 0 ? (
           <Card title="No API Keys">
             <div className="text-center py-8">
               <p className="text-gray-500 mb-6">No API keys found. Create your first key to start collecting data.</p>
-
-              {/* Create API Key Form */}
-              <div className="max-w-md mx-auto">
-                <div className="space-y-4">
-
-
-                  <div>
-                    <label htmlFor="key-name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Key Name
-                    </label>
-                    <input
-                      id="key-name"
-                      type="text"
-                      placeholder="Production Key"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      value={newKey.name || ""}
-                      onChange={(e) => setNewKey({ ...newKey, name: e.target.value })}
-                    />
-                  </div>
-
-                  <button
-                    onClick={createApiKey}
-                    disabled={!project?.id || !newKey.name}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                  >
-                    Create API Key
-                  </button>
-                </div>
-              </div>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+              >
+                <Plus size={20} />
+                <span>Create Your First API Key</span>
+              </button>
             </div>
           </Card>
         ) : (
           <div className="space-y-6">
-            {/* Create Form for existing keys */}
-            {showCreateForm && (
-              <Card title="Create New API Key">
-                <div className="p-6">
-                  <div className="max-w-md">
-                    <div className="space-y-4">
-                      <div>
-                        <label htmlFor="new-key-name" className="block text-sm font-medium text-gray-700 mb-1">
-                          Key Name
-                        </label>
-                        <input
-                          id="new-key-name"
-                          type="text"
-                          placeholder="Production Key"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          value={newKey.name || ""}
-                          onChange={(e) => setNewKey({ ...newKey, name: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={createApiKey}
-                          disabled={!project?.id || !newKey.name}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                        >
-                          Create API Key
-                        </button>
-                        <button
-                          onClick={() => setShowCreateForm(false)}
-                          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
-            
-            {keys.map((key) => {
+            {keys.map((key, index) => {
               const status = getKeyStatus(key);
               const graceCountdown = getGraceCountdown(key);
+              const isFirstKey = index === 0;
 
               return (
-                <Card key={key.id} title={`${key.name} (${key.id})`}>
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Key ID</p>
-                        <p className="text-sm text-gray-900 font-mono">{key.id}</p>
+                <div 
+                  key={key.id}
+                  ref={isFirstKey && key.isHighlighted ? newKeyRef : null}
+                  className={`transition-all duration-500 ${
+                    key.isHighlighted ? 'ring-2 ring-blue-400 ring-opacity-75 shadow-lg' : ''
+                  }`}
+                >
+                  <Card title={key.name}>
+                    {/* Success Panel */}
+                    {key.showSuccessPanel && (
+                      <div className="p-4 border-b">
+                        <ApiKeySuccessPanel
+                          keyId={key.id}
+                          keyName={key.name}
+                          projectId={project?.id || ''}
+                          onGoToInstall={() => handleGoToInstall(key.id)}
+                        />
                       </div>
+                    )}
+
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Key ID</p>
+                          <MaskedKey value={key.id} className="mt-1" />
+                        </div>
 
                       <div>
                         <p className="text-sm font-medium text-gray-500">Status</p>
@@ -387,10 +419,19 @@ export default function ApiKeys() {
                     </div>
                   </div>
                 </Card>
+              </div>
               );
             })}
           </div>
         )}
+
+        {/* Create API Key Modal */}
+        <CreateApiKeyModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={createApiKey}
+          isLoading={isCreating}
+        />
 
         {/* Rotation Modal */}
         {rotationModal && (
@@ -402,6 +443,14 @@ export default function ApiKeys() {
             onRotate={handleRotate}
           />
         )}
+
+
+
+        {/* Toast Container */}
+        <ToastContainer
+          toasts={toasts}
+          onRemove={removeToast}
+        />
       </div>
     </Shell>
   );
