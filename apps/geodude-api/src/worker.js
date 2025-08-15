@@ -179,6 +179,75 @@ export default {
         }
       };
 
+      // Helper function to classify AI source from referrer using KV rules manifest
+      const classifyAISource = async (referrer, env) => {
+        if (!referrer) return null;
+
+        try {
+          // Get rules manifest from KV
+          const manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
+          if (!manifest || !manifest.sources) {
+            // Fallback to hardcoded rules if manifest not available
+            return classifyAISourceFallback(referrer);
+          }
+
+          const url = new URL(referrer.toLowerCase());
+          const hostname = url.hostname;
+          const pathname = url.pathname;
+          const search = url.search;
+
+          // Try to match each source in the manifest
+          for (const [slug, rules] of Object.entries(manifest.sources)) {
+            if (!rules.referrer_domains) continue;
+
+            // Check if hostname matches any of the referrer domains
+            const domainMatch = rules.referrer_domains.some(domain => {
+              return hostname === domain.toLowerCase() || hostname.endsWith('.' + domain.toLowerCase());
+            });
+
+            if (domainMatch) {
+              // If path_hints are specified, check if any are present in the URL
+              if (rules.path_hints && rules.path_hints.length > 0) {
+                const pathMatch = rules.path_hints.some(hint => {
+                  return pathname.includes(hint.toLowerCase()) || search.includes(hint.toLowerCase());
+                });
+                if (!pathMatch) continue;
+              }
+
+              // Get the AI source ID for this slug
+              const sourceResult = await d1.prepare(`
+                SELECT id FROM ai_sources WHERE slug = ? AND is_active = 1
+              `).bind(slug).first();
+
+              if (sourceResult) {
+                return sourceResult.id;
+              }
+            }
+          }
+
+          return null;
+        } catch (error) {
+          console.error('classifyAISource error:', error);
+          // Fallback to hardcoded rules on error
+          return classifyAISourceFallback(referrer);
+        }
+      };
+
+      // Fallback classifier with hardcoded rules
+      const classifyAISourceFallback = (referrer) => {
+        const referer = referrer.toLowerCase();
+        if (referer.includes('chat.openai.com') || referer.includes('chatgpt.com')) {
+          return 10; // ChatGPT
+        } else if (referer.includes('claude.ai')) {
+          return 11; // Claude
+        } else if (referer.includes('perplexity.ai')) {
+          return 12; // Perplexity
+        } else if (referer.includes('gemini.google.com') || referer.includes('bard.google.com')) {
+          return 13; // Gemini
+        }
+        return null;
+      };
+
       // Helper function to check rate limits
       const checkRateLimit = async (key, limit, windowMs) => {
         const now = Date.now();
@@ -3892,19 +3961,10 @@ export default {
                 continue; // Skip invalid events instead of failing the whole batch
               }
 
-              // Classify AI source from metadata
+              // Classify AI source from metadata using KV rules manifest
               let aiSourceId = null;
               if (metadata && metadata.referrer) {
-                const referer = metadata.referrer.toLowerCase();
-                if (referer.includes('chat.openai.com') || referer.includes('openai.com')) {
-                  aiSourceId = 10; // ChatGPT
-                } else if (referer.includes('claude.ai') || referer.includes('anthropic.com')) {
-                  aiSourceId = 11; // Claude
-                } else if (referer.includes('perplexity.ai')) {
-                  aiSourceId = 12; // Perplexity
-                } else if (referer.includes('gemini.google.com') || referer.includes('google.com')) {
-                  aiSourceId = 13; // Gemini
-                }
+                aiSourceId = await classifyAISource(metadata.referrer, env);
               }
 
               // Simple content mapping
@@ -4025,21 +4085,10 @@ export default {
               }
             }
 
-            // Classify AI source from metadata
+            // Classify AI source from metadata using KV rules manifest
             let aiSourceId = null;
             if (metadata && metadata.r) {
-              const referer = metadata.r.toLowerCase();
-
-              // Simple classification logic - can be enhanced later
-              if (referer.includes('chat.openai.com') || referer.includes('openai.com')) {
-                aiSourceId = 10; // ChatGPT
-              } else if (referer.includes('claude.ai') || referer.includes('anthropic.com')) {
-                aiSourceId = 11; // Claude
-              } else if (referer.includes('perplexity.ai')) {
-                aiSourceId = 12; // Perplexity
-              } else if (referer.includes('gemini.google.com') || referer.includes('google.com')) {
-                aiSourceId = 13; // Gemini
-              }
+              aiSourceId = await classifyAISource(metadata.r, env);
             }
 
             // Simple content mapping - just use existing content assets for now
