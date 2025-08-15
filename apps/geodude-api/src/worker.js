@@ -3830,6 +3830,110 @@ export default {
         }
       }
 
+      // POST /api/sources/enable - Enable a source for a project
+      if (url.pathname === "/api/sources/enable" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const body = await request.json();
+          const { project_id, ai_source_id, notes, suggested_pattern_json } = body;
+
+          if (!project_id || !ai_source_id) {
+            const response = new Response(JSON.stringify({ error: "project_id and ai_source_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user has access to this project
+          const accessCheck = await d1.prepare(`
+            SELECT COUNT(*) as count 
+            FROM org_member om
+            JOIN project p ON p.org_id = om.org_id
+            WHERE om.user_id = ? AND p.id = ?
+          `).bind(sessionData.user_id, project_id).first();
+
+          if (!accessCheck || accessCheck.count === 0) {
+            const response = new Response(JSON.stringify({ error: "Access denied to this project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify ai_source exists and is active
+          const sourceCheck = await d1.prepare(`
+            SELECT id FROM ai_sources WHERE id = ? AND is_active = 1
+          `).bind(ai_source_id).first();
+
+          if (!sourceCheck) {
+            const response = new Response(JSON.stringify({ error: "AI source not found or inactive" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Upsert project_ai_sources with enabled=1
+          await d1.prepare(`
+            INSERT INTO project_ai_sources (project_id, ai_source_id, enabled, notes, suggested_pattern_json, updated_at)
+            VALUES (?, ?, 1, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(project_id, ai_source_id) DO UPDATE SET
+              enabled = 1,
+              notes = excluded.notes,
+              suggested_pattern_json = excluded.suggested_pattern_json,
+              updated_at = excluded.updated_at
+          `).bind(project_id, ai_source_id, notes || null, suggested_pattern_json ? JSON.stringify(suggested_pattern_json) : null).run();
+
+          const response = new Response(JSON.stringify({ 
+            success: true,
+            message: "AI source enabled successfully" 
+          }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (error) {
+          console.error("Enable source error:", error);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // DELETE /api/sources/enable - Disable a source for a project
       if (url.pathname === "/api/sources/enable" && request.method === "DELETE") {
         try {
