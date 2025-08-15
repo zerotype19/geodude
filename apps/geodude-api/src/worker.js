@@ -1471,7 +1471,7 @@ export default {
       if (url.pathname === "/v1/tag.js" && request.method === "GET") {
         try {
           const debug = url.searchParams.get("debug") === "1";
-          
+
           // Generate the hosted tag runtime
           const generateRuntime = (debug = false) => {
             const runtime = `${debug ? '// Optiview Analytics Hosted Tag v1.0 (Debug Build)\n' : ''}(function() {
@@ -1716,7 +1716,7 @@ export default {
     }
   });
 })();`;
-            
+
             // Return minified version unless debug mode
             if (debug) {
               return runtime;
@@ -1730,30 +1730,30 @@ export default {
                 .trim();
             }
           };
-          
+
           const jsContent = generateRuntime(debug);
-          
+
           // Generate ETag
           const encoder = new TextEncoder();
           const data = encoder.encode(jsContent);
           const hashBuffer = await crypto.subtle.digest('SHA-256', data);
           const hashArray = Array.from(new Uint8Array(hashBuffer));
           const etag = '"' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('') + '"';
-          
+
           // Check If-None-Match header
           const ifNoneMatch = request.headers.get('if-none-match');
           if (ifNoneMatch === etag) {
-            const response = new Response(null, { 
+            const response = new Response(null, {
               status: 304,
-            headers: {
+              headers: {
                 'ETag': etag,
                 'Cache-Control': 'public, max-age=3600, s-maxage=86400',
                 'Vary': 'Accept-Encoding'
-            }
-          });
-          return addCorsHeaders(response, origin);
+              }
+            });
+            return addCorsHeaders(response, origin);
           }
-          
+
           // Record metrics: tag served
           try {
             await d1.prepare(`
@@ -1767,11 +1767,11 @@ export default {
               new Date().toISOString(),
               new Date().toISOString()
             ).run();
-        } catch (e) {
+          } catch (e) {
             // Metrics recording failed, but don't break the main flow
             console.warn("Failed to record tag served metric:", e);
           }
-          
+
           const response = new Response(jsContent, {
             headers: {
               'Content-Type': 'application/javascript; charset=utf-8',
@@ -1785,7 +1785,7 @@ export default {
 
         } catch (e) {
           console.error("Hosted tag generation error:", e);
-          const response = new Response("// Hosted tag error", { 
+          const response = new Response("// Hosted tag error", {
             status: 500,
             headers: { 'Content-Type': 'application/javascript; charset=utf-8' }
           });
@@ -1995,21 +1995,46 @@ export default {
           const keys = await d1.prepare(`
             SELECT 
               ak.id,
-              ak.id as key_id,
               ak.name,
-              ak.project_id,
               ak.created_ts,
               ak.last_used_ts,
               ak.revoked_ts,
-              p.domain,
-              p.id as property_id
+              ak.grace_hash,
+              ak.grace_expires_ts
             FROM api_key ak
-            LEFT JOIN property p ON p.project_id = ak.project_id
             WHERE ak.project_id = ?
             ORDER BY ak.created_ts DESC
           `).bind(projectId).all();
 
-          const response = new Response(JSON.stringify({ keys: keys.results }), {
+          // Transform keys to match API contract
+          const transformedKeys = (keys.results || []).map(key => {
+            const now = Math.floor(Date.now() / 1000);
+            
+            // Determine status based on the specification
+            let status;
+            if (key.revoked_ts) {
+              status = 'revoked';
+            } else if (key.grace_hash && key.grace_expires_ts && key.grace_expires_ts > now) {
+              status = 'grace';
+            } else {
+              status = 'active';
+            }
+
+            // Convert timestamps to ISO strings
+            const toISOString = (ts) => ts ? new Date(ts * 1000).toISOString() : null;
+
+            return {
+              id: key.id,
+              name: key.name,
+              status: status,
+              created_at: toISOString(key.created_ts),
+              last_used_at: toISOString(key.last_used_ts),
+              revoked_at: toISOString(key.revoked_ts),
+              grace_expires_at: toISOString(key.grace_expires_ts)
+            };
+          });
+
+          const response = new Response(JSON.stringify(transformedKeys), {
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
@@ -2058,7 +2083,7 @@ export default {
           }
 
           const body = await request.json();
-          const { name, project_id, property_id } = body;
+          const { name, project_id } = body;
 
           if (!name || !project_id) {
             const response = new Response(JSON.stringify({ error: "Name and project_id are required" }), {
@@ -2084,11 +2109,10 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // Generate API key ID and secret
+          // Generate API key ID and placeholder secret hash
           const keyId = `key_${generateToken().substring(0, 12)}`;
-          const secret = generateToken();
-          const secretHash = await hashToken(secret);
-          const now = Date.now();
+          const placeholderHash = await hashToken(generateToken()); // Placeholder secret
+          const nowTs = Math.floor(Date.now() / 1000);
 
           // Get org_id from project
           const projectData = await d1.prepare(`
@@ -2107,16 +2131,17 @@ export default {
           await d1.prepare(`
             INSERT INTO api_key (id, project_id, org_id, name, hash, created_ts)
             VALUES (?, ?, ?, ?, ?, ?)
-          `).bind(keyId, project_id, projectData.org_id, name, secretHash, now).run();
+          `).bind(keyId, project_id, projectData.org_id, name, placeholderHash, nowTs).run();
 
+          // Return response matching the specification
           const response = new Response(JSON.stringify({
             id: keyId,
-            key_id: keyId,
-            secret_once: secret, // Show only once
             name: name,
-            project_id: project_id,
-            property_id: property_id || null,
-            created_at: now
+            status: "active",
+            created_at: new Date(nowTs * 1000).toISOString(),
+            last_used_at: null,
+            revoked_at: null,
+            grace_expires_at: null
           }), {
             headers: { "Content-Type": "application/json" }
           });
@@ -2125,6 +2150,174 @@ export default {
         } catch (e) {
           console.error("Create API key error:", e);
           const response = new Response(JSON.stringify({ error: "Failed to create API key" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // API Key Rotate endpoint
+      if (url.pathname.match(/^\/api\/keys\/[^\/]+\/rotate$/) && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Extract key ID from URL
+          const keyId = url.pathname.split('/')[3];
+
+          // Get the API key and verify access
+          const keyData = await d1.prepare(`
+            SELECT ak.id, ak.project_id, ak.hash, ak.revoked_ts
+            FROM api_key ak
+            JOIN project p ON p.id = ak.project_id
+            JOIN org_member om ON om.org_id = p.org_id
+            WHERE ak.id = ? AND om.user_id = ?
+          `).bind(keyId, sessionData.user_id).first();
+
+          if (!keyData) {
+            const response = new Response(JSON.stringify({ error: "API key not found or access denied" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          if (keyData.revoked_ts) {
+            const response = new Response(JSON.stringify({ error: "Cannot rotate revoked key" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rotate the key: move current hash to grace_hash, generate new hash
+          const newHash = await hashToken(generateToken());
+          const nowTs = Math.floor(Date.now() / 1000);
+          const graceExpiresTs = nowTs + (24 * 60 * 60); // 24 hours
+
+          await d1.prepare(`
+            UPDATE api_key 
+            SET hash = ?, grace_hash = ?, grace_expires_ts = ?
+            WHERE id = ?
+          `).bind(newHash, keyData.hash, graceExpiresTs, keyId).run();
+
+          const response = new Response(JSON.stringify({
+            ok: true,
+            grace_expires_at: new Date(graceExpiresTs * 1000).toISOString()
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Rotate API key error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to rotate API key" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // API Key Revoke endpoint
+      if (url.pathname.match(/^\/api\/keys\/[^\/]+\/revoke$/) && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+          `).bind(sessionId, new Date().toISOString()).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Extract key ID from URL
+          const keyId = url.pathname.split('/')[3];
+
+          // Get the API key and verify access
+          const keyData = await d1.prepare(`
+            SELECT ak.id, ak.project_id
+            FROM api_key ak
+            JOIN project p ON p.id = ak.project_id
+            JOIN org_member om ON om.org_id = p.org_id
+            WHERE ak.id = ? AND om.user_id = ?
+          `).bind(keyId, sessionData.user_id).first();
+
+          if (!keyData) {
+            const response = new Response(JSON.stringify({ error: "API key not found or access denied" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Revoke the key
+          const nowTs = Math.floor(Date.now() / 1000);
+          await d1.prepare(`
+            UPDATE api_key SET revoked_ts = ? WHERE id = ?
+          `).bind(nowTs, keyId).run();
+
+          const response = new Response(JSON.stringify({
+            ok: true
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Revoke API key error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to revoke API key" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
@@ -3847,7 +4040,7 @@ export default {
           const sortSql = (() => {
             switch (sort) {
               case "conversions_desc": return "conversions DESC, last_seen DESC";
-              case "last_seen_desc": 
+              case "last_seen_desc":
               default: return "last_seen DESC, conversions DESC";
             }
           })();
@@ -4443,7 +4636,7 @@ export default {
           for (const row of summaryResult.results || []) {
             const sourceQuery = `SELECT slug, name FROM ai_sources WHERE id = ?`;
             const sourceResult = await d1.prepare(sourceQuery).bind(row.ai_source_id).first();
-            
+
             if (sourceResult) {
               bySource.push({
                 slug: sourceResult.slug,
@@ -4633,7 +4826,7 @@ export default {
               case "conversions_desc": return "conversions DESC, conv_rate DESC";
               case "referrals_desc": return "referrals DESC, conv_rate DESC";
               case "last_conversion_desc": return "last_conversion DESC, conv_rate DESC";
-              case "conv_rate_desc": 
+              case "conv_rate_desc":
               default: return "conv_rate DESC, conversions DESC";
             }
           })();
@@ -4749,8 +4942,8 @@ export default {
 
           // Process items (TTC percentiles removed for performance)
           const processedItems = items.results?.map(item => ({
-              ...item,
-              conv_rate: Math.round(item.conv_rate * 100) / 100,
+            ...item,
+            conv_rate: Math.round(item.conv_rate * 100) / 100,
             p50_ttc_min: 0,  // Moved to detail endpoint for performance
             p90_ttc_min: 0   // Moved to detail endpoint for performance
           })) || [];
@@ -4882,7 +5075,7 @@ export default {
           // Get content info
           const contentQuery = `SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?`;
           const contentResult = await d1.prepare(contentQuery).bind(content_id, project_id).first();
-          
+
           if (!contentResult) {
             const response = new Response(JSON.stringify({ error: "Content not found" }), {
               status: 404,
@@ -4894,7 +5087,7 @@ export default {
           // Get source info
           const sourceQuery = `SELECT id, slug, name FROM ai_sources WHERE slug = ?`;
           const sourceResult = await d1.prepare(sourceQuery).bind(source).first();
-          
+
           if (!sourceResult) {
             const response = new Response(JSON.stringify({ error: "Source not found" }), {
               status: 400,
@@ -5198,7 +5391,7 @@ export default {
           `;
 
           const r1Results = await d1.prepare(r1Query).bind(project_id, sinceISO).all();
-          
+
           for (const r1 of r1Results.results || []) {
             // Check if other sources have referrals
             const otherSourcesQuery = `
@@ -5209,7 +5402,7 @@ export default {
             `;
             const otherSourcesResult = await d1.prepare(otherSourcesQuery).bind(project_id, sinceISO).first();
             const hasOtherTraffic = (otherSourcesResult?.total_refs || 0) > 0;
-            
+
             recommendations.push({
               rec_id: `R1:${r1.slug}`,
               type: "R1",
@@ -5272,7 +5465,7 @@ export default {
           `;
 
           const r2Results = await d1.prepare(r2Query).bind(project_id, sinceISO, minReferrals, minConvRate).all();
-          
+
           for (const r2 of r2Results.results || []) {
             const convRate = r2.conversions / r2.referrals;
             recommendations.push({
@@ -5281,7 +5474,7 @@ export default {
               severity: "high",
               title: "High AI referrals but weak conversions",
               description: `${r2.source_name} sends traffic to ${new URL(r2.url).pathname}, but conversion rate is ${Math.round(convRate * 1000) / 10}% (threshold ${minConvRate * 100}%).`,
-              impact_score: Math.min(100, Math.round(r2.referrals/2 + (1 - convRate)*100)),
+              impact_score: Math.min(100, Math.round(r2.referrals / 2 + (1 - convRate) * 100)),
               effort: "medium",
               status: "open",
               evidence: {
@@ -5327,7 +5520,7 @@ export default {
           `;
 
           const r3Results = await d1.prepare(r3Query).bind(project_id, sinceISO, minDirect).all();
-          
+
           for (const r3 of r3Results.results || []) {
             recommendations.push({
               rec_id: `R3:${r3.content_id}`,
@@ -5335,7 +5528,7 @@ export default {
               severity: "medium",
               title: "Strong direct traffic but zero AI referrals",
               description: `${new URL(r3.url).pathname} has ${r3.direct_cnt} direct visits but 0 AI referrals in the last ${window}.`,
-              impact_score: Math.min(80, Math.round(r3.direct_cnt/2)),
+              impact_score: Math.min(80, Math.round(r3.direct_cnt / 2)),
               effort: "medium",
               status: "open",
               evidence: {
@@ -5391,7 +5584,7 @@ export default {
           `;
 
           const r4Results = await d1.prepare(r4Query).bind(project_id, sinceISO, slowTtcMin).all();
-          
+
           for (const r4 of r4Results.results || []) {
             recommendations.push({
               rec_id: `R4:${r4.content_id}:${r4.source_slug}`,
@@ -5426,7 +5619,7 @@ export default {
           `;
 
           const r5Result = await d1.prepare(r5Query).bind(project_id).first();
-          
+
           if (r5Result?.pending_count > 0) {
             recommendations.push({
               rec_id: "R5:rules_suggestions_pending",
@@ -5487,7 +5680,7 @@ export default {
           }
           if (q) {
             const query = q.toLowerCase();
-            recommendations = recommendations.filter(rec => 
+            recommendations = recommendations.filter(rec =>
               rec.title.toLowerCase().includes(query) ||
               rec.description.toLowerCase().includes(query) ||
               (rec.evidence.url && rec.evidence.url.toLowerCase().includes(query)) ||
@@ -5498,7 +5691,7 @@ export default {
           // Apply sorting
           const validSorts = ["impact_desc", "severity_desc", "type_asc", "url_asc"];
           const actualSort = validSorts.includes(sort) ? sort : "impact_desc";
-          
+
           recommendations.sort((a, b) => {
             switch (actualSort) {
               case "impact_desc":
@@ -6223,10 +6416,10 @@ export default {
               ${propertyId ? 'AND property_id = ?' : ''}
             GROUP BY event_type, traffic_class
           `;
-          
+
           const recentEventsParams = [projectId, fifteenMinutesAgo];
           if (propertyId) recentEventsParams.push(propertyId);
-          
+
           const recentEvents = await d1.prepare(recentEventsQuery).bind(...recentEventsParams).all();
 
           // Get the last event timestamp
@@ -6237,10 +6430,10 @@ export default {
             ORDER BY occurred_at DESC 
             LIMIT 1
           `;
-          
+
           const lastEventParams = [projectId];
           if (propertyId) lastEventParams.push(propertyId);
-          
+
           const lastEvent = await d1.prepare(lastEventQuery).bind(...lastEventParams).first();
 
           // Count total events in last 15 minutes
@@ -6250,18 +6443,18 @@ export default {
               AND occurred_at >= ?
               ${propertyId ? 'AND property_id = ?' : ''}
           `;
-          
+
           const totalEventsParams = [projectId, fifteenMinutesAgo];
           if (propertyId) totalEventsParams.push(propertyId);
-          
+
           const totalEvents = await d1.prepare(totalEventsQuery).bind(...totalEventsParams).first();
 
           // Aggregate traffic class counts
           const byClass = {
             direct_human: 0,
-              human_via_ai: 0,
-              ai_agent_crawl: 0,
-              unknown_ai_like: 0
+            human_via_ai: 0,
+            ai_agent_crawl: 0,
+            unknown_ai_like: 0
           };
 
           for (const event of recentEvents.results || []) {
