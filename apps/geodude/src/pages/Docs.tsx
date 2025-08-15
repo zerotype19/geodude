@@ -12,41 +12,100 @@ interface DocPage {
 const docs: DocPage[] = [
   {
     id: 'install-js',
-    title: 'Install / JS Tag',
+    title: 'Install / Hosted Tag',
     path: '/docs/install/js',
-    content: `# JavaScript Tag Installation
+    content: `# Hosted Tag Installation
 
 ## Quick Start
 
 Add this script tag to your HTML \\<head\\> section:
 
 \`\`\`html
-<script src="{{PUBLIC_BASE_URL}}/v1/tag.js?pid=YOUR_PROPERTY_ID&kid=YOUR_KEY_ID"></script>
+<script async src="https://api.optiview.ai/v1/tag.js"
+  data-key-id="YOUR_KEY_ID"
+  data-project-id="YOUR_PROJECT_ID"
+  data-property-id="YOUR_PROPERTY_ID"
+  data-clicks="1"
+  data-spa="1"
+  data-batch-size="10"
+  data-flush-ms="3000"></script>
 \`\`\`
 
-## Parameters
+## Required Attributes
 
-- \`pid\`: Your property ID from the dashboard
-- \`kid\`: Your API key ID from the dashboard
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| \`data-key-id\` | Your API Key ID | \`ak_abc123\` |
+| \`data-project-id\` | Your project identifier | \`prj_xyz789\` |
+| \`data-property-id\` | Numeric property ID | \`123\` |
+
+## Optional Configuration
+
+| Attribute | Description | Default | Valid Values |
+|-----------|-------------|---------|--------------|
+| \`data-clicks\` | Enable click tracking | \`1\` | \`0\` or \`1\` |
+| \`data-spa\` | Enable SPA route tracking | \`1\` | \`0\` or \`1\` |
+| \`data-batch-size\` | Events per batch | \`10\` | \`1\` to \`50\` |
+| \`data-flush-ms\` | Flush interval (ms) | \`3000\` | \`500\` to \`10000\` |
 
 ## Automatic Tracking
 
-The tag automatically tracks:
-- Page views
-- Referrer information
-- User agent patterns
-- AI traffic classification
+The hosted tag automatically tracks:
+- **Page views**: On initial load and SPA navigation
+- **Click events**: Links, buttons, and interactive elements
+- **Referrer information**: Source page tracking
+- **User agent patterns**: For AI traffic classification
+- **Event batching**: Efficient network usage
 
-## Custom Events
+## Public API
 
-Track custom events:
-
+### Page Views
 \`\`\`javascript
-// Track a custom event
-window.optiview?.track('purchase', {
-  value: 99.99,
-  currency: 'USD'
+// Manual page view tracking
+window.optiview.page();
+\`\`\`
+
+### Custom Events
+\`\`\`javascript
+// Track custom events
+window.optiview.track('custom_event', {
+  category: 'engagement',
+  action: 'video_play',
+  label: 'product_demo'
 });
+\`\`\`
+
+### Conversions
+\`\`\`javascript
+// Track conversions
+window.optiview.conversion({
+  amount_cents: 1299,
+  currency: 'USD',
+  metadata: {
+    order_id: 'order-123',
+    product: 'premium_plan'
+  }
+});
+\`\`\`
+
+## Excluding Elements
+
+To exclude elements from click tracking, add the \`data-optiview="ignore"\` attribute:
+
+\`\`\`html
+<button data-optiview="ignore">Not tracked</button>
+<a href="/admin" data-optiview="ignore">Admin link</a>
+\`\`\`
+
+## Google Tag Manager
+
+For GTM users, create a **Custom HTML** tag with trigger **All Pages**:
+
+\`\`\`html
+<script async src="https://api.optiview.ai/v1/tag.js"
+  data-key-id="{{YOUR_KEY_ID}}"
+  data-project-id="{{YOUR_PROJECT_ID}}"
+  data-property-id="{{YOUR_PROPERTY_ID}}"></script>
 \`\`\`
 
 ## Configuration
