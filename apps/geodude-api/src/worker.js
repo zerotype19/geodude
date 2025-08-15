@@ -1639,17 +1639,17 @@ export default {
       
       fetch(apiBase + '/api/conversions', {
         method: 'POST',
-        headers: {
+      headers: {
           'Content-Type': 'application/json',
           'x-optiview-key-id': keyId
-        },
+      },
         body: JSON.stringify(payload)
       }).catch(function() {
-        // Silent fail for analytics
-      });
-    } catch (e) {
       // Silent fail for analytics
-    }
+    });
+    } catch (e) {
+    // Silent fail for analytics
+  }
   };
   
   // Initialize tracking
@@ -1745,13 +1745,13 @@ export default {
           if (ifNoneMatch === etag) {
             const response = new Response(null, { 
               status: 304,
-              headers: {
+            headers: {
                 'ETag': etag,
                 'Cache-Control': 'public, max-age=3600, s-maxage=86400',
                 'Vary': 'Accept-Encoding'
-              }
-            });
-            return addCorsHeaders(response, origin);
+            }
+          });
+          return addCorsHeaders(response, origin);
           }
           
           // Record metrics: tag served
@@ -1767,7 +1767,7 @@ export default {
               new Date().toISOString(),
               new Date().toISOString()
             ).run();
-          } catch (e) {
+        } catch (e) {
             // Metrics recording failed, but don't break the main flow
             console.warn("Failed to record tag served metric:", e);
           }
@@ -2001,8 +2001,6 @@ export default {
               ak.created_ts,
               ak.last_used_ts,
               ak.revoked_ts,
-              ak.grace_secret_hash,
-              ak.grace_expires_at,
               p.domain,
               p.id as property_id
             FROM api_key ak
@@ -3849,7 +3847,7 @@ export default {
           const sortSql = (() => {
             switch (sort) {
               case "conversions_desc": return "conversions DESC, last_seen DESC";
-              case "last_seen_desc":
+              case "last_seen_desc": 
               default: return "last_seen DESC, conversions DESC";
             }
           })();
@@ -4445,7 +4443,7 @@ export default {
           for (const row of summaryResult.results || []) {
             const sourceQuery = `SELECT slug, name FROM ai_sources WHERE id = ?`;
             const sourceResult = await d1.prepare(sourceQuery).bind(row.ai_source_id).first();
-
+            
             if (sourceResult) {
               bySource.push({
                 slug: sourceResult.slug,
@@ -4635,7 +4633,7 @@ export default {
               case "conversions_desc": return "conversions DESC, conv_rate DESC";
               case "referrals_desc": return "referrals DESC, conv_rate DESC";
               case "last_conversion_desc": return "last_conversion DESC, conv_rate DESC";
-              case "conv_rate_desc":
+              case "conv_rate_desc": 
               default: return "conv_rate DESC, conversions DESC";
             }
           })();
@@ -4680,34 +4678,34 @@ export default {
                 AND ce.occurred_at >= p.since
             ),
             attributed AS (
-              SELECT
+              SELECT 
                 c.content_id,
                 c.attributed_source_id,
                 COUNT(*) AS conversions,
                 MAX(c.occurred_at) AS last_conversion
-              FROM convs c
-              WHERE c.attributed_source_id IS NOT NULL
-              GROUP BY c.content_id, c.attributed_source_id
-            ),
-            funnel_data AS (
-              SELECT
-                r.project_id,
-                r.content_id,
-                r.ai_source_id,
-                r.referrals,
+               FROM convs c
+               WHERE c.attributed_source_id IS NOT NULL
+               GROUP BY c.content_id, c.attributed_source_id
+             ),
+             funnel_data AS (
+               SELECT 
+                 r.project_id,
+                 r.content_id,
+                 r.ai_source_id,
+                 r.referrals,
                 COALESCE(a.conversions, 0) AS conversions,
-                CASE 
-                  WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
-                  ELSE 0
+                 CASE 
+                   WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
+                   ELSE 0 
                 END AS conv_rate,
-                r.last_referral,
+                 r.last_referral,
                 a.last_conversion
-              FROM refs r
+               FROM refs r
               LEFT JOIN attributed a
                 ON r.content_id = a.content_id AND r.ai_source_id = a.attributed_source_id
-            ),
-            with_urls AS (
-              SELECT 
+             ),
+             with_urls AS (
+               SELECT 
                 f.project_id,
                 f.content_id,
                 f.ai_source_id,
@@ -4716,29 +4714,29 @@ export default {
                 f.conv_rate,
                 f.last_referral,
                 f.last_conversion,
-                ca.url,
+                 ca.url,
                 s.slug AS source_slug,
                 s.name AS source_name
-              FROM funnel_data f
-              JOIN content_assets ca ON f.content_id = ca.id
+               FROM funnel_data f
+               JOIN content_assets ca ON f.content_id = ca.id
               JOIN ai_sources s ON f.ai_source_id = s.id
-              WHERE f.project_id = ? AND f.last_referral >= ?
+               WHERE f.project_id = ? AND f.last_referral >= ?
                 ${source ? 'AND s.slug = ?' : ''}
-                ${q ? 'AND ca.url LIKE ?' : ''}
-            )
-            SELECT 
-              content_id,
-              url,
-              source_slug,
-              source_name,
-              referrals,
-              conversions,
-              conv_rate,
-              last_referral,
+                 ${q ? 'AND ca.url LIKE ?' : ''}
+             )
+             SELECT 
+               content_id,
+               url,
+               source_slug,
+               source_name,
+               referrals,
+               conversions,
+               conv_rate,
+               last_referral,
               last_conversion
-            FROM with_urls
-            ORDER BY ${sortSql}
-            LIMIT ? OFFSET ?
+             FROM with_urls
+             ORDER BY ${sortSql}
+             LIMIT ? OFFSET ?
            `;
 
           // Build bind parameters
@@ -4751,8 +4749,8 @@ export default {
 
           // Process items (TTC percentiles removed for performance)
           const processedItems = items.results?.map(item => ({
-            ...item,
-            conv_rate: Math.round(item.conv_rate * 100) / 100,
+              ...item,
+              conv_rate: Math.round(item.conv_rate * 100) / 100,
             p50_ttc_min: 0,  // Moved to detail endpoint for performance
             p90_ttc_min: 0   // Moved to detail endpoint for performance
           })) || [];
@@ -4775,12 +4773,12 @@ export default {
               GROUP BY ar.project_id, ar.content_id, ar.ai_source_id
             )
             SELECT COUNT(*) AS total
-            FROM refs r
+              FROM refs r
             JOIN content_assets ca ON r.content_id = ca.id
             JOIN ai_sources s ON r.ai_source_id = s.id
             WHERE r.project_id = ? AND r.last_referral >= ?
               ${source ? 'AND s.slug = ?' : ''}
-              ${q ? 'AND ca.url LIKE ?' : ''}
+                ${q ? 'AND ca.url LIKE ?' : ''}
           `;
 
           const countBind = [project_id, sinceISO, project_id, sinceISO];
@@ -4884,7 +4882,7 @@ export default {
           // Get content info
           const contentQuery = `SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?`;
           const contentResult = await d1.prepare(contentQuery).bind(content_id, project_id).first();
-
+          
           if (!contentResult) {
             const response = new Response(JSON.stringify({ error: "Content not found" }), {
               status: 404,
@@ -4896,7 +4894,7 @@ export default {
           // Get source info
           const sourceQuery = `SELECT id, slug, name FROM ai_sources WHERE slug = ?`;
           const sourceResult = await d1.prepare(sourceQuery).bind(source).first();
-
+          
           if (!sourceResult) {
             const response = new Response(JSON.stringify({ error: "Source not found" }), {
               status: 400,
@@ -6261,9 +6259,9 @@ export default {
           // Aggregate traffic class counts
           const byClass = {
             direct_human: 0,
-            human_via_ai: 0,
-            ai_agent_crawl: 0,
-            unknown_ai_like: 0
+              human_via_ai: 0,
+              ai_agent_crawl: 0,
+              unknown_ai_like: 0
           };
 
           for (const event of recentEvents.results || []) {
