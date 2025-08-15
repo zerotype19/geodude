@@ -3708,6 +3708,69 @@ export default {
         return addCorsHeaders(response, origin);
       }
 
+      // 6.0) API Key validation endpoint (for debugging)
+      if (url.pathname === "/api/events/validate-key" && request.method === "POST") {
+        try {
+          const keyId = request.headers.get('x-optiview-key-id');
+          if (!keyId) {
+            const response = new Response(JSON.stringify({ 
+              valid: false, 
+              error: "Missing x-optiview-key-id header",
+              debug: { hasHeader: false }
+            }), {
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const keyHash = await hashToken(keyId);
+          const apiKey = await d1.prepare(`
+            SELECT id, project_id, name, created_ts, last_used_ts, revoked_ts FROM api_key 
+            WHERE hash = ? AND revoked_ts IS NULL
+          `).bind(keyHash).first();
+
+          if (!apiKey) {
+            const response = new Response(JSON.stringify({ 
+              valid: false, 
+              error: "Invalid API key",
+              debug: { 
+                keyIdPrefix: keyId.substring(0, 8) + '...', 
+                keyIdLength: keyId.length,
+                hashLength: keyHash.length 
+              }
+            }), {
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const response = new Response(JSON.stringify({ 
+            valid: true, 
+            project_id: apiKey.project_id,
+            key_name: apiKey.name,
+            debug: { 
+              keyIdPrefix: keyId.substring(0, 8) + '...', 
+              keyIdLength: keyId.length 
+            }
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error('Key validation error:', e);
+          const response = new Response(JSON.stringify({ 
+            valid: false, 
+            error: "Validation failed",
+            debug: { exception: e.message }
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // 6.1) Events POST endpoint (for JS tag) - Batched format
       if (url.pathname === "/api/events" && request.method === "POST") {
         try {
@@ -3745,6 +3808,14 @@ export default {
             `).bind(keyHash).first();
 
             if (!apiKey) {
+              // Debug: Log key validation failure details
+              console.error('API key validation failed:', {
+                keyIdLength: keyId ? keyId.length : 0,
+                keyIdPrefix: keyId ? keyId.substring(0, 8) + '...' : 'null',
+                hashLength: keyHash ? keyHash.length : 0,
+                origin: origin
+              });
+              
               const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
                 status: 401,
                 headers: { "Content-Type": "application/json" }
