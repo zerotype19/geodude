@@ -1,25 +1,30 @@
 {
-  "version": 9,
+  "version": 10,
   "sources": {
     "openai_chatgpt": {
       "referrer_domains": ["chat.openai.com", "chatgpt.com", "shareg.pt", "link.openai.com"],
+      "path_hints": [],
       "ua_contains": ["GPTBot", "ChatGPT-User"]
     },
     "anthropic_claude": {
       "referrer_domains": ["claude.ai", "www.claude.ai"],
+      "path_hints": [],
       "ua_contains": ["ClaudeBot", "Claude-Web"]
     },
     "google_gemini": {
-      "referrer_domains": ["gemini.google.com", "g.co/gemini", "bard.google.com"],
+      "referrer_domains": ["gemini.google.com", "bard.google.com", "g.co/gemini"],
+      "path_hints": [],
       "ua_contains": []
     },
     "perplexity": {
       "referrer_domains": ["perplexity.ai", "www.perplexity.ai", "pplx.ai"],
+      "path_hints": [],
       "ua_contains": ["PerplexityBot"]
     },
     "microsoft_copilot": {
       "referrer_domains": ["copilot.microsoft.com"],
-      "ua_contains": ["bingbot", "BingPreview"]
+      "path_hints": [],
+      "ua_contains": ["BingPreview", "bingbot"]
     },
     "bing_chat": {
       "referrer_domains": ["www.bing.com"],
@@ -28,19 +33,22 @@
     },
     "poe": {
       "referrer_domains": ["poe.com"],
+      "path_hints": [],
       "ua_contains": []
     },
     "you": {
       "referrer_domains": ["you.com", "api.you.com"],
+      "path_hints": [],
       "ua_contains": ["YouBot"]
     },
     "phind": {
       "referrer_domains": ["phind.com", "www.phind.com"],
+      "path_hints": [],
       "ua_contains": ["PhindBot"]
     },
     "duckduckgo_ai": {
-      "referrer_domains": ["duck.ai", "duckduckgo.com"],
-      "path_hints": ["?ia=chat", "ai/chat", "duckassist"],
+      "referrer_domains": ["duckduckgo.com", "duck.ai"],
+      "path_hints": ["ai", "chat", "duckassist", "?ia=chat"],
       "ua_contains": []
     },
     "brave_leo": {
@@ -55,6 +63,7 @@
     },
     "kagi": {
       "referrer_domains": ["kagi.com", "chat.kagi.com"],
+      "path_hints": ["summarize", "fastgpt"],
       "ua_contains": []
     }
   }

@@ -179,50 +179,136 @@ export default {
         }
       };
 
+      // In-memory cache for AI source ID resolution (5-minute TTL)
+      const sourceIdCache = new Map();
+      const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+      // Legacy source name aliases for backward compatibility
+      const legacyAliases = {
+        "OpenAI": "openai_chatgpt",
+        "Anthropic": "anthropic_claude", 
+        "Google": "google_gemini",
+        "Microsoft": "microsoft_copilot",
+        "Perplexity": "perplexity",
+        "DuckDuckGo": "duckduckgo_ai",
+        "Brave": "brave_leo"
+      };
+
+      // Helper function to resolve AI source slug to ID with caching
+      const getSourceId = async (slug) => {
+        if (!slug) return null;
+
+        // Normalize slug (handle legacy aliases)
+        const normalizedSlug = legacyAliases[slug] || slug;
+        
+        // Check cache first
+        const cacheKey = `source_id:${normalizedSlug}`;
+        const cached = sourceIdCache.get(cacheKey);
+        
+        if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+          return cached.id;
+        }
+
+        try {
+          // Fetch from database
+          const result = await d1.prepare(`
+            SELECT id FROM ai_sources WHERE slug = ? AND is_active = 1 LIMIT 1
+          `).bind(normalizedSlug).first();
+
+          const sourceId = result ? result.id : null;
+
+          // Cache the result (including null results to avoid repeated queries)
+          sourceIdCache.set(cacheKey, {
+            id: sourceId,
+            timestamp: Date.now()
+          });
+
+          // Clean up old cache entries periodically (simple LRU)
+          if (sourceIdCache.size > 100) {
+            const cutoff = Date.now() - CACHE_TTL;
+            for (const [key, value] of sourceIdCache.entries()) {
+              if (value.timestamp < cutoff) {
+                sourceIdCache.delete(key);
+              }
+            }
+          }
+
+          return sourceId;
+        } catch (error) {
+          console.error('getSourceId error:', error);
+          return null; // Don't fail ingestion on source resolution errors
+        }
+      };
+
       // Helper function to classify AI source from referrer using KV rules manifest
       const classifyAISource = async (referrer, env) => {
         if (!referrer) return null;
 
         try {
           // Get rules manifest from KV
-          const manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
+          let manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
+          
+          // Back-compat: if rules:manifest is missing, try to load rules:heuristics
           if (!manifest || !manifest.sources) {
-            // Fallback to hardcoded rules if manifest not available
-            return classifyAISourceFallback(referrer);
+            console.log('rules:manifest missing, attempting legacy fallback');
+            const legacyRules = await env.AI_FINGERPRINTS.get("rules:heuristics", "json");
+            if (legacyRules) {
+              manifest = convertLegacyRules(legacyRules);
+              console.log('Converted legacy rules to manifest format');
+            } else {
+              // Final fallback to hardcoded rules
+              return classifyAISourceFallback(referrer);
+            }
           }
 
           const url = new URL(referrer.toLowerCase());
           const hostname = url.hostname;
           const pathname = url.pathname;
           const search = url.search;
+          const fullPath = pathname + search;
 
-          // Try to match each source in the manifest
+          // Find matching sources with improved algorithm
+          const matches = [];
+          
           for (const [slug, rules] of Object.entries(manifest.sources)) {
             if (!rules.referrer_domains) continue;
 
             // Check if hostname matches any of the referrer domains
-            const domainMatch = rules.referrer_domains.some(domain => {
-              return hostname === domain.toLowerCase() || hostname.endsWith('.' + domain.toLowerCase());
+            const domainMatch = rules.referrer_domains.find(domain => {
+              const normalizedDomain = domain.toLowerCase();
+              return hostname === normalizedDomain || hostname.endsWith('.' + normalizedDomain);
             });
 
             if (domainMatch) {
               // If path_hints are specified, check if any are present in the URL
+              let pathScore = 0;
               if (rules.path_hints && rules.path_hints.length > 0) {
                 const pathMatch = rules.path_hints.some(hint => {
-                  return pathname.includes(hint.toLowerCase()) || search.includes(hint.toLowerCase());
+                  return fullPath.includes(hint.toLowerCase());
                 });
-                if (!pathMatch) continue;
+                if (!pathMatch) continue; // Skip if path hints required but not found
+                pathScore = 1; // Boost score for path hint matches
               }
 
-              // Get the AI source ID for this slug
-              const sourceResult = await d1.prepare(`
-                SELECT id FROM ai_sources WHERE slug = ? AND is_active = 1
-              `).bind(slug).first();
-
-              if (sourceResult) {
-                return sourceResult.id;
-              }
+              matches.push({
+                slug,
+                domainLength: domainMatch.length, // Prefer more specific domains
+                pathScore,
+                rules
+              });
             }
+          }
+
+          // Choose best match: prefer path hints, then longest domain
+          if (matches.length > 0) {
+            matches.sort((a, b) => {
+              if (a.pathScore !== b.pathScore) return b.pathScore - a.pathScore;
+              return b.domainLength - a.domainLength;
+            });
+
+            const bestMatch = matches[0];
+            const sourceId = await getSourceId(bestMatch.slug);
+            return sourceId;
           }
 
           return null;
@@ -231,6 +317,38 @@ export default {
           // Fallback to hardcoded rules on error
           return classifyAISourceFallback(referrer);
         }
+      };
+
+      // Convert legacy rules:heuristics format to canonical manifest
+      const convertLegacyRules = (legacyRules) => {
+        const manifest = {
+          version: 0, // Mark as legacy conversion
+          sources: {}
+        };
+
+        // Convert referer_contains rules to manifest format
+        if (legacyRules.heuristics && legacyRules.heuristics.referer_contains) {
+          for (const rule of legacyRules.heuristics.referer_contains) {
+            const slug = legacyAliases[rule.source] || rule.source.toLowerCase().replace(/\s+/g, '_');
+            if (!manifest.sources[slug]) {
+              manifest.sources[slug] = {
+                referrer_domains: [],
+                path_hints: [],
+                ua_contains: []
+              };
+            }
+            
+            // Extract domain from needle
+            if (rule.needle) {
+              const domain = rule.needle.replace(/^https?:\/\//, '').split('/')[0];
+              if (!manifest.sources[slug].referrer_domains.includes(domain)) {
+                manifest.sources[slug].referrer_domains.push(domain);
+              }
+            }
+          }
+        }
+
+        return manifest;
       };
 
       // Fallback classifier with hardcoded rules
@@ -520,6 +638,30 @@ export default {
             WHERE last_referral IS NOT NULL
           `).bind().first();
 
+          // Get AI rules manifest info
+          let manifestInfo;
+          try {
+            const manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
+            const legacyHeuristics = await env.AI_FINGERPRINTS.get("rules:heuristics", "json");
+            const legacySourcesIndex = await env.AI_FINGERPRINTS.get("sources:index", "json");
+            
+            manifestInfo = {
+              version: manifest ? manifest.version : null,
+              sources_count: manifest ? Object.keys(manifest.sources || {}).length : 0,
+              legacy_keys_present: {
+                heuristics: !!legacyHeuristics,
+                sources_index: !!legacySourcesIndex
+              }
+            };
+          } catch (error) {
+            manifestInfo = {
+              version: null,
+              sources_count: 0,
+              legacy_keys_present: { heuristics: false, sources_index: false },
+              error: error.message
+            };
+          }
+
           // Get recommendations metrics for admin health
           const recommendationsOpen7d = await d1.prepare(`
             WITH recs AS (
@@ -589,7 +731,8 @@ export default {
               magic_links_consumed_5m: 0
             },
             sources: {
-              rules_suggestions_pending: pendingSuggestions?.count || 0
+              rules_suggestions_pending: pendingSuggestions?.count || 0,
+              manifest: manifestInfo
             },
             content: {
               assets_total: contentAssetsTotal?.count || 0,
@@ -642,7 +785,8 @@ export default {
             error: "Failed to query database",
             message: error.message,
             sources: {
-              rules_suggestions_pending: 0
+              rules_suggestions_pending: 0,
+              manifest: { version: null, sources_count: 0, legacy_keys_present: { heuristics: false, sources_index: false }, error: "Health check failed" }
             },
             content: {
               assets_total: 0,

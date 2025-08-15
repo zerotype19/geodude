@@ -1,11 +1,12 @@
-// Test specific problematic referrers
+// Test reconciled classifier
 const testReferrers = [
+  'https://chat.openai.com/',
   'https://copilot.microsoft.com/',
-  'https://chat.kagi.com/',
+  'https://www.bing.com/chat?q=test', // Should match bing_chat due to path hint
 ];
 
 const testClassification = async () => {
-  console.log('Testing specific problematic referrers...\n');
+  console.log('Testing reconciled AI classifier...\n');
   
   for (const referrer of testReferrers) {
     try {
@@ -21,9 +22,9 @@ const testClassification = async () => {
           events: [{
             event_type: 'pageview',
             metadata: {
-              url: 'https://rhythm90.io/test-fix',
+              url: 'https://rhythm90.io/test-reconciled',
               referrer: referrer,
-              title: `Test fix for ${new URL(referrer).hostname}`,
+              title: `Test reconciled from ${new URL(referrer).hostname}`,
               user_agent: 'Test-Agent/1.0'
             },
             occurred_at: new Date().toISOString()
