@@ -436,7 +436,7 @@ export default {
             SELECT AVG((julianday(occurred_at) - julianday(last_referral)) * 24 * 60) as avg_p50_ttc_min
             FROM last_touch
             WHERE last_referral IS NOT NULL
-          `).first();
+          `).bind().first();
 
           // Get recommendations metrics for admin health
           const recommendationsOpen7d = await d1.prepare(`
@@ -483,7 +483,7 @@ export default {
             )
             SELECT 
               (SELECT r1_count FROM recs) + (SELECT r2_count FROM r2) as open_estimate
-          `).first();
+          `).bind().first();
 
           const response = new Response(JSON.stringify({
             status: "healthy",
