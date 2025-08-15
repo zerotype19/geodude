@@ -2150,9 +2150,9 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // Generate API key ID and placeholder secret hash
+          // Generate API key ID and hash the key ID itself
           const keyId = `key_${generateToken().substring(0, 12)}`;
-          const placeholderHash = await hashToken(generateToken()); // Placeholder secret
+          const keyHash = await hashToken(keyId); // Hash the key ID for storage
           const nowTs = Math.floor(Date.now() / 1000);
 
           // Get org_id from project
@@ -2172,7 +2172,7 @@ export default {
           await d1.prepare(`
             INSERT INTO api_key (id, project_id, org_id, name, hash, created_ts)
             VALUES (?, ?, ?, ?, ?, ?)
-          `).bind(keyId, project_id, projectData.org_id, name, placeholderHash, nowTs).run();
+          `).bind(keyId, project_id, projectData.org_id, name, keyHash, nowTs).run();
 
           // Return response matching the specification
           const response = new Response(JSON.stringify({
