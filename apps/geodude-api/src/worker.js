@@ -4131,8 +4131,8 @@ export default {
               SELECT ? AS pid, ? AS since
             )
             SELECT 
-              (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND ar.detected_at >= p.since) as referrals,
-              (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND ce.occurred_at >= p.since) as conversions
+              (SELECT COUNT(*) FROM ai_referrals ar, params p WHERE ar.project_id = p.pid AND ar.detected_at >= p.since) referrals,
+              (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND ce.occurred_at >= p.since) conversions
           `;
 
           const totalsResult = await d1.prepare(totalsQuery).bind(project_id, sinceISO).first();
@@ -4395,7 +4395,7 @@ export default {
                 c.content_id,
                 c.attributed_source_id,
                 COUNT(*) conversions,
-                MAX(c.occurred_at) as last_conversion,
+                MAX(c.occurred_at) last_conversion,
                 GROUP_CONCAT(
                   (julianday(c.occurred_at) - julianday(
                     (SELECT ar.detected_at
@@ -4433,8 +4433,8 @@ export default {
                SELECT 
                  f.*,
                  ca.url,
-                 ais.slug as source_slug,
-                 ais.name as source_name
+                 ais.slug source_slug,
+                 ais.name source_name
                FROM funnel_data f
                JOIN content_assets ca ON f.content_id = ca.id
                JOIN ai_sources ais ON f.ai_source_id = ais.id
