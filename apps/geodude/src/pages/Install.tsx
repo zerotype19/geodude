@@ -926,7 +926,7 @@ export default function Install() {
       const response = await fetch(`${API_BASE}/api/keys?project_id=${project.id}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
-        setApiKeys(data);
+        setApiKeys(data.keys || []);
       }
     } catch (error) {
       console.error("Error loading API keys:", error);

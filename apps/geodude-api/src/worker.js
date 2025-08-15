@@ -2051,7 +2051,7 @@ export default {
             };
           });
 
-          const response = new Response(JSON.stringify(transformedKeys), {
+          const response = new Response(JSON.stringify({ keys: transformedKeys }), {
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
