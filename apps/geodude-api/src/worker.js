@@ -166,6 +166,19 @@ export default {
         return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
       };
 
+      // Helper function to increment counter in KV store
+      const incrementCounter = async (kv, key, ttlSeconds = 300) => {
+        try {
+          const current = await kv.get(key);
+          const count = current ? parseInt(current) + 1 : 1;
+          await kv.put(key, count.toString(), { expirationTtl: ttlSeconds });
+          return count;
+        } catch (error) {
+          console.error('incrementCounter error:', error);
+          return 1; // Return 1 on error to allow operation to continue
+        }
+      };
+
       // Helper function to check rate limits
       const checkRateLimit = async (key, limit, windowMs) => {
         const now = Date.now();
@@ -3869,8 +3882,13 @@ export default {
             for (const event of events) {
               const { event_type, metadata, occurred_at } = event;
 
-              // Validate event_type
-              if (!['pageview', 'click', 'custom'].includes(event_type)) {
+              // Validate and normalize event_type
+              let normalizedEventType = event_type;
+              if (event_type === 'pageview') {
+                normalizedEventType = 'view'; // Database expects 'view' not 'pageview'
+              }
+              
+              if (!['view', 'click', 'custom'].includes(normalizedEventType)) {
                 continue; // Skip invalid events instead of failing the whole batch
               }
 
@@ -3914,7 +3932,7 @@ export default {
                   property_id,
                   contentId,
                   aiSourceId,
-                  event_type,
+                  normalizedEventType,
                   JSON.stringify(metadata || {}),
                   occurred_at || now
                 ).run();
@@ -3922,7 +3940,7 @@ export default {
                 insertResults.push(result);
 
                 // If this is AI traffic with content_id, also insert into ai_referrals
-                if (aiSourceId && contentId && event_type === 'pageview') {
+                if (aiSourceId && contentId && (event_type === 'pageview' || normalizedEventType === 'view')) {
                   await d1.prepare(`
                     INSERT INTO ai_referrals (project_id, content_id, ai_source_id, detected_at)
                     VALUES (?, ?, ?, ?)
