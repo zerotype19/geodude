@@ -1477,8 +1477,21 @@ export default {
             const runtime = `${debug ? '// Optiview Analytics Hosted Tag v1.0 (Debug Build)\n' : ''}(function() {
   var optiview = window.optiview = window.optiview || {};
   
-  // BEGIN apiBase detection (robust)
-  var defaultBase = "https://api.optiview.ai";
+  // BEGIN apiBase detection (minifier-safe)
+  // Safe string builders to prevent naive minifier issues
+  var SL = String.fromCharCode(47);           
+  var S2 = SL + SL;                           
+  var COLON = String.fromCharCode(58);        
+  function joinProtoHost(proto, host) {       
+    return proto + COLON + S2 + host;
+  }
+  
+  // Default endpoint components
+  var DEFAULT_HOST = "api.optiview.ai";
+  var DEFAULT_PROTO = "https";
+  var defaultBase = joinProtoHost(DEFAULT_PROTO, DEFAULT_HOST);
+  
+  // Robust apiBase detection
   var apiBase = defaultBase;
   
   // Allow explicit override via data-endpoint (optional attr)
@@ -1491,13 +1504,14 @@ export default {
                 (function(s){ return s && s[s.length-1] ? s[s.length-1].src : ""; })(document.getElementsByTagName("script"));
       if (src) {
         var u = new URL(src, location.href);
-        apiBase = u.protocol + "//" + u.host;
+        apiBase = joinProtoHost(u.protocol.replace(COLON,""), u.host);
       }
     } catch (e) { /* keep defaultBase */ }
   }
   
-  // Final sanity: require protocol + //
-  if (!/^https?:\/\/[^\/]+$/.test(apiBase)) { apiBase = defaultBase; }
+  // Final sanity: require protocol and double slash
+  var protocolPattern = new RegExp("^https?" + COLON + S2 + "[^" + SL + "]+$", "i");
+  if (!protocolPattern.test(apiBase)) { apiBase = defaultBase; }
   // END apiBase detection
   
   ${debug ? 'try { console.debug("[optiview] apiBase =", apiBase); } catch(e){}' : ''}
@@ -1740,6 +1754,12 @@ export default {
           };
 
           const jsContent = generateRuntime(debug);
+
+          // Basic integration check: verify generated code structure
+          if (!jsContent || !jsContent.includes('(function()') || !jsContent.includes('})();')) {
+            console.error('Tag runtime generation failed - invalid structure');
+            return new Response('Tag generation failed: invalid structure', { status: 500 });
+          }
 
           // Generate ETag
           const encoder = new TextEncoder();
