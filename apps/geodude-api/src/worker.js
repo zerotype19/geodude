@@ -2020,8 +2020,25 @@ export default {
               status = 'active';
             }
 
-            // Convert timestamps to ISO strings
-            const toISOString = (ts) => ts ? new Date(ts * 1000).toISOString() : null;
+            // Convert timestamps to ISO strings (handle both seconds and milliseconds)
+            const toISOString = (ts) => {
+              if (!ts) return null;
+              
+              // If timestamp is > 1e12, it's likely already in milliseconds
+              // If timestamp is < 1e12, it's likely in seconds
+              const msTimestamp = ts > 1e12 ? ts : ts * 1000;
+              
+              // Sanity check: if year would be > 3000, there's corrupted data
+              if (msTimestamp > new Date('3000-01-01').getTime()) {
+                return null;
+              }
+              
+              try {
+                return new Date(msTimestamp).toISOString();
+              } catch (e) {
+                return null;
+              }
+            };
 
             return {
               id: key.id,
