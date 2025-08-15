@@ -4626,19 +4626,7 @@ export default {
             ),
             attributed AS (
               SELECT 
-                COUNT(*) conversions,
-                GROUP_CONCAT(
-                  (julianday(c.occurred_at) - julianday(
-                    (SELECT ar.detected_at
-                     FROM ai_referrals ar, params p
-                     WHERE ar.project_id = c.project_id
-                       AND ar.content_id = c.content_id
-                       AND ar.detected_at <= c.occurred_at
-                       AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
-                     ORDER BY ar.detected_at DESC
-                     LIMIT 1)
-                   ) * 24 * 60
-                ) ttc_minutes
+                COUNT(*) AS conversions
                FROM convs c
                WHERE c.attributed_source_id = ?
              )
@@ -4648,8 +4636,7 @@ export default {
                CASE 
                  WHEN r.referrals > 0 THEN CAST(a.conversions AS REAL) / r.referrals
                  ELSE 0 
-               END conv_rate,
-               a.ttc_minutes
+               END conv_rate
              FROM refs r
              LEFT JOIN attributed a ON 1=1
            `;
@@ -4658,18 +4645,9 @@ export default {
             project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
           ).first();
 
-          // Calculate TTC percentiles
+          // TTC percentiles placeholder (implement later if needed)
           let p50_ttc_min = 0;
           let p90_ttc_min = 0;
-
-          if (summaryResult?.ttc_minutes) {
-            const ttcArray = summaryResult.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
-            if (ttcArray.length > 0) {
-              ttcArray.sort((a, b) => a - b);
-              p50_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.5)];
-              p90_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.9)];
-            }
-          }
 
           // Get timeseries data
           let timeseriesQuery;
