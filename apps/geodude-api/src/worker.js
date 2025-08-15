@@ -4454,36 +4454,23 @@ export default {
                 ar.project_id,
                 ar.content_id,
                 ar.ai_source_id,
-                COUNT(*) as referrals
+                COUNT(*) AS referrals,
+                MAX(ar.detected_at) AS last_referral
               FROM ai_referrals ar, params p
               WHERE ar.project_id = p.pid
                 AND ar.detected_at >= p.since
               GROUP BY ar.project_id, ar.content_id, ar.ai_source_id
-            ),
-            funnel_data AS (
-              SELECT 
-                r.project_id,
-                r.content_id,
-                r.ai_source_id
-              FROM refs r
-            ),
-            with_urls AS (
-              SELECT 
-                f.*,
-                ca.url,
-                ais.slug as source_slug
-              FROM funnel_data f
-              JOIN content_assets ca ON f.content_id = ca.id
-              JOIN ai_sources ais ON f.ai_source_id = ais.id
-              WHERE f.project_id = ? AND f.last_referral >= ?
-                ${source ? 'AND ais.slug = ?' : ''}
-                ${q ? 'AND ca.url LIKE ?' : ''}
             )
-            SELECT COUNT(*) as total
-            FROM with_urls
+            SELECT COUNT(*) AS total
+            FROM refs r
+            JOIN content_assets ca ON r.content_id = ca.id
+            JOIN ai_sources s ON r.ai_source_id = s.id
+            WHERE r.project_id = ? AND r.last_referral >= ?
+              ${source ? 'AND s.slug = ?' : ''}
+              ${q ? 'AND ca.url LIKE ?' : ''}
           `;
 
-          const countBind = [project_id, sinceISO];
+          const countBind = [project_id, sinceISO, project_id, sinceISO];
           if (source) countBind.push(source);
           if (q) countBind.push(`%${q}%`);
 
