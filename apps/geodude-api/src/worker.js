@@ -1744,9 +1744,9 @@ export default {
               return runtime;
             } else {
               // Basic minification - remove comments, extra whitespace, and console.info
+              // Note: Skip // comment removal as it breaks URLs like https://
               return runtime
                 .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
-                .replace(/\/\/.*$/gm, '') // Remove // comments
                 .replace(/\s+/g, ' ') // Collapse whitespace
                 .replace(/;\s*}/g, ';}') // Remove spaces before closing braces
                 .trim();
@@ -2037,7 +2037,7 @@ export default {
           // Transform keys to match API contract
           const transformedKeys = (keys.results || []).map(key => {
             const now = Math.floor(Date.now() / 1000);
-            
+
             // Determine status based on the specification
             let status;
             if (key.revoked_ts) {
@@ -2051,16 +2051,16 @@ export default {
             // Convert timestamps to ISO strings (handle both seconds and milliseconds)
             const toISOString = (ts) => {
               if (!ts) return null;
-              
+
               // If timestamp is > 1e12, it's likely already in milliseconds
               // If timestamp is < 1e12, it's likely in seconds
               const msTimestamp = ts > 1e12 ? ts : ts * 1000;
-              
+
               // Sanity check: if year would be > 3000, there's corrupted data
               if (msTimestamp > new Date('3000-01-01').getTime()) {
                 return null;
               }
-              
+
               try {
                 return new Date(msTimestamp).toISOString();
               } catch (e) {
@@ -2467,7 +2467,7 @@ export default {
           }));
 
           const response = new Response(JSON.stringify(transformedProperties), {
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
             }
@@ -2570,16 +2570,16 @@ export default {
           try {
             // Remove protocol, path, query, hash - extract hostname only
             let cleanDomain = domain.trim().toLowerCase();
-            
+
             // Remove protocol if present
             cleanDomain = cleanDomain.replace(/^https?:\/\//, '');
-            
+
             // Remove path, query, hash
             cleanDomain = cleanDomain.split('/')[0].split('?')[0].split('#')[0];
-            
+
             // Extract hostname (remove port if present)
             cleanDomain = cleanDomain.split(':')[0];
-            
+
             // Validate hostname format
             if (!cleanDomain || cleanDomain === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(cleanDomain)) {
               const response = new Response(JSON.stringify({ error: "Invalid domain: IPs and localhost not allowed" }), {
@@ -2588,7 +2588,7 @@ export default {
               });
               return addCorsHeaders(response, origin);
             }
-            
+
             // Basic hostname validation (must contain at least one dot for TLD)
             if (!cleanDomain.includes('.') || cleanDomain.startsWith('.') || cleanDomain.endsWith('.')) {
               const response = new Response(JSON.stringify({ error: "Invalid domain format" }), {
@@ -2597,7 +2597,7 @@ export default {
               });
               return addCorsHeaders(response, origin);
             }
-            
+
             normalizedDomain = cleanDomain;
           } catch (e) {
             const response = new Response(JSON.stringify({ error: "Invalid domain format" }), {
@@ -3713,8 +3713,8 @@ export default {
         try {
           const keyId = request.headers.get('x-optiview-key-id');
           if (!keyId) {
-            const response = new Response(JSON.stringify({ 
-              valid: false, 
+            const response = new Response(JSON.stringify({
+              valid: false,
               error: "Missing x-optiview-key-id header",
               debug: { hasHeader: false }
             }), {
@@ -3730,13 +3730,13 @@ export default {
           `).bind(keyHash).first();
 
           if (!apiKey) {
-            const response = new Response(JSON.stringify({ 
-              valid: false, 
+            const response = new Response(JSON.stringify({
+              valid: false,
               error: "Invalid API key",
-              debug: { 
-                keyIdPrefix: keyId.substring(0, 8) + '...', 
+              debug: {
+                keyIdPrefix: keyId.substring(0, 8) + '...',
                 keyIdLength: keyId.length,
-                hashLength: keyHash.length 
+                hashLength: keyHash.length
               }
             }), {
               headers: { "Content-Type": "application/json" }
@@ -3744,13 +3744,13 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          const response = new Response(JSON.stringify({ 
-            valid: true, 
+          const response = new Response(JSON.stringify({
+            valid: true,
             project_id: apiKey.project_id,
             key_name: apiKey.name,
-            debug: { 
-              keyIdPrefix: keyId.substring(0, 8) + '...', 
-              keyIdLength: keyId.length 
+            debug: {
+              keyIdPrefix: keyId.substring(0, 8) + '...',
+              keyIdLength: keyId.length
             }
           }), {
             headers: { "Content-Type": "application/json" }
@@ -3759,8 +3759,8 @@ export default {
 
         } catch (e) {
           console.error('Key validation error:', e);
-          const response = new Response(JSON.stringify({ 
-            valid: false, 
+          const response = new Response(JSON.stringify({
+            valid: false,
             error: "Validation failed",
             debug: { exception: e.message }
           }), {
@@ -3775,14 +3775,14 @@ export default {
       if (url.pathname === "/api/events" && request.method === "POST") {
         try {
           const body = await request.json();
-          
+
           // Handle both single event and batched event formats
           const isBatch = body.events && Array.isArray(body.events);
-          
+
           if (isBatch) {
             // Batched format from tag runtime
             const { project_id, property_id, events } = body;
-            
+
             // Validate required fields for batch
             if (!project_id || !property_id || !events || !Array.isArray(events)) {
               const response = new Response(JSON.stringify({ error: "Missing required fields for batch: project_id, property_id, events" }), {
@@ -3815,7 +3815,27 @@ export default {
                 hashLength: keyHash ? keyHash.length : 0,
                 origin: origin
               });
-              
+
+              // Debug: Check what API keys exist for this project
+              try {
+                const projectKeys = await d1.prepare(`
+                  SELECT id, name, created_ts FROM api_key 
+                  WHERE project_id = ? AND revoked_ts IS NULL
+                  LIMIT 5
+                `).bind('prj_cTSh3LZ8qMVZ').all();
+
+                console.error('Available API keys for project prj_cTSh3LZ8qMVZ:', {
+                  count: projectKeys.results.length,
+                  keys: projectKeys.results.map(k => ({
+                    id: k.id,
+                    name: k.name,
+                    created: new Date(k.created_ts * 1000).toISOString()
+                  }))
+                });
+              } catch (e) {
+                console.error('Failed to query project API keys:', e.message);
+              }
+
               const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
                 status: 401,
                 headers: { "Content-Type": "application/json" }
@@ -3852,7 +3872,7 @@ export default {
 
             for (const event of events) {
               const { event_type, metadata, occurred_at } = event;
-              
+
               // Validate event_type
               if (!['pageview', 'click', 'custom'].includes(event_type)) {
                 continue; // Skip invalid events instead of failing the whole batch
@@ -3926,10 +3946,10 @@ export default {
             // Increment metrics
             await incrementCounter(env.AI_FINGERPRINTS, 'tag_events_5m', events.length);
 
-            const response = new Response(JSON.stringify({ 
-              success: true, 
+            const response = new Response(JSON.stringify({
+              success: true,
               processed: insertResults.length,
-              total: events.length 
+              total: events.length
             }), {
               status: 200,
               headers: { "Content-Type": "application/json" }
@@ -3964,138 +3984,138 @@ export default {
               SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
             `).bind(keyHash).first();
 
-          if (!apiKey) {
-            const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
-              status: 401,
-              headers: { "Content-Type": "application/json" }
-            });
-            return addCorsHeaders(response, origin);
-          }
-
-          // Determine project_id and validate property_id scope
-          const projectId = apiKey.project_id;
-
-          // Verify property belongs to project (if property_id provided)
-          if (property_id) {
-            const propertyCheck = await d1.prepare(`
-              SELECT id FROM properties WHERE id = ? AND project_id = ?
-            `).bind(property_id, projectId).first();
-
-            if (!propertyCheck) {
-              const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
-                status: 403,
+            if (!apiKey) {
+              const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
+                status: 401,
                 headers: { "Content-Type": "application/json" }
               });
               return addCorsHeaders(response, origin);
             }
-          }
 
-          // Classify AI source from metadata
-          let aiSourceId = null;
-          if (metadata && metadata.r) {
-            const referer = metadata.r.toLowerCase();
+            // Determine project_id and validate property_id scope
+            const projectId = apiKey.project_id;
 
-            // Simple classification logic - can be enhanced later
-            if (referer.includes('chat.openai.com') || referer.includes('openai.com')) {
-              aiSourceId = 10; // ChatGPT
-            } else if (referer.includes('claude.ai') || referer.includes('anthropic.com')) {
-              aiSourceId = 11; // Claude
-            } else if (referer.includes('perplexity.ai')) {
-              aiSourceId = 12; // Perplexity
-            } else if (referer.includes('gemini.google.com') || referer.includes('google.com')) {
-              aiSourceId = 13; // Gemini
+            // Verify property belongs to project (if property_id provided)
+            if (property_id) {
+              const propertyCheck = await d1.prepare(`
+              SELECT id FROM properties WHERE id = ? AND project_id = ?
+            `).bind(property_id, projectId).first();
+
+              if (!propertyCheck) {
+                const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
+                  status: 403,
+                  headers: { "Content-Type": "application/json" }
+                });
+                return addCorsHeaders(response, origin);
+              }
             }
-          }
 
-          // Simple content mapping - just use existing content assets for now
-          let contentId = null;
-          if (metadata && metadata.p) {
-            // Try to find existing content asset by path
-            const existingContent = await d1.prepare(`
+            // Classify AI source from metadata
+            let aiSourceId = null;
+            if (metadata && metadata.r) {
+              const referer = metadata.r.toLowerCase();
+
+              // Simple classification logic - can be enhanced later
+              if (referer.includes('chat.openai.com') || referer.includes('openai.com')) {
+                aiSourceId = 10; // ChatGPT
+              } else if (referer.includes('claude.ai') || referer.includes('anthropic.com')) {
+                aiSourceId = 11; // Claude
+              } else if (referer.includes('perplexity.ai')) {
+                aiSourceId = 12; // Perplexity
+              } else if (referer.includes('gemini.google.com') || referer.includes('google.com')) {
+                aiSourceId = 13; // Gemini
+              }
+            }
+
+            // Simple content mapping - just use existing content assets for now
+            let contentId = null;
+            if (metadata && metadata.p) {
+              // Try to find existing content asset by path
+              const existingContent = await d1.prepare(`
               SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
             `).bind(`%${metadata.p}%`, projectId).first();
 
-            if (existingContent) {
-              contentId = existingContent.id;
+              if (existingContent) {
+                contentId = existingContent.id;
+              }
             }
-          }
 
-          // Store event in interaction_events table
-          const now = new Date().toISOString();
+            // Store event in interaction_events table
+            const now = new Date().toISOString();
 
-          const result = await d1.prepare(`
+            const result = await d1.prepare(`
             INSERT INTO interaction_events (
               project_id, property_id, content_id, ai_source_id, 
               event_type, metadata, occurred_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
           `).bind(
-            projectId,
-            property_id,
-            contentId,
-            aiSourceId,
-            event_type,
-            JSON.stringify(metadata || {}),
-            now
-          ).run();
+              projectId,
+              property_id,
+              contentId,
+              aiSourceId,
+              event_type,
+              JSON.stringify(metadata || {}),
+              now
+            ).run();
 
-          // If this is AI traffic with content_id, also insert into ai_referrals
-          if (aiSourceId && contentId) {
-            try {
-              // Extract ref_url from metadata.r (if present) and sanitize
-              let refUrl = null;
-              if (metadata && metadata.r) {
-                refUrl = metadata.r.substring(0, 512); // Limit to 512 chars
-                // Remove control characters
-                refUrl = refUrl.replace(/[\x00-\x1F\x7F]/g, '');
-              }
-
-              // Prepare metadata for ai_referrals (sanitized & limited)
-              let aiReferralMetadata = null;
-              if (metadata) {
-                const cleanMetadata = { ...metadata };
-                // Remove sensitive fields
-                delete cleanMetadata.ip;
-                delete cleanMetadata.ua;
-                const metadataStr = JSON.stringify(cleanMetadata);
-                if (metadataStr.length <= 512) {
-                  aiReferralMetadata = metadataStr;
+            // If this is AI traffic with content_id, also insert into ai_referrals
+            if (aiSourceId && contentId) {
+              try {
+                // Extract ref_url from metadata.r (if present) and sanitize
+                let refUrl = null;
+                if (metadata && metadata.r) {
+                  refUrl = metadata.r.substring(0, 512); // Limit to 512 chars
+                  // Remove control characters
+                  refUrl = refUrl.replace(/[\x00-\x1F\x7F]/g, '');
                 }
-              }
 
-              await d1.prepare(`
+                // Prepare metadata for ai_referrals (sanitized & limited)
+                let aiReferralMetadata = null;
+                if (metadata) {
+                  const cleanMetadata = { ...metadata };
+                  // Remove sensitive fields
+                  delete cleanMetadata.ip;
+                  delete cleanMetadata.ua;
+                  const metadataStr = JSON.stringify(cleanMetadata);
+                  if (metadataStr.length <= 512) {
+                    aiReferralMetadata = metadataStr;
+                  }
+                }
+
+                await d1.prepare(`
                 INSERT INTO ai_referrals (
                   project_id, ai_source_id, content_id, ref_type, 
                   detected_at, ref_url, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
               `).bind(
-                projectId,
-                aiSourceId,
-                contentId,
-                'assistant', // Default ref_type
-                now,
-                refUrl,
-                aiReferralMetadata
-              ).run();
-            } catch (e) {
-              console.warn("Failed to insert AI referral:", e);
-              // Don't fail the main event insertion
+                  projectId,
+                  aiSourceId,
+                  contentId,
+                  'assistant', // Default ref_type
+                  now,
+                  refUrl,
+                  aiReferralMetadata
+                ).run();
+              } catch (e) {
+                console.warn("Failed to insert AI referral:", e);
+                // Don't fail the main event insertion
+              }
             }
-          }
 
-          // Update last_used timestamp for API key
-          await d1.prepare(`
+            // Update last_used timestamp for API key
+            await d1.prepare(`
             UPDATE api_key SET last_used_ts = ? WHERE id = ?
           `).bind(Date.now(), apiKey.id).run();
 
-          const response = new Response(JSON.stringify({
-            ok: true,
-            id: result.meta.last_row_id,
-            timestamp: now
-          }), {
-            status: 201,
-            headers: { "Content-Type": "application/json" }
-          });
-          return addCorsHeaders(response, origin);
+            const response = new Response(JSON.stringify({
+              ok: true,
+              id: result.meta.last_row_id,
+              timestamp: now
+            }), {
+              status: 201,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
           }
 
         } catch (e) {
