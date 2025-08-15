@@ -3308,7 +3308,7 @@ export default {
               WHERE ai_source_id IS NOT NULL
             )
             SELECT 
-              COUNT(*) as conversions,
+                              COUNT(*) conversions,
               COUNT(CASE WHEN ai_source_id IS NOT NULL THEN 1 END) as ai_attributed,
               COUNT(CASE WHEN ai_source_id IS NULL THEN 1 END) as non_ai,
               COALESCE(SUM(amount_cents), 0) as revenue_cents
@@ -3361,7 +3361,7 @@ export default {
             SELECT 
               ais.slug,
               ais.name,
-              COUNT(*) as conversions,
+                              COUNT(*) conversions,
               COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
             FROM (
               SELECT 
@@ -3385,7 +3385,7 @@ export default {
             SELECT 
               ca.id as content_id,
               ca.url,
-              COUNT(*) as conversions,
+                              COUNT(*) conversions,
               COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
             FROM conversion_event ce
             JOIN content_assets ca ON ce.content_id = ca.id
@@ -3430,7 +3430,7 @@ export default {
             )
             SELECT 
               strftime('%Y-%m-%d', ce.occurred_at) as ts,
-              COUNT(*) as conversions,
+                              COUNT(*) conversions,
               COUNT(CASE WHEN lta.ai_source_id IS NOT NULL THEN 1 END) as ai_attributed,
               COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
             FROM conversion_event ce
@@ -3886,7 +3886,7 @@ export default {
               WHERE ai_source_id IS NOT NULL
             )
             SELECT 
-              COUNT(*) as conversions,
+                              COUNT(*) conversions,
               COALESCE(SUM(ce.amount_cents), 0) as revenue_cents,
               MAX(ce.occurred_at) as last_seen
             FROM conversion_event ce
@@ -3929,7 +3929,7 @@ export default {
             )
             SELECT 
               strftime('%Y-%m-%d', ce.occurred_at) as ts,
-              COUNT(*) as conversions,
+                              COUNT(*) conversions,
               COALESCE(SUM(ce.amount_cents), 0) as revenue_cents
             FROM conversion_event ce
             LEFT JOIN last_touch_attribution lta ON 
@@ -4063,8 +4063,8 @@ export default {
             refs AS (
               SELECT 
                 ar.ai_source_id,
-                COUNT(*) as referrals,
-                MAX(ar.detected_at) as last_referral
+                COUNT(*) referrals,
+                MAX(ar.detected_at) last_referral
               FROM ai_referrals ar, params p
               WHERE ar.project_id = p.pid
                 AND ar.detected_at >= p.since
@@ -4092,7 +4092,7 @@ export default {
             attributed AS (
               SELECT 
                 c.attributed_source_id,
-                COUNT(*) as conversions,
+                COUNT(*) conversions,
                 GROUP_CONCAT(
                   (julianday(c.occurred_at) - julianday(
                     (SELECT ar.detected_at
@@ -4104,7 +4104,7 @@ export default {
                      ORDER BY ar.detected_at DESC
                      LIMIT 1)
                    ) * 24 * 60
-                 ) as ttc_minutes
+                 ) ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id IS NOT NULL
                GROUP BY c.attributed_source_id
@@ -4112,11 +4112,11 @@ export default {
              SELECT 
                r.ai_source_id,
                r.referrals,
-               COALESCE(a.conversions, 0) as conversions,
+               COALESCE(a.conversions, 0) conversions,
                CASE 
                  WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
                  ELSE 0 
-               END as conv_rate,
+               END conv_rate,
                a.ttc_minutes
              FROM refs r
              LEFT JOIN attributed a ON r.ai_source_id = a.attributed_source_id
@@ -4363,8 +4363,8 @@ export default {
                 ar.project_id,
                 ar.content_id,
                 ar.ai_source_id,
-                COUNT(*) as referrals,
-                MAX(ar.detected_at) as last_referral
+                COUNT(*) referrals,
+                MAX(ar.detected_at) last_referral
               FROM ai_referrals ar, params p
               WHERE ar.project_id = p.pid
                 AND ar.detected_at >= p.since
@@ -4394,7 +4394,7 @@ export default {
               SELECT 
                 c.content_id,
                 c.attributed_source_id,
-                COUNT(*) as conversions,
+                COUNT(*) conversions,
                 MAX(c.occurred_at) as last_conversion,
                 GROUP_CONCAT(
                   (julianday(c.occurred_at) - julianday(
@@ -4407,7 +4407,7 @@ export default {
                      ORDER BY ar.detected_at DESC
                      LIMIT 1)
                    ) * 24 * 60
-                 ) as ttc_minutes
+                 ) ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id IS NOT NULL
                GROUP BY c.content_id, c.attributed_source_id
@@ -4418,11 +4418,11 @@ export default {
                  r.content_id,
                  r.ai_source_id,
                  r.referrals,
-                 COALESCE(a.conversions, 0) as conversions,
+                 COALESCE(a.conversions, 0) conversions,
                  CASE 
                    WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
                    ELSE 0 
-                 END as conv_rate,
+                 END conv_rate,
                  r.last_referral,
                  a.last_conversion,
                  a.ttc_minutes
@@ -4683,7 +4683,7 @@ export default {
             ),
             attributed AS (
               SELECT 
-                COUNT(*) as conversions,
+                COUNT(*) conversions,
                 GROUP_CONCAT(
                   (julianday(c.occurred_at) - julianday(
                     (SELECT ar.detected_at
@@ -4695,7 +4695,7 @@ export default {
                      ORDER BY ar.detected_at DESC
                      LIMIT 1)
                    ) * 24 * 60
-                 ) as ttc_minutes
+                 ) ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id = ?
              )
@@ -4705,7 +4705,7 @@ export default {
                CASE 
                  WHEN r.referrals > 0 THEN CAST(a.conversions AS REAL) / r.referrals
                  ELSE 0 
-               END as conv_rate,
+               END conv_rate,
                a.ttc_minutes
              FROM refs r
              LEFT JOIN attributed a ON 1=1
@@ -4956,7 +4956,7 @@ export default {
           // Get totals
           const totals = await d1.prepare(`
             SELECT 
-              COUNT(*) as referrals,
+                              COUNT(*) referrals,
               COUNT(DISTINCT content_id) as contents,
               COUNT(DISTINCT ai_source_id) as sources
             FROM ai_referrals 
