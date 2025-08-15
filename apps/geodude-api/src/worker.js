@@ -438,6 +438,53 @@ export default {
             WHERE last_referral IS NOT NULL
           `).first();
 
+          // Get recommendations metrics for admin health
+          const recommendationsOpen7d = await d1.prepare(`
+            WITH recs AS (
+              -- R1: No-visibility sources
+              SELECT COUNT(*) as r1_count
+              FROM project_ai_sources pas
+              JOIN ai_sources s ON s.id = pas.ai_source_id
+              LEFT JOIN (
+                SELECT ai_source_id, COUNT(*) AS cnt
+                FROM ai_referrals
+                WHERE detected_at >= datetime('now','-7 days')
+                GROUP BY ai_source_id
+              ) r ON r.ai_source_id = pas.ai_source_id
+              WHERE COALESCE(r.cnt, 0) = 0 AND pas.enabled = 1
+            ),
+            r2 AS (
+              -- R2: High referrals, weak conversions (using default threshold 5 referrals, 5% conv rate)
+              SELECT COUNT(*) as r2_count
+              FROM (
+                SELECT r.content_id, r.ai_source_id, r.referrals,
+                       SUM(CASE WHEN c.attributed_source_id = r.ai_source_id THEN 1 ELSE 0 END) AS conversions
+                FROM (
+                  SELECT content_id, ai_source_id, COUNT(*) AS referrals
+                  FROM ai_referrals
+                  WHERE detected_at >= datetime('now','-7 days')
+                  GROUP BY content_id, ai_source_id
+                ) r
+                LEFT JOIN (
+                  SELECT ce.content_id,
+                    (SELECT ar.ai_source_id
+                     FROM ai_referrals ar
+                     WHERE ar.project_id = ce.project_id
+                       AND ar.content_id = ce.content_id
+                       AND ar.detected_at <= ce.occurred_at
+                       AND ar.detected_at >= datetime(ce.occurred_at, '-7 days')
+                     ORDER BY ar.detected_at DESC LIMIT 1) AS attributed_source_id
+                  FROM conversion_event ce
+                  WHERE ce.occurred_at >= datetime('now','-7 days')
+                ) c ON c.content_id = r.content_id
+                GROUP BY r.content_id, r.ai_source_id
+                HAVING r.referrals >= 5 AND (CAST(conversions AS REAL)/r.referrals) < 0.05
+              )
+            )
+            SELECT 
+              (SELECT r1_count FROM recs) + (SELECT r2_count FROM r2) as open_estimate
+          `).first();
+
           const response = new Response(JSON.stringify({
             status: "healthy",
             timestamp: new Date().toISOString(),
@@ -493,6 +540,10 @@ export default {
               referrals_24h: funnelsReferrals24h?.count || 0,
               conversions_24h: funnelsConversions24h?.count || 0,
               avg_p50_ttc_min_24h: funnelsAvgP50TTC24h?.avg_p50_ttc_min || null
+            },
+            recommendations: {
+              open_estimate_7d: recommendationsOpen7d?.open_estimate || 0,
+              pending_rules_suggestions: pendingSuggestions?.count || 0
             }
           }), {
             status: 200,
@@ -4817,6 +4868,543 @@ export default {
           return addCorsHeaders(response, origin);
         }
       }
+
+      // =====================================
+      // RECOMMENDATIONS v1 ENDPOINTS
+      // =====================================
+
+      // 7.1.1) List Recommendations endpoint
+      if (url.pathname === "/api/recommendations" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d", status = "all", severity, type, q, sort = "impact_desc", page = "1", pageSize = "50" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!["15m", "24h", "7d"].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          const now = new Date();
+          let sinceTime;
+          switch (window) {
+            case "15m":
+              sinceTime = new Date(now.getTime() - 15 * 60 * 1000);
+              break;
+            case "24h":
+              sinceTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+              break;
+            case "7d":
+            default:
+              sinceTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+              break;
+          }
+          const sinceISO = sinceTime.toISOString();
+
+          // Get environment thresholds (with defaults)
+          const minReferrals = parseInt(env.RECO_MIN_REFERRALS || "5");
+          const minDirect = parseInt(env.RECO_MIN_DIRECT || "20");
+          const minConvRate = parseFloat(env.RECO_MIN_CONV_RATE || "0.05");
+          const slowTtcMin = parseInt(env.RECO_SLOW_TTC_MIN || "120");
+
+          let recommendations = [];
+
+          // R1: No-visibility source
+          const r1Query = `
+            WITH params AS (SELECT ? AS pid, ? AS since)
+            SELECT s.slug, s.name, 0 AS referrals
+            FROM project_ai_sources pas
+            JOIN ai_sources s ON s.id = pas.ai_source_id
+            LEFT JOIN (
+              SELECT ai_source_id, COUNT(*) AS cnt
+              FROM ai_referrals, params p
+              WHERE project_id = p.pid AND detected_at >= p.since
+              GROUP BY ai_source_id
+            ) r ON r.ai_source_id = pas.ai_source_id
+            WHERE pas.project_id = (SELECT pid FROM params)
+              AND COALESCE(r.cnt, 0) = 0
+              AND pas.enabled = 1;
+          `;
+
+          const r1Results = await d1.prepare(r1Query).bind(project_id, sinceISO).all();
+          
+          for (const r1 of r1Results.results || []) {
+            // Check if other sources have referrals
+            const otherSourcesQuery = `
+              SELECT COUNT(*) AS total_refs
+              FROM ai_referrals ar
+              JOIN project_ai_sources pas ON pas.ai_source_id = ar.ai_source_id
+              WHERE ar.project_id = ? AND ar.detected_at >= ? AND pas.enabled = 1;
+            `;
+            const otherSourcesResult = await d1.prepare(otherSourcesQuery).bind(project_id, sinceISO).first();
+            const hasOtherTraffic = (otherSourcesResult?.total_refs || 0) > 0;
+            
+            recommendations.push({
+              rec_id: `R1:${r1.slug}`,
+              type: "R1",
+              severity: hasOtherTraffic ? "high" : "medium",
+              title: "No AI referrals from enabled source",
+              description: `${r1.name} is enabled but generated 0 referrals in the last ${window}.`,
+              impact_score: hasOtherTraffic ? 60 : 40,
+              effort: "low",
+              status: "open",
+              evidence: {
+                source_slug: r1.slug,
+                source_name: r1.name,
+                window,
+                referrals: 0
+              },
+              links: [
+                { label: "Configure Source", href: `/sources?source=${r1.slug}` },
+                { label: "View Funnels", href: `/funnels?source=${r1.slug}` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
+
+          // R2: High referrals, weak conversions
+          const r2Query = `
+            WITH params AS (SELECT ? AS pid, ? AS since, '-7 days' AS lookback),
+            refs AS (
+              SELECT content_id, ai_source_id, COUNT(*) AS referrals
+              FROM ai_referrals, params p
+              WHERE project_id = p.pid AND detected_at >= p.since
+              GROUP BY content_id, ai_source_id
+            ),
+            convs AS (
+              SELECT ce.id, ce.content_id,
+                (SELECT ar.ai_source_id
+                 FROM ai_referrals ar, params p
+                 WHERE ar.project_id = ce.project_id
+                   AND ar.content_id = ce.content_id
+                   AND ar.detected_at <= ce.occurred_at
+                   AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
+                 ORDER BY ar.detected_at DESC LIMIT 1) AS attributed_source_id
+              FROM conversion_event ce, params p
+              WHERE ce.project_id = p.pid AND ce.occurred_at >= p.since
+            ),
+            agg AS (
+              SELECT r.content_id, r.ai_source_id,
+                     r.referrals,
+                     SUM(CASE WHEN c.attributed_source_id = r.ai_source_id THEN 1 ELSE 0 END) AS conversions
+              FROM refs r
+              LEFT JOIN convs c ON c.content_id = r.content_id
+              GROUP BY r.content_id, r.ai_source_id
+            )
+            SELECT a.content_id, a.ai_source_id, a.referrals, a.conversions,
+                   ca.url, s.slug AS source_slug, s.name AS source_name
+            FROM agg a
+            JOIN content_assets ca ON ca.id = a.content_id
+            JOIN ai_sources s ON s.id = a.ai_source_id
+            WHERE a.referrals >= ? AND (CAST(a.conversions AS REAL)/a.referrals) < ?;
+          `;
+
+          const r2Results = await d1.prepare(r2Query).bind(project_id, sinceISO, minReferrals, minConvRate).all();
+          
+          for (const r2 of r2Results.results || []) {
+            const convRate = r2.conversions / r2.referrals;
+            recommendations.push({
+              rec_id: `R2:${r2.content_id}:${r2.source_slug}`,
+              type: "R2",
+              severity: "high",
+              title: "High AI referrals but weak conversions",
+              description: `${r2.source_name} sends traffic to ${new URL(r2.url).pathname}, but conversion rate is ${Math.round(convRate * 1000) / 10}% (threshold ${minConvRate * 100}%).`,
+              impact_score: Math.min(100, Math.round(r2.referrals/2 + (1 - convRate)*100)),
+              effort: "medium",
+              status: "open",
+              evidence: {
+                url: r2.url,
+                source_slug: r2.source_slug,
+                source_name: r2.source_name,
+                referrals: r2.referrals,
+                conversions: r2.conversions,
+                conv_rate: Math.round(convRate * 1000) / 1000
+              },
+              links: [
+                { label: "Open in Funnels", href: `/funnels?source=${r2.source_slug}&q=${encodeURIComponent(new URL(r2.url).pathname)}` },
+                { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r2.url).pathname)}` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
+
+          // R3: Strong direct traffic, zero AI referrals
+          const r3Query = `
+            WITH params AS (SELECT ? AS pid, ? AS since),
+            directs AS (
+              SELECT content_id, COUNT(*) AS direct_cnt
+              FROM interaction_events, params p
+              WHERE project_id = p.pid
+                AND occurred_at >= p.since
+                AND json_extract(metadata,'$.class') = 'direct_human'
+                AND content_id IS NOT NULL
+              GROUP BY content_id
+            ),
+            refs AS (
+              SELECT content_id, COUNT(*) AS ref_cnt
+              FROM ai_referrals, params p
+              WHERE project_id = p.pid AND detected_at >= p.since
+              GROUP BY content_id
+            )
+            SELECT d.content_id, d.direct_cnt, ca.url
+            FROM directs d
+            LEFT JOIN refs r ON r.content_id = d.content_id
+            JOIN content_assets ca ON ca.id = d.content_id
+            WHERE COALESCE(r.ref_cnt, 0) = 0 AND d.direct_cnt >= ?;
+          `;
+
+          const r3Results = await d1.prepare(r3Query).bind(project_id, sinceISO, minDirect).all();
+          
+          for (const r3 of r3Results.results || []) {
+            recommendations.push({
+              rec_id: `R3:${r3.content_id}`,
+              type: "R3",
+              severity: "medium",
+              title: "Strong direct traffic but zero AI referrals",
+              description: `${new URL(r3.url).pathname} has ${r3.direct_cnt} direct visits but 0 AI referrals in the last ${window}.`,
+              impact_score: Math.min(80, Math.round(r3.direct_cnt/2)),
+              effort: "medium",
+              status: "open",
+              evidence: {
+                url: r3.url,
+                direct_count: r3.direct_cnt,
+                referrals: 0,
+                window
+              },
+              links: [
+                { label: "View Sources", href: `/sources` },
+                { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r3.url).pathname)}` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
+
+          // R4: Slow time-to-conversion
+          const r4Query = `
+            WITH params AS (SELECT ? AS pid, ? AS since, '-7 days' AS lookback),
+            cv AS (
+              SELECT ce.content_id, ce.occurred_at,
+                (SELECT detected_at
+                 FROM ai_referrals ar, params p
+                 WHERE ar.project_id = ce.project_id
+                   AND ar.content_id = ce.content_id
+                   AND ar.detected_at <= ce.occurred_at
+                   AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
+                 ORDER BY ar.detected_at DESC LIMIT 1) AS last_ref_at,
+                (SELECT ai_source_id
+                 FROM ai_referrals ar, params p
+                 WHERE ar.project_id = ce.project_id
+                   AND ar.content_id = ce.content_id
+                   AND ar.detected_at <= ce.occurred_at
+                   AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
+                 ORDER BY ar.detected_at DESC LIMIT 1) AS last_src_id
+              FROM conversion_event ce, params p
+              WHERE ce.project_id = p.pid AND ce.occurred_at >= p.since
+            ),
+            pairs AS (
+              SELECT content_id, last_src_id AS ai_source_id,
+                     ((julianday(occurred_at) - julianday(last_ref_at)) * 1440.0) AS ttc_min
+              FROM cv
+              WHERE last_ref_at IS NOT NULL AND last_src_id IS NOT NULL
+            )
+            SELECT p.content_id, p.ai_source_id, AVG(p.ttc_min) AS avg_ttc_min, COUNT(*) AS convs,
+                   ca.url, s.slug AS source_slug, s.name AS source_name
+            FROM pairs p
+            JOIN content_assets ca ON ca.id = p.content_id
+            JOIN ai_sources s ON s.id = p.ai_source_id
+            GROUP BY p.content_id, p.ai_source_id
+            HAVING avg_ttc_min > ? AND convs >= 2;
+          `;
+
+          const r4Results = await d1.prepare(r4Query).bind(project_id, sinceISO, slowTtcMin).all();
+          
+          for (const r4 of r4Results.results || []) {
+            recommendations.push({
+              rec_id: `R4:${r4.content_id}:${r4.source_slug}`,
+              type: "R4",
+              severity: "medium",
+              title: "Slow time-to-conversion",
+              description: `Conversions from ${r4.source_name} to ${new URL(r4.url).pathname} take ${Math.round(r4.avg_ttc_min)} minutes on average (threshold ${slowTtcMin} min).`,
+              impact_score: Math.min(70, Math.round(r4.avg_ttc_min - slowTtcMin)),
+              effort: "medium",
+              status: "open",
+              evidence: {
+                url: r4.url,
+                source_slug: r4.source_slug,
+                source_name: r4.source_name,
+                avg_ttc_min: Math.round(r4.avg_ttc_min * 10) / 10,
+                conversions: r4.convs
+              },
+              links: [
+                { label: "Open in Funnels", href: `/funnels/detail?project_id=${project_id}&content_id=${r4.content_id}&source=${r4.source_slug}` },
+                { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r4.url).pathname)}` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
+
+          // R5: Pending fingerprint suggestions
+          const r5Query = `
+            SELECT COUNT(*) AS pending_count
+            FROM rules_suggestions
+            WHERE project_id = ? AND status = 'pending';
+          `;
+
+          const r5Result = await d1.prepare(r5Query).bind(project_id).first();
+          
+          if (r5Result?.pending_count > 0) {
+            recommendations.push({
+              rec_id: "R5:rules_suggestions_pending",
+              type: "R5",
+              severity: "low",
+              title: "Pending fingerprint suggestions",
+              description: `You have ${r5Result.pending_count} pending fingerprint suggestions that need review.`,
+              impact_score: Math.min(40, r5Result.pending_count * 5),
+              effort: "low",
+              status: "open",
+              evidence: {
+                count: r5Result.pending_count
+              },
+              links: [
+                { label: "Review Suggestions", href: `/sources#suggestions` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
+
+          // Apply overrides from recommendation_override table
+          const overrideQuery = `
+            SELECT rec_id, status, note, updated_at
+            FROM recommendation_override
+            WHERE project_id = ?;
+          `;
+
+          const overrideResults = await d1.prepare(overrideQuery).bind(project_id).all();
+          const overrides = {};
+          for (const override of overrideResults.results || []) {
+            overrides[override.rec_id] = override;
+          }
+
+          // Apply overrides to recommendations
+          recommendations = recommendations.map(rec => {
+            if (overrides[rec.rec_id]) {
+              const override = overrides[rec.rec_id];
+              return {
+                ...rec,
+                status: override.status,
+                note: override.note,
+                updated_at: override.updated_at
+              };
+            }
+            return rec;
+          });
+
+          // Apply filters
+          if (status !== "all") {
+            recommendations = recommendations.filter(rec => rec.status === status);
+          }
+          if (severity) {
+            recommendations = recommendations.filter(rec => rec.severity === severity);
+          }
+          if (type) {
+            recommendations = recommendations.filter(rec => rec.type === type);
+          }
+          if (q) {
+            const query = q.toLowerCase();
+            recommendations = recommendations.filter(rec => 
+              rec.title.toLowerCase().includes(query) ||
+              rec.description.toLowerCase().includes(query) ||
+              (rec.evidence.url && rec.evidence.url.toLowerCase().includes(query)) ||
+              (rec.evidence.source_name && rec.evidence.source_name.toLowerCase().includes(query))
+            );
+          }
+
+          // Apply sorting
+          const validSorts = ["impact_desc", "severity_desc", "type_asc", "url_asc"];
+          const actualSort = validSorts.includes(sort) ? sort : "impact_desc";
+          
+          recommendations.sort((a, b) => {
+            switch (actualSort) {
+              case "impact_desc":
+                return b.impact_score - a.impact_score;
+              case "severity_desc":
+                const severityOrder = { high: 3, medium: 2, low: 1 };
+                return severityOrder[b.severity] - severityOrder[a.severity];
+              case "type_asc":
+                return a.type.localeCompare(b.type);
+              case "url_asc":
+                return (a.evidence.url || "").localeCompare(b.evidence.url || "");
+              default:
+                return 0;
+            }
+          });
+
+          // Apply pagination
+          const pageNum = Math.max(1, parseInt(page));
+          const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize)));
+          const total = recommendations.length;
+          const offset = (pageNum - 1) * pageSizeNum;
+          const items = recommendations.slice(offset, offset + pageSizeNum);
+
+          // Record metrics: recommendations list viewed
+          try {
+            await d1.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `reco_list_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            console.warn("Failed to record recommendations list metric:", e);
+          }
+
+          const response = new Response(JSON.stringify({
+            items,
+            page: pageNum,
+            pageSize: pageSizeNum,
+            total
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=120"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Recommendations list error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.1.2) Update Recommendation Status endpoint
+      if (url.pathname === "/api/recommendations/status" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { project_id, rec_id, status, note } = body;
+
+          if (!project_id || !rec_id || !status) {
+            const response = new Response(JSON.stringify({ error: "project_id, rec_id, and status are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          if (!["open", "dismissed", "resolved"].includes(status)) {
+            const response = new Response(JSON.stringify({ error: "status must be one of: open, dismissed, resolved" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Upsert into recommendation_override
+          await d1.prepare(`
+            INSERT INTO recommendation_override (project_id, rec_id, status, note, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(project_id, rec_id) DO UPDATE SET
+              status = ?,
+              note = ?,
+              updated_at = ?
+          `).bind(
+            project_id, rec_id, status, note || null, new Date().toISOString(),
+            status, note || null, new Date().toISOString()
+          ).run();
+
+          // Record metrics: recommendation status updated
+          try {
+            await d1.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `reco_status_updated_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            console.warn("Failed to record recommendation status metric:", e);
+          }
+
+          const response = new Response(JSON.stringify({ ok: true }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Recommendation status update error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 7.1.3) Reset Recommendation Status endpoint
+      if (url.pathname === "/api/recommendations/reset" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { project_id, rec_id } = body;
+
+          if (!project_id || !rec_id) {
+            const response = new Response(JSON.stringify({ error: "project_id and rec_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Delete from recommendation_override
+          await d1.prepare(`
+            DELETE FROM recommendation_override 
+            WHERE project_id = ? AND rec_id = ?
+          `).bind(project_id, rec_id).run();
+
+          const response = new Response(JSON.stringify({ ok: true }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Recommendation reset error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // =====================================
 
       // 7.1) Referrals summary endpoint
       if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
