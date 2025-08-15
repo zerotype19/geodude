@@ -4084,7 +4084,7 @@ export default {
                     AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
                   ORDER BY ar.detected_at DESC
                   LIMIT 1
-                ) AS attributed_source_id
+                ) attributed_source_id
               FROM conversion_event ce, params p
               WHERE ce.project_id = p.pid
                 AND ce.occurred_at >= p.since
@@ -4385,7 +4385,7 @@ export default {
                     AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
                   ORDER BY ar.detected_at DESC
                   LIMIT 1
-                ) AS attributed_source_id
+                ) attributed_source_id
               FROM conversion_event ce, params p
               WHERE ce.project_id = p.pid
                 AND ce.occurred_at >= p.since
@@ -4675,7 +4675,7 @@ export default {
                     AND ar.detected_at >= datetime(ce.occurred_at, p.lookback)
                   ORDER BY ar.detected_at DESC
                   LIMIT 1
-                ) AS attributed_source_id
+                ) attributed_source_id
               FROM conversion_event ce, params p
               WHERE ce.project_id = p.pid
                 AND ce.content_id = p.cid
