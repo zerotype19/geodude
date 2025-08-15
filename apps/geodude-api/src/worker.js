@@ -224,30 +224,30 @@ export default {
           // Get pending rules suggestions count
           const pendingSuggestions = await d1.prepare(`
             SELECT COUNT(*) as count FROM rules_suggestions WHERE status = 'pending'
-          `).first();
+          `).bind().first();
 
           // Get content metrics
           const contentAssetsTotal = await d1.prepare(`
             SELECT COUNT(*) as count FROM content_assets
-          `).first();
+          `).bind().first();
 
           const activeAssets24h = await d1.prepare(`
             SELECT COUNT(DISTINCT content_id) as count
             FROM interaction_events
             WHERE occurred_at >= datetime('now','-1 day') AND content_id IS NOT NULL
-          `).first();
+          `).bind().first();
 
           const events24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM interaction_events
             WHERE occurred_at >= datetime('now','-1 day')
-          `).first();
+          `).bind().first();
 
           const referrals24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM ai_referrals
             WHERE detected_at >= datetime('now','-1 day')
-          `).first();
+          `).bind().first();
 
           // Get 5-minute metrics for content operations
           const current5MinWindow = Math.floor(Date.now() / (5 * 60 * 1000));
@@ -281,13 +281,13 @@ export default {
             SELECT COUNT(*) as count
             FROM ai_referrals
             WHERE detected_at >= datetime('now','-1 day')
-          `).first();
+          `).bind().first();
 
           const referralsActiveContents24h = await d1.prepare(`
             SELECT COUNT(DISTINCT content_id) as count
             FROM ai_referrals
             WHERE detected_at >= datetime('now','-1 day')
-          `).first();
+          `).bind().first();
 
           const referralsBySource24h = await d1.prepare(`
             SELECT s.slug, COUNT(*) as count
@@ -297,14 +297,14 @@ export default {
             GROUP BY ar.ai_source_id, s.slug
             ORDER BY count DESC
             LIMIT 5
-          `).all();
+          `).bind().all();
 
           // Get conversions metrics
           const conversionsTotal7d = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM conversion_event
             WHERE occurred_at >= datetime('now','-7 days')
-          `).first();
+          `).bind().first();
 
           const conversionsAiAttributed7d = await d1.prepare(`
             WITH conversion_attribution AS (
@@ -344,13 +344,13 @@ export default {
               ce.id = lta.id AND lta.rn = 1
             WHERE ce.occurred_at >= datetime('now','-7 days')
             AND lta.ai_source_id IS NOT NULL
-          `).first();
+          `).bind().first();
 
           const conversionsRevenue7d = await d1.prepare(`
             SELECT COALESCE(SUM(amount_cents), 0) as revenue_cents
             FROM conversion_event
             WHERE occurred_at >= datetime('now','-7 days')
-          `).first();
+          `).bind().first();
 
           const conversionsBySource7d = await d1.prepare(`
             WITH conversion_attribution AS (
@@ -396,20 +396,20 @@ export default {
             GROUP BY ais.id, ais.slug
             ORDER BY conversions DESC
             LIMIT 5
-          `).all();
+          `).bind().all();
 
           // Get funnels metrics for admin health
           const funnelsReferrals24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM ai_referrals
             WHERE detected_at >= datetime('now','-1 day')
-          `).first();
+          `).bind().first();
 
           const funnelsConversions24h = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM conversion_event
             WHERE occurred_at >= datetime('now','-1 day')
-          `).first();
+          `).bind().first();
 
           // Calculate average p50 TTC for funnels in last 24h
           const funnelsAvgP50TTC24h = await d1.prepare(`
