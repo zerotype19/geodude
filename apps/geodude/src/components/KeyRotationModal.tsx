@@ -4,9 +4,9 @@ import { X, Copy, Eye, EyeOff, AlertTriangle } from "lucide-react";
 interface KeyRotationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  keyId: number;
+  keyId: string;
   keyName: string;
-  onRotate: (keyId: number, immediate: boolean) => Promise<void>;
+  onRotate: (keyId: string, immediate: boolean) => Promise<void>;
 }
 
 interface RotationResult {

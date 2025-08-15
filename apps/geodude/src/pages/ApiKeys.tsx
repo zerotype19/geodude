@@ -7,17 +7,59 @@ import { RotateCcw, Trash2, AlertTriangle, Clock, CheckCircle, XCircle } from "l
 import { useAuth } from "../contexts/AuthContext";
 
 interface ApiKey {
-  id: number;
-  key_id: string;
+  id: string;
   name: string;
-  property_id: number;
-  project_id: number;
-  domain: string;
+  status: string;
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
-  grace_secret_hash: string | null;
   grace_expires_at: string | null;
+}
+
+function getKeyStatus(key: ApiKey) {
+  switch (key.status) {
+    case 'active':
+      return { status: 'active', text: 'Active', icon: <CheckCircle className="text-green-600" size={16} /> };
+    case 'grace':
+      return { status: 'grace', text: 'Grace Period', icon: <Clock className="text-yellow-600" size={16} /> };
+    case 'revoked':
+      return { status: 'revoked', text: 'Revoked', icon: <XCircle className="text-red-600" size={16} /> };
+    default:
+      return { status: 'active', text: 'Active', icon: <CheckCircle className="text-green-600" size={16} /> };
+  }
+}
+
+function getGraceCountdown(key: ApiKey) {
+  if (key.status !== 'grace' || !key.grace_expires_at) return null;
+  
+  const expiresAt = new Date(key.grace_expires_at).getTime();
+  const now = Date.now();
+  const timeLeft = expiresAt - now;
+  
+  if (timeLeft <= 0) return "Expired";
+  
+  const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+  const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  } else {
+    return `${minutes}m`;
+  }
+}
+
+function formatDate(dateString: string) {
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return 'Invalid Date';
+  }
 }
 
 export default function ApiKeys() {
@@ -25,8 +67,9 @@ export default function ApiKeys() {
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rotationModal, setRotationModal] = useState<{ isOpen: boolean; keyId: number; keyName: string } | null>(null);
-  const [newKey, setNewKey] = useState({ domain: "", name: "" });
+  const [rotationModal, setRotationModal] = useState<{ isOpen: boolean; keyId: string; keyName: string } | null>(null);
+  const [newKey, setNewKey] = useState({ name: "" });
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   useEffect(() => {
     if (project?.id) {
@@ -56,7 +99,7 @@ export default function ApiKeys() {
   }
 
   async function createApiKey() {
-    if (!project?.id || !newKey.domain || !newKey.name) return;
+    if (!project?.id || !newKey.name) return;
 
     try {
       setLoading(true);
@@ -66,17 +109,16 @@ export default function ApiKeys() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          project_id: parseInt(project.id),
-          property_id: 1, // We'll need to get this from the domain
-          name: newKey.name,
-          domain: newKey.domain
+          project_id: project.id,
+          name: newKey.name
         })
       });
 
       if (response.ok) {
         const data = await response.json();
-        alert(`API Key created! Key ID: ${data.key_id}\nSecret: ${data.secret_once}\n\n⚠️ Store this secret securely - it won't be shown again!`);
-        setNewKey({ domain: "", name: "" });
+        alert(`API Key created! Key ID: ${data.id}\n\n⚠️ Use this Key ID in your hosted tag implementation.`);
+        setNewKey({ name: "" });
+        setShowCreateForm(false);
         await loadKeys();
       } else {
         console.error("Failed to create API key");
@@ -88,7 +130,7 @@ export default function ApiKeys() {
     }
   }
 
-  async function handleRotate(keyId: number, immediate: boolean) {
+  async function handleRotate(keyId: string, immediate: boolean) {
     try {
       const response = await fetch(`${API_BASE}/api/keys/${keyId}/rotate`, {
         ...FETCH_OPTS,
@@ -116,7 +158,7 @@ export default function ApiKeys() {
     }
   }
 
-  async function handleRevoke(keyId: number) {
+  async function handleRevoke(keyId: string) {
     if (!confirm("Are you sure you want to revoke this API key? This action cannot be undone.")) {
       return;
     }
@@ -142,40 +184,9 @@ export default function ApiKeys() {
     }
   }
 
-  function getKeyStatus(key: ApiKey) {
-    if (key.revoked_at) {
-      return { status: 'revoked', icon: <XCircle className="text-red-600" size={16} />, text: 'Revoked' };
-    }
 
-    if (key.grace_secret_hash && key.grace_expires_at) {
-      const expiry = new Date(key.grace_expires_at);
-      const now = new Date();
-      if (now < expiry) {
-        return { status: 'grace', icon: <Clock className="text-yellow-600" size={16} />, text: 'Grace Period' };
-      }
-    }
 
-    return { status: 'active', icon: <CheckCircle className="text-green-600" size={16} />, text: 'Active' };
-  }
 
-  function getGraceCountdown(key: ApiKey) {
-    if (!key.grace_expires_at) return null;
-
-    const expiry = new Date(key.grace_expires_at);
-    const now = new Date();
-    const diffMs = expiry.getTime() - now.getTime();
-
-    if (diffMs <= 0) return null;
-
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    return `${hours}h ${minutes}m remaining`;
-  }
-
-  function formatDate(dateString: string) {
-    return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString();
-  }
 
   if (loading) {
     return (
@@ -200,11 +211,21 @@ export default function ApiKeys() {
   return (
     <Shell>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">API Keys</h1>
-          <p className="mt-2 text-gray-600">
-            Manage your API keys for data ingestion
-          </p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">API Keys</h1>
+            <p className="mt-2 text-gray-600">
+              Manage your API keys for data ingestion
+            </p>
+          </div>
+          {keys.length > 0 && (
+            <button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            >
+              Create New Key
+            </button>
+          )}
         </div>
 
         {keys.length === 0 ? (
@@ -215,19 +236,7 @@ export default function ApiKeys() {
               {/* Create API Key Form */}
               <div className="max-w-md mx-auto">
                 <div className="space-y-4">
-                  <div>
-                    <label htmlFor="property-domain" className="block text-sm font-medium text-gray-700 mb-1">
-                      Property Domain
-                    </label>
-                    <input
-                      id="property-domain"
-                      type="text"
-                      placeholder="example.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      value={newKey.domain || ""}
-                      onChange={(e) => setNewKey({ ...newKey, domain: e.target.value })}
-                    />
-                  </div>
+
 
                   <div>
                     <label htmlFor="key-name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -245,7 +254,7 @@ export default function ApiKeys() {
 
                   <button
                     onClick={createApiKey}
-                    disabled={!project?.id || !newKey.domain || !newKey.name}
+                    disabled={!project?.id || !newKey.name}
                     className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
                   >
                     Create API Key
@@ -256,17 +265,58 @@ export default function ApiKeys() {
           </Card>
         ) : (
           <div className="space-y-6">
+            {/* Create Form for existing keys */}
+            {showCreateForm && (
+              <Card title="Create New API Key">
+                <div className="p-6">
+                  <div className="max-w-md">
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="new-key-name" className="block text-sm font-medium text-gray-700 mb-1">
+                          Key Name
+                        </label>
+                        <input
+                          id="new-key-name"
+                          type="text"
+                          placeholder="Production Key"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          value={newKey.name || ""}
+                          onChange={(e) => setNewKey({ ...newKey, name: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={createApiKey}
+                          disabled={!project?.id || !newKey.name}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                        >
+                          Create API Key
+                        </button>
+                        <button
+                          onClick={() => setShowCreateForm(false)}
+                          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+            
             {keys.map((key) => {
               const status = getKeyStatus(key);
               const graceCountdown = getGraceCountdown(key);
 
               return (
-                <Card key={key.id} title={`${key.name} (${key.domain})`}>
+                <Card key={key.id} title={`${key.name} (${key.id})`}>
                   <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                       <div>
                         <p className="text-sm font-medium text-gray-500">Key ID</p>
-                        <p className="text-sm text-gray-900 font-mono">{key.key_id}</p>
+                        <p className="text-sm text-gray-900 font-mono">{key.id}</p>
                       </div>
 
                       <div>
