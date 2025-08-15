@@ -186,7 +186,7 @@ export default {
       // Legacy source name aliases for backward compatibility
       const legacyAliases = {
         "OpenAI": "openai_chatgpt",
-        "Anthropic": "anthropic_claude", 
+        "Anthropic": "anthropic_claude",
         "Google": "google_gemini",
         "Microsoft": "microsoft_copilot",
         "Perplexity": "perplexity",
@@ -200,11 +200,11 @@ export default {
 
         // Normalize slug (handle legacy aliases)
         const normalizedSlug = legacyAliases[slug] || slug;
-        
+
         // Check cache first
         const cacheKey = `source_id:${normalizedSlug}`;
         const cached = sourceIdCache.get(cacheKey);
-        
+
         if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
           return cached.id;
         }
@@ -247,7 +247,7 @@ export default {
         try {
           // Get rules manifest from KV
           let manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
-          
+
           // Back-compat: if rules:manifest is missing, try to load rules:heuristics
           if (!manifest || !manifest.sources) {
             console.log('rules:manifest missing, attempting legacy fallback');
@@ -269,7 +269,7 @@ export default {
 
           // Find matching sources with improved algorithm
           const matches = [];
-          
+
           for (const [slug, rules] of Object.entries(manifest.sources)) {
             if (!rules.referrer_domains) continue;
 
@@ -337,7 +337,7 @@ export default {
                 ua_contains: []
               };
             }
-            
+
             // Extract domain from needle
             if (rule.needle) {
               const domain = rule.needle.replace(/^https?:\/\//, '').split('/')[0];
@@ -644,7 +644,7 @@ export default {
             const manifest = await env.AI_FINGERPRINTS.get("rules:manifest", "json");
             const legacyHeuristics = await env.AI_FINGERPRINTS.get("rules:heuristics", "json");
             const legacySourcesIndex = await env.AI_FINGERPRINTS.get("sources:index", "json");
-            
+
             manifestInfo = {
               version: manifest ? manifest.version : null,
               sources_count: manifest ? Object.keys(manifest.sources || {}).length : 0,
@@ -3689,7 +3689,7 @@ export default {
           const response = new Response(JSON.stringify(sources.results), {
             headers: {
               "Content-Type": "application/json",
-              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+              "Cache-Control": "private, max-age=10, stale-while-revalidate=10"
             }
           });
           return addCorsHeaders(response, origin);
@@ -3915,9 +3915,9 @@ export default {
               updated_at = excluded.updated_at
           `).bind(project_id, ai_source_id, notes || null, suggested_pattern_json ? JSON.stringify(suggested_pattern_json) : null).run();
 
-          const response = new Response(JSON.stringify({ 
+          const response = new Response(JSON.stringify({
             success: true,
-            message: "AI source enabled successfully" 
+            message: "AI source enabled successfully"
           }), {
             status: 200,
             headers: { "Content-Type": "application/json" }
@@ -4204,7 +4204,7 @@ export default {
               if (event_type === 'pageview') {
                 normalizedEventType = 'view'; // Database expects 'view' not 'pageview'
               }
-              
+
               if (!['view', 'click', 'custom'].includes(normalizedEventType)) {
                 continue; // Skip invalid events instead of failing the whole batch
               }
