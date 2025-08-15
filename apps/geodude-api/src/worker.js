@@ -4092,19 +4092,7 @@ export default {
             attributed AS (
               SELECT 
                 c.attributed_source_id,
-                COUNT(*) conversions,
-                GROUP_CONCAT(
-                  (julianday(c.occurred_at) - julianday(
-                    (SELECT ar.detected_at
-                     FROM ai_referrals ar, params p
-                     WHERE ar.project_id = c.project_id
-                       AND ar.content_id = c.content_id
-                       AND ar.detected_at <= c.occurred_at
-                       AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
-                     ORDER BY ar.detected_at DESC
-                     LIMIT 1)
-                   ) * 24 * 60
-                 ) ttc_minutes
+                COUNT(*) AS conversions
                FROM convs c
                WHERE c.attributed_source_id IS NOT NULL
                GROUP BY c.attributed_source_id
@@ -4116,8 +4104,7 @@ export default {
                CASE 
                  WHEN r.referrals > 0 THEN CAST(COALESCE(a.conversions, 0) AS REAL) / r.referrals
                  ELSE 0 
-               END conv_rate,
-               a.ttc_minutes
+               END conv_rate
              FROM refs r
              LEFT JOIN attributed a ON r.ai_source_id = a.attributed_source_id
              ORDER BY r.referrals DESC
@@ -4147,27 +4134,14 @@ export default {
             const sourceResult = await d1.prepare(sourceQuery).bind(row.ai_source_id).first();
 
             if (sourceResult) {
-              // Calculate TTC percentiles
-              let p50_ttc_min = 0;
-              let p90_ttc_min = 0;
-
-              if (row.ttc_minutes) {
-                const ttcArray = row.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
-                if (ttcArray.length > 0) {
-                  ttcArray.sort((a, b) => a - b);
-                  p50_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.5)];
-                  p90_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.9)];
-                }
-              }
-
               bySource.push({
                 slug: sourceResult.slug,
                 name: sourceResult.name,
                 referrals: row.referrals,
                 conversions: row.conversions,
                 conv_rate: Math.round(row.conv_rate * 100) / 100,
-                p50_ttc_min,
-                p90_ttc_min
+                p50_ttc_min: 0,  // Placeholder - implement in detail endpoint
+                p90_ttc_min: 0   // Placeholder - implement in detail endpoint
               });
             }
           }
@@ -4391,27 +4365,15 @@ export default {
                 AND ce.occurred_at >= p.since
             ),
             attributed AS (
-              SELECT 
+              SELECT
                 c.content_id,
                 c.attributed_source_id,
-                COUNT(*) conversions,
-                MAX(c.occurred_at) last_conversion,
-                GROUP_CONCAT(
-                  (julianday(c.occurred_at) - julianday(
-                    (SELECT ar.detected_at
-                     FROM ai_referrals ar, params p
-                     WHERE ar.project_id = c.project_id
-                       AND ar.content_id = c.content_id
-                       AND ar.detected_at <= c.occurred_at
-                       AND ar.detected_at >= datetime(c.occurred_at, p.lookback)
-                     ORDER BY ar.detected_at DESC
-                     LIMIT 1)
-                   ) * 24 * 60
-                 ) ttc_minutes
-               FROM convs c
-               WHERE c.attributed_source_id IS NOT NULL
-               GROUP BY c.content_id, c.attributed_source_id
-             ),
+                COUNT(*) AS conversions,
+                MAX(c.occurred_at) AS last_conversion
+              FROM convs c
+              WHERE c.attributed_source_id IS NOT NULL
+              GROUP BY c.content_id, c.attributed_source_id
+            ),
              funnel_data AS (
                SELECT 
                  r.project_id,
@@ -4424,8 +4386,7 @@ export default {
                    ELSE 0 
                  END conv_rate,
                  r.last_referral,
-                 a.last_conversion,
-                 a.ttc_minutes
+                 a.last_conversion
                FROM refs r
                LEFT JOIN attributed a ON r.content_id = a.content_id AND r.ai_source_id = a.attributed_source_id
              ),
@@ -4451,8 +4412,7 @@ export default {
                conversions,
                conv_rate,
                last_referral,
-               last_conversion,
-               ttc_minutes
+               last_conversion
              FROM with_urls
              ORDER BY ${sortSql}
              LIMIT ? OFFSET ?
@@ -4466,27 +4426,13 @@ export default {
 
           const items = await d1.prepare(mainQuery).bind(...bindParams).all();
 
-          // Process TTC data for each item
-          const itemsWithTTC = items.results?.map(item => {
-            let p50_ttc_min = 0;
-            let p90_ttc_min = 0;
-
-            if (item.ttc_minutes) {
-              const ttcArray = item.ttc_minutes.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
-              if (ttcArray.length > 0) {
-                ttcArray.sort((a, b) => a - b);
-                p50_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.5)];
-                p90_ttc_min = ttcArray[Math.floor(ttcArray.length * 0.9)];
-              }
-            }
-
-            return {
-              ...item,
-              conv_rate: Math.round(item.conv_rate * 100) / 100,
-              p50_ttc_min,
-              p90_ttc_min
-            };
-          }) || [];
+          // Process items (TTC percentiles removed for performance)
+          const processedItems = items.results?.map(item => ({
+            ...item,
+            conv_rate: Math.round(item.conv_rate * 100) / 100,
+            p50_ttc_min: 0,  // Moved to detail endpoint for performance
+            p90_ttc_min: 0   // Moved to detail endpoint for performance
+          })) || [];
 
           // Count query
           const countQuery = `
@@ -4553,7 +4499,7 @@ export default {
           }
 
           const response = new Response(JSON.stringify({
-            items: itemsWithTTC,
+            items: processedItems,
             page: pageNum,
             pageSize: pageSizeNum,
             total
@@ -4695,7 +4641,7 @@ export default {
                      ORDER BY ar.detected_at DESC
                      LIMIT 1)
                    ) * 24 * 60
-                 ) ttc_minutes
+                ) ttc_minutes
                FROM convs c
                WHERE c.attributed_source_id = ?
              )
