@@ -2342,6 +2342,297 @@ export default {
         }
       }
 
+      // Properties API endpoints
+      if (url.pathname === "/api/properties" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT s.user_id, u.email 
+            FROM session s 
+            JOIN user u ON u.id = s.user_id 
+            WHERE s.session_id = ? AND s.expires_at > CURRENT_TIMESTAMP
+          `).bind(sessionId).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const rateLimitKey = `api_properties_get:${sessionData.user_id}:${Math.floor(Date.now() / 60000)}`;
+
+          try {
+            const currentCount = await incrementCounter(env.AI_FINGERPRINTS, rateLimitKey, 60);
+            if (currentCount > 60) {
+              const response = new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+                status: 429,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+          } catch (e) {
+            console.error("Rate limiting error:", e);
+            // Continue on rate limiting errors
+          }
+
+          const project_id = url.searchParams.get("project_id");
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user has access to the project
+          const projectAccess = await d1.prepare(`
+            SELECT p.id, p.name, p.org_id
+            FROM project p
+            JOIN org_member om ON om.org_id = p.org_id
+            WHERE p.id = ? AND om.user_id = ?
+          `).bind(project_id, sessionData.user_id).first();
+
+          if (!projectAccess) {
+            const response = new Response(JSON.stringify({ error: "Project not found or access denied" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get properties for the project
+          const properties = await d1.prepare(`
+            SELECT id, project_id, domain, created_ts
+            FROM properties
+            WHERE project_id = ?
+            ORDER BY created_ts DESC
+          `).bind(project_id).all();
+
+          // Transform timestamps to ISO strings
+          const transformedProperties = properties.results.map(prop => ({
+            id: prop.id,
+            project_id: prop.project_id,
+            domain: prop.domain,
+            created_at: new Date(prop.created_ts * 1000).toISOString()
+          }));
+
+          const response = new Response(JSON.stringify(transformedProperties), {
+            headers: { 
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Get properties error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      if (url.pathname === "/api/properties" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT s.user_id, u.email 
+            FROM session s 
+            JOIN user u ON u.id = s.user_id 
+            WHERE s.session_id = ? AND s.expires_at > CURRENT_TIMESTAMP
+          `).bind(sessionId).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 30 rpm per user for creates
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const rateLimitKey = `api_properties_post:${sessionData.user_id}:${Math.floor(Date.now() / 60000)}`;
+
+          try {
+            const currentCount = await incrementCounter(env.AI_FINGERPRINTS, rateLimitKey, 60);
+            if (currentCount > 30) {
+              const response = new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+                status: 429,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+          } catch (e) {
+            console.error("Rate limiting error:", e);
+            // Continue on rate limiting errors
+          }
+
+          const body = await request.json();
+          const { project_id, domain } = body;
+
+          if (!project_id || !domain) {
+            const response = new Response(JSON.stringify({ error: "project_id and domain are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user has access to the project
+          const projectAccess = await d1.prepare(`
+            SELECT p.id, p.name, p.org_id
+            FROM project p
+            JOIN org_member om ON om.org_id = p.org_id
+            WHERE p.id = ? AND om.user_id = ?
+          `).bind(project_id, sessionData.user_id).first();
+
+          if (!projectAccess) {
+            const response = new Response(JSON.stringify({ error: "Project not found or access denied" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Normalize domain
+          let normalizedDomain;
+          try {
+            // Remove protocol, path, query, hash - extract hostname only
+            let cleanDomain = domain.trim().toLowerCase();
+            
+            // Remove protocol if present
+            cleanDomain = cleanDomain.replace(/^https?:\/\//, '');
+            
+            // Remove path, query, hash
+            cleanDomain = cleanDomain.split('/')[0].split('?')[0].split('#')[0];
+            
+            // Extract hostname (remove port if present)
+            cleanDomain = cleanDomain.split(':')[0];
+            
+            // Validate hostname format
+            if (!cleanDomain || cleanDomain === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(cleanDomain)) {
+              const response = new Response(JSON.stringify({ error: "Invalid domain: IPs and localhost not allowed" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+            
+            // Basic hostname validation (must contain at least one dot for TLD)
+            if (!cleanDomain.includes('.') || cleanDomain.startsWith('.') || cleanDomain.endsWith('.')) {
+              const response = new Response(JSON.stringify({ error: "Invalid domain format" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+            
+            normalizedDomain = cleanDomain;
+          } catch (e) {
+            const response = new Response(JSON.stringify({ error: "Invalid domain format" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const nowTs = Math.floor(Date.now() / 1000);
+
+          // Check for duplicate domain in this project
+          const existingProperty = await d1.prepare(`
+            SELECT id FROM properties WHERE project_id = ? AND domain = ?
+          `).bind(project_id, normalizedDomain).first();
+
+          if (existingProperty) {
+            const response = new Response(JSON.stringify({ error: "duplicate_property" }), {
+              status: 409,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Insert new property
+          const insertResult = await d1.prepare(`
+            INSERT INTO properties (project_id, domain, created_ts, updated_ts)
+            VALUES (?, ?, ?, ?)
+          `).bind(project_id, normalizedDomain, nowTs, nowTs).run();
+
+          // Increment metrics counter
+          try {
+            const metricsKey = `properties_created_5m:${Math.floor(Date.now() / 300000)}`;
+            await incrementCounter(env.AI_FINGERPRINTS, metricsKey, 300);
+          } catch (e) {
+            console.error("Metrics error:", e);
+            // Continue on metrics errors
+          }
+
+          // Return the created property
+          const createdProperty = {
+            id: insertResult.meta.last_row_id,
+            project_id: project_id,
+            domain: normalizedDomain,
+            created_at: new Date(nowTs * 1000).toISOString()
+          };
+
+          const response = new Response(JSON.stringify(createdProperty), {
+            status: 201,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Create property error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // 4) Content endpoint - Proper implementation
       if (url.pathname === "/api/content" && request.method === "GET") {
         try {
