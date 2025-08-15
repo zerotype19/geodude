@@ -1477,33 +1477,41 @@ export default {
             const runtime = `${debug ? '// Optiview Analytics Hosted Tag v1.0 (Debug Build)\n' : ''}(function() {
   var optiview = window.optiview = window.optiview || {};
   
-  // Auto-derive API base from script source
-  var scripts = document.getElementsByTagName('script');
-  var currentScript = document.currentScript || scripts[scripts.length - 1];
-  var apiBase = '';
+  // BEGIN apiBase detection (robust)
+  var defaultBase = "https://api.optiview.ai";
+  var apiBase = defaultBase;
   
-  if (currentScript && currentScript.src) {
-    try {
-      var url = new URL(currentScript.src);
-      apiBase = url.protocol + '//' + url.host;
-    } catch (e) {
-      apiBase = '${config.PUBLIC_BASE_URL}';
-    }
+  // Allow explicit override via data-endpoint (optional attr)
+  var ds = (document.currentScript || document.getElementsByTagName("script")[document.getElementsByTagName("script").length - 1]).dataset || {};
+  if (ds && ds.endpoint) {
+    apiBase = String(ds.endpoint);
   } else {
-    apiBase = '${config.PUBLIC_BASE_URL}';
+    try {
+      var src = (document.currentScript && document.currentScript.src) ||
+                (function(s){ return s && s[s.length-1] ? s[s.length-1].src : ""; })(document.getElementsByTagName("script"));
+      if (src) {
+        var u = new URL(src, location.href);
+        apiBase = u.protocol + "//" + u.host;
+      }
+    } catch (e) { /* keep defaultBase */ }
   }
   
-  // Read configuration from data attributes
-  var dataset = currentScript ? currentScript.dataset : {};
-  var keyId = dataset.keyId;
-  var projectId = dataset.projectId;
-  var propertyId = dataset.propertyId;
+  // Final sanity: require protocol + //
+  if (!/^https?:\/\/[^\/]+$/.test(apiBase)) { apiBase = defaultBase; }
+  // END apiBase detection
+  
+  ${debug ? 'try { console.debug("[optiview] apiBase =", apiBase); } catch(e){}' : ''}
+  
+  // Read configuration from data attributes (reuse ds from above)
+  var keyId = ds.keyId;
+  var projectId = ds.projectId;
+  var propertyId = ds.propertyId;
   
   // Optional configuration with defaults
-  var clicksEnabled = dataset.clicks !== '0' && dataset.clicks !== 0;
-  var spaEnabled = dataset.spa !== '0' && dataset.spa !== 0;
-  var batchSize = Math.min(Math.max(parseInt(dataset.batchSize) || 10, 1), 50);
-  var flushMs = Math.min(Math.max(parseInt(dataset.flushMs) || 3000, 500), 10000);
+  var clicksEnabled = ds.clicks !== '0' && ds.clicks !== 0;
+  var spaEnabled = ds.spa !== '0' && ds.spa !== 0;
+  var batchSize = Math.min(Math.max(parseInt(ds.batchSize) || 10, 1), 50);
+  var flushMs = Math.min(Math.max(parseInt(ds.flushMs) || 3000, 500), 10000);
   
   ${debug ? 'console.info("Optiview: Configuration loaded", { keyId: keyId, projectId: projectId, propertyId: propertyId, clicksEnabled: clicksEnabled, spaEnabled: spaEnabled, batchSize: batchSize, flushMs: flushMs });' : ''}
   
