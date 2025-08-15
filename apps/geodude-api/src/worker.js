@@ -1467,66 +1467,328 @@ export default {
       }
 
       // 3.5) JS Tag for Installation
+      // 3.0) Hosted Tag Endpoint
       if (url.pathname === "/v1/tag.js" && request.method === "GET") {
         try {
-          const pid = url.searchParams.get("pid");
-          const kid = url.searchParams.get("kid");
-
-          if (!pid || !kid) {
-            const response = new Response("Missing pid or kid parameters", { status: 400 });
-            return addCorsHeaders(response, origin);
-          }
-
-          // Generate the JS tag
-          const jsTag = `// Optiview Analytics Tag v1.0
-!function(){
-  try{
-    var pid = "${pid}"; 
-    var kid = "${kid}";
-    var ep = "${config.PUBLIC_BASE_URL}/api/events";
+          const debug = url.searchParams.get("debug") === "1";
+          
+          // Generate the hosted tag runtime
+          const generateRuntime = (debug = false) => {
+            const runtime = `${debug ? '// Optiview Analytics Hosted Tag v1.0 (Debug Build)\n' : ''}(function() {
+  var optiview = window.optiview = window.optiview || {};
+  
+  // Auto-derive API base from script source
+  var scripts = document.getElementsByTagName('script');
+  var currentScript = document.currentScript || scripts[scripts.length - 1];
+  var apiBase = '';
+  
+  if (currentScript && currentScript.src) {
+    try {
+      var url = new URL(currentScript.src);
+      apiBase = url.protocol + '//' + url.host;
+    } catch (e) {
+      apiBase = '${config.PUBLIC_BASE_URL}';
+    }
+  } else {
+    apiBase = '${config.PUBLIC_BASE_URL}';
+  }
+  
+  // Read configuration from data attributes
+  var dataset = currentScript ? currentScript.dataset : {};
+  var keyId = dataset.keyId;
+  var projectId = dataset.projectId;
+  var propertyId = dataset.propertyId;
+  
+  // Optional configuration with defaults
+  var clicksEnabled = dataset.clicks !== '0' && dataset.clicks !== 0;
+  var spaEnabled = dataset.spa !== '0' && dataset.spa !== 0;
+  var batchSize = Math.min(Math.max(parseInt(dataset.batchSize) || 10, 1), 50);
+  var flushMs = Math.min(Math.max(parseInt(dataset.flushMs) || 3000, 500), 10000);
+  
+  ${debug ? 'console.info("Optiview: Configuration loaded", { keyId: keyId, projectId: projectId, propertyId: propertyId, clicksEnabled: clicksEnabled, spaEnabled: spaEnabled, batchSize: batchSize, flushMs: flushMs });' : ''}
+  
+  // Graceful no-op if required values missing
+  if (!keyId || !projectId || !propertyId) {
+    ${debug ? 'console.info("Optiview: Missing required configuration, tag will no-op");' : ''}
+    return;
+  }
+  
+  // Event batching system
+  var eventQueue = [];
+  var flushTimer = null;
+  
+  function flushEvents() {
+    if (eventQueue.length === 0) return;
     
+    var events = eventQueue.splice(0, batchSize);
     var payload = {
-      property_id: pid,
-      key_id: kid,
-      event_type: "view",
-      metadata: {
-        p: location.pathname,
-        r: document.referrer ? new URL(document.referrer).hostname : "",
-        t: document.title.slice(0,120),
-        ua: navigator.userAgent.slice(0,100)
-      }
+      project_id: projectId,
+      property_id: parseInt(propertyId),
+      events: events
     };
     
-    var body = JSON.stringify(payload);
-    var timestamp = Math.floor(Date.now() / 1000);
-    
-    fetch(ep, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-optiview-key-id": kid,
-        "x-optiview-timestamp": timestamp
-      },
-      body: body
-    }).catch(function(e) {
+    try {
+      fetch(apiBase + '/api/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-optiview-key-id': keyId
+        },
+        body: JSON.stringify(payload)
+      }).catch(function() {
+        // Silent fail for analytics
+      });
+    } catch (e) {
       // Silent fail for analytics
-    });
-  }catch(e){
-    // Silent fail for analytics
+    }
+    
+    // Schedule next flush if more events remain
+    if (eventQueue.length > 0) {
+      flushTimer = setTimeout(flushEvents, flushMs);
+    } else {
+      flushTimer = null;
+    }
   }
-}();`;
-
-          const response = new Response(jsTag, {
+  
+  function scheduleFlush() {
+    if (!flushTimer) {
+      flushTimer = setTimeout(flushEvents, flushMs);
+    }
+  }
+  
+  function addEvent(eventType, metadata) {
+    try {
+      var event = {
+        event_type: eventType,
+        metadata: metadata || {},
+        occurred_at: new Date().toISOString()
+      };
+      
+      eventQueue.push(event);
+      
+      // Immediate flush if batch size reached
+      if (eventQueue.length >= batchSize) {
+        if (flushTimer) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        flushEvents();
+      } else {
+        scheduleFlush();
+      }
+    } catch (e) {
+      // Silent fail for analytics
+    }
+  }
+  
+  // Page view tracking
+  function trackPageView() {
+    addEvent('pageview', {
+      url: location.href,
+      pathname: location.pathname,
+      referrer: document.referrer,
+      title: document.title.slice(0, 120),
+      user_agent: navigator.userAgent.slice(0, 100)
+    });
+  }
+  
+  // Click tracking
+  function trackClick(element) {
+    if (!clicksEnabled) return;
+    
+    var metadata = {
+      tag_name: element.tagName.toLowerCase(),
+      pathname: location.pathname
+    };
+    
+    // Add element-specific data
+    if (element.href) metadata.href = element.href;
+    if (element.textContent) metadata.text = element.textContent.slice(0, 100);
+    if (element.id) metadata.element_id = element.id;
+    if (element.className) metadata.css_classes = element.className;
+    
+    addEvent('click', metadata);
+  }
+  
+  // SPA route tracking
+  var currentPath = location.pathname;
+  function trackSpaNavigation() {
+    if (!spaEnabled) return;
+    
+    var newPath = location.pathname;
+    if (newPath !== currentPath) {
+      currentPath = newPath;
+      trackPageView();
+    }
+  }
+  
+  // Public API
+  optiview.page = trackPageView;
+  optiview.track = function(eventType, metadata) {
+    addEvent(eventType, metadata);
+  };
+  optiview.conversion = function(data) {
+    try {
+      var payload = {
+        project_id: projectId,
+        property_id: parseInt(propertyId),
+        amount_cents: data.amount_cents,
+        currency: data.currency || 'USD',
+        metadata: data.metadata || {}
+      };
+      
+      fetch(apiBase + '/api/conversions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-optiview-key-id': keyId
+        },
+        body: JSON.stringify(payload)
+      }).catch(function() {
+        // Silent fail for analytics
+      });
+    } catch (e) {
+      // Silent fail for analytics
+    }
+  };
+  
+  // Initialize tracking
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      trackPageView();
+    });
+  } else {
+    trackPageView();
+  }
+  
+  // Click event listener
+  if (clicksEnabled) {
+    document.addEventListener('click', function(e) {
+      var element = e.target;
+      
+      // Skip if element has data-optiview="ignore"
+      if (element.getAttribute && element.getAttribute('data-optiview') === 'ignore') {
+        return;
+      }
+      
+      // Track clicks on links and buttons
+      if (element.tagName === 'A' || element.tagName === 'BUTTON' || element.onclick) {
+        trackClick(element);
+      }
+    }, true);
+  }
+  
+  // SPA navigation listeners
+  if (spaEnabled) {
+    // History API listeners
+    var originalPushState = history.pushState;
+    var originalReplaceState = history.replaceState;
+    
+    history.pushState = function() {
+      originalPushState.apply(history, arguments);
+      setTimeout(trackSpaNavigation, 0);
+    };
+    
+    history.replaceState = function() {
+      originalReplaceState.apply(history, arguments);
+      setTimeout(trackSpaNavigation, 0);
+    };
+    
+    window.addEventListener('popstate', trackSpaNavigation);
+  }
+  
+  // Flush remaining events on page unload
+  window.addEventListener('beforeunload', function() {
+    if (eventQueue.length > 0) {
+      // Use sendBeacon if available for more reliable delivery
+      if (navigator.sendBeacon) {
+        var events = eventQueue.splice(0);
+        var payload = JSON.stringify({
+          project_id: projectId,
+          property_id: parseInt(propertyId),
+          events: events
+        });
+        
+        navigator.sendBeacon(apiBase + '/api/events', payload);
+      } else {
+        flushEvents();
+      }
+    }
+  });
+})();`;
+            
+            // Return minified version unless debug mode
+            if (debug) {
+              return runtime;
+            } else {
+              // Basic minification - remove comments, extra whitespace, and console.info
+              return runtime
+                .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+                .replace(/\/\/.*$/gm, '') // Remove // comments
+                .replace(/\s+/g, ' ') // Collapse whitespace
+                .replace(/;\s*}/g, ';}') // Remove spaces before closing braces
+                .trim();
+            }
+          };
+          
+          const jsContent = generateRuntime(debug);
+          
+          // Generate ETag
+          const encoder = new TextEncoder();
+          const data = encoder.encode(jsContent);
+          const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+          const hashArray = Array.from(new Uint8Array(hashBuffer));
+          const etag = '"' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('') + '"';
+          
+          // Check If-None-Match header
+          const ifNoneMatch = request.headers.get('if-none-match');
+          if (ifNoneMatch === etag) {
+            const response = new Response(null, { 
+              status: 304,
+              headers: {
+                'ETag': etag,
+                'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+                'Vary': 'Accept-Encoding'
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+          
+          // Record metrics: tag served
+          try {
+            await d1.prepare(`
+              INSERT INTO metrics (key, value, created_at) 
+              VALUES (?, 1, ?) 
+              ON CONFLICT(key) DO UPDATE SET 
+                value = value + 1, 
+                updated_at = ?
+            `).bind(
+              `tag_served_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record tag served metric:", e);
+          }
+          
+          const response = new Response(jsContent, {
             headers: {
-              "Content-Type": "application/javascript",
-              "Cache-Control": "public, max-age=3600"
+              'Content-Type': 'application/javascript; charset=utf-8',
+              'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+              'ETag': etag,
+              'Vary': 'Accept-Encoding',
+              'Cross-Origin-Resource-Policy': 'cross-origin'
             }
           });
           return addCorsHeaders(response, origin);
 
         } catch (e) {
-          console.error("JS tag generation error:", e);
-          const response = new Response("Internal server error", { status: 500 });
+          console.error("Hosted tag generation error:", e);
+          const response = new Response("// Hosted tag error", { 
+            status: 500,
+            headers: { 'Content-Type': 'application/javascript; charset=utf-8' }
+          });
           return addCorsHeaders(response, origin);
         }
       }
@@ -5940,51 +6202,86 @@ export default {
       // 7.5) Events last-seen endpoint (for install verification)
       if (url.pathname === "/api/events/last-seen" && request.method === "GET") {
         try {
+          const projectId = url.searchParams.get("project_id");
           const propertyId = url.searchParams.get("property_id");
 
-          if (!propertyId) {
-            const response = new Response(JSON.stringify({ error: "property_id is required" }), {
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
             return addCorsHeaders(response, origin);
           }
 
-          const now = Date.now();
-          const fifteenMinutesAgo = now - (15 * 60 * 1000);
+          const fifteenMinutesAgo = new Date(Date.now() - (15 * 60 * 1000)).toISOString();
 
-          // Get events in the last 15 minutes for this property
-          const recentEvents = await d1.prepare(`
-            SELECT COUNT(*) as count, event_type, metadata
-            FROM edge_click_event 
-            WHERE property_id = ? AND timestamp > ?
-            GROUP BY event_type
-          `).bind(propertyId, fifteenMinutesAgo).all();
+          // Get events in the last 15 minutes for this project
+          const recentEventsQuery = `
+            SELECT COUNT(*) as count, event_type, 
+                   json_extract(metadata, '$.class') as traffic_class
+            FROM interaction_events 
+            WHERE project_id = ? 
+              AND occurred_at >= ? 
+              ${propertyId ? 'AND property_id = ?' : ''}
+            GROUP BY event_type, traffic_class
+          `;
+          
+          const recentEventsParams = [projectId, fifteenMinutesAgo];
+          if (propertyId) recentEventsParams.push(propertyId);
+          
+          const recentEvents = await d1.prepare(recentEventsQuery).bind(...recentEventsParams).all();
 
           // Get the last event timestamp
-          const lastEvent = await d1.prepare(`
-            SELECT timestamp FROM edge_click_event 
-            WHERE property_id = ? 
-            ORDER BY timestamp DESC 
+          const lastEventQuery = `
+            SELECT occurred_at, event_type FROM interaction_events 
+            WHERE project_id = ? 
+              ${propertyId ? 'AND property_id = ?' : ''}
+            ORDER BY occurred_at DESC 
             LIMIT 1
-          `).bind(propertyId).first();
+          `;
+          
+          const lastEventParams = [projectId];
+          if (propertyId) lastEventParams.push(propertyId);
+          
+          const lastEvent = await d1.prepare(lastEventQuery).bind(...lastEventParams).first();
 
           // Count total events in last 15 minutes
-          const totalEvents = await d1.prepare(`
-            SELECT COUNT(*) as count FROM edge_click_event 
-            WHERE property_id = ? AND timestamp > ?
-          `).bind(propertyId, fifteenMinutesAgo).first();
+          const totalEventsQuery = `
+            SELECT COUNT(*) as count FROM interaction_events 
+            WHERE project_id = ? 
+              AND occurred_at >= ?
+              ${propertyId ? 'AND property_id = ?' : ''}
+          `;
+          
+          const totalEventsParams = [projectId, fifteenMinutesAgo];
+          if (propertyId) totalEventsParams.push(propertyId);
+          
+          const totalEvents = await d1.prepare(totalEventsQuery).bind(...totalEventsParams).first();
+
+          // Aggregate traffic class counts
+          const byClass = {
+            direct_human: 0,
+            human_via_ai: 0,
+            ai_agent_crawl: 0,
+            unknown_ai_like: 0
+          };
+
+          for (const event of recentEvents.results || []) {
+            const trafficClass = event.traffic_class || 'unknown_ai_like';
+            if (byClass.hasOwnProperty(trafficClass)) {
+              byClass[trafficClass] += event.count;
+            } else {
+              byClass.unknown_ai_like += event.count;
+            }
+          }
 
           const response = new Response(JSON.stringify({
-            property_id: propertyId,
+            project_id: projectId,
+            property_id: propertyId || null,
             events_15m: totalEvents?.count || 0,
-            by_class_15m: {
-              direct_human: 0, // TODO: Implement traffic classification
-              human_via_ai: 0,
-              ai_agent_crawl: 0,
-              unknown_ai_like: 0
-            },
-            last_event_ts: lastEvent?.timestamp || null
+            by_class_15m: byClass,
+            last_event_ts: lastEvent?.occurred_at || null,
+            last_event_type: lastEvent?.event_type || null
           }), {
             headers: { "Content-Type": "application/json" }
           });
