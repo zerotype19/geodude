@@ -4395,7 +4395,14 @@ export default {
             ),
             with_urls AS (
               SELECT 
-                f.*,
+                f.project_id,
+                f.content_id,
+                f.ai_source_id,
+                f.referrals,
+                f.conversions,
+                f.conv_rate,
+                f.last_referral,
+                f.last_conversion,
                 ca.url,
                 s.slug AS source_slug,
                 s.name AS source_name
