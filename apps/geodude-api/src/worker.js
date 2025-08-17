@@ -3,6 +3,25 @@ import { EmailService } from './email-service.ts';
 import { addCorsHeaders } from './cors';
 import { handleApiRoutes } from './routes/api.ts';
 
+// Helper function to get content ID for an event
+async function getContentIdForEvent(event, projectId, d1) {
+  if (!event?.metadata) return null;
+  
+  const urlToMatch = event.metadata.url || event.metadata.pathname;
+  if (!urlToMatch) return null;
+  
+  try {
+    const existingContent = await d1.prepare(`
+      SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
+    `).bind(`%${urlToMatch}%`, projectId).first();
+    
+    return existingContent?.id || null;
+  } catch (error) {
+    console.error('Error getting content ID:', error);
+    return null;
+  }
+}
+
 // D1 Error Tracer (temporary)
 function traceD1(d1) {
   return {
@@ -4231,6 +4250,105 @@ export default {
             // Process each event in the batch
             const now = new Date().toISOString();
             const insertResults = [];
+            
+            // Session tracking: resolve visitor and session once per batch
+            let visitorId = null;
+            let sessionId = null;
+            
+            // Extract visitor key from first event's metadata
+            const firstEvent = events[0];
+            const visitorKey = firstEvent?.metadata?.vid || 
+              `anon:${await hashString((request.headers.get('cf-connecting-ip') || 'unknown') + 
+                                    (request.headers.get('user-agent') || 'unknown') + 
+                                    new Date().toISOString().split('T')[0])}`;
+
+            // Resolve/upsert visitor
+            const ipHash = await hashString(request.headers.get('cf-connecting-ip') || 'unknown');
+            const uaHash = await hashString(request.headers.get('user-agent') || 'unknown');
+            
+            try {
+              // Insert or ignore visitor
+              await d1.prepare(`
+                INSERT OR IGNORE INTO visitor (project_id, visitor_key, first_seen, last_seen, ua_hash, ip_hash)
+                VALUES (?, ?, ?, ?, ?, ?)
+              `).bind(project_id, visitorKey, now, now, uaHash, ipHash).run();
+              
+              // Update last_seen and hashes
+              await d1.prepare(`
+                UPDATE visitor SET last_seen = ?, ua_hash = ?, ip_hash = ? 
+                WHERE project_id = ? AND visitor_key = ?
+              `).bind(now, uaHash, ipHash, project_id, visitorKey).run();
+              
+              // Get visitor ID
+              const visitor = await d1.prepare(`
+                SELECT id FROM visitor WHERE project_id = ? AND visitor_key = ?
+              `).bind(project_id, visitorKey).first();
+              
+              visitorId = visitor?.id;
+            } catch (error) {
+              console.error('Error resolving visitor:', error);
+            }
+
+            // Resolve/maintain session
+            if (visitorId) {
+              try {
+                // Find latest session within 30 minute window
+                const latestSession = await d1.prepare(`
+                  SELECT id, started_at, ended_at FROM session_v1 
+                  WHERE project_id = ? AND visitor_id = ? 
+                    AND (ended_at IS NULL OR ended_at >= datetime('now', '-30 minutes'))
+                  ORDER BY started_at DESC
+                  LIMIT 1
+                `).bind(project_id, visitorId).first();
+
+                const sessionTimeoutMinutes = 30;
+                const eventTime = new Date(firstEvent?.occurred_at || now);
+                
+                if (latestSession) {
+                  // Check if we need to close the old session due to 30min gap
+                  const lastEventInSession = await d1.prepare(`
+                    SELECT MAX(ie.occurred_at) as last_event
+                    FROM session_event_map sem 
+                    JOIN interaction_events ie ON ie.id = sem.event_id
+                    WHERE sem.session_id = ?
+                  `).bind(latestSession.id).first();
+                  
+                  const lastEventTime = lastEventInSession?.last_event ? 
+                    new Date(lastEventInSession.last_event) : new Date(latestSession.started_at);
+                  const timeDiffMinutes = (eventTime.getTime() - lastEventTime.getTime()) / (1000 * 60);
+                  
+                  if (timeDiffMinutes > sessionTimeoutMinutes) {
+                    // Close old session and create new one
+                    await d1.prepare(`
+                      UPDATE session_v1 SET ended_at = ? WHERE id = ?
+                    `).bind(lastEventTime.toISOString(), latestSession.id).run();
+                    
+                    sessionId = null; // Will create new session below
+                  } else {
+                    sessionId = latestSession.id;
+                  }
+                }
+
+                // Create new session if needed
+                if (!sessionId) {
+                  const entryContentId = await getContentIdForEvent(firstEvent, project_id, d1);
+                  const entryUrl = firstEvent?.metadata?.url || firstEvent?.metadata?.pathname;
+                  
+                  const newSession = await d1.prepare(`
+                    INSERT INTO session_v1 (project_id, visitor_id, started_at, entry_content_id, entry_url)
+                    VALUES (?, ?, ?, ?, ?)
+                  `).bind(project_id, visitorId, eventTime.toISOString(), entryContentId, entryUrl).run();
+                  
+                  sessionId = newSession.meta.last_row_id;
+                  
+                  // Increment sessions_opened_5m metric
+                  const sessionsOpenedKey = `sessions_opened_5m:${Math.floor(Date.now() / 300000)}`;
+                  await incrementCounter(env.AI_FINGERPRINTS, sessionsOpenedKey, 300);
+                }
+              } catch (error) {
+                console.error('Error resolving session:', error);
+              }
+            }
 
             for (const event of events) {
               const { event_type, metadata, occurred_at } = event;
@@ -4282,6 +4400,46 @@ export default {
                 ).run();
 
                 insertResults.push(result);
+                const eventId = result.meta.last_row_id;
+
+                // Session event mapping
+                if (sessionId && eventId) {
+                  try {
+                    // Link event to session
+                    await d1.prepare(`
+                      INSERT OR IGNORE INTO session_event_map (session_id, event_id)
+                      VALUES (?, ?)
+                    `).bind(sessionId, eventId).run();
+                    
+                    // Update session metrics and AI influence
+                    const isAiInfluenced = aiSourceId || 
+                      (metadata?.traffic_class && ['human_via_ai', 'ai_agent_crawl'].includes(metadata.traffic_class));
+                    
+                    if (isAiInfluenced) {
+                      await d1.prepare(`
+                        UPDATE session_v1 SET 
+                          ai_influenced = 1,
+                          primary_ai_source_id = COALESCE(primary_ai_source_id, ?)
+                        WHERE id = ?
+                      `).bind(aiSourceId, sessionId).run();
+                    }
+                    
+                    // Update session counts and exit content
+                    await d1.prepare(`
+                      UPDATE session_v1 SET 
+                        events_count = events_count + 1,
+                        exit_content_id = ?
+                      WHERE id = ?
+                    `).bind(contentId, sessionId).run();
+                    
+                    // Increment session_attach_events_5m metric
+                    const sessionAttachKey = `session_attach_events_5m:${Math.floor(Date.now() / 300000)}`;
+                    await incrementCounter(env.AI_FINGERPRINTS, sessionAttachKey, 300);
+                    
+                  } catch (sessionError) {
+                    console.error('Error updating session:', sessionError);
+                  }
+                }
 
                 // If this is AI traffic with content_id, also insert into ai_referrals
                 if (aiSourceId && contentId && (event_type === 'pageview' || normalizedEventType === 'view')) {

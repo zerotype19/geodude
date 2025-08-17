@@ -1020,6 +1020,377 @@ export async function handleApiRoutes(
         }
     }
 
+    // 7.1) Sessions Summary API
+    if (url.pathname === "/api/sessions/summary" && req.method === "GET") {
+        try {
+            const { project_id, window = "24h", from, to } = Object.fromEntries(url.searchParams);
+            
+            if (!project_id) {
+                const response = new Response(JSON.stringify({ error: "Missing project_id parameter" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Calculate time window
+            let sinceTime;
+            if (from && to) {
+                sinceTime = Math.floor(new Date(from).getTime() / 1000);
+            } else {
+                const windowMs = window === "15m" ? 15 * 60 * 1000 : 
+                                window === "24h" ? 24 * 60 * 60 * 1000 : 
+                                7 * 24 * 60 * 60 * 1000; // 7d default
+                sinceTime = Math.floor((Date.now() - windowMs) / 1000);
+            }
+
+            // Get totals
+            const totalsQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    COUNT(*) as sessions,
+                    COUNT(CASE WHEN ai_influenced = 1 THEN 1 END) as ai_influenced,
+                    ROUND(AVG(events_count), 1) as avg_events_per_session
+                FROM session_v1 
+                WHERE project_id = ? AND started_at >= datetime(?, 'unixepoch')
+            `).bind(project_id, sinceTime).first();
+
+            // Get by_source breakdown
+            const bySourceQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT s.slug, s.name, COUNT(*) as count
+                FROM session_v1 sv
+                JOIN ai_sources s ON s.id = sv.primary_ai_source_id
+                WHERE sv.project_id = ? 
+                  AND sv.started_at >= datetime(?, 'unixepoch')
+                  AND sv.primary_ai_source_id IS NOT NULL
+                GROUP BY sv.primary_ai_source_id, s.slug, s.name
+                ORDER BY count DESC
+                LIMIT 10
+            `).bind(project_id, sinceTime).all();
+
+            // Get entry_pages breakdown  
+            const entryPagesQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT sv.entry_content_id as content_id, ca.url, COUNT(*) as count
+                FROM session_v1 sv
+                LEFT JOIN content_assets ca ON ca.id = sv.entry_content_id
+                WHERE sv.project_id = ? 
+                  AND sv.started_at >= datetime(?, 'unixepoch')
+                  AND sv.entry_content_id IS NOT NULL
+                GROUP BY sv.entry_content_id, ca.url
+                ORDER BY count DESC
+                LIMIT 10
+            `).bind(project_id, sinceTime).all();
+
+            // Get timeseries with proper bucketing
+            let timeFormat;
+            if (window === "15m") {
+                timeFormat = "strftime('%Y-%m-%dT%H:%M:00Z', started_at)";
+            } else if (window === "24h") {
+                timeFormat = "strftime('%Y-%m-%dT%H:00:00Z', started_at)";
+            } else {
+                timeFormat = "strftime('%Y-%m-%dT00:00:00Z', started_at)";
+            }
+
+            const timeseriesQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT ${timeFormat} as ts, COUNT(*) as count
+                FROM session_v1
+                WHERE project_id = ? AND started_at >= datetime(?, 'unixepoch')
+                GROUP BY ${timeFormat}
+                ORDER BY ts
+            `).bind(project_id, sinceTime).all();
+
+            const response = new Response(JSON.stringify({
+                totals: {
+                    sessions: totalsQuery?.sessions || 0,
+                    ai_influenced: totalsQuery?.ai_influenced || 0,
+                    avg_events_per_session: totalsQuery?.avg_events_per_session || 0
+                },
+                by_source: (bySourceQuery?.results || []).map(row => ({
+                    slug: row.slug,
+                    name: row.name,
+                    count: row.count
+                })),
+                entry_pages: (entryPagesQuery?.results || []).map(row => ({
+                    content_id: row.content_id,
+                    url: row.url,
+                    count: row.count
+                })),
+                timeseries: (timeseriesQuery?.results || []).map(row => ({
+                    ts: row.ts,
+                    count: row.count
+                }))
+            }), {
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("sessions_summary_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 7.2) Sessions Recent API
+    if (url.pathname === "/api/sessions/recent" && req.method === "GET") {
+        try {
+            const { 
+                project_id, 
+                window = "24h", 
+                from, 
+                to, 
+                ai = "all", 
+                page = "1", 
+                pageSize = "50", 
+                q = "" 
+            } = Object.fromEntries(url.searchParams);
+            
+            if (!project_id) {
+                const response = new Response(JSON.stringify({ error: "Missing project_id parameter" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const pageNum = Math.max(1, parseInt(page));
+            const pageSizeNum = Math.min(200, Math.max(1, parseInt(pageSize)));
+            const offset = (pageNum - 1) * pageSizeNum;
+
+            // Calculate time window
+            let sinceTime;
+            if (from && to) {
+                sinceTime = Math.floor(new Date(from).getTime() / 1000);
+            } else {
+                const windowMs = window === "15m" ? 15 * 60 * 1000 : 
+                                window === "24h" ? 24 * 60 * 60 * 1000 : 
+                                7 * 24 * 60 * 60 * 1000;
+                sinceTime = Math.floor((Date.now() - windowMs) / 1000);
+            }
+
+            // Build WHERE conditions
+            let whereConditions = ["sv.project_id = ?", "sv.started_at >= datetime(?, 'unixepoch')"];
+            let bindParams = [project_id, sinceTime];
+
+            // AI filter
+            if (ai === "only") {
+                whereConditions.push("sv.ai_influenced = 1");
+            } else if (ai === "none") {
+                whereConditions.push("sv.ai_influenced = 0");
+            }
+
+            // Search filter
+            if (q) {
+                whereConditions.push("(sv.entry_url LIKE ? OR ca_entry.url LIKE ? OR ca_exit.url LIKE ?)");
+                bindParams.push(`%${q}%`, `%${q}%`, `%${q}%`);
+            }
+
+            const whereClause = whereConditions.join(" AND ");
+
+            // Get total count
+            const countQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as total
+                FROM session_v1 sv
+                LEFT JOIN content_assets ca_entry ON ca_entry.id = sv.entry_content_id
+                LEFT JOIN content_assets ca_exit ON ca_exit.id = sv.exit_content_id
+                WHERE ${whereClause}
+            `).bind(...bindParams).first();
+
+            // Get paginated results
+            const sessionsQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    sv.id,
+                    sv.started_at,
+                    sv.ended_at,
+                    sv.events_count,
+                    sv.ai_influenced,
+                    sv.entry_content_id,
+                    sv.entry_url,
+                    sv.exit_content_id,
+                    ca_entry.url as entry_content_url,
+                    ca_exit.url as exit_content_url,
+                    s.id as source_id,
+                    s.slug as source_slug,
+                    s.name as source_name
+                FROM session_v1 sv
+                LEFT JOIN content_assets ca_entry ON ca_entry.id = sv.entry_content_id
+                LEFT JOIN content_assets ca_exit ON ca_exit.id = sv.exit_content_id
+                LEFT JOIN ai_sources s ON s.id = sv.primary_ai_source_id
+                WHERE ${whereClause}
+                ORDER BY sv.started_at DESC
+                LIMIT ? OFFSET ?
+            `).bind(...bindParams, pageSizeNum, offset).all();
+
+            const items = (sessionsQuery?.results || []).map(row => {
+                const startTime = new Date(row.started_at);
+                const endTime = row.ended_at ? new Date(row.ended_at) : new Date();
+                const durationSec = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+
+                return {
+                    id: row.id,
+                    started_at: row.started_at,
+                    ended_at: row.ended_at,
+                    duration_sec: durationSec,
+                    events_count: row.events_count,
+                    ai_influenced: row.ai_influenced === 1,
+                    primary_ai_source: row.source_id ? {
+                        slug: row.source_slug,
+                        name: row.source_name
+                    } : null,
+                    entry: row.entry_content_id ? {
+                        content_id: row.entry_content_id,
+                        url: row.entry_content_url || row.entry_url
+                    } : { url: row.entry_url },
+                    exit: row.exit_content_id ? {
+                        content_id: row.exit_content_id,
+                        url: row.exit_content_url
+                    } : null
+                };
+            });
+
+            const response = new Response(JSON.stringify({
+                items,
+                page: pageNum,
+                pageSize: pageSizeNum,
+                total: countQuery?.total || 0
+            }), {
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("sessions_recent_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 7.3) Sessions Journey API
+    if (url.pathname === "/api/sessions/journey" && req.method === "GET") {
+        try {
+            const { project_id, session_id } = Object.fromEntries(url.searchParams);
+            
+            if (!project_id || !session_id) {
+                const response = new Response(JSON.stringify({ error: "Missing project_id or session_id parameter" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get session details
+            const sessionQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    sv.id,
+                    sv.started_at,
+                    sv.ended_at,
+                    sv.events_count,
+                    sv.ai_influenced,
+                    sv.entry_content_id,
+                    sv.entry_url,
+                    sv.exit_content_id,
+                    ca_entry.url as entry_content_url,
+                    ca_exit.url as exit_content_url,
+                    s.id as source_id,
+                    s.slug as source_slug,
+                    s.name as source_name
+                FROM session_v1 sv
+                LEFT JOIN content_assets ca_entry ON ca_entry.id = sv.entry_content_id
+                LEFT JOIN content_assets ca_exit ON ca_exit.id = sv.exit_content_id
+                LEFT JOIN ai_sources s ON s.id = sv.primary_ai_source_id
+                WHERE sv.project_id = ? AND sv.id = ?
+            `).bind(project_id, session_id).first();
+
+            if (!sessionQuery) {
+                const response = new Response(JSON.stringify({ error: "Session not found" }), {
+                    status: 404,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get session events
+            const eventsQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.id,
+                    ie.occurred_at,
+                    ie.event_type,
+                    ie.content_id,
+                    ca.url as content_url,
+                    s.id as ai_source_id,
+                    s.slug as ai_source_slug,
+                    s.name as ai_source_name
+                FROM session_event_map sem
+                JOIN interaction_events ie ON ie.id = sem.event_id
+                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
+                WHERE sem.session_id = ?
+                ORDER BY ie.occurred_at ASC
+            `).bind(session_id).all();
+
+            const session = {
+                id: sessionQuery.id,
+                started_at: sessionQuery.started_at,
+                ended_at: sessionQuery.ended_at,
+                events_count: sessionQuery.events_count,
+                ai_influenced: sessionQuery.ai_influenced === 1,
+                primary_ai_source: sessionQuery.source_id ? {
+                    slug: sessionQuery.source_slug,
+                    name: sessionQuery.source_name
+                } : null,
+                entry: sessionQuery.entry_content_id ? {
+                    content_id: sessionQuery.entry_content_id,
+                    url: sessionQuery.entry_content_url || sessionQuery.entry_url
+                } : { url: sessionQuery.entry_url },
+                exit: sessionQuery.exit_content_id ? {
+                    content_id: sessionQuery.exit_content_id,
+                    url: sessionQuery.exit_content_url
+                } : null
+            };
+
+            const events = (eventsQuery?.results || []).map(row => ({
+                id: row.id,
+                occurred_at: row.occurred_at,
+                event_type: row.event_type,
+                content: row.content_id ? {
+                    id: row.content_id,
+                    url: row.content_url
+                } : null,
+                ai_source: row.ai_source_id ? {
+                    slug: row.ai_source_slug,
+                    name: row.ai_source_name
+                } : null
+            }));
+
+            const response = new Response(JSON.stringify({
+                session,
+                events
+            }), {
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("sessions_journey_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
     return null; // No API route matched
 }
 
