@@ -1,6 +1,7 @@
-import { Request, Response } from '@cloudflare/workers-types';
+// Request and Response are global types in Cloudflare Workers
 import { Env } from '../auth-middleware';
-import { addBasicSecurityHeaders, addCorsHeaders } from '../cors';
+import { addCorsHeaders } from '../cors';
+import { addBasicSecurityHeaders } from '../security-headers';
 
 export async function handleApiRoutes(
     req: Request,
