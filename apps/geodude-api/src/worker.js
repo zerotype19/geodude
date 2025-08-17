@@ -1,6 +1,7 @@
 import { loadConfig, getConfigForEnvCheck, getConfigErrors, getMissingConfigKeys } from './config.js';
 import { EmailService } from './email-service.ts';
 import { addCorsHeaders } from './cors';
+import { handleApiRoutes } from './routes/api.ts';
 
 // D1 Error Tracer (temporary)
 function traceD1(d1) {
@@ -1170,6 +1171,20 @@ export default {
           headers: { "Content-Type": "text/html" }
         });
         return addCorsHeaders(response, origin);
+      }
+
+      // Try API routes from routes/api.ts first
+      const apiResult = await handleApiRoutes(
+        request, 
+        env, 
+        url, 
+        origin,
+        (resp) => resp, // attach function (identity for now)
+        (resp) => resp, // addBasicSecurityHeaders (identity for now) 
+        addCorsHeaders
+      );
+      if (apiResult) {
+        return apiResult;
       }
 
       // 3.1) Create Organization

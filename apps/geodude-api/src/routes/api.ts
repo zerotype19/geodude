@@ -1,6 +1,5 @@
 import { Request, Response } from '@cloudflare/workers-types';
-import { Env } from '../types';
-import { log } from '../logging';
+import { Env } from '../auth-middleware';
 import { addBasicSecurityHeaders, addCorsHeaders } from '../cors';
 
 export async function handleApiRoutes(
@@ -46,7 +45,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("keys_create_error", { error: e.message, stack: e.stack });
+            console.error("keys_create_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -89,7 +88,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("keys_list_error", { error: e.message, stack: e.stack });
+            console.error("keys_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -128,7 +127,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("events_list_error", { error: e.message, stack: e.stack });
+            console.error("events_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -288,7 +287,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("events_summary_error", { error: e.message, stack: e.stack });
+            console.error("events_summary_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -442,7 +441,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("events_recent_error", { error: e.message, stack: e.stack });
+            console.error("events_recent_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -520,7 +519,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("events_has_any_error", { error: e.message, stack: e.stack });
+            console.error("events_has_any_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -555,7 +554,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("content_list_error", { error: e.message, stack: e.stack });
+            console.error("content_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -581,7 +580,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("sources_list_error", { error: e.message, stack: e.stack });
+            console.error("sources_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -618,7 +617,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("funnels_summary_error", { error: e.message, stack: e.stack });
+            console.error("funnels_summary_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -664,7 +663,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("funnels_list_error", { error: e.message, stack: e.stack });
+            console.error("funnels_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -706,7 +705,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("funnels_detail_error", { error: e.message, stack: e.stack });
+            console.error("funnels_detail_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -794,7 +793,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("citations_summary_error", { error: e.message, stack: e.stack });
+            console.error("citations_summary_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -902,7 +901,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("citations_list_error", { error: e.message, stack: e.stack });
+            console.error("citations_list_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
@@ -1011,7 +1010,7 @@ export async function handleApiRoutes(
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
-            log("citations_detail_error", { error: e.message, stack: e.stack });
+            console.error("citations_detail_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
