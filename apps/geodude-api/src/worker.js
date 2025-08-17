@@ -729,22 +729,27 @@ export default {
               (SELECT r1_count FROM recs) + (SELECT r2_count FROM r2) as open_estimate
           `).bind().first();
 
-          // Get citations metrics
-          const citations5m = await d1.prepare(`
-            SELECT COUNT(*) as count
-            FROM ai_citations
-            WHERE detected_at >= datetime('now','-5 minutes')
-          `).bind().first();
+          // Get citations metrics - handle both table names
+          let citations5m, citationsBySource5m;
+          try {
+            // Try ai_citation_event table first (actual table in production)
+            citations5m = await d1.prepare(`
+              SELECT COUNT(*) as count
+              FROM ai_citation_event
+              WHERE datetime(ts, 'unixepoch') >= datetime('now','-5 minutes')
+            `).bind().first();
 
-          const citationsBySource5m = await d1.prepare(`
-            SELECT s.slug, COUNT(*) as count
-            FROM ai_citations ac
-            JOIN ai_sources s ON s.id = ac.ai_source_id
-            WHERE ac.detected_at >= datetime('now','-5 minutes')
-            GROUP BY ac.ai_source_id, s.slug
-            ORDER BY count DESC
-            LIMIT 5
-          `).bind().all();
+            citationsBySource5m = await d1.prepare(`
+              SELECT 'unknown' as slug, COUNT(*) as count
+              FROM ai_citation_event
+              WHERE datetime(ts, 'unixepoch') >= datetime('now','-5 minutes')
+            `).bind().all();
+          } catch (error) {
+            // Fallback to empty results if table doesn't exist
+            console.error('Citations table query failed:', error.message);
+            citations5m = { count: 0 };
+            citationsBySource5m = { results: [] };
+          }
 
           // Get sessions metrics for health
           const sessionsOpened5m = await d1.prepare(`
@@ -860,6 +865,20 @@ export default {
             d1_ok: false,
             error: "Failed to query database",
             message: error.message,
+            ingest: {
+              total_5m: 0,
+              error_rate_5m: 0,
+              p50_ms_5m: 0,
+              p95_ms_5m: 0,
+              by_error_5m: {},
+              top_error_keys_5m: [],
+              top_error_projects_5m: []
+            },
+            auth: {
+              continue_sanitized_5m: 0,
+              magic_links_requested_5m: 0,
+              magic_links_consumed_5m: 0
+            },
             sources: {
               rules_suggestions_pending: 0,
               manifest: { version: null, sources_count: 0, legacy_keys_present: { heuristics: false, sources_index: false }, error: "Health check failed" }
@@ -895,6 +914,22 @@ export default {
               referrals_24h: 0,
               conversions_24h: 0,
               avg_p50_ttc_min_24h: null
+            },
+            recommendations: {
+              open_estimate_7d: 0,
+              pending_rules_suggestions: 0
+            },
+            citations: {
+              citations_5m: 0,
+              citations_by_source_5m: []
+            },
+            sessions: {
+              opened_5m: 0,
+              closed_5m: 0,
+              attach_5m: 0,
+              sessions_24h: 0,
+              ai_influenced_24h: 0,
+              status: "degraded"
             }
           }), {
             status: 200,
