@@ -137,90 +137,390 @@ export async function handleApiRoutes(
         }
     }
 
-    // 6.3) Events Summary API
+    // 6.3) Events Summary API (New Spec with Legacy Support)
     if (url.pathname === "/api/events/summary" && req.method === "GET") {
         try {
-            const { project_id, from, to } = Object.fromEntries(url.searchParams);
+            const { project_id, window = "24h", from, to, legacy } = Object.fromEntries(url.searchParams);
             if (!project_id) {
                 const response = new Response("missing project_id", { status: 400 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            const fromTs = from ? parseInt(from) : Date.now() - 7 * 24 * 60 * 60 * 1000;
-            const toTs = to ? parseInt(to) : Date.now();
+            // Calculate time bounds from window or from/to override
+            let fromTs: number, toTs: number;
+            if (from && to) {
+                fromTs = new Date(from).getTime();
+                toTs = new Date(to).getTime();
+            } else {
+                const now = Date.now();
+                switch (window) {
+                    case "15m": fromTs = now - 15 * 60 * 1000; break;
+                    case "24h": fromTs = now - 24 * 60 * 60 * 1000; break;
+                    case "7d": fromTs = now - 7 * 24 * 60 * 60 * 1000; break;
+                    default: fromTs = now - 24 * 60 * 60 * 1000; break;
+                }
+                toTs = now;
+            }
+
+            // Convert to SQL-compatible format (milliseconds -> seconds)
+            const fromSql = fromTs / 1000;
+            const toSql = toTs / 1000;
+
+            // CTE for scoped events
+            const scopedEvents = `
+                SELECT ie.*, 
+                       COALESCE(json_extract(ie.metadata, '$.class'), 'direct_human') as traffic_class
+                FROM interaction_events ie
+                WHERE ie.project_id = ? 
+                  AND ie.occurred_at >= datetime(?, 'unixepoch')
+                  AND ie.occurred_at <= datetime(?, 'unixepoch')
+            `;
 
             // Get total events
             const totalResult = await env.OPTIVIEW_DB.prepare(`
-        SELECT COUNT(*) AS total
-        FROM interaction_events
-        WHERE project_id = ? AND occurred_at >= ? AND occurred_at < ?
-      `).bind(project_id, fromTs, toTs).first<any>();
+                WITH scoped AS (${scopedEvents})
+                SELECT COUNT(*) AS events FROM scoped
+            `).bind(project_id, fromSql, toSql).first<any>();
 
-            // Get breakdown by traffic class
+            // Get AI-influenced count
+            const aiInfluencedResult = await env.OPTIVIEW_DB.prepare(`
+                WITH scoped AS (${scopedEvents})
+                SELECT COUNT(*) AS ai_influenced 
+                FROM scoped 
+                WHERE ai_source_id IS NOT NULL 
+                   OR traffic_class IN ('human_via_ai', 'ai_agent_crawl')
+            `).bind(project_id, fromSql, toSql).first<any>();
+
+            // Get breakdown by class
             const classBreakdown = await env.OPTIVIEW_DB.prepare(`
-        SELECT 
-          json_extract(metadata, '$.class') AS traffic_class,
-          COUNT(*) AS cnt
-        FROM interaction_events
-        WHERE project_id = ? AND occurred_at >= ? AND occurred_at < ?
-        GROUP BY traffic_class
-        ORDER BY cnt DESC
-      `).bind(project_id, fromTs, toTs).all<any>();
+                WITH scoped AS (${scopedEvents})
+                SELECT traffic_class AS class, COUNT(*) AS count
+                FROM scoped
+                GROUP BY traffic_class
+                ORDER BY count DESC
+            `).bind(project_id, fromSql, toSql).all<any>();
 
             // Get top AI sources
             const topSources = await env.OPTIVIEW_DB.prepare(`
-        SELECT 
-          s.slug AS source_slug,
-          s.name AS source_name,
-          COUNT(*) AS cnt
-        FROM interaction_events AS ie
-        JOIN ai_sources AS s ON s.id = ie.ai_source_id
-        WHERE ie.project_id = ?
-          AND ie.occurred_at >= ? AND ie.occurred_at < ?
-        GROUP BY ie.ai_source_id
-        ORDER BY cnt DESC
-        LIMIT 5
-      `).bind(project_id, fromTs, toTs).all<any>();
+                WITH scoped AS (${scopedEvents})
+                SELECT ie.ai_source_id, s.slug, s.name, COUNT(*) AS count
+                FROM scoped ie
+                JOIN ai_sources s ON s.id = ie.ai_source_id
+                WHERE ie.ai_source_id IS NOT NULL
+                GROUP BY ie.ai_source_id, s.slug, s.name
+                ORDER BY count DESC
+                LIMIT 5
+            `).bind(project_id, fromSql, toSql).all<any>();
 
-            // Get timeseries data by day + class
+            // Get timeseries data with appropriate bucketing
+            let bucketFormat: string;
+            switch (window) {
+                case "15m": bucketFormat = "%Y-%m-%dT%H:%M:00.000Z"; break; // 1-minute buckets
+                case "24h": bucketFormat = "%Y-%m-%dT%H:00:00.000Z"; break; // hourly buckets  
+                case "7d": bucketFormat = "%Y-%m-%dT00:00:00.000Z"; break; // daily buckets
+                default: bucketFormat = "%Y-%m-%dT%H:00:00.000Z"; break;
+            }
+
             const timeseries = await env.OPTIVIEW_DB.prepare(`
-        SELECT 
-          date(occurred_at) AS day,
-          json_extract(metadata,'$.class') AS traffic_class,
-          COUNT(*) AS cnt
-        FROM interaction_events
-        WHERE project_id = ? AND occurred_at >= ? AND occurred_at < ?
-        GROUP BY day, traffic_class
-        ORDER BY day
-      `).bind(project_id, fromTs, toTs).all<any>();
+                WITH scoped AS (${scopedEvents})
+                SELECT strftime(?, occurred_at) AS ts, COUNT(*) AS count
+                FROM scoped
+                GROUP BY strftime(?, occurred_at)
+                ORDER BY ts
+            `).bind(project_id, fromSql, toSql, bucketFormat, bucketFormat).all<any>();
 
+            // Build response based on legacy flag
+            if (legacy === "1") {
+                // Legacy format for backward compatibility
+                const legacySummary = {
+                    total: totalResult?.events || 0,
+                    breakdown: (classBreakdown.results || []).map(row => ({
+                        traffic_class: row.class,
+                        count: row.count
+                    })),
+                    top_sources: (topSources.results || []).map(row => ({
+                        source_slug: row.slug,
+                        source_name: row.name,
+                        count: row.count
+                    })),
+                    timeseries: (timeseries.results || []).map(row => ({
+                        day: row.ts?.split('T')[0], // Extract date part
+                        count: row.count
+                    }))
+                };
+
+                const response = new Response(JSON.stringify(legacySummary), {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+                    }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // New format
             const summary = {
-                total: totalResult?.total || 0,
-                breakdown: (classBreakdown.results || []).map(row => ({
-                    traffic_class: row.traffic_class,
-                    count: row.cnt
+                totals: {
+                    events: totalResult?.events || 0,
+                    ai_influenced: aiInfluencedResult?.ai_influenced || 0
+                },
+                by_class: (classBreakdown.results || []).map(row => ({
+                    class: row.class,
+                    count: row.count
                 })),
-                top_sources: (topSources.results || []).map(row => ({
-                    source_slug: row.source_slug,
-                    source_name: row.source_name,
-                    count: row.cnt
+                by_source: (topSources.results || []).map(row => ({
+                    ai_source_id: row.ai_source_id,
+                    slug: row.slug,
+                    name: row.name,
+                    count: row.count
                 })),
                 timeseries: (timeseries.results || []).map(row => ({
-                    day: row.day,
-                    traffic_class: row.traffic_class,
-                    count: row.cnt
+                    ts: row.ts,
+                    count: row.count
                 }))
             };
 
             const response = new Response(JSON.stringify(summary), {
                 headers: {
                     "Content-Type": "application/json",
-                    "Cache-Control": "public, max-age=300" // 5 min cache
+                    "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
                 }
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
             log("events_summary_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.3.1) Events Recent API
+    if (url.pathname === "/api/events/recent" && req.method === "GET") {
+        try {
+            const { 
+                project_id, 
+                window = "24h", 
+                from, 
+                to, 
+                page = "1", 
+                pageSize = "50",
+                q = "",
+                source = ""
+            } = Object.fromEntries(url.searchParams);
+            
+            if (!project_id) {
+                const response = new Response("missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Calculate time bounds
+            let fromTs: number, toTs: number;
+            if (from && to) {
+                fromTs = new Date(from).getTime();
+                toTs = new Date(to).getTime();
+            } else {
+                const now = Date.now();
+                switch (window) {
+                    case "15m": fromTs = now - 15 * 60 * 1000; break;
+                    case "24h": fromTs = now - 24 * 60 * 60 * 1000; break;
+                    case "7d": fromTs = now - 7 * 24 * 60 * 60 * 1000; break;
+                    default: fromTs = now - 24 * 60 * 60 * 1000; break;
+                }
+                toTs = now;
+            }
+
+            const fromSql = fromTs / 1000;
+            const toSql = toTs / 1000;
+            
+            const pageNum = Math.max(1, parseInt(page));
+            const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 200);
+            const offset = (pageNum - 1) * pageSizeNum;
+
+            // Build WHERE conditions
+            let whereConditions = [
+                "ie.project_id = ?",
+                "ie.occurred_at >= datetime(?, 'unixepoch')",
+                "ie.occurred_at <= datetime(?, 'unixepoch')"
+            ];
+            let params: any[] = [project_id, fromSql, toSql];
+
+            // Add URL search filter
+            if (q.trim()) {
+                whereConditions.push("ca.url LIKE ?");
+                params.push(`%${q.trim()}%`);
+            }
+
+            // Add source filter
+            if (source.trim()) {
+                whereConditions.push("s.slug = ?");
+                params.push(source.trim());
+            }
+
+            const whereClause = whereConditions.join(" AND ");
+
+            // Get total count for pagination
+            const countResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) AS total
+                FROM interaction_events ie
+                LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
+                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                WHERE ${whereClause}
+            `).bind(...params).first<any>();
+
+            // Get paginated results
+            const itemsResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.id,
+                    ie.occurred_at,
+                    ie.event_type,
+                    ie.metadata,
+                    COALESCE(json_extract(ie.metadata, '$.class'), 'direct_human') as traffic_class,
+                    s.id as ai_source_id,
+                    s.slug as ai_source_slug,
+                    s.name as ai_source_name,
+                    ca.id as content_id,
+                    ca.url as content_url
+                FROM interaction_events ie
+                LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
+                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                WHERE ${whereClause}
+                ORDER BY ie.occurred_at DESC
+                LIMIT ? OFFSET ?
+            `).bind(...params, pageSizeNum, offset).all<any>();
+
+            const items = (itemsResult.results || []).map(row => {
+                let metadata_snippet = {};
+                let referrer = null;
+
+                try {
+                    if (row.metadata) {
+                        const meta = JSON.parse(row.metadata);
+                        metadata_snippet = {
+                            pathname: meta.pathname || meta.p,
+                            title: meta.title || meta.t
+                        };
+                        referrer = meta.referrer || meta.r;
+                    }
+                } catch (e) {
+                    // Invalid JSON, leave as empty object
+                }
+
+                return {
+                    id: row.id,
+                    occurred_at: row.occurred_at,
+                    event_type: row.event_type,
+                    traffic_class: row.traffic_class,
+                    ai_source: row.ai_source_id ? {
+                        id: row.ai_source_id,
+                        slug: row.ai_source_slug,
+                        name: row.ai_source_name
+                    } : null,
+                    content: row.content_id ? {
+                        id: row.content_id,
+                        url: row.content_url
+                    } : null,
+                    referrer,
+                    metadata_snippet
+                };
+            });
+
+            const result = {
+                items,
+                page: pageNum,
+                pageSize: pageSizeNum,
+                total: countResult?.total || 0
+            };
+
+            const response = new Response(JSON.stringify(result), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=15"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            log("events_recent_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.3.2) Events Has-Any API
+    if (url.pathname === "/api/events/has-any" && req.method === "GET") {
+        try {
+            const { project_id, window = "15m" } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response("missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Calculate time bounds
+            const now = Date.now();
+            let fromTs: number;
+            switch (window) {
+                case "15m": fromTs = now - 15 * 60 * 1000; break;
+                case "24h": fromTs = now - 24 * 60 * 60 * 1000; break;
+                case "7d": fromTs = now - 7 * 24 * 60 * 60 * 1000; break;
+                default: fromTs = now - 15 * 60 * 1000; break;
+            }
+
+            const fromSql = fromTs / 1000;
+
+            // Check if any events exist
+            const hasAnyResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 1 as has_events 
+                FROM interaction_events 
+                WHERE project_id = ? 
+                  AND occurred_at >= datetime(?, 'unixepoch')
+                LIMIT 1
+            `).bind(project_id, fromSql).first<any>();
+
+            // Get last event timestamp
+            const lastEventResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT occurred_at as last_event_at
+                FROM interaction_events
+                WHERE project_id = ?
+                  AND occurred_at >= datetime(?, 'unixepoch')
+                ORDER BY occurred_at DESC
+                LIMIT 1
+            `).bind(project_id, fromSql).first<any>();
+
+            // Get breakdown by class within window
+            const classBreakdown = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    COALESCE(json_extract(metadata, '$.class'), 'direct_human') as class,
+                    COUNT(*) as count
+                FROM interaction_events
+                WHERE project_id = ?
+                  AND occurred_at >= datetime(?, 'unixepoch')
+                GROUP BY class
+                ORDER BY count DESC
+            `).bind(project_id, fromSql).all<any>();
+
+            const result = {
+                has_any: !!hasAnyResult?.has_events,
+                last_event_at: lastEventResult?.last_event_at || null,
+                by_class: (classBreakdown.results || []).map(row => ({
+                    class: row.class,
+                    count: row.count
+                }))
+            };
+
+            const response = new Response(JSON.stringify(result), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=30"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            log("events_has_any_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
