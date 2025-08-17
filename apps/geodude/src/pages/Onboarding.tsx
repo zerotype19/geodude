@@ -23,11 +23,11 @@ export default function Onboarding() {
   const [state, setState] = useState<OnboardingState>({
     step: 1,
     organization: {
-      name: 'Rhythm90',
+      name: '',
     },
     project: {
-      name: 'Rhythm90 Blog',
-      description: 'This is the thought leadership blog',
+      name: '',
+      description: '',
     },
     loading: false,
     error: '',
@@ -310,7 +310,7 @@ export default function Onboarding() {
                     value={state.organization.name}
                     onChange={(e) => updateOrganization('name', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your organization name"
+                    placeholder="e.g., Acme Corp, My Company, etc."
                     disabled={state.loading}
                   />
                 </div>
@@ -331,7 +331,7 @@ export default function Onboarding() {
                     value={state.project.name}
                     onChange={(e) => updateProject('name', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter your project name"
+                    placeholder="e.g., Company Website, Marketing Blog, etc."
                     disabled={state.loading}
                   />
                 </div>
@@ -344,7 +344,7 @@ export default function Onboarding() {
                     onChange={(e) => updateProject('description', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows={3}
-                    placeholder="Describe what this project is for"
+                    placeholder="e.g., Track AI referrals for our blog and marketing content"
                     disabled={state.loading}
                   />
                 </div>
