@@ -51,10 +51,30 @@ export default function Sources() {
             const response = await fetch(`${API_BASE}/api/sources?project_id=${project.id}&includeTop=false`, FETCH_OPTS);
             if (response.ok) {
                 const data = await response.json();
-                setSources(data || []);
+                console.log('Sources API response:', data); // Debug logging
+                // Handle both response formats: direct array or { sources: [...] }
+                let sourcesArray = data;
+                if (data && typeof data === 'object' && Array.isArray(data.sources)) {
+                    sourcesArray = data.sources;
+                }
+                // Ensure each source has required fields with defaults
+                const normalizedSources = (sourcesArray || []).map((source) => ({
+                    id: source.id,
+                    slug: source.slug || source.name?.toLowerCase().replace(/\s+/g, '_') || 'unknown',
+                    name: source.name || 'Unknown',
+                    category: source.category || 'other',
+                    enabled: Boolean(source.enabled), // Explicitly convert to boolean
+                    last_seen: source.last_seen || null,
+                    events_15m: source.events_15m || 0,
+                    events_24h: source.events_24h || 0,
+                    referrals_24h: source.referrals_24h || 0,
+                    top_content: source.top_content || []
+                }));
+                setSources(normalizedSources);
             }
             else {
-                setError(`Failed to load sources: ${response.status}`);
+                const errorText = await response.text();
+                setError(`Failed to load sources: ${response.status} - ${errorText}`);
             }
         }
         catch (error) {

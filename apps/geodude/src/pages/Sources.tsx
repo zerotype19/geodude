@@ -77,6 +77,7 @@ export default function Sources() {
       const response = await fetch(`${API_BASE}/api/sources?project_id=${project.id}&includeTop=false`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
+        console.log('Sources API response:', data); // Debug logging
         
         // Handle both response formats: direct array or { sources: [...] }
         let sourcesArray = data;
@@ -90,7 +91,7 @@ export default function Sources() {
           slug: source.slug || source.name?.toLowerCase().replace(/\s+/g, '_') || 'unknown',
           name: source.name || 'Unknown',
           category: source.category || 'other',
-          enabled: source.enabled ?? false,
+          enabled: Boolean(source.enabled), // Explicitly convert to boolean
           last_seen: source.last_seen || null,
           events_15m: source.events_15m || 0,
           events_24h: source.events_24h || 0,
