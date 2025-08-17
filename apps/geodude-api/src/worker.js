@@ -1,5 +1,5 @@
 import { loadConfig, getConfigForEnvCheck, getConfigErrors, getMissingConfigKeys } from './config.js';
-import { EmailService } from './email-service.js';
+import { EmailService } from './email-service.ts';
 import { addCorsHeaders } from './cors';
 
 // D1 Error Tracer (temporary)
@@ -1048,7 +1048,7 @@ export default {
             // Check if this is the first user in the system
             const userCount = await d1.prepare(`
               SELECT COUNT(*) as count FROM user
-            `).first();
+            `).bind().first();
 
             // Make the first user an admin
             const isAdmin = userCount.count === 0 ? 1 : 0;
@@ -4304,8 +4304,8 @@ export default {
             // Validate API key
             const keyHash = await hashToken(key_id);
             const apiKey = await d1.prepare(`
-              SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
-            `).bind(keyHash).first();
+            SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
+          `).bind(keyHash).first();
 
             if (!apiKey) {
               const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
