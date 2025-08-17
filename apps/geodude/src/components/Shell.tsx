@@ -53,6 +53,7 @@ export default function Shell({ children }: ShellProps) {
     { name: "Events", href: "/events" },
     { name: "Sources", href: "/sources" },
     { name: "Content", href: "/content" },
+    { name: "Citations", href: "/citations" },
     { name: "Funnels", href: "/funnels" },
     { name: "Recommendations", href: "/recommendations" },
     { name: "Install", href: "/install" },

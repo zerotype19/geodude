@@ -415,6 +415,311 @@ export async function handleApiRoutes(
         }
     }
 
+    // 6.9) Citations Summary API
+    if (url.pathname === "/api/citations/summary" && req.method === "GET") {
+        try {
+            const { project_id, window = "7d" } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response("Missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Calculate window timestamps
+            const now = Date.now();
+            let windowMs: number;
+            switch (window) {
+                case "15m": windowMs = 15 * 60 * 1000; break;
+                case "24h": windowMs = 24 * 60 * 60 * 1000; break;
+                case "7d": 
+                default: windowMs = 7 * 24 * 60 * 60 * 1000; break;
+            }
+            const fromTs = now - windowMs;
+
+            // Get total citations
+            const totalResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) AS citations
+                FROM ai_citations
+                WHERE project_id = ? AND detected_at >= datetime(?, 'unixepoch', 'utc')
+            `).bind(project_id, Math.floor(fromTs / 1000)).first<any>();
+
+            // Get citations by source
+            const bySourceResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT s.slug, s.name, COUNT(*) AS count
+                FROM ai_citations ac
+                JOIN ai_sources s ON s.id = ac.ai_source_id
+                WHERE ac.project_id = ? AND ac.detected_at >= datetime(?, 'unixepoch', 'utc')
+                GROUP BY ac.ai_source_id, s.slug, s.name
+                ORDER BY count DESC
+                LIMIT 10
+            `).bind(project_id, Math.floor(fromTs / 1000)).all<any>();
+
+            // Get top content
+            const topContentResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT ca.id AS content_id, ca.url, COUNT(*) AS count
+                FROM ai_citations ac
+                JOIN content_assets ca ON ca.id = ac.content_id
+                WHERE ac.project_id = ? AND ac.detected_at >= datetime(?, 'unixepoch', 'utc')
+                GROUP BY ac.content_id, ca.id, ca.url
+                ORDER BY count DESC
+                LIMIT 5
+            `).bind(project_id, Math.floor(fromTs / 1000)).all<any>();
+
+            // Get timeseries data
+            const timeseriesResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT DATE(detected_at) AS day, COUNT(*) AS count
+                FROM ai_citations
+                WHERE project_id = ? AND detected_at >= datetime(?, 'unixepoch', 'utc')
+                GROUP BY DATE(detected_at)
+                ORDER BY day
+            `).bind(project_id, Math.floor(fromTs / 1000)).all<any>();
+
+            const summary = {
+                totals: { citations: totalResult?.citations || 0, by_source: bySourceResult.results || [] },
+                top_content: (topContentResult.results || []).map(row => ({
+                    content_id: row.content_id,
+                    url: row.url,
+                    count: row.count
+                })),
+                timeseries: (timeseriesResult.results || []).map(row => ({
+                    day: row.day,
+                    count: row.count
+                }))
+            };
+
+            const response = new Response(JSON.stringify(summary), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=120, stale-while-revalidate=120"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            log("citations_summary_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.10) Citations List API
+    if (url.pathname === "/api/citations" && req.method === "GET") {
+        try {
+            const {
+                project_id,
+                window = "7d",
+                source = "",
+                q = "",
+                page = "1",
+                pageSize = "50"
+            } = Object.fromEntries(url.searchParams);
+
+            if (!project_id) {
+                const response = new Response("Missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Calculate window timestamps
+            const now = Date.now();
+            let windowMs: number;
+            switch (window) {
+                case "15m": windowMs = 15 * 60 * 1000; break;
+                case "24h": windowMs = 24 * 60 * 60 * 1000; break;
+                case "7d": 
+                default: windowMs = 7 * 24 * 60 * 60 * 1000; break;
+            }
+            const fromTs = now - windowMs;
+
+            const pageNum = Math.max(1, parseInt(page));
+            const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
+            const offset = (pageNum - 1) * pageSizeNum;
+
+            // Build query conditions
+            let whereConditions = ["ac.project_id = ?", "ac.detected_at >= datetime(?, 'unixepoch', 'utc')"];
+            let params: any[] = [project_id, Math.floor(fromTs / 1000)];
+
+            if (source) {
+                whereConditions.push("s.slug = ?");
+                params.push(source);
+            }
+
+            if (q.trim()) {
+                whereConditions.push("(ca.url LIKE ? OR ac.snippet LIKE ?)");
+                const searchTerm = `%${q.trim()}%`;
+                params.push(searchTerm, searchTerm);
+            }
+
+            const whereClause = whereConditions.join(" AND ");
+
+            // Get total count
+            const countResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) AS total
+                FROM ai_citations ac
+                JOIN ai_sources s ON s.id = ac.ai_source_id
+                LEFT JOIN content_assets ca ON ca.id = ac.content_id
+                WHERE ${whereClause}
+            `).bind(...params).first<any>();
+
+            // Get paginated results
+            const itemsResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ac.id,
+                    ac.detected_at,
+                    s.slug AS source_slug,
+                    s.name AS source_name,
+                    ca.id AS content_id,
+                    ca.url AS content_url,
+                    ac.ref_url,
+                    ac.snippet
+                FROM ai_citations ac
+                JOIN ai_sources s ON s.id = ac.ai_source_id
+                LEFT JOIN content_assets ca ON ca.id = ac.content_id
+                WHERE ${whereClause}
+                ORDER BY ac.detected_at DESC
+                LIMIT ? OFFSET ?
+            `).bind(...params, pageSizeNum, offset).all<any>();
+
+            const result = {
+                items: (itemsResult.results || []).map(row => ({
+                    id: row.id,
+                    detected_at: row.detected_at,
+                    source: { slug: row.source_slug, name: row.source_name },
+                    content: row.content_id ? { id: row.content_id, url: row.content_url } : null,
+                    ref_url: row.ref_url,
+                    snippet: row.snippet
+                })),
+                page: pageNum,
+                pageSize: pageSizeNum,
+                total: countResult?.total || 0
+            };
+
+            const response = new Response(JSON.stringify(result), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=120, stale-while-revalidate=120"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            log("citations_list_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.11) Citations Detail API
+    if (url.pathname === "/api/citations/detail" && req.method === "GET") {
+        try {
+            const { id } = Object.fromEntries(url.searchParams);
+            if (!id) {
+                const response = new Response("Missing citation id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get the citation
+            const citationResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ac.id,
+                    ac.project_id,
+                    ac.detected_at,
+                    ac.ref_url,
+                    ac.snippet,
+                    ac.confidence,
+                    ac.metadata,
+                    s.slug AS source_slug,
+                    s.name AS source_name,
+                    ca.id AS content_id,
+                    ca.url AS content_url
+                FROM ai_citations ac
+                JOIN ai_sources s ON s.id = ac.ai_source_id
+                LEFT JOIN content_assets ca ON ca.id = ac.content_id
+                WHERE ac.id = ?
+            `).bind(id).first<any>();
+
+            if (!citationResult) {
+                const response = new Response("Citation not found", { status: 404 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get recent citations for same content (timeline context)
+            const recentForContentResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ac.id,
+                    ac.detected_at,
+                    s.slug AS source_slug,
+                    s.name AS source_name
+                FROM ai_citations ac
+                JOIN ai_sources s ON s.id = ac.ai_source_id
+                WHERE ac.content_id = ? AND ac.id != ?
+                ORDER BY ac.detected_at DESC
+                LIMIT 10
+            `).bind(citationResult.content_id, id).all<any>();
+
+            // Get recent referrals for context (last 10)
+            const recentReferralsResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ar.id,
+                    ar.detected_at,
+                    ar.ref_url,
+                    s.slug AS source_slug,
+                    s.name AS source_name
+                FROM ai_referrals ar
+                JOIN ai_sources s ON s.id = ar.ai_source_id
+                WHERE ar.content_id = ?
+                ORDER BY ar.detected_at DESC
+                LIMIT 10
+            `).bind(citationResult.content_id).all<any>();
+
+            const detail = {
+                citation: {
+                    id: citationResult.id,
+                    detected_at: citationResult.detected_at,
+                    ref_url: citationResult.ref_url,
+                    snippet: citationResult.snippet,
+                    confidence: citationResult.confidence,
+                    metadata: citationResult.metadata,
+                    source: { slug: citationResult.source_slug, name: citationResult.source_name },
+                    content: citationResult.content_id ? { 
+                        id: citationResult.content_id, 
+                        url: citationResult.content_url 
+                    } : null
+                },
+                related: {
+                    recent_for_content: (recentForContentResult.results || []).map(row => ({
+                        id: row.id,
+                        detected_at: row.detected_at,
+                        source: { slug: row.source_slug, name: row.source_name }
+                    })),
+                    recent_referrals: (recentReferralsResult.results || []).map(row => ({
+                        id: row.id,
+                        detected_at: row.detected_at,
+                        ref_url: row.ref_url,
+                        source: { slug: row.source_slug, name: row.source_name }
+                    }))
+                }
+            };
+
+            const response = new Response(JSON.stringify(detail), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=120"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            log("citations_detail_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
     return null; // No API route matched
 }
 

@@ -709,6 +709,23 @@ export default {
               (SELECT r1_count FROM recs) + (SELECT r2_count FROM r2) as open_estimate
           `).bind().first();
 
+          // Get citations metrics
+          const citations5m = await d1.prepare(`
+            SELECT COUNT(*) as count
+            FROM ai_citations
+            WHERE detected_at >= datetime('now','-5 minutes')
+          `).bind().first();
+
+          const citationsBySource5m = await d1.prepare(`
+            SELECT s.slug, COUNT(*) as count
+            FROM ai_citations ac
+            JOIN ai_sources s ON s.id = ac.ai_source_id
+            WHERE ac.detected_at >= datetime('now','-5 minutes')
+            GROUP BY ac.ai_source_id, s.slug
+            ORDER BY count DESC
+            LIMIT 5
+          `).bind().all();
+
           const response = new Response(JSON.stringify({
             status: "healthy",
             timestamp: new Date().toISOString(),
@@ -769,6 +786,10 @@ export default {
             recommendations: {
               open_estimate_7d: recommendationsOpen7d?.open_estimate || 0,
               pending_rules_suggestions: pendingSuggestions?.count || 0
+            },
+            citations: {
+              citations_5m: citations5m?.count || 0,
+              citations_by_source_5m: citationsBySource5m?.results || []
             }
           }), {
             status: 200,
@@ -7672,7 +7693,137 @@ export default {
         }
       }
 
-      // 10) Admin Rules Suggestions endpoints
+      // 10) Admin Citations Ingestion endpoint
+      if (url.pathname === "/admin/citations/ingest" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          
+          // Verify admin session
+          const session = await d1.prepare(`
+            SELECT s.*, u.email, u.is_admin 
+            FROM session s 
+            JOIN user u ON s.user_id = u.id 
+            WHERE s.session_id = ? AND s.expires_at > datetime('now')
+          `).bind(sessionId).first();
+
+          if (!session || !session.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin privileges required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting for admin citations endpoint (30 rpm per IP)
+          const clientIP = getClientIP(request);
+          const adminLimiter = createRateLimiter({ rps: 30/60, burst: 5, retryAfter: 60 });
+          const rateLimitResult = adminLimiter.tryConsume(`admin_citations_${clientIP}`);
+          
+          if (!rateLimitResult.success) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retryAfter: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: { 
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const body = await request.json();
+          const { project_id, content_id, ai_source_id, ref_url, snippet, confidence, metadata } = body;
+
+          // Validate required fields
+          if (!project_id || !ai_source_id) {
+            const response = new Response(JSON.stringify({ 
+              error: "Missing required fields: project_id, ai_source_id" 
+            }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate optional fields
+          if (snippet && snippet.length > 500) {
+            const response = new Response(JSON.stringify({ 
+              error: "Snippet must be 500 characters or less" 
+            }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          if (confidence !== null && confidence !== undefined && (confidence < 0 || confidence > 1)) {
+            const response = new Response(JSON.stringify({ 
+              error: "Confidence must be between 0 and 1" 
+            }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Insert citation with deduplication
+          const insertResult = await d1.prepare(`
+            INSERT OR IGNORE INTO ai_citations 
+            (project_id, content_id, ai_source_id, ref_url, snippet, confidence, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            project_id,
+            content_id || null,
+            ai_source_id,
+            ref_url || null,
+            snippet || null,
+            confidence || null,
+            metadata ? JSON.stringify(metadata) : null
+          ).run();
+
+          const response = new Response(JSON.stringify({
+            success: true,
+            citation_id: insertResult.meta.last_row_id,
+            changes: insertResult.meta.changes
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (error) {
+          console.error("Admin citations ingest error:", error);
+          const response = new Response(JSON.stringify({ 
+            error: "Internal server error",
+            message: error.message 
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 11) Admin Rules Suggestions endpoints
       if (url.pathname === "/admin/rules/suggestions" && request.method === "GET") {
         try {
           const sessionCookie = request.headers.get("cookie");
