@@ -16,10 +16,10 @@ export async function handleApiRoutes(
     if (url.pathname === "/api/keys" && req.method === "POST") {
         try {
             const body = await req.json() as any;
-            const { project_id, property_id, name } = body;
+            const { project_id, name, org_id } = body;
 
-            if (!project_id || !property_id || !name) {
-                const response = new Response("Missing required fields", { status: 400 });
+            if (!project_id || !name) {
+                const response = new Response("Missing required fields (project_id, name)", { status: 400 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
@@ -27,20 +27,21 @@ export async function handleApiRoutes(
             const keyId = `key_${crypto.randomUUID().replace(/-/g, '').substring(0, 12)}`;
             const secret = crypto.randomUUID().replace(/-/g, '');
             const secretHash = await hashString(secret);
+            const currentTs = Math.floor(Date.now() / 1000);
 
-            // Insert the API key
+            // Insert the API key (table is api_key, not api_keys)
             const result = await env.OPTIVIEW_DB.prepare(`
-        INSERT INTO api_keys (project_id, property_id, name, key_id, secret_hash)
-        VALUES (?, ?, ?, ?, ?)
-      `).bind(project_id, property_id, name, keyId, secretHash).run();
+        INSERT INTO api_key (id, project_id, org_id, name, hash, created_ts)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(keyId, project_id, org_id, name, secretHash, currentTs).run();
 
             const response = new Response(JSON.stringify({
-                id: result.meta.last_row_id,
-                key_id: keyId,
+                id: keyId,
                 secret_once: secret, // Show only once
                 name,
                 project_id,
-                property_id
+                org_id,
+                created_ts: currentTs
             }), {
                 headers: { "Content-Type": "application/json" }
             });
@@ -63,21 +64,21 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
+            // Note: api_key table doesn't have property_id, only project_id and org_id
             let query = `
-        SELECT ak.id, ak.name, ak.key_id, ak.created_at, ak.last_used_at, ak.revoked_at,
-               p.domain AS property_domain
+        SELECT ak.id, ak.name, ak.created_ts, ak.last_used_ts, ak.revoked_ts, ak.org_id
         FROM api_key AS ak
-        JOIN properties AS p ON ak.property_id = p.id
         WHERE ak.project_id = ?
       `;
             let params = [project_id];
 
-            if (property_id) {
-                query += " AND ak.property_id = ?";
-                params.push(property_id);
-            }
+            // property_id filtering not supported as api_key table doesn't have property_id column
+            // if (property_id) {
+            //     query += " AND ak.property_id = ?";
+            //     params.push(property_id);
+            // }
 
-            query += " ORDER BY ak.created_at DESC";
+            query += " ORDER BY ak.created_ts DESC";
 
             const keys = await env.OPTIVIEW_DB.prepare(query).bind(...params).all<any>();
 
@@ -196,7 +197,7 @@ export async function handleApiRoutes(
                 WITH scoped AS (${scopedEvents})
                 SELECT traffic_class AS class, COUNT(*) AS count
                 FROM scoped
-                GROUP BY traffic_class
+        GROUP BY traffic_class
                 ORDER BY count DESC
             `).bind(project_id, fromSql, toSql).all<any>();
 
@@ -209,7 +210,7 @@ export async function handleApiRoutes(
                 WHERE ie.ai_source_id IS NOT NULL
                 GROUP BY ie.ai_source_id, s.slug, s.name
                 ORDER BY count DESC
-                LIMIT 5
+        LIMIT 5
             `).bind(project_id, fromSql, toSql).all<any>();
 
             // Get timeseries data with appropriate bucketing
@@ -234,16 +235,16 @@ export async function handleApiRoutes(
                 // Legacy format for backward compatibility
                 const legacySummary = {
                     total: totalResult?.events || 0,
-                    breakdown: (classBreakdown.results || []).map(row => ({
+                breakdown: (classBreakdown.results || []).map(row => ({
                         traffic_class: row.class,
                         count: row.count
-                    })),
-                    top_sources: (topSources.results || []).map(row => ({
+                })),
+                top_sources: (topSources.results || []).map(row => ({
                         source_slug: row.slug,
                         source_name: row.name,
                         count: row.count
-                    })),
-                    timeseries: (timeseries.results || []).map(row => ({
+                })),
+                timeseries: (timeseries.results || []).map(row => ({
                         day: row.ts?.split('T')[0], // Extract date part
                         count: row.count
                     }))
