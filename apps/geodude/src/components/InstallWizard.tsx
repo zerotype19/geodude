@@ -84,7 +84,7 @@ export default function InstallWizard() {
   // Verification state
   const [verificationData, setVerificationData] = useState<VerificationData | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<'waiting' | 'connected' | 'error'>('waiting');
-  const [verificationTimer, setVerificationTimer] = useState<number | null>(null);
+  const [verificationTimer, setVerificationTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Copy states
   const [copiedSnippet, setCopiedSnippet] = useState(false);

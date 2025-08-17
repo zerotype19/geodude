@@ -13,15 +13,50 @@ import {
   Copy,
   AlertCircle
 } from "lucide-react";
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
-} from "recharts";
+// Simple SVG chart component instead of recharts
+function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: string) => string }) {
+  if (!data || data.length === 0) return null;
+  
+  const maxValue = Math.max(...data.map(d => d.count));
+  const minValue = Math.min(...data.map(d => d.count));
+  const range = Math.max(1, maxValue - minValue);
+  
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * 300;
+    const y = 100 - ((d.count - minValue) / range) * 80;
+    return `${x},${y}`;
+  }).join(' ');
+  
+  return (
+    <div className="relative h-64 w-full">
+      <svg viewBox="0 0 300 120" className="w-full h-full">
+        <polyline
+          fill="none"
+          stroke="#3B82F6"
+          strokeWidth="2"
+          points={points}
+        />
+        {data.map((d, i) => (
+          <circle
+            key={i}
+            cx={(i / (data.length - 1)) * 300}
+            cy={100 - ((d.count - minValue) / range) * 80}
+            r="3"
+            fill="#3B82F6"
+          />
+        ))}
+      </svg>
+      <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500 px-2">
+        {data.length > 0 && (
+          <>
+            <span>{formatTime(data[0].ts)}</span>
+            {data.length > 1 && <span>{formatTime(data[data.length - 1].ts)}</span>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../contexts/AuthContext";
@@ -548,30 +583,10 @@ export default function Events() {
             <div className="p-4">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Events Over Time</h3>
               {summary.timeseries.length > 0 ? (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={summary.timeseries}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="ts"
-                        tickFormatter={formatChartTime}
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip 
-                        labelFormatter={(label) => new Date(label).toLocaleString()}
-                        formatter={(value) => [formatNumber(value as number), 'Events']}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke="#3B82F6" 
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                <SimpleLineChart 
+                  data={summary.timeseries} 
+                  formatTime={formatChartTime}
+                />
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   No data in this time window
