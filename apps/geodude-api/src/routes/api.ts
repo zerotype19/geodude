@@ -565,30 +565,7 @@ export async function handleApiRoutes(
     }
 
     // 6.5) Sources API
-    if (url.pathname === "/api/sources" && req.method === "GET") {
-        try {
-            const sources = await env.OPTIVIEW_DB.prepare(`
-        SELECT id, name, category, fingerprint, created_at
-        FROM ai_sources
-        ORDER BY name
-      `).all<any>();
 
-            const response = new Response(JSON.stringify({ sources: sources.results || [] }), {
-                headers: {
-                    "Content-Type": "application/json",
-                    "Cache-Control": "public, max-age=600" // 10 min cache
-                }
-            });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-        } catch (e: any) {
-            console.error("sources_list_error", { error: e.message, stack: e.stack });
-            const response = new Response(JSON.stringify({
-                error: "Internal server error",
-                message: e.message
-            }), { status: 500, headers: { "Content-Type": "application/json" } });
-            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-        }
-    }
 
     // 6.6) Funnels Summary API
     if (url.pathname === "/api/funnels/summary" && req.method === "GET") {
