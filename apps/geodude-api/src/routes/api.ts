@@ -235,16 +235,16 @@ export async function handleApiRoutes(
                 // Legacy format for backward compatibility
                 const legacySummary = {
                     total: totalResult?.events || 0,
-                breakdown: (classBreakdown.results || []).map(row => ({
+                    breakdown: (classBreakdown.results || []).map(row => ({
                         traffic_class: row.class,
                         count: row.count
-                })),
-                top_sources: (topSources.results || []).map(row => ({
+                    })),
+                    top_sources: (topSources.results || []).map(row => ({
                         source_slug: row.slug,
                         source_name: row.name,
                         count: row.count
-                })),
-                timeseries: (timeseries.results || []).map(row => ({
+                    })),
+                    timeseries: (timeseries.results || []).map(row => ({
                         day: row.ts?.split('T')[0], // Extract date part
                         count: row.count
                     }))
@@ -301,17 +301,17 @@ export async function handleApiRoutes(
     // 6.3.1) Events Recent API
     if (url.pathname === "/api/events/recent" && req.method === "GET") {
         try {
-            const { 
-                project_id, 
-                window = "24h", 
-                from, 
-                to, 
-                page = "1", 
+            const {
+                project_id,
+                window = "24h",
+                from,
+                to,
+                page = "1",
                 pageSize = "50",
                 q = "",
                 source = ""
             } = Object.fromEntries(url.searchParams);
-            
+
             if (!project_id) {
                 const response = new Response("missing project_id", { status: 400 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
@@ -335,7 +335,7 @@ export async function handleApiRoutes(
 
             const fromSql = fromTs / 1000;
             const toSql = toTs / 1000;
-            
+
             const pageNum = Math.max(1, parseInt(page));
             const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 200);
             const offset = (pageNum - 1) * pageSizeNum;
@@ -579,10 +579,10 @@ export async function handleApiRoutes(
 
             // Return minimal test data with no SQL queries
             const summary = {
-                totals: { 
-                    referrals: 0, 
-                    conversions: 0, 
-                    conv_rate: 0.0 
+                totals: {
+                    referrals: 0,
+                    conversions: 0,
+                    conv_rate: 0.0
                 },
                 by_source: [],
                 timeseries: []
@@ -708,48 +708,19 @@ export async function handleApiRoutes(
             switch (window) {
                 case "15m": windowMs = 15 * 60 * 1000; break;
                 case "24h": windowMs = 24 * 60 * 60 * 1000; break;
-                case "7d": 
+                case "7d":
                 default: windowMs = 7 * 24 * 60 * 60 * 1000; break;
             }
             const fromTs = now - windowMs;
 
-            // Get total citations
-            const totalResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT COUNT(*) AS citations
-                FROM ai_citations
-                WHERE project_id = ? AND detected_at >= datetime(?, 'unixepoch', 'utc')
-            `).bind(project_id, Math.floor(fromTs / 1000)).first<any>();
+            // Citations table doesn't exist yet - return empty results gracefully
+            // TODO: Replace with actual ai_citations table queries when implemented
+            const totalResult = { citations: 0 };
+            const bySourceResult = { results: [] };
+            const topContentResult = { results: [] };
 
-            // Get citations by source
-            const bySourceResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT s.slug, s.name, COUNT(*) AS count
-                FROM ai_citations ac
-                JOIN ai_sources s ON s.id = ac.ai_source_id
-                WHERE ac.project_id = ? AND ac.detected_at >= datetime(?, 'unixepoch', 'utc')
-                GROUP BY ac.ai_source_id, s.slug, s.name
-                ORDER BY count DESC
-                LIMIT 10
-            `).bind(project_id, Math.floor(fromTs / 1000)).all<any>();
-
-            // Get top content
-            const topContentResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT ca.id AS content_id, ca.url, COUNT(*) AS count
-                FROM ai_citations ac
-                JOIN content_assets ca ON ca.id = ac.content_id
-                WHERE ac.project_id = ? AND ac.detected_at >= datetime(?, 'unixepoch', 'utc')
-                GROUP BY ac.content_id, ca.id, ca.url
-                ORDER BY count DESC
-                LIMIT 5
-            `).bind(project_id, Math.floor(fromTs / 1000)).all<any>();
-
-            // Get timeseries data
-            const timeseriesResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT DATE(detected_at) AS day, COUNT(*) AS count
-                FROM ai_citations
-                WHERE project_id = ? AND detected_at >= datetime(?, 'unixepoch', 'utc')
-                GROUP BY DATE(detected_at)
-                ORDER BY day
-            `).bind(project_id, Math.floor(fromTs / 1000)).all<any>();
+            // Get timeseries data (also empty for now)
+            const timeseriesResult = { results: [] };
 
             const summary = {
                 totals: { citations: totalResult?.citations || 0, by_source: bySourceResult.results || [] },
@@ -804,59 +775,18 @@ export async function handleApiRoutes(
             switch (window) {
                 case "15m": windowMs = 15 * 60 * 1000; break;
                 case "24h": windowMs = 24 * 60 * 60 * 1000; break;
-                case "7d": 
+                case "7d":
                 default: windowMs = 7 * 24 * 60 * 60 * 1000; break;
             }
             const fromTs = now - windowMs;
 
             const pageNum = Math.max(1, parseInt(page));
             const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
-            const offset = (pageNum - 1) * pageSizeNum;
 
-            // Build query conditions
-            let whereConditions = ["ac.project_id = ?", "ac.detected_at >= datetime(?, 'unixepoch', 'utc')"];
-            let params: any[] = [project_id, Math.floor(fromTs / 1000)];
-
-            if (source) {
-                whereConditions.push("s.slug = ?");
-                params.push(source);
-            }
-
-            if (q.trim()) {
-                whereConditions.push("(ca.url LIKE ? OR ac.snippet LIKE ?)");
-                const searchTerm = `%${q.trim()}%`;
-                params.push(searchTerm, searchTerm);
-            }
-
-            const whereClause = whereConditions.join(" AND ");
-
-            // Get total count
-            const countResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT COUNT(*) AS total
-                FROM ai_citations ac
-                JOIN ai_sources s ON s.id = ac.ai_source_id
-                LEFT JOIN content_assets ca ON ca.id = ac.content_id
-                WHERE ${whereClause}
-            `).bind(...params).first<any>();
-
-            // Get paginated results
-            const itemsResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT 
-                    ac.id,
-                    ac.detected_at,
-                    s.slug AS source_slug,
-                    s.name AS source_name,
-                    ca.id AS content_id,
-                    ca.url AS content_url,
-                    ac.ref_url,
-                    ac.snippet
-                FROM ai_citations ac
-                JOIN ai_sources s ON s.id = ac.ai_source_id
-                LEFT JOIN content_assets ca ON ca.id = ac.content_id
-                WHERE ${whereClause}
-                ORDER BY ac.detected_at DESC
-                LIMIT ? OFFSET ?
-            `).bind(...params, pageSizeNum, offset).all<any>();
+            // Citations table doesn't exist yet - return empty results gracefully
+            // TODO: Replace with actual ai_citations table queries when implemented
+            const countResult = { total: 0 };
+            const itemsResult = { results: [] };
 
             const result = {
                 items: (itemsResult.results || []).map(row => ({
@@ -898,95 +828,9 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // Get the citation
-            const citationResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT 
-                    ac.id,
-                    ac.project_id,
-                    ac.detected_at,
-                    ac.ref_url,
-                    ac.snippet,
-                    ac.confidence,
-                    ac.metadata,
-                    s.slug AS source_slug,
-                    s.name AS source_name,
-                    ca.id AS content_id,
-                    ca.url AS content_url
-                FROM ai_citations ac
-                JOIN ai_sources s ON s.id = ac.ai_source_id
-                LEFT JOIN content_assets ca ON ca.id = ac.content_id
-                WHERE ac.id = ?
-            `).bind(id).first<any>();
-
-            if (!citationResult) {
-                const response = new Response("Citation not found", { status: 404 });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-            }
-
-            // Get recent citations for same content (timeline context)
-            const recentForContentResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT 
-                    ac.id,
-                    ac.detected_at,
-                    s.slug AS source_slug,
-                    s.name AS source_name
-                FROM ai_citations ac
-                JOIN ai_sources s ON s.id = ac.ai_source_id
-                WHERE ac.content_id = ? AND ac.id != ?
-                ORDER BY ac.detected_at DESC
-                LIMIT 10
-            `).bind(citationResult.content_id, id).all<any>();
-
-            // Get recent referrals for context (last 10)
-            const recentReferralsResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT 
-                    ar.id,
-                    ar.detected_at,
-                    ar.ref_url,
-                    s.slug AS source_slug,
-                    s.name AS source_name
-                FROM ai_referrals ar
-                JOIN ai_sources s ON s.id = ar.ai_source_id
-                WHERE ar.content_id = ?
-                ORDER BY ar.detected_at DESC
-                LIMIT 10
-            `).bind(citationResult.content_id).all<any>();
-
-            const detail = {
-                citation: {
-                    id: citationResult.id,
-                    detected_at: citationResult.detected_at,
-                    ref_url: citationResult.ref_url,
-                    snippet: citationResult.snippet,
-                    confidence: citationResult.confidence,
-                    metadata: citationResult.metadata,
-                    source: { slug: citationResult.source_slug, name: citationResult.source_name },
-                    content: citationResult.content_id ? { 
-                        id: citationResult.content_id, 
-                        url: citationResult.content_url 
-                    } : null
-                },
-                related: {
-                    recent_for_content: (recentForContentResult.results || []).map(row => ({
-                        id: row.id,
-                        detected_at: row.detected_at,
-                        source: { slug: row.source_slug, name: row.source_name }
-                    })),
-                    recent_referrals: (recentReferralsResult.results || []).map(row => ({
-                        id: row.id,
-                        detected_at: row.detected_at,
-                        ref_url: row.ref_url,
-                        source: { slug: row.source_slug, name: row.source_name }
-                    }))
-                }
-            };
-
-            const response = new Response(JSON.stringify(detail), {
-                headers: {
-                    "Content-Type": "application/json",
-                    "Cache-Control": "private, max-age=120"
-                }
-            });
+            // Citations table doesn't exist yet - return 404 gracefully
+            // TODO: Replace with actual ai_citations table queries when implemented
+            const response = new Response("Citations feature not yet implemented", { status: 404 });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
             console.error("citations_detail_error", { error: e.message, stack: e.stack });
@@ -1002,7 +846,7 @@ export async function handleApiRoutes(
     if (url.pathname === "/api/sessions/summary" && req.method === "GET") {
         try {
             const { project_id, window = "24h", from, to } = Object.fromEntries(url.searchParams);
-            
+
             if (!project_id) {
                 const response = new Response(JSON.stringify({ error: "Missing project_id parameter" }), {
                     status: 400,
@@ -1016,9 +860,9 @@ export async function handleApiRoutes(
             if (from && to) {
                 sinceTime = Math.floor(new Date(from).getTime() / 1000);
             } else {
-                const windowMs = window === "15m" ? 15 * 60 * 1000 : 
-                                window === "24h" ? 24 * 60 * 60 * 1000 : 
-                                7 * 24 * 60 * 60 * 1000; // 7d default
+                const windowMs = window === "15m" ? 15 * 60 * 1000 :
+                    window === "24h" ? 24 * 60 * 60 * 1000 :
+                        7 * 24 * 60 * 60 * 1000; // 7d default
                 sinceTime = Math.floor((Date.now() - windowMs) / 1000);
             }
 
@@ -1097,7 +941,7 @@ export async function handleApiRoutes(
                     count: row.count
                 }))
             }), {
-                headers: { 
+                headers: {
                     "Content-Type": "application/json",
                     "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
                 }
@@ -1116,17 +960,17 @@ export async function handleApiRoutes(
     // 7.2) Sessions Recent API
     if (url.pathname === "/api/sessions/recent" && req.method === "GET") {
         try {
-            const { 
-                project_id, 
-                window = "24h", 
-                from, 
-                to, 
-                ai = "all", 
-                page = "1", 
-                pageSize = "50", 
-                q = "" 
+            const {
+                project_id,
+                window = "24h",
+                from,
+                to,
+                ai = "all",
+                page = "1",
+                pageSize = "50",
+                q = ""
             } = Object.fromEntries(url.searchParams);
-            
+
             if (!project_id) {
                 const response = new Response(JSON.stringify({ error: "Missing project_id parameter" }), {
                     status: 400,
@@ -1144,9 +988,9 @@ export async function handleApiRoutes(
             if (from && to) {
                 sinceTime = Math.floor(new Date(from).getTime() / 1000);
             } else {
-                const windowMs = window === "15m" ? 15 * 60 * 1000 : 
-                                window === "24h" ? 24 * 60 * 60 * 1000 : 
-                                7 * 24 * 60 * 60 * 1000;
+                const windowMs = window === "15m" ? 15 * 60 * 1000 :
+                    window === "24h" ? 24 * 60 * 60 * 1000 :
+                        7 * 24 * 60 * 60 * 1000;
                 sinceTime = Math.floor((Date.now() - windowMs) / 1000);
             }
 
@@ -1236,7 +1080,7 @@ export async function handleApiRoutes(
                 pageSize: pageSizeNum,
                 total: countQuery?.total || 0
             }), {
-                headers: { 
+                headers: {
                     "Content-Type": "application/json",
                     "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
                 }
@@ -1256,7 +1100,7 @@ export async function handleApiRoutes(
     if (url.pathname === "/api/sessions/journey" && req.method === "GET") {
         try {
             const { project_id, session_id } = Object.fromEntries(url.searchParams);
-            
+
             if (!project_id || !session_id) {
                 const response = new Response(JSON.stringify({ error: "Missing project_id or session_id parameter" }), {
                     status: 400,
@@ -1353,7 +1197,7 @@ export async function handleApiRoutes(
                 session,
                 events
             }), {
-                headers: { 
+                headers: {
                     "Content-Type": "application/json",
                     "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
                 }
