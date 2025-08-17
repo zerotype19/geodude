@@ -746,6 +746,31 @@ export default {
             LIMIT 5
           `).bind().all();
 
+          // Get sessions metrics for health
+          const sessionsOpened5m = await d1.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`sessions_opened_5m:${current5MinWindow}`).first();
+
+          const sessionsClosed5m = await d1.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`sessions_closed_5m:${current5MinWindow}`).first();
+
+          const sessionAttach5m = await d1.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`session_attach_events_5m:${current5MinWindow}`).first();
+
+          const sessions24h = await d1.prepare(`
+            SELECT COUNT(*) as count
+            FROM session_v1
+            WHERE started_at >= datetime('now','-1 day')
+          `).bind().first();
+
+          const aiInfluencedSessions24h = await d1.prepare(`
+            SELECT COUNT(*) as count
+            FROM session_v1
+            WHERE started_at >= datetime('now','-1 day') AND ai_influenced = 1
+          `).bind().first();
+
           const response = new Response(JSON.stringify({
             status: "healthy",
             timestamp: new Date().toISOString(),
@@ -810,6 +835,16 @@ export default {
             citations: {
               citations_5m: citations5m?.count || 0,
               citations_by_source_5m: citationsBySource5m?.results || []
+            },
+            sessions: {
+              opened_5m: sessionsOpened5m?.value || 0,
+              closed_5m: sessionsClosed5m?.value || 0,
+              attach_5m: sessionAttach5m?.value || 0,
+              sessions_24h: sessions24h?.count || 0,
+              ai_influenced_24h: aiInfluencedSessions24h?.count || 0,
+              status: ((sessionsOpened5m?.value || 0) > 0 && (sessionAttach5m?.value || 0) > 0) ? "healthy" : 
+                      ((sessions24h?.count || 0) > 0 && (sessionsOpened5m?.value || 0) === 0) ? "watch" : 
+                      ((events24h?.count || 0) > 0 && (sessionAttach5m?.value || 0) === 0) ? "degraded" : "healthy"
             }
           }), {
             status: 200,

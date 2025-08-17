@@ -4,6 +4,7 @@ import Sources from "./pages/Sources";
 import Content from "./pages/Content";
 import Events from "./pages/Events";
 import Citations from "./pages/Citations";
+import Journeys from "./pages/Journeys";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
 import AdminHealth from "./pages/AdminHealth";
@@ -61,6 +62,7 @@ function AppRoutes() {
       <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
       <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="/citations" element={<ProtectedRoute><Citations /></ProtectedRoute>} />
+      <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
       <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/api-keys" element={<ProtectedRoute><ApiKeys /></ProtectedRoute>} />
