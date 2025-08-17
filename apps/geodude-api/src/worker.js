@@ -1805,15 +1805,152 @@ export default {
   // Optional configuration with defaults
   var clicksEnabled = ds.clicks !== '0' && ds.clicks !== 0;
   var spaEnabled = ds.spa !== '0' && ds.spa !== 0;
+  var sessionsEnabled = ds.sessions !== '0' && ds.sessions !== 0;
   var batchSize = Math.min(Math.max(parseInt(ds.batchSize) || 10, 1), 50);
   var flushMs = Math.min(Math.max(parseInt(ds.flushMs) || 3000, 500), 10000);
   
-  ${debug ? 'console.info("Optiview: Configuration loaded", { keyId: keyId, projectId: projectId, propertyId: propertyId, clicksEnabled: clicksEnabled, spaEnabled: spaEnabled, batchSize: batchSize, flushMs: flushMs });' : ''}
+  ${debug ? 'console.info("Optiview: Configuration loaded", { keyId: keyId, projectId: projectId, propertyId: propertyId, clicksEnabled: clicksEnabled, spaEnabled: spaEnabled, sessionsEnabled: sessionsEnabled, batchSize: batchSize, flushMs: flushMs });' : ''}
   
   // Graceful no-op if required values missing
   if (!keyId || !projectId || !propertyId) {
     ${debug ? 'console.info("Optiview: Missing required configuration, tag will no-op");' : ''}
     return;
+  }
+  
+  // Visitor and Session ID Management
+  var visitorId = null;
+  var sessionId = null;
+  var lastActivityTime = Date.now();
+  var SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+  
+  function generateUUID() {
+    // UUID v4 generation using crypto API or fallback
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      var arr = new Uint8Array(16);
+      crypto.getRandomValues(arr);
+      arr[6] = (arr[6] & 0x0f) | 0x40; // version 4
+      arr[8] = (arr[8] & 0x3f) | 0x80; // variant bits
+      var hex = Array.from(arr, function(b) { return (b < 16 ? '0' : '') + b.toString(16); });
+      return hex[0] + hex[1] + hex[2] + hex[3] + '-' + hex[4] + hex[5] + '-' + hex[6] + hex[7] + '-' + hex[8] + hex[9] + '-' + hex[10] + hex[11] + hex[12] + hex[13] + hex[14] + hex[15];
+    } else {
+      // Fallback for older browsers
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0;
+        var v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+  }
+  
+  function setCookie(name, value, days) {
+    try {
+      var expires = '';
+      if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = '; expires=' + date.toUTCString();
+      }
+      var secure = location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = name + '=' + value + expires + '; path=/; SameSite=Lax' + secure;
+    } catch (e) {
+      // Silent fail for cookie setting
+    }
+  }
+  
+  function getCookie(name) {
+    try {
+      var nameEQ = name + '=';
+      var ca = document.cookie.split(';');
+      for (var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+      }
+    } catch (e) {
+      // Silent fail for cookie reading
+    }
+    return null;
+  }
+  
+  function getLocalStorage(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  function setLocalStorage(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      // Silent fail for localStorage
+    }
+  }
+  
+  function getSessionStorage(key) {
+    try {
+      return sessionStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  function setSessionStorage(key, value) {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch (e) {
+      // Silent fail for sessionStorage
+    }
+  }
+  
+  function getVisitorId() {
+    if (!sessionsEnabled) return null;
+    if (visitorId) return visitorId;
+    
+    // Try cookie first, then localStorage, then generate new
+    visitorId = getCookie('ov_vid') || getLocalStorage('ov_vid');
+    
+    if (!visitorId) {
+      visitorId = generateUUID();
+    }
+    
+    // Store in both cookie and localStorage for resilience
+    setCookie('ov_vid', visitorId, 365);
+    setLocalStorage('ov_vid', visitorId);
+    
+    return visitorId;
+  }
+  
+  function getSessionId() {
+    if (!sessionsEnabled) return null;
+    
+    var now = Date.now();
+    var storedSessionId = getSessionStorage('ov_sid');
+    var storedLastActivity = parseInt(getSessionStorage('ov_sid_last_ts')) || 0;
+    
+    // Check if we need a new session (timeout or no existing session)
+    if (!storedSessionId || (now - storedLastActivity) > SESSION_TIMEOUT_MS) {
+      sessionId = generateUUID();
+      setSessionStorage('ov_sid', sessionId);
+    } else {
+      sessionId = storedSessionId;
+    }
+    
+    // Update last activity timestamp
+    lastActivityTime = now;
+    setSessionStorage('ov_sid_last_ts', String(now));
+    
+    return sessionId;
+  }
+  
+  // Initialize session IDs
+  if (sessionsEnabled) {
+    visitorId = getVisitorId();
+    sessionId = getSessionId();
+    ${debug ? 'try { console.debug("[optiview] apiBase=" + apiBase + " vid=" + visitorId + " sid=" + sessionId + " sessions=on"); } catch(e){}' : ''}
+  } else {
+    ${debug ? 'try { console.debug("[optiview] apiBase=" + apiBase + " sessions=off"); } catch(e){}' : ''}
   }
   
   // Event batching system
@@ -1861,9 +1998,19 @@ export default {
   
   function addEvent(eventType, metadata) {
     try {
+      var eventMetadata = metadata || {};
+      
+      // Add session tracking if enabled
+      if (sessionsEnabled) {
+        // Refresh session ID in case of timeout
+        var currentSessionId = getSessionId();
+        eventMetadata.vid = getVisitorId();
+        eventMetadata.sid = currentSessionId;
+      }
+      
       var event = {
         event_type: eventType,
-        metadata: metadata || {},
+        metadata: eventMetadata,
         occurred_at: new Date().toISOString()
       };
       
