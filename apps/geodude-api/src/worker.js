@@ -8046,7 +8046,15 @@ export default {
 
         } catch (e) {
           console.error("Referrals list error:", e);
-          const response = new Response(JSON.stringify({ error: "Failed to get referrals list" }), {
+          console.error("Error details:", {
+            message: e.message,
+            stack: e.stack,
+            name: e.name
+          });
+          const response = new Response(JSON.stringify({ 
+            error: "Failed to get referrals list",
+            debug: e.message // Include error message for debugging
+          }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
