@@ -17,6 +17,8 @@ export default function InstallWizard() {
     const preselectedKeyId = urlParams.get('key_id');
     const preselectedPropertyId = urlParams.get('property_id');
     const preselectedProjectId = urlParams.get('project_id');
+    // Check if arrived via direct link with project_id and key_id
+    const arrivedViaDirectLink = !!(preselectedProjectId && preselectedKeyId);
     // State
     const [properties, setProperties] = useState([]);
     const [apiKeys, setApiKeys] = useState([]);
@@ -42,6 +44,10 @@ export default function InstallWizard() {
     const [verificationData, setVerificationData] = useState(null);
     const [verificationStatus, setVerificationStatus] = useState('waiting');
     const [verificationTimer, setVerificationTimer] = useState(null);
+    // Live data banner state
+    const [showLiveDataBanner, setShowLiveDataBanner] = useState(false);
+    const [showPreselectedBanner, setShowPreselectedBanner] = useState(false);
+    const [preselectedBannerDismissed, setPreselectedBannerDismissed] = useState(false);
     // Copy states
     const [copiedSnippet, setCopiedSnippet] = useState(false);
     // Calculate wizard steps
@@ -143,7 +149,11 @@ export default function InstallWizard() {
             }
             if (keysResponse.ok) {
                 const keysData = await keysResponse.json();
+                console.log('API Keys response:', keysData); // Debug logging
                 setApiKeys(keysData.keys || []);
+            }
+            else {
+                console.error('Failed to fetch API keys:', keysResponse.status, keysResponse.statusText);
             }
         }
         catch (error) {
@@ -265,6 +275,10 @@ export default function InstallWizard() {
                     setVerificationData(data);
                     if (data.events_15m > 0) {
                         setVerificationStatus('connected');
+                        // Show live data banner if arrived via direct link
+                        if (arrivedViaDirectLink && !showLiveDataBanner) {
+                            setShowLiveDataBanner(true);
+                        }
                         if (verificationTimer) {
                             clearInterval(verificationTimer);
                             setVerificationTimer(null);
@@ -319,7 +333,7 @@ export default function InstallWizard() {
                 return (_jsx("div", { className: "w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center", children: _jsx("span", { className: "text-sm font-medium text-gray-600", children: step.id }) }));
         }
     };
-    return (_jsxs("div", { className: "max-w-4xl mx-auto px-4 py-8", children: [_jsxs("div", { className: "mb-8", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { children: [_jsx("h1", { className: "text-3xl font-bold text-gray-900", children: "Installation Guide" }), _jsx("p", { className: "mt-2 text-gray-600", children: "Set up your hosted analytics tag in 3 easy steps" })] }), project && (_jsxs("div", { className: "px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium", children: ["Project: ", project.name] }))] }), (preselectedKeyId || preselectedPropertyId) && (_jsx("div", { className: "mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md", children: _jsxs("p", { className: "text-sm text-blue-800", children: ["\uD83D\uDD17 Preselected from link:", preselectedKeyId && ` Key ${preselectedKeyId}`, preselectedPropertyId && ` Property ${preselectedPropertyId}`, ". You can change selections below."] }) })), _jsx("div", { className: "mt-6 flex space-x-6", children: steps.map((step) => (_jsxs("div", { className: "flex items-center space-x-2", children: [_jsx(StepIcon, { step: step }), _jsx("span", { className: `text-sm font-medium ${step.status === 'ready' ? 'text-green-600' :
+    return (_jsxs("div", { className: "max-w-4xl mx-auto px-4 py-8", children: [_jsxs("div", { className: "mb-8", children: [_jsxs("div", { className: "flex items-center justify-between", children: [_jsxs("div", { children: [_jsx("h1", { className: "text-3xl font-bold text-gray-900", children: "Installation Guide" }), _jsx("p", { className: "mt-2 text-gray-600", children: "Set up your hosted analytics tag in 3 easy steps" })] }), project && (_jsxs("div", { className: "px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium", children: ["Project: ", project.name] }))] }), (preselectedKeyId || preselectedPropertyId) && !preselectedBannerDismissed && (_jsxs("div", { className: "mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md relative", children: [_jsx("button", { onClick: () => setPreselectedBannerDismissed(true), className: "absolute top-2 right-2 text-blue-600 hover:text-blue-800", children: "\u2715" }), _jsxs("p", { className: "text-sm text-blue-800 pr-6", children: [_jsx("strong", { children: "Preselected from API Keys:" }), preselectedKeyId && ` Key ${preselectedKeyId}`, preselectedPropertyId && ` Property ${preselectedPropertyId}`, ". You can change selections below."] })] })), showLiveDataBanner && verificationStatus === 'connected' && (_jsx("div", { className: "mt-4 bg-green-50 border border-green-200 rounded-lg p-4", children: _jsxs("div", { className: "flex items-center", children: [_jsx(CheckCircle, { className: "h-5 w-5 text-green-600 mr-3" }), _jsxs("div", { className: "flex-1", children: [_jsx("p", { className: "text-sm font-medium text-green-800", children: "Live data detected for this project in the last 15 minutes." }), _jsx("p", { className: "text-sm text-green-700 mt-1", children: "Your tracking tag is working and events are flowing successfully." })] }), _jsxs("div", { className: "flex items-center space-x-2", children: [_jsx("button", { onClick: () => navigate('/events'), className: "px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2", children: "Go to Events" }), _jsx("button", { onClick: () => setShowLiveDataBanner(false), className: "text-green-600 hover:text-green-800", children: _jsx("svg", { className: "h-4 w-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", children: _jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }) }) })] })] }) })), _jsx("div", { className: "mt-6 flex space-x-6", children: steps.map((step) => (_jsxs("div", { className: "flex items-center space-x-2", children: [_jsx(StepIcon, { step: step }), _jsx("span", { className: `text-sm font-medium ${step.status === 'ready' ? 'text-green-600' :
                                         step.status === 'error' ? 'text-red-600' : 'text-gray-500'}`, children: step.title })] }, step.id))) })] }), _jsx(Card, { title: "Step 1 \u2014 Property", children: _jsx("div", { className: "p-6", children: _jsxs("div", { className: "flex items-start space-x-4", children: [_jsx(StepIcon, { step: steps[0] }), _jsxs("div", { className: "flex-1", children: [_jsxs("div", { className: "flex items-center justify-between mb-2", children: [_jsx("h3", { className: "text-lg font-medium text-gray-900", children: "Choose Your Domain" }), _jsx("a", { href: "/settings#properties", className: "text-sm text-blue-600 hover:text-blue-800", children: "Manage domains" })] }), _jsx("p", { className: "text-sm text-gray-600 mb-4", children: "Your site's domain must be allow-listed for CORS. Use the exact domain where you'll install the tag." }), preselectedPropertyId && !selectedProperty && properties.length > 0 && (_jsx("div", { className: "mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md", children: _jsx("p", { className: "text-sm text-yellow-800", children: "\u26A0\uFE0F Preselected property not found; please choose or add a domain." }) })), properties.length > 0 && properties.every(p => p.domain.includes('test') || p.domain.includes('localhost') || p.domain.includes('dev')) && (_jsx("div", { className: "mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md", children: _jsx("p", { className: "text-sm text-blue-800", children: "\uD83D\uDCA1 Add your real domain to allow CORS from your site." }) })), _jsxs("div", { className: "space-y-6", children: [properties.length > 0 && (_jsxs("div", { children: [_jsx("label", { className: "block text-sm font-medium text-gray-700 mb-2", children: "Select Existing Domain" }), _jsxs("select", { value: selectedProperty?.id || '', onChange: (e) => {
                                                             const property = properties.find(p => p.id.toString() === e.target.value);
                                                             setSelectedProperty(property || null);

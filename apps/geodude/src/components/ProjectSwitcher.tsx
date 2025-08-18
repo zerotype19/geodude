@@ -18,7 +18,7 @@ interface ProjectSwitcherProps {
 interface RenameModalProps {
   isOpen: boolean;
   onClose: () => void;
-  project: Project | null;
+  project: { id: string; name: string; org_id?: string } | null;
   onSuccess: () => void;
 }
 
