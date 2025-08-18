@@ -50,13 +50,17 @@ export default function Shell({ children }: ShellProps) {
   };
 
   const navigation = [
+    // Insights (in requested order)
     { name: "Events", href: "/events" },
-    { name: "Sources", href: "/sources" },
     { name: "Content", href: "/content" },
-    { name: "Citations", href: "/citations" },
-    { name: "Journeys", href: "/journeys" },
+    { name: "Referrals", href: "/referrals" },
+    { name: "Conversions", href: "/conversions" },
     { name: "Funnels", href: "/funnels" },
+    { name: "Journeys", href: "/journeys" },
+    { name: "Citations", href: "/citations" },
     { name: "Recommendations", href: "/recommendations" },
+    // Configuration
+    { name: "Sources", href: "/sources" },
     { name: "Install", href: "/install" },
     { name: "API Keys", href: "/api-keys" },
     { name: "Data Policy", href: "/data-policy" },
@@ -84,7 +88,8 @@ export default function Shell({ children }: ShellProps) {
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 {navigation.map((item) => {
-                  const isActive = location.pathname === item.href;
+                  const isActive = location.pathname === item.href || 
+                    (item.href === "/events" && location.pathname.startsWith("/events"));
                   return (
                     <Link
                       key={item.name}
@@ -272,7 +277,8 @@ export default function Shell({ children }: ShellProps) {
 
             {/* Navigation Links */}
             {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
+              const isActive = location.pathname === item.href || 
+                (item.href === "/events" && location.pathname.startsWith("/events"));
               return (
                 <Link
                   key={item.name}

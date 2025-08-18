@@ -56,6 +56,9 @@ export default function InstallWizard() {
   const preselectedKeyId = urlParams.get('key_id');
   const preselectedPropertyId = urlParams.get('property_id');
   const preselectedProjectId = urlParams.get('project_id');
+  
+  // Check if arrived via direct link with project_id and key_id
+  const arrivedViaDirectLink = !!(preselectedProjectId && preselectedKeyId);
 
   // State
   const [properties, setProperties] = useState<Property[]>([]);
@@ -85,6 +88,9 @@ export default function InstallWizard() {
   const [verificationData, setVerificationData] = useState<VerificationData | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<'waiting' | 'connected' | 'error'>('waiting');
   const [verificationTimer, setVerificationTimer] = useState<NodeJS.Timeout | null>(null);
+  
+  // Live data banner state
+  const [showLiveDataBanner, setShowLiveDataBanner] = useState(false);
 
   // Copy states
   const [copiedSnippet, setCopiedSnippet] = useState(false);
@@ -317,6 +323,12 @@ export default function InstallWizard() {
           
           if (data.events_15m > 0) {
             setVerificationStatus('connected');
+            
+            // Show live data banner if arrived via direct link
+            if (arrivedViaDirectLink && !showLiveDataBanner) {
+              setShowLiveDataBanner(true);
+            }
+            
             if (verificationTimer) {
               clearInterval(verificationTimer);
               setVerificationTimer(null);
@@ -415,6 +427,31 @@ export default function InstallWizard() {
               {preselectedPropertyId && ` Property ${preselectedPropertyId}`}
               . You can change selections below.
             </p>
+          </div>
+        )}
+
+        {/* Live Data Detection Banner */}
+        {showLiveDataBanner && verificationStatus === 'connected' && (
+          <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-800">
+                  Live data detected for this project in the last 15 minutes.
+                </p>
+                <p className="text-sm text-green-700 mt-1">
+                  Your tracking tag is working and events are flowing successfully.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowLiveDataBanner(false)}
+                className="ml-3 text-green-600 hover:text-green-800"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
 
