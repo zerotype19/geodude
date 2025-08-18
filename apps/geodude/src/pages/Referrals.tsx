@@ -74,8 +74,8 @@ const Referrals: React.FC = () => {
   const fetchSummary = async () => {
     if (!project?.id) return;
     try {
-      const summaryUrl = `${API_BASE}/api/referrals/summary?project_id=${project.id}&window=${window}`;
-      console.log('Summary API URL:', summaryUrl, 'API_BASE:', API_BASE);
+      const summaryUrl = `${API_BASE}/api/referrals/summary?project_id=${project.id}&window=${window}&_cachebust=${Date.now()}`;
+      console.log('🔍 Summary API URL:', summaryUrl, 'API_BASE:', API_BASE, 'timestamp:', new Date().toISOString());
       
       const response = await fetch(summaryUrl, FETCH_OPTS);
       if (!response.ok) throw new Error('Failed to fetch summary');
@@ -101,8 +101,9 @@ const Referrals: React.FC = () => {
       if (source) params.append('source', source);
       if (searchQuery) params.append('q', searchQuery);
 
+      params.append('_cachebust', Date.now().toString());
       const apiUrl = `${API_BASE}/api/referrals?${params}`;
-      console.log('API URL:', apiUrl, 'API_BASE:', API_BASE);
+      console.log('🔍 Referrals API URL:', apiUrl, 'API_BASE:', API_BASE, 'timestamp:', new Date().toISOString());
       
       const response = await fetch(apiUrl, FETCH_OPTS);
       if (!response.ok) throw new Error('Failed to fetch referrals');
