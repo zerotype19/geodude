@@ -427,7 +427,7 @@ export default function Events() {
                 <div className="ml-4">
                   <h3 className="text-lg font-medium text-blue-800">No events yet</h3>
                   <p className="text-blue-700 mt-1">
-                    Install the tracking tag to start monitoring AI traffic and user interactions.
+                    Add a Property, create an API Key, and install the hosted tag.
                   </p>
                 </div>
               </div>
@@ -436,13 +436,13 @@ export default function Events() {
                   href={`/install?project_id=${project.id}`}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  Install Tag
+                  Install
                 </a>
                 <a
-                  href="/sources"
+                  href="/api-keys"
                   className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  View Sources
+                  API Keys
                 </a>
               </div>
             </div>

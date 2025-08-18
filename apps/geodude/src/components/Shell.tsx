@@ -2,6 +2,9 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, LineChart, PlusSquare, Settings, User, Users, Building2, ChevronDown, LogOut } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { INSIGHTS_NAV, SETUP_NAV, NavItem } from "../nav.config";
+import ProjectSwitcher from "./ProjectSwitcher";
+import CreateProjectModal from "./CreateProjectModal";
 
 interface ShellProps {
   children: ReactNode;
@@ -16,6 +19,7 @@ export default function Shell({ children }: ShellProps) {
   const [availableOrgs, setAvailableOrgs] = useState<Array<{ id: string, name: string }>>([]);
   const [availableProjects, setAvailableProjects] = useState<Array<{ id: string, name: string, org_id: string }>>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
 
   // Load available organizations and projects when org menu opens
   useEffect(() => {
@@ -49,25 +53,11 @@ export default function Shell({ children }: ShellProps) {
     }
   };
 
-  const navigation = [
-    // Insights (in requested order)
-    { name: "Events", href: "/events" },
-    { name: "Content", href: "/content" },
-    { name: "Referrals", href: "/referrals" },
-    { name: "Conversions", href: "/conversions" },
-    { name: "Funnels", href: "/funnels" },
-    { name: "Journeys", href: "/journeys" },
-    { name: "Citations", href: "/citations" },
-    { name: "Recommendations", href: "/recommendations" },
-    // Configuration
-    { name: "Sources", href: "/sources" },
-    { name: "Install", href: "/install" },
-    { name: "API Keys", href: "/api-keys" },
-    { name: "Data Policy", href: "/data-policy" },
-    { name: "Settings", href: "/settings" },
-    // Only show Health for admin users
-    ...(user?.is_admin ? [{ name: "Health", href: "/admin/health" }] : []),
-  ];
+  // Filter navigation items based on user permissions
+  const visibleInsightsNav = INSIGHTS_NAV;
+  const visibleSetupNav = SETUP_NAV.filter(item => 
+    !item.requiresAdmin || user?.is_admin
+  );
 
   const handleLogout = () => {
     logout();
@@ -86,23 +76,50 @@ export default function Shell({ children }: ShellProps) {
                   Optiview
                 </Link>
               </div>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                {navigation.map((item) => {
-                  const isActive = location.pathname === item.href || 
-                    (item.href === "/events" && location.pathname.startsWith("/events"));
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
-                        ? "border-blue-500 text-gray-900"
-                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+              <div className="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-8">
+                {/* Project Switcher */}
+                <ProjectSwitcher onCreateProject={() => setShowCreateProjectModal(true)} />
+                
+                {/* Insights Navigation */}
+                <div className="flex space-x-8">
+                  {visibleInsightsNav.map((item) => {
+                    const isActive = item.match(location.pathname);
+                    return (
+                      <Link
+                        key={item.label}
+                        to={item.href}
+                        className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
+                          ? "border-blue-500 text-gray-900"
+                          : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                         }`}
-                    >
-                      {item.name}
-                    </Link>
-                  );
-                })}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+
+                {/* Divider */}
+                <div className="h-6 w-px bg-gray-300"></div>
+
+                {/* Setup Navigation */}
+                <div className="flex space-x-8">
+                  {visibleSetupNav.map((item) => {
+                    const isActive = item.match(location.pathname);
+                    return (
+                      <Link
+                        key={item.label}
+                        to={item.href}
+                        className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive
+                          ? "border-blue-500 text-gray-900"
+                          : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:items-center">
@@ -276,23 +293,51 @@ export default function Shell({ children }: ShellProps) {
             </div>
 
             {/* Navigation Links */}
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href || 
-                (item.href === "/events" && location.pathname.startsWith("/events"));
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`block pl-4 pr-4 py-3 border-l-4 text-base font-medium ${isActive
+            {/* Insights Section */}
+            <div className="border-b border-gray-200 pb-3 mb-3">
+              <h3 className="px-4 py-2 text-sm font-medium text-gray-500 uppercase tracking-wider">
+                Insights
+              </h3>
+              {visibleInsightsNav.map((item) => {
+                const isActive = item.match(location.pathname);
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`block pl-4 pr-4 py-3 border-l-4 text-base font-medium ${isActive
                       ? "bg-blue-50 border-blue-500 text-blue-700"
                       : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
                     }`}
-                >
-                  {item.name}
-                </Link>
-              );
-            })}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Setup Section */}
+            <div>
+              <h3 className="px-4 py-2 text-sm font-medium text-gray-500 uppercase tracking-wider">
+                Setup
+              </h3>
+              {visibleSetupNav.map((item) => {
+                const isActive = item.match(location.pathname);
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`block pl-4 pr-4 py-3 border-l-4 text-base font-medium ${isActive
+                      ? "bg-blue-50 border-blue-500 text-blue-700"
+                      : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
 
             {/* User Info and Actions */}
             <div className="border-t border-gray-200 pt-4 pb-3 mt-auto">
@@ -410,6 +455,12 @@ export default function Shell({ children }: ShellProps) {
           </div>
         </div>
       </footer>
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={showCreateProjectModal}
+        onClose={() => setShowCreateProjectModal(false)}
+      />
     </div>
   );
 }

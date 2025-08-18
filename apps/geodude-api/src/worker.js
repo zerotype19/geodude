@@ -812,6 +812,11 @@ export default {
             WHERE started_at >= datetime('now','-1 day') AND ai_influenced = 1
           `).bind().first();
 
+          // Get projects created metric for health
+          const projectsCreated5m = await d1.prepare(`
+            SELECT value FROM metrics WHERE key = ?
+          `).bind(`projects_created_5m:${current5MinWindow}`).first();
+
           const response = new Response(JSON.stringify({
             status: "healthy",
             timestamp: new Date().toISOString(),
@@ -886,6 +891,9 @@ export default {
               status: ((sessionsOpened5m?.value || 0) > 0 && (sessionAttach5m?.value || 0) > 0) ? "healthy" :
                 ((sessions24h?.count || 0) > 0 && (sessionsOpened5m?.value || 0) === 0) ? "watch" :
                   ((events24h?.count || 0) > 0 && (sessionAttach5m?.value || 0) === 0) ? "degraded" : "healthy"
+            },
+            projects: {
+              created_5m: projectsCreated5m?.value || 0
             }
           }), {
             status: 200,
@@ -2893,6 +2901,291 @@ export default {
         } catch (e) {
           console.error("Revoke API key error:", e);
           const response = new Response(JSON.stringify({ error: "Failed to revoke API key" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // Projects API endpoints
+      if (url.pathname === "/api/projects" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT s.user_id, u.email 
+            FROM session s 
+            JOIN user u ON u.id = s.user_id 
+            WHERE s.session_id = ? AND s.expires_at > CURRENT_TIMESTAMP
+          `).bind(sessionId).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const rateLimitKey = `api_projects_get:${sessionData.user_id}:${Math.floor(Date.now() / 60000)}`;
+
+          try {
+            const currentCount = await incrementCounter(env.AI_FINGERPRINTS, rateLimitKey, 60);
+            if (currentCount > 60) {
+              const response = new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+                status: 429,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+          } catch (e) {
+            console.error("Rate limiting error:", e);
+          }
+
+          // Get org_id from query parameters
+          const orgId = url.searchParams.get("org_id");
+          if (!orgId) {
+            const response = new Response(JSON.stringify({ error: "Missing org_id parameter" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user is a member of the organization
+          const orgMember = await d1.prepare(`
+            SELECT role FROM org_member WHERE org_id = ? AND user_id = ?
+          `).bind(orgId, sessionData.user_id).first();
+
+          if (!orgMember) {
+            const response = new Response(JSON.stringify({ error: "Access denied to organization" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get projects for the organization
+          const projects = await d1.prepare(`
+            SELECT id, org_id, name, created_ts
+            FROM project 
+            WHERE org_id = ?
+            ORDER BY name
+          `).bind(orgId).all();
+
+          const transformedProjects = projects.results.map(project => ({
+            id: project.id,
+            org_id: project.org_id,
+            name: project.name,
+            created_at: new Date(project.created_ts).toISOString()
+          }));
+
+          const response = new Response(JSON.stringify({ projects: transformedProjects }), {
+            headers: { 
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Get projects error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      if (url.pathname === "/api/projects" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT s.user_id, u.email, u.is_admin
+            FROM session s 
+            JOIN user u ON u.id = s.user_id 
+            WHERE s.session_id = ? AND s.expires_at > CURRENT_TIMESTAMP
+          `).bind(sessionId).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 10 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const rateLimitKey = `api_projects_post:${sessionData.user_id}:${Math.floor(Date.now() / 60000)}`;
+
+          try {
+            const currentCount = await incrementCounter(env.AI_FINGERPRINTS, rateLimitKey, 60);
+            if (currentCount > 10) {
+              const response = new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+                status: 429,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+          } catch (e) {
+            console.error("Rate limiting error:", e);
+          }
+
+          // Parse request body
+          const body = await request.json();
+          const { org_id, name, create_property, domain, create_key } = body;
+
+          if (!org_id || !name) {
+            const response = new Response(JSON.stringify({ error: "Missing required fields: org_id and name" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user is owner or admin
+          const orgMember = await d1.prepare(`
+            SELECT role FROM org_member WHERE org_id = ? AND user_id = ?
+          `).bind(org_id, sessionData.user_id).first();
+
+          if (!orgMember || (orgMember.role !== 'owner' && !sessionData.is_admin)) {
+            const response = new Response(JSON.stringify({ error: "Only organization owners or admins can create projects" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Generate project ID
+          const projectId = `prj_${generateToken().substring(0, 12)}`;
+          const nowTs = Math.floor(Date.now());
+          
+          // Create slug from name (simple version)
+          const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+          // Create project
+          await d1.prepare(`
+            INSERT INTO project (id, org_id, name, slug, created_ts)
+            VALUES (?, ?, ?, ?, ?)
+          `).bind(projectId, org_id, name, slug, nowTs).run();
+
+          let propertyResult = null;
+          let keyResult = null;
+
+          // Create property if requested and domain provided
+          if (create_property && domain) {
+            try {
+              // Normalize domain (basic version - reuse your existing logic if more complex)
+              const normalizedDomain = domain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+              
+              const propertyInsert = await d1.prepare(`
+                INSERT INTO properties (project_id, domain, name, created_ts, updated_ts)
+                VALUES (?, ?, ?, ?, ?)
+              `).bind(projectId, normalizedDomain, normalizedDomain, nowTs, nowTs).run();
+
+              propertyResult = {
+                id: propertyInsert.meta.last_row_id,
+                domain: normalizedDomain
+              };
+            } catch (e) {
+              console.error("Error creating property:", e);
+              // Continue without property - don't fail the whole request
+            }
+          }
+
+          // Create API key if requested
+          if (create_key) {
+            try {
+              const keyId = `key_${generateToken().substring(0, 12)}`;
+              const keyName = domain ? `Default Key ${domain}` : "Default Key";
+              const rawKey = generateToken();
+              const keyHash = await hashToken(rawKey);
+
+              await d1.prepare(`
+                INSERT INTO api_key (id, project_id, name, hash, created_ts)
+                VALUES (?, ?, ?, ?, ?)
+              `).bind(keyId, projectId, keyName, keyHash, nowTs).run();
+
+              keyResult = {
+                id: keyId,
+                name: keyName
+              };
+            } catch (e) {
+              console.error("Error creating API key:", e);
+              // Continue without key - don't fail the whole request
+            }
+          }
+
+          // Increment projects_created_5m metric
+          const current5MinWindow = Math.floor(Date.now() / (5 * 60 * 1000));
+          const metricsKey = `projects_created_5m:${current5MinWindow}`;
+          try {
+            await incrementCounter(env.AI_FINGERPRINTS, metricsKey, 300);
+          } catch (e) {
+            console.error("Error incrementing projects metric:", e);
+          }
+
+          // Log audit event
+          console.log(`project_created: user_id=${sessionData.user_id}, org_id=${org_id}, project_id=${projectId}`);
+
+          const response = new Response(JSON.stringify({
+            ok: true,
+            project: {
+              id: projectId,
+              org_id: org_id,
+              name: name,
+              created_at: new Date(nowTs).toISOString()
+            },
+            property: propertyResult,
+            key: keyResult
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Create project error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });

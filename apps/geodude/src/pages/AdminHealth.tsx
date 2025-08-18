@@ -24,6 +24,9 @@ interface HealthMetrics {
     attach_5m: number;
     status: 'healthy' | 'watch' | 'degraded';
   };
+  projects: {
+    created_5m: number;
+  };
 }
 
 export default function AdminHealth() {
@@ -346,6 +349,24 @@ export default function AdminHealth() {
                 </div>
                 <p className="text-xs text-gray-500 mt-3">
                   Opened = new sessions started; Attached = events linked to sessions.
+                </p>
+              </div>
+            </Card>
+
+            {/* Projects Metrics */}
+            <Card title="Projects (last 5m)">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Projects (last 5m)</h3>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {health.projects.created_5m}
+                  </div>
+                  <div className="text-sm text-gray-600">Created</div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Number of projects created in the last 5 minutes.
                 </p>
               </div>
             </Card>
