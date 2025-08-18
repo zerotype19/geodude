@@ -375,7 +375,7 @@ export async function handleApiRoutes(
                 const response = new Response(JSON.stringify(legacySummary), {
                     headers: {
                         "Content-Type": "application/json",
-                        "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+                        "Cache-Control": "private, max-age=10, stale-while-revalidate=30"
                     }
                 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
@@ -406,7 +406,7 @@ export async function handleApiRoutes(
             const response = new Response(JSON.stringify(summary), {
                 headers: {
                     "Content-Type": "application/json",
-                    "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+                    "Cache-Control": "private, max-age=10, stale-while-revalidate=30"
                 }
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
