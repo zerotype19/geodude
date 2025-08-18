@@ -41,7 +41,7 @@ export default function TopNav({
     <>
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
         <div className="mx-auto max-w-screen-2xl px-4">
-          <div className="h-12 flex items-center gap-3">
+          <div className="h-12 flex items-center gap-3 min-w-0">
             {/* Brand */}
             <a 
               href="/" 
@@ -51,29 +51,37 @@ export default function TopNav({
             </a>
 
             {/* Divider */}
-            <div className="h-6 w-px bg-slate-200" />
+            <div className="h-6 w-px bg-slate-200 shrink-0" />
 
             {/* Project switcher (single place) */}
-            <ProjectSwitcher 
-              onCreateProject={() => setShowCreateProjectModal(true)}
-            />
+            <div className="min-w-0 flex-shrink-0">
+              <ProjectSwitcher 
+                onCreateProject={() => setShowCreateProjectModal(true)}
+              />
+            </div>
 
             {/* Primary nav – Insights tabs (hidden on mobile) */}
-            <NavTabs items={navItemsInsights} />
+            <div className="hidden md:block">
+              <NavTabs items={navItemsInsights} />
+            </div>
 
             {/* Spacer */}
-            <div className="flex-1" />
+            <div className="flex-1 min-w-0" />
 
             {/* Setup dropdown (always visible; items filtered by isAdmin) */}
-            <SetupMenu items={navItemsSetup} isAdmin={isAdmin} />
+            <div className="shrink-0">
+              <SetupMenu items={navItemsSetup} isAdmin={isAdmin} />
+            </div>
 
             {/* User menu (single place) */}
-            <UserMenu user={user} />
+            <div className="shrink-0">
+              <UserMenu user={user} />
+            </div>
 
             {/* Mobile menu button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shrink-0"
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
             >

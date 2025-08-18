@@ -232,16 +232,16 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
   }
 
   return (
-    <div className="relative flex items-center">
+    <div className="relative flex items-center min-w-0">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-l-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-l-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 min-w-0"
       >
-        <Building2 className="h-4 w-4 text-gray-500" />
-        <span className="text-sm font-medium text-gray-900 max-w-32 truncate">
+        <Building2 className="h-4 w-4 text-gray-500 flex-shrink-0" />
+        <span className="text-sm font-medium text-gray-900 max-w-48 truncate">
           {project.name}
         </span>
-        <ChevronDown className="h-4 w-4 text-gray-400" />
+        <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
       </button>
       
       {/* Project Menu Button */}
@@ -263,7 +263,7 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
             />
 
             {/* Menu */}
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+            <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
               <div className="py-1">
                 <button
                   onClick={handleRenameProject}
@@ -298,7 +298,7 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
           />
 
           {/* Dropdown */}
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+          <div className="absolute left-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
             <div className="p-4">
               {/* Search */}
               <div className="relative mb-4">

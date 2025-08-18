@@ -17,7 +17,7 @@ export function NavTabs({ items }: NavTabsProps) {
 
   return (
     <nav
-      className="ml-3 hidden md:block max-w-[56vw] overflow-x-auto overscroll-x-contain"
+      className="hidden md:block max-w-[56vw] overflow-x-auto overscroll-x-contain"
       aria-label="Primary"
     >
       <ul className="flex items-center gap-2 whitespace-nowrap pr-2">
