@@ -13,7 +13,7 @@
     "dev:ui": "cd apps/geodude && wrangler pages dev",
     "build": "pnpm run build:api && pnpm run build:ui",
     "build:api": "cd apps/geodude-api && wrangler deploy --dry-run",
-    "build:ui": "cd apps/geodude && npm run build",
+    "build:ui": "cd apps/geodude && rm -rf dist .vite && npm run build",
     "cf:publish": "pnpm run cf:publish:api && pnpm run cf:publish:ui",
     "cf:publish:api": "cd apps/geodude-api && wrangler deploy",
     "cf:publish:ui": "cd apps/geodude && wrangler pages deploy dist",
