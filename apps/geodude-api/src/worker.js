@@ -7850,13 +7850,53 @@ export default {
       // 7.2) Referrals list endpoint
       if (url.pathname === "/api/referrals" && request.method === "GET") {
         try {
-          // Simplified check - just get project_id and continue for now
+          // Session authentication (same pattern as content endpoints)
+          const sessionCookie = request.headers.get("cookie");
+          const sessionMatch = sessionCookie?.match(/optiview_session=([^;]+)/);
+          if (!sessionCookie || !sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT user_id FROM session 
+            WHERE session_id = ? AND expires_at > CURRENT_TIMESTAMP
+          `).bind(sessionId).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
           const projectId = url.searchParams.get("project_id");
           const window = url.searchParams.get("window") || "24h";
 
           if (!projectId) {
             const response = new Response(JSON.stringify({ error: "project_id is required" }), {
               status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user has access to this project
+          const accessCheck = await d1.prepare(`
+            SELECT COUNT(*) as count
+            FROM org_member om
+            JOIN project p ON p.org_id = om.org_id
+            WHERE p.id = ? AND om.user_id = ?
+          `).bind(projectId, sessionData.user_id).first();
+
+          if (accessCheck.count === 0) {
+            const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+              status: 403,
               headers: { "Content-Type": "application/json" }
             });
             return addCorsHeaders(response, origin);
