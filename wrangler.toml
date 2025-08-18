@@ -1,0 +1,6 @@
+name = "geodude"
+pages_build_output_dir = "apps/geodude/dist"
+compatibility_date = "2025-08-01"
+
+[build]
+command = "cd apps/geodude && rm -rf dist .vite && npm run build"
