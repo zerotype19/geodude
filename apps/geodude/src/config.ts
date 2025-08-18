@@ -1,6 +1,6 @@
-// API configuration - FORCE DEPLOYMENT UPDATE
-const configuredApiBase = "https://api.optiview.ai"; // HARDCODED TO FORCE UPDATE
-console.log('🚨 FORCED API_BASE:', configuredApiBase, 'DEPLOYMENT_UPDATE:', Date.now());
+// API configuration - FORCE DEPLOYMENT UPDATE v2
+const configuredApiBase = "https://api.optiview.ai"; // HARDCODED TO FORCE UPDATE  
+console.log('🚨🚨 FORCED API_BASE v2:', configuredApiBase, 'DEPLOYMENT_UPDATE:', Date.now(), 'TIMESTAMP:', new Date().toISOString());
 export const API_BASE = configuredApiBase;
 
 export const FETCH_OPTS: RequestInit = { credentials: "include" }; // send cookies
