@@ -1,6 +1,6 @@
-// API configuration - Force correct API URL for production
-const configuredApiBase = (import.meta as any).env?.VITE_API_URL || "https://api.optiview.ai";
-console.log('🔧 Config loaded - API_BASE:', configuredApiBase, 'env.VITE_API_URL:', (import.meta as any).env?.VITE_API_URL, 'location.hostname:', location.hostname);
+// API configuration - FORCE DEPLOYMENT UPDATE
+const configuredApiBase = "https://api.optiview.ai"; // HARDCODED TO FORCE UPDATE
+console.log('🚨 FORCED API_BASE:', configuredApiBase, 'DEPLOYMENT_UPDATE:', Date.now());
 export const API_BASE = configuredApiBase;
 
 export const FETCH_OPTS: RequestInit = { credentials: "include" }; // send cookies
