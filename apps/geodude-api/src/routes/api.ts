@@ -49,9 +49,14 @@ export async function handleApiRoutes(
                 id: keyId,
                 secret_once: secret, // Show only once
                 name,
+                status: 'active',
+                created_at: new Date(currentTs * 1000).toISOString(),
+                last_used_at: null,
+                revoked_at: null,
+                grace_expires_at: null,
                 project_id,
                 org_id: projectData.org_id,
-                created_ts: currentTs
+                created_ts: currentTs // Keep for backward compatibility
             }), {
                 headers: { "Content-Type": "application/json" }
             });
@@ -92,7 +97,18 @@ export async function handleApiRoutes(
 
             const keys = await env.OPTIVIEW_DB.prepare(query).bind(...params).all<any>();
 
-            const response = new Response(JSON.stringify({ keys: keys.results || [] }), {
+            // Transform the API keys to match frontend expectations
+            const transformedKeys = (keys.results || []).map(key => ({
+                id: key.id,
+                name: key.name,
+                status: key.revoked_ts ? 'revoked' : 'active', // Determine status based on revoked_ts
+                created_at: key.created_ts ? new Date(key.created_ts * 1000).toISOString() : null, // Convert Unix timestamp to ISO string
+                last_used_at: key.last_used_ts ? new Date(key.last_used_ts * 1000).toISOString() : null,
+                revoked_at: key.revoked_ts ? new Date(key.revoked_ts * 1000).toISOString() : null,
+                grace_expires_at: null // This field doesn't exist in our current schema
+            }));
+
+            const response = new Response(JSON.stringify({ keys: transformedKeys }), {
                 headers: {
                     "Content-Type": "application/json",
                     "Cache-Control": "public, max-age=300"
