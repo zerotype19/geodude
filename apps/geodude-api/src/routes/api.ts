@@ -15,11 +15,59 @@ export async function handleApiRoutes(
     // 6.1) API Keys Management
     if (url.pathname === "/api/keys" && req.method === "POST") {
         try {
+            // Check authentication
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
             const body = await req.json() as any;
             const { project_id, name } = body;
 
             if (!project_id || !name) {
                 const response = new Response("Missing required fields (project_id, name)", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Verify user has access to this project
+            const accessCheck = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count 
+                FROM org_member om
+                JOIN project p ON p.org_id = om.org_id
+                WHERE om.user_id = ? AND p.id = ?
+            `).bind(sessionData.user_id, project_id).first();
+
+            if (accessCheck.count === 0) {
+                const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" }
+                });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
@@ -73,9 +121,57 @@ export async function handleApiRoutes(
 
     if (url.pathname === "/api/keys" && req.method === "GET") {
         try {
+            // Check authentication
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
             const { project_id, property_id } = Object.fromEntries(url.searchParams);
             if (!project_id) {
                 const response = new Response("Missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Verify user has access to this project
+            const accessCheck = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as count 
+                FROM org_member om
+                JOIN project p ON p.org_id = om.org_id
+                WHERE om.user_id = ? AND p.id = ?
+            `).bind(sessionData.user_id, project_id).first();
+
+            if (accessCheck.count === 0) {
+                const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" }
+                });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 

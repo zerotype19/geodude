@@ -193,7 +193,10 @@ export default function InstallWizard() {
 
       if (keysResponse.ok) {
         const keysData = await keysResponse.json();
+        console.log('API Keys response:', keysData); // Debug logging
         setApiKeys(keysData.keys || []);
+      } else {
+        console.error('Failed to fetch API keys:', keysResponse.status, keysResponse.statusText);
       }
     } catch (error) {
       console.error('Error loading data:', error);
