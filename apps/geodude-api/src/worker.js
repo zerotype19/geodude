@@ -3,18 +3,54 @@ import { EmailService } from './email-service.ts';
 import { addCorsHeaders } from './cors';
 import { handleApiRoutes } from './routes/api.ts';
 
+// Helper function to normalize URL for matching
+function normalizeUrl(url) {
+  try {
+    // Remove protocol, www, trailing slashes, and query parameters for simpler matching
+    return url
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/\/+$/, '')
+      .split('?')[0]
+      .split('#')[0];
+  } catch (error) {
+    return url;
+  }
+}
+
 // Helper function to get content ID for an event
 async function getContentIdForEvent(event, projectId, d1) {
   if (!event?.metadata) return null;
-  
+
   const urlToMatch = event.metadata.url || event.metadata.pathname;
   if (!urlToMatch) return null;
-  
+
   try {
-    const existingContent = await d1.prepare(`
-      SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
-    `).bind(`%${urlToMatch}%`, projectId).first();
-    
+    // First try exact URL match
+    let existingContent = await d1.prepare(`
+      SELECT id FROM content_assets WHERE url = ? AND project_id = ?
+    `).bind(urlToMatch, projectId).first();
+
+    // If no exact match, try normalized URL match
+    if (!existingContent) {
+      const normalizedUrl = normalizeUrl(urlToMatch);
+      existingContent = await d1.prepare(`
+        SELECT id FROM content_assets WHERE url = ? AND project_id = ?
+      `).bind(normalizedUrl, projectId).first();
+    }
+
+    // If still no match, try a simple domain-based match (safer than complex LIKE)
+    if (!existingContent) {
+      try {
+        const domain = new URL(urlToMatch).hostname;
+        existingContent = await d1.prepare(`
+          SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ? LIMIT 1
+        `).bind(`%${domain}%`, projectId).first();
+      } catch (urlError) {
+        // If URL parsing fails, skip domain matching
+      }
+    }
+
     return existingContent?.id || null;
   } catch (error) {
     console.error('Error getting content ID:', error);
@@ -847,9 +883,9 @@ export default {
               attach_5m: sessionAttach5m?.value || 0,
               sessions_24h: sessions24h?.count || 0,
               ai_influenced_24h: aiInfluencedSessions24h?.count || 0,
-              status: ((sessionsOpened5m?.value || 0) > 0 && (sessionAttach5m?.value || 0) > 0) ? "healthy" : 
-                      ((sessions24h?.count || 0) > 0 && (sessionsOpened5m?.value || 0) === 0) ? "watch" : 
-                      ((events24h?.count || 0) > 0 && (sessionAttach5m?.value || 0) === 0) ? "degraded" : "healthy"
+              status: ((sessionsOpened5m?.value || 0) > 0 && (sessionAttach5m?.value || 0) > 0) ? "healthy" :
+                ((sessions24h?.count || 0) > 0 && (sessionsOpened5m?.value || 0) === 0) ? "watch" :
+                  ((events24h?.count || 0) > 0 && (sessionAttach5m?.value || 0) === 0) ? "degraded" : "healthy"
             }
           }), {
             status: 200,
@@ -1264,9 +1300,9 @@ export default {
 
       // Try API routes from routes/api.ts first
       const apiResult = await handleApiRoutes(
-        request, 
-        env, 
-        url, 
+        request,
+        env,
+        url,
         origin,
         (resp) => resp, // attach function (identity for now)
         (resp) => resp, // addBasicSecurityHeaders (identity for now) 
@@ -4467,40 +4503,40 @@ export default {
             // Process each event in the batch
             const now = new Date().toISOString();
             const insertResults = [];
-            
+
             // Session tracking: resolve visitor and session once per batch
             let visitorId = null;
             let sessionId = null;
-            
+
             // Extract visitor key from first event's metadata
             const firstEvent = events[0];
-            const visitorKey = firstEvent?.metadata?.vid || 
-              `anon:${await hashString((request.headers.get('cf-connecting-ip') || 'unknown') + 
-                                    (request.headers.get('user-agent') || 'unknown') + 
-                                    new Date().toISOString().split('T')[0])}`;
+            const visitorKey = firstEvent?.metadata?.vid ||
+              `anon:${await hashString((request.headers.get('cf-connecting-ip') || 'unknown') +
+                (request.headers.get('user-agent') || 'unknown') +
+                new Date().toISOString().split('T')[0])}`;
 
             // Resolve/upsert visitor
             const ipHash = await hashString(request.headers.get('cf-connecting-ip') || 'unknown');
             const uaHash = await hashString(request.headers.get('user-agent') || 'unknown');
-            
+
             try {
               // Insert or ignore visitor
               await d1.prepare(`
                 INSERT OR IGNORE INTO visitor (project_id, visitor_key, first_seen, last_seen, ua_hash, ip_hash)
                 VALUES (?, ?, ?, ?, ?, ?)
               `).bind(project_id, visitorKey, now, now, uaHash, ipHash).run();
-              
+
               // Update last_seen and hashes
               await d1.prepare(`
                 UPDATE visitor SET last_seen = ?, ua_hash = ?, ip_hash = ? 
                 WHERE project_id = ? AND visitor_key = ?
               `).bind(now, uaHash, ipHash, project_id, visitorKey).run();
-              
+
               // Get visitor ID
               const visitor = await d1.prepare(`
                 SELECT id FROM visitor WHERE project_id = ? AND visitor_key = ?
               `).bind(project_id, visitorKey).first();
-              
+
               visitorId = visitor?.id;
             } catch (error) {
               console.error('Error resolving visitor:', error);
@@ -4520,7 +4556,7 @@ export default {
 
                 const sessionTimeoutMinutes = 30;
                 const eventTime = new Date(firstEvent?.occurred_at || now);
-                
+
                 if (latestSession) {
                   // Check if we need to close the old session due to 30min gap
                   const lastEventInSession = await d1.prepare(`
@@ -4529,17 +4565,17 @@ export default {
                     JOIN interaction_events ie ON ie.id = sem.event_id
                     WHERE sem.session_id = ?
                   `).bind(latestSession.id).first();
-                  
-                  const lastEventTime = lastEventInSession?.last_event ? 
+
+                  const lastEventTime = lastEventInSession?.last_event ?
                     new Date(lastEventInSession.last_event) : new Date(latestSession.started_at);
                   const timeDiffMinutes = (eventTime.getTime() - lastEventTime.getTime()) / (1000 * 60);
-                  
+
                   if (timeDiffMinutes > sessionTimeoutMinutes) {
                     // Close old session and create new one
                     await d1.prepare(`
                       UPDATE session_v1 SET ended_at = ? WHERE id = ?
                     `).bind(lastEventTime.toISOString(), latestSession.id).run();
-                    
+
                     sessionId = null; // Will create new session below
                   } else {
                     sessionId = latestSession.id;
@@ -4550,14 +4586,14 @@ export default {
                 if (!sessionId) {
                   const entryContentId = await getContentIdForEvent(firstEvent, project_id, d1);
                   const entryUrl = firstEvent?.metadata?.url || firstEvent?.metadata?.pathname;
-                  
+
                   const newSession = await d1.prepare(`
                     INSERT INTO session_v1 (project_id, visitor_id, started_at, entry_content_id, entry_url)
                     VALUES (?, ?, ?, ?, ?)
                   `).bind(project_id, visitorId, eventTime.toISOString(), entryContentId, entryUrl).run();
-                  
+
                   sessionId = newSession.meta.last_row_id;
-                  
+
                   // Increment sessions_opened_5m metric
                   const sessionsOpenedKey = `sessions_opened_5m:${Math.floor(Date.now() / 300000)}`;
                   await incrementCounter(env.AI_FINGERPRINTS, sessionsOpenedKey, 300);
@@ -4586,18 +4622,8 @@ export default {
                 aiSourceId = await classifyAISource(metadata.referrer, env);
               }
 
-              // Simple content mapping
-              let contentId = null;
-              if (metadata && (metadata.url || metadata.pathname)) {
-                const urlToMatch = metadata.url || metadata.pathname;
-                const existingContent = await d1.prepare(`
-                  SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
-                `).bind(`%${urlToMatch}%`, project_id).first();
-
-                if (existingContent) {
-                  contentId = existingContent.id;
-                }
-              }
+              // Simple content mapping using improved URL matching
+              const contentId = await getContentIdForEvent(event, project_id, d1);
 
               // Store event in interaction_events table
               try {
@@ -4627,11 +4653,11 @@ export default {
                       INSERT OR IGNORE INTO session_event_map (session_id, event_id)
                       VALUES (?, ?)
                     `).bind(sessionId, eventId).run();
-                    
+
                     // Update session metrics and AI influence
-                    const isAiInfluenced = aiSourceId || 
+                    const isAiInfluenced = aiSourceId ||
                       (metadata?.traffic_class && ['human_via_ai', 'ai_agent_crawl'].includes(metadata.traffic_class));
-                    
+
                     if (isAiInfluenced) {
                       await d1.prepare(`
                         UPDATE session_v1 SET 
@@ -4640,7 +4666,7 @@ export default {
                         WHERE id = ?
                       `).bind(aiSourceId, sessionId).run();
                     }
-                    
+
                     // Update session counts and exit content
                     await d1.prepare(`
                       UPDATE session_v1 SET 
@@ -4648,11 +4674,11 @@ export default {
                         exit_content_id = ?
                       WHERE id = ?
                     `).bind(contentId, sessionId).run();
-                    
+
                     // Increment session_attach_events_5m metric
                     const sessionAttachKey = `session_attach_events_5m:${Math.floor(Date.now() / 300000)}`;
                     await incrementCounter(env.AI_FINGERPRINTS, sessionAttachKey, 300);
-                    
+
                   } catch (sessionError) {
                     console.error('Error updating session:', sessionError);
                   }
@@ -4750,17 +4776,12 @@ export default {
               aiSourceId = await classifyAISource(metadata.r, env);
             }
 
-            // Simple content mapping - just use existing content assets for now
+            // Simple content mapping - use improved URL matching for path
             let contentId = null;
             if (metadata && metadata.p) {
-              // Try to find existing content asset by path
-              const existingContent = await d1.prepare(`
-              SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ?
-            `).bind(`%${metadata.p}%`, projectId).first();
-
-              if (existingContent) {
-                contentId = existingContent.id;
-              }
+              // Create a pseudo-event object to use our improved URL matching function
+              const pathEvent = { metadata: { pathname: metadata.p } };
+              contentId = await getContentIdForEvent(pathEvent, projectId, d1);
             }
 
             // Store event in interaction_events table
@@ -8105,7 +8126,7 @@ export default {
           }
 
           const sessionId = sessionMatch[1];
-          
+
           // Verify admin session
           const session = await d1.prepare(`
             SELECT s.*, u.email, u.is_admin 
@@ -8124,16 +8145,16 @@ export default {
 
           // Rate limiting for admin citations endpoint (30 rpm per IP)
           const clientIP = getClientIP(request);
-          const adminLimiter = createRateLimiter({ rps: 30/60, burst: 5, retryAfter: 60 });
+          const adminLimiter = createRateLimiter({ rps: 30 / 60, burst: 5, retryAfter: 60 });
           const rateLimitResult = adminLimiter.tryConsume(`admin_citations_${clientIP}`);
-          
+
           if (!rateLimitResult.success) {
             const response = new Response(JSON.stringify({
               error: "Rate limit exceeded",
               retryAfter: rateLimitResult.retryAfter
             }), {
               status: 429,
-              headers: { 
+              headers: {
                 "Content-Type": "application/json",
                 "Retry-After": rateLimitResult.retryAfter.toString()
               }
@@ -8146,8 +8167,8 @@ export default {
 
           // Validate required fields
           if (!project_id || !ai_source_id) {
-            const response = new Response(JSON.stringify({ 
-              error: "Missing required fields: project_id, ai_source_id" 
+            const response = new Response(JSON.stringify({
+              error: "Missing required fields: project_id, ai_source_id"
             }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
@@ -8157,8 +8178,8 @@ export default {
 
           // Validate optional fields
           if (snippet && snippet.length > 500) {
-            const response = new Response(JSON.stringify({ 
-              error: "Snippet must be 500 characters or less" 
+            const response = new Response(JSON.stringify({
+              error: "Snippet must be 500 characters or less"
             }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
@@ -8167,8 +8188,8 @@ export default {
           }
 
           if (confidence !== null && confidence !== undefined && (confidence < 0 || confidence > 1)) {
-            const response = new Response(JSON.stringify({ 
-              error: "Confidence must be between 0 and 1" 
+            const response = new Response(JSON.stringify({
+              error: "Confidence must be between 0 and 1"
             }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
@@ -8202,9 +8223,9 @@ export default {
 
         } catch (error) {
           console.error("Admin citations ingest error:", error);
-          const response = new Response(JSON.stringify({ 
+          const response = new Response(JSON.stringify({
             error: "Internal server error",
-            message: error.message 
+            message: error.message
           }), {
             status: 500,
             headers: { "Content-Type": "application/json" }
