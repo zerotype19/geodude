@@ -3847,10 +3847,10 @@ export default {
           }
 
           const body = await request.json();
-          const { name, url, project_id, type } = body;
+          const { property_id, url, project_id, type } = body;
 
-          if (!name || !url || !project_id || !type) {
-            const response = new Response(JSON.stringify({ error: "Name, URL, project_id, and type are required" }), {
+          if (!property_id || !url || !project_id || !type) {
+            const response = new Response(JSON.stringify({ error: "property_id, URL, project_id, and type are required" }), {
               status: 400,
               headers: { "Content-Type": "application/json" }
             });
@@ -3910,16 +3910,7 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // Get property_id from the request
-          const { property_id } = body;
-
-          if (!property_id) {
-            const response = new Response(JSON.stringify({ error: "property_id is required" }), {
-              status: 400,
-              headers: { "Content-Type": "application/json" }
-            });
-            return addCorsHeaders(response, origin);
-          }
+          // property_id already validated above
 
           // Verify the property belongs to the project
           const propertyCheck = await d1.prepare(`
