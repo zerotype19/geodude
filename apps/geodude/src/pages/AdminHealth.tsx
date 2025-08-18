@@ -18,6 +18,12 @@ interface HealthMetrics {
     top_error_keys_5m: Array<{ key_id: string; count: number }>;
     top_error_projects_5m: Array<{ project_id: number; count: number }>;
   };
+  sessions: {
+    opened_5m: number;
+    closed_5m: number;
+    attach_5m: number;
+    status: 'healthy' | 'watch' | 'degraded';
+  };
 }
 
 export default function AdminHealth() {
@@ -302,6 +308,47 @@ export default function AdminHealth() {
                 </div>
               </Card>
             </div>
+
+            {/* Sessions Metrics */}
+            <Card title="Sessions (last 5m)">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Sessions (last 5m)</h3>
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    health.sessions.status === 'healthy' 
+                      ? 'bg-green-100 text-green-800' 
+                      : health.sessions.status === 'watch'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {health.sessions.status}
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {health.sessions.opened_5m}
+                    </div>
+                    <div className="text-sm text-gray-600">Opened</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {health.sessions.closed_5m}
+                    </div>
+                    <div className="text-sm text-gray-600">Closed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {health.sessions.attach_5m}
+                    </div>
+                    <div className="text-sm text-gray-600">Events attached</div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Opened = new sessions started; Attached = events linked to sessions.
+                </p>
+              </div>
+            </Card>
 
             {/* Ingestion Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
