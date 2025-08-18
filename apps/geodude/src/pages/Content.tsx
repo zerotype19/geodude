@@ -40,6 +40,8 @@ const Content: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newAsset, setNewAsset] = useState({ url: '', type: 'page' });
   const [assetDetails, setAssetDetails] = useState<Record<number, ContentDetail>>({});
+  const [addingAsset, setAddingAsset] = useState(false);
+  const [addError, setAddError] = useState('');
 
 
 
@@ -130,16 +132,19 @@ const Content: React.FC = () => {
 
     const propertyId = project.primary_property?.id;
     if (!propertyId) {
-      console.error('No primary property found for project');
+      setAddError('No primary property found for project');
       return;
     }
 
+    setAddingAsset(true);
+    setAddError('');
+
     try {
-              const response = await fetch(`${API_BASE}/api/content`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          ...FETCH_OPTS,
-          body: JSON.stringify({
+      const response = await fetch(`${API_BASE}/api/content`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        ...FETCH_OPTS,
+        body: JSON.stringify({
           project_id: project.id,
           property_id: propertyId,
           url: newAsset.url,
@@ -150,10 +155,17 @@ const Content: React.FC = () => {
       if (response.ok) {
         setShowAddModal(false);
         setNewAsset({ url: '', type: 'page' });
+        setAddError('');
         loadAssets(); // Refresh the list
+      } else {
+        const errorData = await response.json();
+        setAddError(errorData.error || 'Failed to add content asset');
       }
     } catch (error) {
       console.error('Error creating asset:', error);
+      setAddError('Network error - please try again');
+    } finally {
+      setAddingAsset(false);
     }
   };
 
@@ -271,7 +283,7 @@ const Content: React.FC = () => {
                 </p>
                 <div className="flex justify-center gap-3">
                   <button
-                    onClick={() => {/* TODO: Add content modal */}}
+                    onClick={() => setShowAddModal(true)}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     Add Content
@@ -440,6 +452,13 @@ const Content: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Add Content Asset</h3>
+            
+            {addError && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+                <p className="text-sm text-red-700">{addError}</p>
+              </div>
+            )}
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
@@ -448,7 +467,8 @@ const Content: React.FC = () => {
                   placeholder="https://example.com/page"
                   value={newAsset.url}
                   onChange={(e) => setNewAsset(prev => ({ ...prev, url: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={addingAsset}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 />
               </div>
               <div>
@@ -456,7 +476,8 @@ const Content: React.FC = () => {
                 <select
                   value={newAsset.type}
                   onChange={(e) => setNewAsset(prev => ({ ...prev, type: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={addingAsset}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                 >
                   <option value="page">Page</option>
                   <option value="article">Article</option>
@@ -467,17 +488,28 @@ const Content: React.FC = () => {
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button
-                onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setAddError('');
+                  setNewAsset({ url: '', type: 'page' });
+                }}
+                disabled={addingAsset}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddAsset}
-                disabled={!newAsset.url.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                disabled={!newAsset.url.trim() || addingAsset}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
               >
-                Add Asset
+                {addingAsset && (
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {addingAsset ? 'Adding...' : 'Add Asset'}
               </button>
             </div>
           </div>
