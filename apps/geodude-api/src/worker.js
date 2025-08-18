@@ -1826,22 +1826,20 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // Generate API key ID and secret
+          // Generate API key ID and hash it for storage
           const keyId = `key_${generateToken().substring(0, 12)}`;
-          const secret = generateToken();
-          const secretHash = await hashToken(secret);
+          const keyHash = await hashToken(keyId); // Hash the key ID itself for validation
           const now = Date.now();
 
           // Store API key in database
           await d1.prepare(`
             INSERT INTO api_key (id, project_id, name, hash, created_ts)
             VALUES (?, ?, ?, ?, ?)
-          `).bind(keyId, project_id, name, secretHash, now).run();
+          `).bind(keyId, project_id, name, keyHash, now).run();
 
           const response = new Response(JSON.stringify({
             id: keyId,
-            key_id: keyId,
-            secret_once: secret, // Show only once
+            key_id: keyId, // This is what should be used in the tag data-key-id attribute
             name: name,
             project_id: project_id,
             property_id: property_id,
@@ -3138,8 +3136,7 @@ export default {
             try {
               const keyId = `key_${generateToken().substring(0, 12)}`;
               const keyName = domain ? `Default Key ${domain}` : "Default Key";
-              const rawKey = generateToken();
-              const keyHash = await hashToken(rawKey);
+              const keyHash = await hashToken(keyId); // Hash the key ID itself, not a separate token
 
               await d1.prepare(`
                 INSERT INTO api_key (id, project_id, name, hash, created_ts)
