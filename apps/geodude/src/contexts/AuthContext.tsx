@@ -15,12 +15,20 @@ interface Organization {
   created_ts: number;
 }
 
+interface Property {
+  id: number;
+  project_id: string;
+  domain: string;
+  created_at: string;
+}
+
 interface Project {
   id: string;
   name: string;
   slug: string;
   org_id: string;
   created_ts: number;
+  primary_property?: Property | null;
 }
 
 interface AuthContextType {

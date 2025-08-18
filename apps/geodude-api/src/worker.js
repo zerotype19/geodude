@@ -1638,7 +1638,27 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          const response = new Response(JSON.stringify(projectData), {
+          // Get the primary property for this project
+          const primaryProperty = await d1.prepare(`
+            SELECT id, project_id, domain, created_ts
+            FROM properties
+            WHERE project_id = ?
+            ORDER BY created_ts ASC
+            LIMIT 1
+          `).bind(projectData.id).first();
+
+          // Include property in the response
+          const enrichedProjectData = {
+            ...projectData,
+            primary_property: primaryProperty ? {
+              id: primaryProperty.id,
+              project_id: primaryProperty.project_id,
+              domain: primaryProperty.domain,
+              created_at: new Date(primaryProperty.created_ts * 1000).toISOString()
+            } : null
+          };
+
+          const response = new Response(JSON.stringify(enrichedProjectData), {
             headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, request.headers.get("origin"));

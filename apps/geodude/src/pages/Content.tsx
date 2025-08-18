@@ -128,6 +128,12 @@ const Content: React.FC = () => {
   const handleAddAsset = async () => {
     if (!project?.id || !newAsset.url.trim()) return;
 
+    const propertyId = project.primary_property?.id;
+    if (!propertyId) {
+      console.error('No primary property found for project');
+      return;
+    }
+
     try {
               const response = await fetch(`${API_BASE}/api/content`, {
           method: 'POST',
@@ -135,7 +141,7 @@ const Content: React.FC = () => {
           ...FETCH_OPTS,
           body: JSON.stringify({
           project_id: project.id,
-          property_id: 1, // TODO: Get from project properties
+          property_id: propertyId,
           url: newAsset.url,
           type: newAsset.type
         })
