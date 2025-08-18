@@ -44,33 +44,43 @@ const SmartDefaultRoute = () => {
   const [checkingEvents, setCheckingEvents] = useState(true);
 
   useEffect(() => {
-    const checkForEvents = async () => {
+    const checkForActivity = async () => {
       if (!project?.id || loading) return;
       
       try {
         setCheckingEvents(true);
-        const response = await fetch(
-          `${API_BASE}/api/events/has-any?project_id=${project.id}`,
-          FETCH_OPTS
-        );
         
-        if (response.ok) {
-          const data = await response.json();
-          setHasEvents(data.hasAny || false);
-        } else {
-          // If API fails, default to events page
-          setHasEvents(true);
+        // Check for any activity: events, referrals, or conversions
+        const [eventsResponse, referralsResponse, conversionsResponse] = await Promise.allSettled([
+          fetch(`${API_BASE}/api/events?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS),
+          fetch(`${API_BASE}/api/referrals?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS),
+          fetch(`${API_BASE}/api/conversions?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS)
+        ]);
+        
+        let hasAnyActivity = false;
+        
+        // Check if any endpoint returned data
+        for (const response of [eventsResponse, referralsResponse, conversionsResponse]) {
+          if (response.status === 'fulfilled' && response.value.ok) {
+            const data = await response.value.json();
+            if (data.total > 0 || (data.items && data.items.length > 0)) {
+              hasAnyActivity = true;
+              break;
+            }
+          }
         }
+        
+        setHasEvents(hasAnyActivity);
       } catch (error) {
-        console.error('Failed to check events:', error);
-        // If check fails, default to events page
+        console.error('Failed to check for activity:', error);
+        // If check fails, default to events page (safer for users with data)
         setHasEvents(true);
       } finally {
         setCheckingEvents(false);
       }
     };
 
-    checkForEvents();
+    checkForActivity();
   }, [project?.id, loading]);
 
   if (loading || checkingEvents || hasEvents === null) {
