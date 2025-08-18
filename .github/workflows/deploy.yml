@@ -10,8 +10,9 @@ jobs:
     defaults: { run: { working-directory: apps/geodude-api } }
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 9 }
+      - uses: pnpm/action-setup@v3
+        with:
+          run_install: false
       - run: pnpm i --frozen-lockfile
       - run: npx wrangler deploy --env dev
         env:
@@ -24,8 +25,9 @@ jobs:
     defaults: { run: { working-directory: apps/geodude } }
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 9 }
+      - uses: pnpm/action-setup@v3
+        with:
+          run_install: false
       - run: pnpm i --frozen-lockfile
       - run: pnpm build
       - run: npx wrangler pages deploy dist --project-name geodude

@@ -9,10 +9,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          run_install: false
+
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - run: npm i -g pnpm
-      - run: pnpm i
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
       - run: npx playwright install --with-deps
       - run: node scripts/playwright/capture.ts
       - name: Post NDJSON to geodude-api

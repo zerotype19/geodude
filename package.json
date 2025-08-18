@@ -21,7 +21,7 @@
     "seed:fingerprints": "cd apps/geodude-api && tsx scripts/seed-fingerprints.ts",
     "test": "cd apps/geodude-api && vitest run",
     "test:watch": "cd apps/geodude-api && vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "token:gen": "tsx scripts/token-gen.ts",
     "ai:capture": "tsx scripts/playwright/capture.ts"
   },
