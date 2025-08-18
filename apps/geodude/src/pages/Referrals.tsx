@@ -74,8 +74,8 @@ const Referrals: React.FC = () => {
   const fetchSummary = async () => {
     if (!project?.id) return;
     try {
-      const summaryUrl = `${API_BASE}/api/referrals/summary?project_id=${project.id}&window=${window}`;
-      console.log('Summary API URL:', summaryUrl);
+      const summaryUrl = `https://api.optiview.ai/api/referrals/summary?project_id=${project.id}&window=${window}`;
+      console.log('Summary API URL (hardcoded):', summaryUrl);
       
       const response = await fetch(summaryUrl, FETCH_OPTS);
       if (!response.ok) throw new Error('Failed to fetch summary');
@@ -101,10 +101,8 @@ const Referrals: React.FC = () => {
       if (source) params.append('source', source);
       if (searchQuery) params.append('q', searchQuery);
 
-      const apiUrl = `${API_BASE}/api/referrals?${params}`;
-      console.log('API_BASE:', API_BASE);
-      console.log('Full API URL:', apiUrl);
-      console.log('location.hostname:', location.hostname);
+      const apiUrl = `https://api.optiview.ai/api/referrals?${params}`;
+      console.log('API URL (hardcoded):', apiUrl);
       
       const response = await fetch(apiUrl, FETCH_OPTS);
       if (!response.ok) throw new Error('Failed to fetch referrals');
