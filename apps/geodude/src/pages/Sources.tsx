@@ -39,12 +39,11 @@ export default function Sources() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
-  const [sortBy, setSortBy] = useState<"last_seen" | "events_24h" | "name">("last_seen");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState<"last_seen" | "events_24h" | "name">("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [filter, setFilter] = useState<"all" | "enabled" | "has_activity" | "no_activity">("all");
 
-  // Add Source modal state
-  const [showAddModal, setShowAddModal] = useState(false);
+  // Modal state
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [selectedSource, setSelectedSource] = useState<SourceRow | null>(null);
@@ -343,37 +342,35 @@ export default function Sources() {
           </a>
         </div>
 
-        {/* Add Source Section */}
-        <Card title="Add AI Source">
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-3">
+        {/* Header Actions */}
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <p className="text-slate-600">
+              Enable or disable AI sources to track which platforms reference your content. 
+              All sources are available globally - just toggle them on or off for this project.
+            </p>
+          </div>
+          
+          <div className="flex gap-3">
+            {!user?.is_admin && (
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => setShowSuggestModal(true)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Suggest New Source
+              </button>
+            )}
+            
+            {user?.is_admin && (
+              <button
+                onClick={() => setShowAdminModal(true)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
-                Enable Existing Source
+                Add New Source
               </button>
-              
-              {!user?.is_admin && (
-                <button
-                  onClick={() => setShowSuggestModal(true)}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-                >
-                  Suggest Pattern
-                </button>
-              )}
-              
-              {user?.is_admin && (
-                <button
-                  onClick={() => setShowAdminModal(true)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                >
-                  Create Global Source
-                </button>
-              )}
-            </div>
+            )}
           </div>
-        </Card>
+        </div>
 
         {/* Error Alert */}
         {error && (
@@ -402,28 +399,30 @@ export default function Sources() {
           </div>
         )}
 
-        {/* Sources Table */}
-        <Card title="AI Sources">
+        {/* Sources List */}
+        <Card title="Available AI Sources">
           {/* Controls */}
-          <div className="mb-4 flex flex-wrap gap-4 items-center">
-            {/* Sort Controls */}
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Sort by:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="text-sm border border-gray-300 rounded px-2 py-1"
-              >
-                <option value="last_seen">Last Seen</option>
-                <option value="events_24h">24h Events</option>
-                <option value="name">Name</option>
-              </select>
-              <button
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                className="text-sm text-gray-600 hover:text-gray-800"
-              >
-                {sortOrder === "asc" ? "↑" : "↓"}
-              </button>
+          <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* Sort Controls */}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="text-sm border border-gray-300 rounded px-2 py-1"
+                >
+                  <option value="name">Name</option>
+                  <option value="last_seen">Last Activity</option>
+                  <option value="events_24h">24h Events</option>
+                </select>
+                <button
+                  onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                  className="text-sm text-gray-600 hover:text-gray-800"
+                >
+                  {sortOrder === "asc" ? "↑" : "↓"}
+                </button>
+              </div>
             </div>
 
             {/* Filter Pills */}
@@ -438,9 +437,9 @@ export default function Sources() {
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  {filterOption === "all" && "All"}
-                  {filterOption === "enabled" && "Enabled"}
-                  {filterOption === "has_activity" && "Has Activity"}
+                  {filterOption === "all" && "All Sources"}
+                  {filterOption === "enabled" && "Enabled Only"}
+                  {filterOption === "has_activity" && "With Activity"}
                   {filterOption === "no_activity" && "No Activity"}
                 </button>
               ))}
@@ -458,15 +457,15 @@ export default function Sources() {
             </div>
           ) : sortedSources.length === 0 ? (
             <div className="text-center py-12">
-              {!hasActivity && !hasEnabled ? (
+              {filter === "all" ? (
                 <div>
-                  <p className="text-lg text-gray-900 font-medium">No AI sources yet</p>
-                  <p className="text-gray-600 mt-1">Add your first source above.</p>
+                  <p className="text-lg text-gray-900 font-medium">No AI sources available</p>
+                  <p className="text-gray-600 mt-1">Contact your administrator to add new AI sources to the system.</p>
                 </div>
               ) : (
                 <div>
                   <p className="text-lg text-gray-900 font-medium">No sources match your filters</p>
-                  <p className="text-gray-600 mt-1">Try adjusting your filter selection.</p>
+                  <p className="text-gray-600 mt-1">Try selecting "All Sources" to see all available options.</p>
                 </div>
               )}
             </div>
@@ -475,26 +474,26 @@ export default function Sources() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-slate-500 border-b">
-                      <th className="py-3 pr-4">Source</th>
-                      <th className="py-3 pr-4">Enabled</th>
+                      <th className="py-3 pr-4">AI Source</th>
+                      <th className="py-3 pr-4 text-center">Enabled for Project</th>
                       <th className="py-3 pr-4">
-                        <span className="cursor-help" title="Number of events attributed to this source in the last 15 minutes">
-                          Last Seen
+                        <span className="cursor-help" title="Last time this source was detected referencing your content">
+                          Last Activity
                         </span>
                       </th>
                       <th className="py-3 pr-4">
-                        <span className="cursor-help" title="Number of events attributed to this source in the last 15 minutes">
-                          15m
+                        <span className="cursor-help" title="Events from this source in the last 15 minutes">
+                          15m Events
                         </span>
                       </th>
                       <th className="py-3 pr-4">
-                        <span className="cursor-help" title="Number of events attributed to this source in the last 24 hours">
-                          24h
+                        <span className="cursor-help" title="Events from this source in the last 24 hours">
+                          24h Events
                         </span>
                       </th>
                       <th className="py-3 pr-4">
-                        <span className="cursor-help" title="AI referrals detected in the last 24 hours">
-                          Referrals (24h)
+                        <span className="cursor-help" title="AI referrals detected from this source in the last 24 hours">
+                          24h Referrals
                         </span>
                       </th>
                       <th className="py-3 pr-4">Actions</th>
@@ -522,19 +521,22 @@ export default function Sources() {
                             </span>
                           </div>
                         </td>
-                        <td className="py-3 pr-4">
-                          <button
-                            onClick={() => toggleSource(source, !source.enabled)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                              source.enabled ? 'bg-blue-600' : 'bg-gray-200'
-                            }`}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                source.enabled ? 'translate-x-6' : 'translate-x-1'
+                        <td className="py-3 pr-4 text-center">
+                          <div className="flex items-center justify-center">
+                            <button
+                              onClick={() => toggleSource(source, !source.enabled)}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                                source.enabled ? 'bg-blue-600' : 'bg-gray-200'
                               }`}
-                            />
-                          </button>
+                              title={source.enabled ? `Disable ${source.name} for this project` : `Enable ${source.name} for this project`}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  source.enabled ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                          </div>
                         </td>
                         <td className="py-3 pr-4 text-gray-600">
                           {source.last_seen ? (
@@ -617,55 +619,17 @@ export default function Sources() {
         </Card>
       </div>
 
-      {/* Add Source Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Enable Existing Source</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Source
-                  </label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    onChange={(e) => {
-                      const source = sources.find(s => s.id === parseInt(e.target.value));
-                      if (source) {
-                        toggleSource(source, true);
-                        setShowAddModal(false);
-                      }
-                    }}
-                  >
-                    <option value="">Choose a source...</option>
-                    {sources.filter(s => !s.enabled).map(source => (
-                      <option key={source.id} value={source.id}>
-                        {source.name} ({source.category.replace('_', ' ')})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => setShowAddModal(false)}
-                    className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Suggest Pattern Modal */}
+
+      {/* Suggest New Source Modal */}
       {showSuggestModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Suggest Pattern</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Suggest New AI Source</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Request a new AI source to be added to the system. Provide detection patterns to help identify traffic from this source.
+              </p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -718,12 +682,15 @@ export default function Sources() {
         </div>
       )}
 
-      {/* Admin Create Global Source Modal */}
+      {/* Admin Add New Source Modal */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Create Global Source</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add New AI Source</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Add a new AI source that will be available to all projects in the system.
+              </p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -786,9 +753,9 @@ export default function Sources() {
                   <button
                     onClick={createGlobalSource}
                     disabled={!newSource.name || !newSource.slug}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                   >
-                    Create
+                    Add Source
                   </button>
                 </div>
               </div>
