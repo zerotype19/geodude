@@ -16,10 +16,20 @@ export async function handleApiRoutes(
     if (url.pathname === "/api/keys" && req.method === "POST") {
         try {
             const body = await req.json() as any;
-            const { project_id, name, org_id } = body;
+            const { project_id, name } = body;
 
             if (!project_id || !name) {
                 const response = new Response("Missing required fields (project_id, name)", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get org_id from project
+            const projectData = await env.OPTIVIEW_DB.prepare(`
+                SELECT org_id FROM project WHERE id = ?
+            `).bind(project_id).first();
+
+            if (!projectData) {
+                const response = new Response("Project not found", { status: 404 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
@@ -33,14 +43,14 @@ export async function handleApiRoutes(
             const result = await env.OPTIVIEW_DB.prepare(`
         INSERT INTO api_key (id, project_id, org_id, name, hash, created_ts)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).bind(keyId, project_id, org_id, name, secretHash, currentTs).run();
+      `).bind(keyId, project_id, projectData.org_id, name, secretHash, currentTs).run();
 
             const response = new Response(JSON.stringify({
                 id: keyId,
                 secret_once: secret, // Show only once
                 name,
                 project_id,
-                org_id,
+                org_id: projectData.org_id,
                 created_ts: currentTs
             }), {
                 headers: { "Content-Type": "application/json" }
