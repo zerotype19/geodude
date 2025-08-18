@@ -8,6 +8,9 @@ jobs:
   deploy-worker-test:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: apps/geodude-api } }
+    env:
+      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v3
@@ -19,11 +22,10 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: npx wrangler whoami
-      - run: npx wrangler --version  
+      - run: npx wrangler --version
+      - run: ls -la
+      - run: cat wrangler.toml | head -20
       - run: pnpm run deploy:test
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
 
   deploy-pages:
     runs-on: ubuntu-latest
