@@ -237,7 +237,7 @@ export default function Funnels() {
   if (error) {
     return (
       <Shell>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div>
           <div className="bg-red-50 border border-red-200 rounded-md p-4">
             <div className="flex">
               <div className="ml-3">
@@ -253,7 +253,7 @@ export default function Funnels() {
 
   return (
     <Shell>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">

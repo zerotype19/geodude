@@ -23,7 +23,9 @@ export default function Shell({ children }: ShellProps) {
 
       {/* Main content - breadcrumbs and page content */}
       <main className="flex-1">
-        {children}
+        <div className="mx-auto max-w-screen-2xl px-4 py-6">
+          {children}
+        </div>
       </main>
 
       {/* Footer */}
