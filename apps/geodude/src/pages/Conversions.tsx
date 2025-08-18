@@ -93,6 +93,7 @@ const Conversions = () => {
 
     const fetchConversions = async () => {
         if (!project?.id) return;
+        setLoading(true);
         try {
             const params = new URLSearchParams({
                 project_id: project.id,
@@ -103,13 +104,15 @@ const Conversions = () => {
             if (source) params.append('source', source);
             if (search) params.append('q', search);
 
-            const response = await fetch(`https://api.optiview.ai/api/conversions?${params}`);
+            const response = await fetch(`${API_BASE}/api/conversions?${params}`, FETCH_OPTS);
             if (!response.ok) throw new Error('Failed to load conversions');
             const data = await response.json();
             setConversions(data.items || []);
             setTotal(data.total || 0);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load conversions');
+        } finally {
+            setLoading(false);
         }
     };
 
