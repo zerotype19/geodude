@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Shell from '../components/Shell';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE, FETCH_OPTS } from '../config';
 
 interface ReferralSummary {
   totals: {
@@ -73,7 +74,7 @@ const Referrals: React.FC = () => {
   const fetchSummary = async () => {
     if (!project?.id) return;
     try {
-      const response = await fetch(`/api/referrals/summary?project_id=${project.id}&window=${window}`);
+      const response = await fetch(`${API_BASE}/api/referrals/summary?project_id=${project.id}&window=${window}`, FETCH_OPTS);
       if (!response.ok) throw new Error('Failed to fetch summary');
       const data = await response.json();
       setSummary(data);
@@ -97,7 +98,7 @@ const Referrals: React.FC = () => {
       if (source) params.append('source', source);
       if (searchQuery) params.append('q', searchQuery);
 
-      const response = await fetch(`/api/referrals?${params}`);
+      const response = await fetch(`${API_BASE}/api/referrals?${params}`, FETCH_OPTS);
       if (!response.ok) throw new Error('Failed to fetch referrals');
       const data = await response.json();
       setReferrals(data.items);

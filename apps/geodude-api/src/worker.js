@@ -7620,25 +7620,83 @@ export default {
       // 7.1) Referrals summary endpoint
       if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
         try {
+          // Session authentication
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT s.user_id, u.email 
+            FROM session s 
+            JOIN user u ON u.id = s.user_id 
+            WHERE s.session_id = ? AND s.expires_at > CURRENT_TIMESTAMP
+          `).bind(sessionId).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
           // Rate limiting: 60 rpm per user
-          const rateLimitKey = `referrals_summary:${request.headers.get('x-optiview-request-id') || 'anonymous'}`;
-          const rateLimitResult = await checkRateLimit(env, rateLimitKey, 60, 60);
-          if (!rateLimitResult.allowed) {
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const userKey = `rate_limit:referrals_summary:user:${sessionData.user_id}`;
+          const userLimit = await checkRateLimit(userKey, 60, 60 * 1000); // 60 rpm
+
+          if (!userLimit.allowed) {
             const response = new Response(JSON.stringify({
-              error: "Rate limit exceeded",
-              retry_after: rateLimitResult.retryAfter
+              error: "Rate limited",
+              retry_after: Math.ceil(userLimit.retryAfter / 1000)
             }), {
               status: 429,
-              headers: {
-                "Content-Type": "application/json",
-                "Retry-After": rateLimitResult.retryAfter.toString()
-              }
+              headers: { "Content-Type": "application/json" }
             });
             return addCorsHeaders(response, origin);
           }
 
           const projectId = url.searchParams.get("project_id");
           const window = url.searchParams.get("window") || "24h";
+
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user has access to this project
+          const userOrgMember = await d1.prepare(`
+            SELECT om.role 
+            FROM org_member om
+            JOIN project p ON p.org_id = om.org_id
+            WHERE p.id = ? AND om.user_id = ?
+          `).bind(projectId, sessionData.user_id).first();
+
+          if (!userOrgMember) {
+            const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
           if (!projectId) {
             const response = new Response(JSON.stringify({ error: "project_id is required" }), {
@@ -7800,25 +7858,83 @@ export default {
       // 7.2) Referrals list endpoint
       if (url.pathname === "/api/referrals" && request.method === "GET") {
         try {
+          // Session authentication
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT s.user_id, u.email 
+            FROM session s 
+            JOIN user u ON u.id = s.user_id 
+            WHERE s.session_id = ? AND s.expires_at > CURRENT_TIMESTAMP
+          `).bind(sessionId).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
           // Rate limiting: 60 rpm per user
-          const rateLimitKey = `referrals_list:${request.headers.get('x-optiview-request-id') || 'anonymous'}`;
-          const rateLimitResult = await checkRateLimit(env, rateLimitKey, 60, 60);
-          if (!rateLimitResult.allowed) {
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const userKey = `rate_limit:referrals_list:user:${sessionData.user_id}`;
+          const userLimit = await checkRateLimit(userKey, 60, 60 * 1000); // 60 rpm
+
+          if (!userLimit.allowed) {
             const response = new Response(JSON.stringify({
-              error: "Rate limit exceeded",
-              retry_after: rateLimitResult.retryAfter
+              error: "Rate limited",
+              retry_after: Math.ceil(userLimit.retryAfter / 1000)
             }), {
               status: 429,
-              headers: {
-                "Content-Type": "application/json",
-                "Retry-After": rateLimitResult.retryAfter.toString()
-              }
+              headers: { "Content-Type": "application/json" }
             });
             return addCorsHeaders(response, origin);
           }
 
           const projectId = url.searchParams.get("project_id");
           const window = url.searchParams.get("window") || "24h";
+
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user has access to this project
+          const userOrgMember = await d1.prepare(`
+            SELECT om.role 
+            FROM org_member om
+            JOIN project p ON p.org_id = om.org_id
+            WHERE p.id = ? AND om.user_id = ?
+          `).bind(projectId, sessionData.user_id).first();
+
+          if (!userOrgMember) {
+            const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
           const source = url.searchParams.get("source");
           const q = url.searchParams.get("q");
           const page = parseInt(url.searchParams.get("page") || "1");

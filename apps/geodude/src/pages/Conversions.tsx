@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Shell from '../components/Shell';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE, FETCH_OPTS } from '../config';
 
 // Type definitions
 interface ConversionSummary {
@@ -81,7 +82,7 @@ const Conversions = () => {
     const fetchSummary = async () => {
         if (!project?.id) return;
         try {
-            const response = await fetch(`https://api.optiview.ai/api/conversions/summary?project_id=${project.id}&window=${window}`);
+            const response = await fetch(`${API_BASE}/api/conversions/summary?project_id=${project.id}&window=${window}`, FETCH_OPTS);
             if (!response.ok) throw new Error('Failed to load conversions summary');
             const data = await response.json();
             setSummary(data);
