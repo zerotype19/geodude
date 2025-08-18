@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Shell from '../components/Shell';
 import { Card } from '../components/ui/Card';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ReferralSummary {
   totals: {
@@ -36,6 +37,7 @@ interface ReferralItem {
 }
 
 const Referrals: React.FC = () => {
+  const { project } = useAuth();
   const [summary, setSummary] = useState<ReferralSummary | null>(null);
   const [referrals, setReferrals] = useState<ReferralItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +51,29 @@ const Referrals: React.FC = () => {
   const [pageSize] = useState(50);
   const [total, setTotal] = useState(0);
 
-  // Mock project ID for now - in real app this would come from context/auth
-  const projectId = 'prj_test';
+  // Load window preference from localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const storageKey = `referrals_window_${project.id}`;
+      const savedWindow = localStorage.getItem(storageKey) as '15m' | '24h' | '7d';
+      if (savedWindow && savedWindow !== window) {
+        setWindow(savedWindow);
+      }
+    }
+  }, [project?.id]);
+
+  // Save window preference to localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const storageKey = `referrals_window_${project.id}`;
+      localStorage.setItem(storageKey, window);
+    }
+  }, [project?.id, window]);
 
   const fetchSummary = async () => {
+    if (!project?.id) return;
     try {
-      const response = await fetch(`/api/referrals/summary?project_id=${projectId}&window=${window}`);
+      const response = await fetch(`/api/referrals/summary?project_id=${project.id}&window=${window}`);
       if (!response.ok) throw new Error('Failed to fetch summary');
       const data = await response.json();
       setSummary(data);
@@ -65,10 +84,11 @@ const Referrals: React.FC = () => {
   };
 
   const fetchReferrals = async () => {
+    if (!project?.id) return;
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        project_id: projectId,
+        project_id: project.id,
         window,
         page: page.toString(),
         pageSize: pageSize.toString()
@@ -361,17 +381,31 @@ const Referrals: React.FC = () => {
         {/* Empty State */}
         {!loading && referrals.length === 0 && summary?.totals.referrals === 0 && (
           <div className="text-center py-12">
-            <div className="text-gray-400 text-6xl mb-4">🤖</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No AI referrals yet</h3>
-            <p className="text-gray-600 mb-4">
-              AI referrals will appear here when AI platforms start sending traffic to your content.
-            </p>
-            <a
-              href="/sources"
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Check your AI Sources →
-            </a>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md mx-auto">
+              <div className="flex items-center justify-center mb-4">
+                <svg className="h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-blue-800 mb-2">No AI referrals yet</h3>
+              <p className="text-blue-700 mb-4">
+                Start tracking AI referrals by installing the tracking tag and configuring your sources.
+              </p>
+              <div className="flex justify-center gap-3">
+                <a
+                  href={`/install?project_id=${project?.id}`}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Install
+                </a>
+                <a
+                  href="/api-keys"
+                  className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  API Keys
+                </a>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useState, useEffect } from 'react';
 import Shell from '../components/Shell';
 import { Card } from '../components/ui/Card';
+import { useAuth } from '../contexts/AuthContext';
 
 // Type definitions
 interface ConversionSummary {
@@ -46,6 +47,7 @@ interface ConversionItem {
 }
 
 const Conversions = () => {
+    const { project } = useAuth();
     const [summary, setSummary] = useState<ConversionSummary | null>(null);
     const [conversions, setConversions] = useState<ConversionItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -56,11 +58,30 @@ const Conversions = () => {
     const [page, setPage] = useState(1);
     const [pageSize] = useState(50);
     const [total, setTotal] = useState(0);
-    const [projectId] = useState('test_project'); // This should come from auth context
+
+    // Load window preference from localStorage
+    useEffect(() => {
+      if (project?.id) {
+        const storageKey = `conversions_window_${project.id}`;
+        const savedWindow = localStorage.getItem(storageKey);
+        if (savedWindow && savedWindow !== window) {
+          setWindow(savedWindow);
+        }
+      }
+    }, [project?.id]);
+
+    // Save window preference to localStorage
+    useEffect(() => {
+      if (project?.id) {
+        const storageKey = `conversions_window_${project.id}`;
+        localStorage.setItem(storageKey, window);
+      }
+    }, [project?.id, window]);
 
     const fetchSummary = async () => {
+        if (!project?.id) return;
         try {
-            const response = await fetch(`https://api.optiview.ai/api/conversions/summary?project_id=${projectId}&window=${window}`);
+            const response = await fetch(`https://api.optiview.ai/api/conversions/summary?project_id=${project.id}&window=${window}`);
             if (!response.ok) throw new Error('Failed to load conversions summary');
             const data = await response.json();
             setSummary(data);
@@ -70,9 +91,10 @@ const Conversions = () => {
     };
 
     const fetchConversions = async () => {
+        if (!project?.id) return;
         try {
             const params = new URLSearchParams({
-                project_id: projectId,
+                project_id: project.id,
                 window,
                 page: page.toString(),
                 pageSize: pageSize.toString()
@@ -338,25 +360,39 @@ const Conversions = () => {
                             </table>
                         </div>
                     ) : (
-                        <div className="text-center py-12">
-                            <div className="text-gray-400 mb-4">
-                                <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
+                        <div className="p-6 text-center">
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md mx-auto">
+                                <div className="flex items-center justify-center mb-4">
+                                    <svg className="h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-medium text-blue-800 mb-2">
+                                    {summary?.totals.conversions === 0 ? "No conversion data yet" : "No conversions found"}
+                                </h3>
+                                <p className="text-blue-700 mb-4">
+                                    {summary?.totals.conversions === 0 
+                                        ? "Start tracking conversions by installing the tracking tag."
+                                        : "No conversions match your current filters."
+                                    }
+                                </p>
+                                {summary?.totals.conversions === 0 && (
+                                    <div className="flex justify-center gap-3">
+                                        <a
+                                            href={`/install?project_id=${project?.id}`}
+                                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        >
+                                            Install
+                                        </a>
+                                        <a
+                                            href="/api-keys"
+                                            className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                        >
+                                            API Keys
+                                        </a>
+                                    </div>
+                                )}
                             </div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">No conversions yet</h3>
-                            <p className="text-gray-500 mb-4">
-                                {summary?.totals.conversions === 0 
-                                    ? "Start tracking conversions to see data here."
-                                    : "No conversions match your current filters."
-                                }
-                            </p>
-                            <a
-                                href="/docs/conversions"
-                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                            >
-                                View Documentation
-                            </a>
                         </div>
                     )}
                 </div>

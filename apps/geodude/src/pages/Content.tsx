@@ -43,6 +43,25 @@ const Content: React.FC = () => {
 
 
 
+  // Load window preference from localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const storageKey = `content_window_${project.id}`;
+      const savedWindow = localStorage.getItem(storageKey);
+      if (savedWindow && savedWindow !== filters.window) {
+        setFilters(prev => ({ ...prev, window: savedWindow }));
+      }
+    }
+  }, [project?.id]);
+
+  // Save window preference to localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const storageKey = `content_window_${project.id}`;
+      localStorage.setItem(storageKey, filters.window);
+    }
+  }, [project?.id, filters.window]);
+
   useEffect(() => {
     if (project?.id) {
       loadAssets();
@@ -233,9 +252,32 @@ const Content: React.FC = () => {
           {loading ? (
             <div className="p-6 text-center text-gray-500">Loading...</div>
           ) : assets.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">
-              <p className="mb-4">No content assets found.</p>
-              <p className="text-sm">Create your first content asset or check your installation configuration.</p>
+            <div className="p-6 text-center">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <div className="flex items-center justify-center mb-4">
+                  <svg className="h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-blue-800 mb-2">No content data yet</h3>
+                <p className="text-blue-700 mb-4">
+                  Start tracking your website content by installing the tracking tag.
+                </p>
+                <div className="flex justify-center gap-3">
+                  <a
+                    href={`/install?project_id=${project?.id}`}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Install
+                  </a>
+                  <a
+                    href="/api-keys"
+                    className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    API Keys
+                  </a>
+                </div>
+              </div>
             </div>
           ) : (
             <table className="min-w-full divide-y divide-gray-200">

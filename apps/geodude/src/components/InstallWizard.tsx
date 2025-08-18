@@ -91,6 +91,8 @@ export default function InstallWizard() {
   
   // Live data banner state
   const [showLiveDataBanner, setShowLiveDataBanner] = useState(false);
+  const [showPreselectedBanner, setShowPreselectedBanner] = useState(false);
+  const [preselectedBannerDismissed, setPreselectedBannerDismissed] = useState(false);
 
   // Copy states
   const [copiedSnippet, setCopiedSnippet] = useState(false);
@@ -419,10 +421,16 @@ export default function InstallWizard() {
         </div>
 
         {/* Preselect banner */}
-        {(preselectedKeyId || preselectedPropertyId) && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-            <p className="text-sm text-blue-800">
-              🔗 Preselected from link: 
+        {(preselectedKeyId || preselectedPropertyId) && !preselectedBannerDismissed && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md relative">
+            <button
+              onClick={() => setPreselectedBannerDismissed(true)}
+              className="absolute top-2 right-2 text-blue-600 hover:text-blue-800"
+            >
+              ✕
+            </button>
+            <p className="text-sm text-blue-800 pr-6">
+              <strong>Preselected from API Keys:</strong> 
               {preselectedKeyId && ` Key ${preselectedKeyId}`}
               {preselectedPropertyId && ` Property ${preselectedPropertyId}`}
               . You can change selections below.
@@ -443,14 +451,22 @@ export default function InstallWizard() {
                   Your tracking tag is working and events are flowing successfully.
                 </p>
               </div>
-              <button
-                onClick={() => setShowLiveDataBanner(false)}
-                className="ml-3 text-green-600 hover:text-green-800"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => navigate('/events')}
+                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                >
+                  Go to Events
+                </button>
+                <button
+                  onClick={() => setShowLiveDataBanner(false)}
+                  className="text-green-600 hover:text-green-800"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         )}

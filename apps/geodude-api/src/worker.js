@@ -3193,6 +3193,144 @@ export default {
         }
       }
 
+      if (url.pathname.startsWith("/api/projects/") && request.method === "PATCH") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
+            SELECT s.user_id, u.email, u.is_admin
+            FROM session s 
+            JOIN user u ON u.id = s.user_id 
+            WHERE s.session_id = ? AND s.expires_at > CURRENT_TIMESTAMP
+          `).bind(sessionId).first();
+
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 10 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const rateLimitKey = `api_projects_patch:${sessionData.user_id}:${Math.floor(Date.now() / 60000)}`;
+
+          try {
+            const currentCount = await incrementCounter(env.AI_FINGERPRINTS, rateLimitKey, 60);
+            if (currentCount > 10) {
+              const response = new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+                status: 429,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+          } catch (e) {
+            console.error("Rate limiting error:", e);
+          }
+
+          // Extract project ID from URL
+          const projectId = url.pathname.split('/')[3];
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "Missing project ID" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get project and verify access
+          const projectData = await d1.prepare(`
+            SELECT p.id, p.org_id, p.name, p.slug, p.created_ts
+            FROM project p
+            JOIN org_member om ON om.org_id = p.org_id
+            WHERE p.id = ? AND om.user_id = ?
+          `).bind(projectId, sessionData.user_id).first();
+
+          if (!projectData) {
+            const response = new Response(JSON.stringify({ error: "Project not found or access denied" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Verify user is owner or admin
+          const orgMember = await d1.prepare(`
+            SELECT role FROM org_member WHERE org_id = ? AND user_id = ?
+          `).bind(projectData.org_id, sessionData.user_id).first();
+
+          if (!orgMember || (orgMember.role !== 'owner' && !sessionData.is_admin)) {
+            const response = new Response(JSON.stringify({ error: "Only organization owners or admins can rename projects" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Parse request body
+          const body = await request.json();
+          const { name } = body;
+
+          if (!name || !name.trim()) {
+            const response = new Response(JSON.stringify({ error: "Missing required field: name" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Update project name
+          const trimmedName = name.trim();
+          const slug = trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+          
+          await d1.prepare(`
+            UPDATE project SET name = ?, slug = ? WHERE id = ?
+          `).bind(trimmedName, slug, projectId).run();
+
+          // Log audit event
+          console.log(`project_renamed: user_id=${sessionData.user_id}, project_id=${projectId}, old_name=${projectData.name}, new_name=${trimmedName}, ip=${clientIP}`);
+
+          const response = new Response(JSON.stringify({
+            ok: true,
+            project: {
+              id: projectData.id,
+              org_id: projectData.org_id,
+              name: trimmedName,
+              created_at: new Date(projectData.created_ts).toISOString()
+            }
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Update project error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // Properties API endpoints
       if (url.pathname === "/api/properties" && request.method === "GET") {
         try {

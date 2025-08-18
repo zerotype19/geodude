@@ -94,6 +94,25 @@ export default function Funnels() {
   // Get project ID from project context
   const projectId = project?.id || 'prj_cTSh3LZ8qMVZ'; // fallback to known project ID
 
+  // Load window preference from localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const storageKey = `funnels_window_${project.id}`;
+      const savedWindow = localStorage.getItem(storageKey) as '15m' | '24h' | '7d';
+      if (savedWindow && savedWindow !== window) {
+        setWindow(savedWindow);
+      }
+    }
+  }, [project?.id]);
+
+  // Save window preference to localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const storageKey = `funnels_window_${project.id}`;
+      localStorage.setItem(storageKey, window);
+    }
+  }, [project?.id, window]);
+
   useEffect(() => {
     fetchSummary();
     fetchItems();

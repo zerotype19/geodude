@@ -293,50 +293,52 @@ export default function Shell({ children }: ShellProps) {
             </div>
 
             {/* Navigation Links */}
-            {/* Insights Section */}
-            <div className="border-b border-gray-200 pb-3 mb-3">
-              <h3 className="px-4 py-2 text-sm font-medium text-gray-500 uppercase tracking-wider">
-                Insights
-              </h3>
-              {visibleInsightsNav.map((item) => {
-                const isActive = item.match(location.pathname);
-                return (
-                  <Link
-                    key={item.label}
-                    to={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`block pl-4 pr-4 py-3 border-l-4 text-base font-medium ${isActive
-                      ? "bg-blue-50 border-blue-500 text-blue-700"
-                      : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
+            <div className="flex-1 overflow-y-auto">
+              {/* Insights Section */}
+              <div className="border-b border-gray-200 pb-3 mb-3">
+                <h3 className="sticky top-0 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  Insights
+                </h3>
+                {visibleInsightsNav.map((item) => {
+                  const isActive = item.match(location.pathname);
+                  return (
+                    <Link
+                      key={item.label}
+                      to={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`block pl-4 pr-4 py-3 border-l-4 text-base font-medium ${isActive
+                        ? "bg-blue-50 border-blue-500 text-blue-700"
+                        : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
 
-            {/* Setup Section */}
-            <div>
-              <h3 className="px-4 py-2 text-sm font-medium text-gray-500 uppercase tracking-wider">
-                Setup
-              </h3>
-              {visibleSetupNav.map((item) => {
-                const isActive = item.match(location.pathname);
-                return (
-                  <Link
-                    key={item.label}
-                    to={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`block pl-4 pr-4 py-3 border-l-4 text-base font-medium ${isActive
-                      ? "bg-blue-50 border-blue-500 text-blue-700"
-                      : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {/* Setup Section */}
+              <div>
+                <h3 className="sticky top-0 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                  Setup
+                </h3>
+                {visibleSetupNav.map((item) => {
+                  const isActive = item.match(location.pathname);
+                  return (
+                    <Link
+                      key={item.label}
+                      to={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`block pl-4 pr-4 py-3 border-l-4 text-base font-medium ${isActive
+                        ? "bg-blue-50 border-blue-500 text-blue-700"
+                        : "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800"
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
 
             {/* User Info and Actions */}
