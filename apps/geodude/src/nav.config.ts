@@ -3,6 +3,7 @@ export type NavItem = {
   href: string;
   match: (path: string) => boolean;
   requiresAdmin?: boolean;
+  adminOnly?: boolean; // New property for cleaner naming
 };
 
 export const INSIGHTS_NAV: NavItem[] = [
@@ -22,5 +23,5 @@ export const SETUP_NAV: NavItem[] = [
   { label: "API Keys",    href: "/api-keys",       match: p => p.startsWith("/api-keys") },
   { label: "Data Policy", href: "/data-policy",    match: p => p.startsWith("/data-policy") },
   { label: "Settings",    href: "/settings",       match: p => p.startsWith("/settings") },
-  { label: "Health",      href: "/admin/health",   match: p => p.startsWith("/admin/health"), requiresAdmin: true },
+  { label: "Health",      href: "/admin/health",   match: p => p.startsWith("/admin/health"), adminOnly: true },
 ];

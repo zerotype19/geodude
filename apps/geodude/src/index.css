@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent horizontal page scroll */
+html, body {
+  overflow-x: hidden;
+}
+
 :root { 
   color-scheme: light; 
 }
