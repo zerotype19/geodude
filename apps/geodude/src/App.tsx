@@ -146,6 +146,10 @@ function AppRoutes() {
 }
 
 function App() {
+  // FORCE VITE REBUILD: This comment will change the app bundle content hash
+  const forceRebuild = "2025-08-18T23:45:00Z";
+  console.log("🚀 App starting with timestamp:", forceRebuild);
+  
   return (
     <AuthProvider>
       <Router>
