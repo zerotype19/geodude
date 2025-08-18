@@ -389,23 +389,9 @@ const Referrals: React.FC = () => {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-blue-800 mb-2">No AI referrals yet</h3>
-              <p className="text-blue-700 mb-4">
-                Start tracking AI referrals by installing the tracking tag and configuring your sources.
+              <p className="text-blue-700">
+                AI platforms haven't started referring traffic to your content yet. This can take some time after content is published and indexed by AI tools.
               </p>
-              <div className="flex justify-center gap-3">
-                <a
-                  href={`/install?project_id=${project?.id}`}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Install
-                </a>
-                <a
-                  href="/api-keys"
-                  className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  API Keys
-                </a>
-              </div>
             </div>
           </div>
         )}

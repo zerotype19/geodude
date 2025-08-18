@@ -37,9 +37,9 @@ export function UserMenu({ user }: UserMenuProps) {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsOpen(false);
-    logout();
+    await logout();
   };
 
   if (!user) {

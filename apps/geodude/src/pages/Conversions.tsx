@@ -376,26 +376,11 @@ const Conversions = () => {
                                 </h3>
                                 <p className="text-blue-700 mb-4">
                                     {summary?.totals.conversions === 0 
-                                        ? "Start tracking conversions by installing the tracking tag."
+                                        ? "No conversions have been tracked yet. Conversions are events that indicate business value, such as purchases, sign-ups, or form submissions."
                                         : "No conversions match your current filters."
                                     }
                                 </p>
-                                {summary?.totals.conversions === 0 && (
-                                    <div className="flex justify-center gap-3">
-                                        <a
-                                            href={`/install?project_id=${project?.id}`}
-                                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                        >
-                                            Install
-                                        </a>
-                                        <a
-                                            href="/api-keys"
-                                            className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                        >
-                                            API Keys
-                                        </a>
-                                    </div>
-                                )}
+
                             </div>
                         </div>
                     )}

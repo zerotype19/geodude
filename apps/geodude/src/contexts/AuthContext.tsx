@@ -73,11 +73,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Call the API to properly invalidate the session
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.error('Failed to logout on server:', err);
+      // Continue with client-side logout even if server call fails
+    }
+    
+    // Clear local state
     setUser(null);
     setOrganization(null);
     setProject(null);
-    document.cookie = 'optiview_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    
+    // Clear the session cookie
+    document.cookie = 'optiview_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
+    
+    // Redirect to login page
+    window.location.href = '/login';
   };
 
   const listOrganizations = async (): Promise<Organization[]> => {
