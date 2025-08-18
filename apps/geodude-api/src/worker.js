@@ -983,7 +983,105 @@ export default {
         }
       }
 
-      // 1.6) Admin environment check (for debugging)
+      // 1.6) Admin selfcheck (automated monitoring)
+      if (url.pathname === "/admin/selfcheck") {
+        try {
+          // Check D1 connectivity
+          const d1Check = await d1.prepare(`SELECT 1 as test`).bind().first();
+          const d1_ok = d1Check?.test === 1;
+
+          // Check KV connectivity  
+          let kv_ok = false;
+          try {
+            await env.AI_FINGERPRINTS.get("test-key");
+            kv_ok = true;
+          } catch (kvError) {
+            console.error("KV check failed:", kvError);
+          }
+
+          // Check rules manifest
+          let rules_manifest_version = null;
+          try {
+            const manifest = await env.AI_FINGERPRINTS.get("rules:manifest");
+            if (manifest) {
+              const parsed = JSON.parse(manifest);
+              rules_manifest_version = parsed.version || 0;
+            }
+          } catch (manifestError) {
+            console.error("Rules manifest check failed:", manifestError);
+          }
+
+          // Check tag.js ETag presence
+          let tag_etag_present = false;
+          try {
+            const tagResponse = await fetch(`${config.PUBLIC_BASE_URL}/v1/tag.js`, { method: 'HEAD' });
+            tag_etag_present = tagResponse.headers.has('etag') || tagResponse.headers.has('ETag');
+          } catch (tagError) {
+            console.error("Tag ETag check failed:", tagError);
+          }
+
+          // Check events ingestion endpoint
+          let events_ingest_2xx = false;
+          try {
+            const ingestResponse = await fetch(`${config.PUBLIC_BASE_URL}/api/events`, { 
+              method: 'OPTIONS',
+              headers: { 'Origin': 'https://example.com' }
+            });
+            events_ingest_2xx = ingestResponse.status >= 200 && ingestResponse.status < 300;
+          } catch (ingestError) {
+            console.error("Events ingest check failed:", ingestError);
+          }
+
+          // Check cron last run (estimate from recent events)
+          let cron_last_run_sec = null;
+          try {
+            const recentEvent = await d1.prepare(`
+              SELECT occurred_at FROM interaction_events 
+              ORDER BY occurred_at DESC LIMIT 1
+            `).bind().first();
+            if (recentEvent) {
+              const lastEventTime = new Date(recentEvent.occurred_at);
+              cron_last_run_sec = Math.floor((Date.now() - lastEventTime.getTime()) / 1000);
+            }
+          } catch (cronError) {
+            console.error("Cron check failed:", cronError);
+          }
+
+          const overall_ok = d1_ok && kv_ok && tag_etag_present && events_ingest_2xx;
+
+          const response = new Response(JSON.stringify({
+            ok: overall_ok,
+            kv: kv_ok,
+            d1: d1_ok,
+            cron_last_run_sec: cron_last_run_sec,
+            tag_etag_present: tag_etag_present,
+            events_ingest_2xx: events_ingest_2xx,
+            rules_manifest_version: rules_manifest_version
+          }), {
+            status: overall_ok ? 200 : 503,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (error) {
+          console.error("Selfcheck error:", error);
+          const response = new Response(JSON.stringify({
+            ok: false,
+            kv: false,
+            d1: false,
+            cron_last_run_sec: null,
+            tag_etag_present: false,
+            events_ingest_2xx: false,
+            rules_manifest_version: null,
+            error: error.message
+          }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
+      // 1.7) Admin environment check (for debugging)
       if (url.pathname === "/admin/env-check") {
         try {
           const configForEnvCheck = getConfigForEnvCheck(config);
@@ -4926,9 +5024,9 @@ export default {
               return addCorsHeaders(response, origin);
             }
 
-            // Verify property belongs to project
+            // Verify property belongs to project and get domain for CORS
             const propertyCheck = await d1.prepare(`
-              SELECT id FROM properties WHERE id = ? AND project_id = ?
+              SELECT id, domain FROM properties WHERE id = ? AND project_id = ?
             `).bind(property_id, project_id).first();
 
             if (!propertyCheck) {
@@ -4937,6 +5035,22 @@ export default {
                 headers: { "Content-Type": "application/json" }
               });
               return addCorsHeaders(response, origin);
+            }
+
+            // Enforce property-scoped CORS
+            const propertyDomain = propertyCheck.domain;
+            const expectedOrigin = `https://${propertyDomain}`;
+            const expectedOriginWww = `https://www.${propertyDomain}`;
+            
+            if (origin && origin !== expectedOrigin && origin !== expectedOriginWww) {
+              const response = new Response(JSON.stringify({ 
+                error: "Origin not allowed for this property",
+                details: "origin_denied" 
+              }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, expectedOrigin); // Use property origin, not request origin
             }
 
             // Process each event in the batch
@@ -5153,7 +5267,7 @@ export default {
               status: 200,
               headers: { "Content-Type": "application/json" }
             });
-            return addCorsHeaders(response, origin);
+            return addCorsHeaders(response, expectedOrigin);
 
           } else {
             // Legacy single event format
@@ -5486,9 +5600,9 @@ export default {
               return addCorsHeaders(response, origin);
             }
 
-            // Verify property belongs to project
+            // Verify property belongs to project and get domain for CORS
             const propertyCheck = await d1.prepare(`
-              SELECT id FROM properties WHERE id = ? AND project_id = ?
+              SELECT id, domain FROM properties WHERE id = ? AND project_id = ?
             `).bind(finalPropertyId, project_id).first();
 
             if (!propertyCheck) {
@@ -5497,6 +5611,22 @@ export default {
                 headers: { "Content-Type": "application/json" }
               });
               return addCorsHeaders(response, origin);
+            }
+
+            // Enforce property-scoped CORS for conversions
+            const propertyDomain = propertyCheck.domain;
+            const expectedOrigin = `https://${propertyDomain}`;
+            const expectedOriginWww = `https://www.${propertyDomain}`;
+            
+            if (origin && origin !== expectedOrigin && origin !== expectedOriginWww) {
+              const response = new Response(JSON.stringify({ 
+                error: "Origin not allowed for this property",
+                details: "origin_denied" 
+              }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, expectedOrigin);
             }
 
             // Upsert content asset
