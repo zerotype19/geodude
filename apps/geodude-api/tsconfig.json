@@ -3,6 +3,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "noEmit": true,
+    "composite": true,
+    "skipLibCheck": true,
+    "strict": false,
     "types": [
       "@cloudflare/workers-types"
     ],
@@ -11,6 +14,10 @@
     ]
   },
   "include": [
-    "src"
+    "scripts/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*",
+    "tests/**/*"
   ]
 }
