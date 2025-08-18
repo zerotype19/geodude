@@ -655,22 +655,80 @@ export async function handleApiRoutes(
     // 6.4) Content API
     if (url.pathname === "/api/content" && req.method === "GET") {
         try {
-            const { project_id } = Object.fromEntries(url.searchParams);
+            const params = Object.fromEntries(url.searchParams);
+            const { 
+                project_id,
+                window = "24h",
+                q = "",
+                type = "",
+                aiOnly = "false",
+                page = "1",
+                pageSize = "50"
+            } = params;
+            
             if (!project_id) {
                 const response = new Response("missing project_id", { status: 400 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            const content = await env.OPTIVIEW_DB.prepare(`
-        SELECT ca.id, ca.url, ca.type, ca.metadata, ca.created_at,
-               p.domain
-        FROM content_assets ca
-        JOIN properties p ON ca.property_id = p.id
-        WHERE p.project_id = ?
-        ORDER BY ca.created_at DESC
-      `).bind(project_id).all<any>();
+            const pageNum = Math.max(1, parseInt(page));
+            const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
+            const offset = (pageNum - 1) * pageSizeNum;
 
-            const response = new Response(JSON.stringify({ content: content.results || [] }), {
+            // Build WHERE conditions
+            let whereConditions = ["ca.project_id = ?"];
+            let bindParams = [project_id];
+
+            if (q.trim()) {
+                whereConditions.push("ca.url LIKE ?");
+                bindParams.push(`%${q.trim()}%`);
+            }
+
+            if (type.trim()) {
+                whereConditions.push("ca.type = ?");
+                bindParams.push(type.trim());
+            }
+
+            const whereClause = whereConditions.join(" AND ");
+
+            // Get total count
+            const countResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as total
+                FROM content_assets ca
+                WHERE ${whereClause}
+            `).bind(...bindParams).first();
+
+            // Get paginated content with metrics
+            const content = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ca.id, ca.url, ca.type, ca.metadata, ca.created_at,
+                    COALESCE((SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id), '1970-01-01') AS last_seen,
+                    COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')), 0) AS events_24h,
+                    COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')), 0) AS events_15m
+                FROM content_assets ca
+                WHERE ${whereClause}
+                ORDER BY ca.created_at DESC
+                LIMIT ? OFFSET ?
+            `).bind(...bindParams, pageSizeNum, offset).all<any>();
+
+            const items = (content.results || []).map(row => ({
+                id: row.id,
+                url: row.url,
+                type: row.type,
+                last_seen: row.last_seen,
+                events_15m: row.events_15m || 0,
+                events_24h: row.events_24h || 0,
+                ai_referrals_24h: 0,
+                by_source_24h: [],
+                coverage_score: row.events_24h > 0 ? 50 : 0
+            }));
+
+            const response = new Response(JSON.stringify({
+                items,
+                page: pageNum,
+                pageSize: pageSizeNum,
+                total: countResult?.total || 0
+            }), {
                 headers: {
                     "Content-Type": "application/json",
                     "Cache-Control": "public, max-age=300"
