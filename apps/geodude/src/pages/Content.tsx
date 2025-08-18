@@ -259,22 +259,22 @@ const Content: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-medium text-blue-800 mb-2">No content data yet</h3>
+                <h3 className="text-lg font-medium text-blue-800 mb-2">No manual content assets yet</h3>
                 <p className="text-blue-700 mb-4">
-                  Start tracking your website content by installing the tracking tag.
+                  You can manually add content URLs to track, or view existing AI activity in Referrals.
                 </p>
                 <div className="flex justify-center gap-3">
-                  <a
-                    href={`/install?project_id=${project?.id}`}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  <button
+                    onClick={() => {/* TODO: Add content modal */}}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
-                    Install
-                  </a>
+                    Add Content
+                  </button>
                   <a
-                    href="/api-keys"
+                    href="/referrals"
                     className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
-                    API Keys
+                    View AI Activity
                   </a>
                 </div>
               </div>
