@@ -25,15 +25,15 @@ import Recommendations from "./pages/Recommendations";
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
@@ -46,19 +46,19 @@ const SmartDefaultRoute = () => {
   useEffect(() => {
     const checkForActivity = async () => {
       if (!project?.id || loading) return;
-      
+
       try {
         setCheckingEvents(true);
-        
+
         // Check for any activity: events, referrals, or conversions
         const [eventsResponse, referralsResponse, conversionsResponse] = await Promise.allSettled([
           fetch(`${API_BASE}/api/events?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS),
           fetch(`${API_BASE}/api/referrals?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS),
           fetch(`${API_BASE}/api/conversions?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS)
         ]);
-        
+
         let hasAnyActivity = false;
-        
+
         // Check if any endpoint returned data
         for (const response of [eventsResponse, referralsResponse, conversionsResponse]) {
           if (response.status === 'fulfilled' && response.value.ok) {
@@ -69,7 +69,7 @@ const SmartDefaultRoute = () => {
             }
           }
         }
-        
+
         setHasEvents(hasAnyActivity);
       } catch (error) {
         console.error('Failed to check for activity:', error);
@@ -102,15 +102,15 @@ const SmartDefaultRoute = () => {
 // Public Route Component (redirects to home if already logged in)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-  
+
   if (user) {
     return <Navigate to="/" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
@@ -119,7 +119,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/onboarding" element={<Onboarding />} />
-      
+
       {/* Protected Routes */}
       <Route path="/" element={<SmartDefaultRoute />} />
       <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
@@ -136,7 +136,7 @@ function AppRoutes() {
       <Route path="/api-keys" element={<ProtectedRoute><ApiKeys /></ProtectedRoute>} />
       <Route path="/data-policy" element={<ProtectedRoute><DataPolicy /></ProtectedRoute>} />
       <Route path="/docs/*" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
-      
+
       {/* Public Routes */}
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />

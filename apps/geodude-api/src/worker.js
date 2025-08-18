@@ -5303,17 +5303,101 @@ export default {
         }
       }
 
+      // 7) Events recent endpoint
+      if (url.pathname === "/api/events/recent" && request.method === "GET") {
+        try {
+          const projectId = url.searchParams.get("project_id");
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get recent events from interaction_events table
+          const events = await d1.prepare(`
+            SELECT 
+              ie.id,
+              ie.event_type,
+              ie.occurred_at,
+              ie.metadata,
+              ca.url,
+              s.name as source_name,
+              s.slug as source_slug
+            FROM interaction_events ie
+            LEFT JOIN content_assets ca ON ca.id = ie.content_id
+            LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
+            WHERE ie.project_id = ?
+            ORDER BY ie.occurred_at DESC
+            LIMIT 100
+          `).bind(projectId).all();
+
+          const response = new Response(JSON.stringify({
+            events: events.results || [],
+            total: events.results?.length || 0
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (e) {
+          console.error("Events recent error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to fetch events" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // 7) Events summary endpoint
       if (url.pathname === "/api/events/summary" && request.method === "GET") {
-        const response = new Response(JSON.stringify({
-          total: 0,
-          breakdown: [],
-          top_sources: [],
-          timeseries: []
-        }), {
-          headers: { "Content-Type": "application/json" }
-        });
-        return addCorsHeaders(response, origin);
+        try {
+          const projectId = url.searchParams.get("project_id");
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get summary data from interaction_events table
+          const summary = await d1.prepare(`
+            SELECT 
+              COUNT(*) as total,
+              COUNT(CASE WHEN occurred_at >= datetime('now', '-15 minutes') THEN 1 END) as last_15m,
+              COUNT(CASE WHEN ai_source_id IS NOT NULL THEN 1 END) as ai_events,
+              COUNT(DISTINCT content_id) as unique_pages
+            FROM interaction_events 
+            WHERE project_id = ?
+          `).bind(projectId).first();
+
+          const response = new Response(JSON.stringify({
+            total: summary?.total || 0,
+            last_15m: summary?.last_15m || 0,
+            ai_events: summary?.ai_events || 0,
+            unique_pages: summary?.unique_pages || 0,
+            breakdown: [],
+            top_sources: [],
+            timeseries: []
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (e) {
+          console.error("Events summary error:", e);
+          const response = new Response(JSON.stringify({
+            total: 0,
+            breakdown: [],
+            top_sources: [],
+            timeseries: []
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
       }
 
       // 7.0.1) Conversions POST endpoint

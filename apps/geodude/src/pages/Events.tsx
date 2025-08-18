@@ -60,6 +60,7 @@ function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: s
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../contexts/AuthContext";
+import { API_BASE, FETCH_OPTS } from '../config';
 
 interface EventItem {
   id: number;
@@ -148,9 +149,7 @@ export default function Events() {
     setSummaryLoading(true);
     try {
       const params = new URLSearchParams({ project_id: project.id, window });
-      const response = await fetch(`https://api.optiview.ai/api/events/summary?${params}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_BASE}/api/events/summary?${params}`, FETCH_OPTS);
       
       if (response.ok) {
         const data = await response.json();
@@ -183,9 +182,7 @@ export default function Events() {
       if (sourceFilter) params.append("source", sourceFilter);
       if (searchQuery) params.append("q", searchQuery);
 
-      const response = await fetch(`https://api.optiview.ai/api/events/recent?${params}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_BASE}/api/events/recent?${params}`, FETCH_OPTS);
       
       if (response.ok) {
         const data = await response.json();
@@ -205,9 +202,7 @@ export default function Events() {
     
     try {
       const params = new URLSearchParams({ project_id: project.id, window });
-      const response = await fetch(`https://api.optiview.ai/api/events/has-any?${params}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_BASE}/api/events/has-any?${params}`, FETCH_OPTS);
       
       if (response.ok) {
         const data = await response.json();
