@@ -7911,11 +7911,14 @@ export default {
 
           // Get total count
           const totalQuery = `
-            SELECT COUNT(DISTINCT ar.content_id, ar.ai_source_id) as count
-            FROM ai_referrals ar
-            JOIN ai_sources s ON s.id = ar.ai_source_id
-            JOIN content_assets ca ON ca.id = ar.content_id
-            WHERE ${whereClause}
+            SELECT COUNT(*) as count
+            FROM (
+              SELECT DISTINCT ar.content_id, ar.ai_source_id
+              FROM ai_referrals ar
+              JOIN ai_sources s ON s.id = ar.ai_source_id
+              JOIN content_assets ca ON ca.id = ar.content_id
+              WHERE ${whereClause}
+            )
           `;
           const totalResult = await d1.prepare(totalQuery).bind(...params).first();
           const total = totalResult?.count || 0;
