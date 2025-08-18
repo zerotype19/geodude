@@ -7698,14 +7698,6 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          if (!projectId) {
-            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-              status: 400,
-              headers: { "Content-Type": "application/json" }
-            });
-            return addCorsHeaders(response, origin);
-          }
-
           // Validate window parameter
           if (!['15m', '24h', '7d'].includes(window)) {
             const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
