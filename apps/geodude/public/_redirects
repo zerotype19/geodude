@@ -1,29 +1,7 @@
-# API routes first - highest priority
+# API routes to external service (before SPA fallback)
 /api/* https://api.optiview.ai/api/:splat 302
 
-# Exact SPA routes - MUST serve index.html without redirect
-/login /index.html 200
-/onboarding /index.html 200
-/events /index.html 200
-/content /index.html 200
-/referrals /index.html 200
-/conversions /index.html 200
-/funnels /index.html 200
-/journeys /index.html 200
-/citations /index.html 200
-/recommendations /index.html 200
-/sources /index.html 200
-/install /index.html 200
-/settings /index.html 200
-/api-keys /index.html 200
-/data-policy /index.html 200
-/terms /index.html 200
-/privacy /index.html 200
-/magic-link /index.html 200
-
-# Wildcard routes for query parameters
-/install* /index.html 200
-/magic-link* /index.html 200
-
-# SPA fallback - ANY unmatched route should serve index.html
-/* /index.html 200
+# SPA fallback: rewrite to index.html (no redirect)
+# Cloudflare Pages treats "200" here as a rewrite, NOT a redirect.
+# Keep this as the LAST rule.
+/*   /index.html   200
