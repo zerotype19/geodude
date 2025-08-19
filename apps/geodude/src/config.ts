@@ -1,16 +1,15 @@
-// API configuration - FORCED due to environment variable issues
-const FORCE_API_URL = "https://api.optiview.ai";
-export const API_BASE = FORCE_API_URL;
+// API configuration
+// Using hardcoded URL since VITE_API_URL from Pages dashboard isn't loading during build
+export const API_BASE = "https://api.optiview.ai";
 
-// Environment variable debugging
-const envDebug = {
+// Debug: Check if environment variables are available
+const envCheck = {
   VITE_API_URL: (import.meta as any).env.VITE_API_URL,
   NODE_ENV: (import.meta as any).env.NODE_ENV,
   MODE: (import.meta as any).env.MODE,
-  forced: true,
-  timestamp: "2025-08-19-02-32"
+  hardcoded: true
 };
-console.log("🔍 FORCED API CONFIG:", envDebug);
+console.log("🔧 API CONFIG:", { API_BASE, env: envCheck });
 
 export const FETCH_OPTS: RequestInit = { credentials: "include" }; // send cookies
 

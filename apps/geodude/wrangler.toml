@@ -1,17 +1,3 @@
 name = "optiview"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-08-01"
-
-# Build configuration for Pages
-[build]
-command = "npm run build"
-cwd = "."
-
-# Environment variables for Vite build process
-[env.production.vars]
-VITE_API_URL = "https://api.optiview.ai"
-VITE_ENABLE_ADMIN = "false"
-
-[env.preview.vars]
-VITE_API_URL = "https://api.optiview.ai"
-VITE_ENABLE_ADMIN = "true"
