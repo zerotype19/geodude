@@ -3,16 +3,16 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
 
-// NUCLEAR BUNDLE CHANGE: Force completely new hash
-const DEPLOYMENT_ID = "FINAL_API_FIX_" + Date.now() + "_" + Math.random().toString(36).substring(2);
-const FORCED_TIMESTAMP = "2025-08-19T03:52:00Z";
-const FINAL_API_FIX_VERSION = "v4_no_domain_redirects_final";
-const NUCLEAR_CACHE_BUST = Math.random().toString(36) + Date.now().toString(36);
-console.log("🚀 NUCLEAR BUNDLE CHANGE - FINAL API FIX:", { 
+// ENV VAR BASED CONFIG: Use Cloudflare Pages VITE_API_URL
+const DEPLOYMENT_ID = "ENV_VAR_CONFIG_" + Date.now() + "_" + Math.random().toString(36).substring(2);
+const FORCED_TIMESTAMP = "2025-08-19T03:55:00Z";
+const ENV_VAR_VERSION = "v5_cloudflare_env_vars";
+const CACHE_BUST = Math.random().toString(36) + Date.now().toString(36);
+console.log("🚀 ENV VAR CONFIG - CLOUDFLARE PAGES:", { 
   DEPLOYMENT_ID, 
   FORCED_TIMESTAMP, 
-  FINAL_API_FIX_VERSION, 
-  NUCLEAR_CACHE_BUST,
+  ENV_VAR_VERSION, 
+  CACHE_BUST,
   source: "main.tsx" 
 });
 
