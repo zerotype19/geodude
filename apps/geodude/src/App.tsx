@@ -146,9 +146,14 @@ function AppRoutes() {
 }
 
 function App() {
-  // FORCE VITE REBUILD: This comment will change the app bundle content hash
-  const forceRebuild = "2025-08-19T02:25:00Z";
-  console.log("🚀 App starting with timestamp:", forceRebuild);
+  // NUCLEAR BUNDLE CHANGE: Force completely different content hash
+  const buildTimestamp = "DEPLOYMENT_2025-08-19T02-27-00Z";
+  const debugInfo = {
+    timestamp: buildTimestamp,
+    buildId: Math.random().toString(36),
+    forced: true
+  };
+  console.log("🚀 GEODUDE APP STARTING:", debugInfo);
   
   return (
     <AuthProvider>

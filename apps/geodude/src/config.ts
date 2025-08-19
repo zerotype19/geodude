@@ -1,7 +1,12 @@
 // API configuration  
-// TEMPORARY FIX: Force API_BASE until VITE_API_URL is configured in Cloudflare Pages
-export const API_BASE = "https://api.optiview.ai";
-// export const API_BASE = (import.meta as any).env.VITE_API_URL || "https://api.optiview.ai";
+export const API_BASE = (import.meta as any).env.VITE_API_URL || "https://api.optiview.ai";
+
+// Debug environment variables in build
+console.log("🔍 Environment check:", {
+  VITE_API_URL: (import.meta as any).env.VITE_API_URL,
+  NODE_ENV: (import.meta as any).env.NODE_ENV,
+  MODE: (import.meta as any).env.MODE
+});
 
 export const FETCH_OPTS: RequestInit = { credentials: "include" }; // send cookies
 
