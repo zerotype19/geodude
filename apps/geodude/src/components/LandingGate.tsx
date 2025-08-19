@@ -7,6 +7,8 @@ export default function LandingGate() {
   const navigate = useNavigate();
   const { user, project, loading } = useAuth();
 
+  console.log("🎯 LandingGate: Component mounted - NEW ROUTING ACTIVE");
+
   useEffect(() => {
     let cancelled = false;
 

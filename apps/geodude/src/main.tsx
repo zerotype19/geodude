@@ -4,9 +4,10 @@ import "./index.css";
 import App from "./App";
 
 // FORCE DIFFERENT BUNDLE: Adding unique code to guarantee new hash
-const DEPLOYMENT_ID = "DEPLOY_" + Date.now() + "_" + Math.random().toString(36).substring(2);
-const FORCED_TIMESTAMP = "2025-08-19T02:32:00Z";
-console.log("🚀 MAIN.TSX LOADED:", { DEPLOYMENT_ID, FORCED_TIMESTAMP, source: "main.tsx" });
+const DEPLOYMENT_ID = "ROUTING_FIX_" + Date.now() + "_" + Math.random().toString(36).substring(2);
+const FORCED_TIMESTAMP = "2025-08-19T03:10:00Z";
+const ROUTING_FIX_VERSION = "v2_landing_gate_isolated";
+console.log("🚀 MAIN.TSX LOADED - ROUTING FIX:", { DEPLOYMENT_ID, FORCED_TIMESTAMP, ROUTING_FIX_VERSION, source: "main.tsx" });
 
 // Different code structure to force bundle change
 const initializeApp = () => {
