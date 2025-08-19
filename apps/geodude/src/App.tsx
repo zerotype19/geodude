@@ -1,7 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { useState, useEffect } from "react";
-import { API_BASE, FETCH_OPTS } from "./config";
 import Sources from "./pages/Sources";
 import Content from "./pages/Content";
 import Events from "./pages/Events";
@@ -21,6 +19,7 @@ import Privacy from "./pages/Privacy";
 import Onboarding from "./pages/Onboarding";
 import Funnels from "./pages/Funnels";
 import Recommendations from "./pages/Recommendations";
+import LandingGate from "./components/LandingGate";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -37,67 +36,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Smart Default Route Component - redirects based on data availability
-const SmartDefaultRoute = () => {
-  const { user, project, loading } = useAuth();
-  const [hasEvents, setHasEvents] = useState<boolean | null>(null);
-  const [checkingEvents, setCheckingEvents] = useState(true);
-
-  useEffect(() => {
-    const checkForActivity = async () => {
-      if (!project?.id || loading) return;
-
-      try {
-        setCheckingEvents(true);
-
-        // Check for any activity: events, referrals, or conversions
-        const [eventsResponse, referralsResponse, conversionsResponse] = await Promise.allSettled([
-          fetch(`${API_BASE}/api/events?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS),
-          fetch(`${API_BASE}/api/referrals?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS),
-          fetch(`${API_BASE}/api/conversions?project_id=${project.id}&page=1&pageSize=1`, FETCH_OPTS)
-        ]);
-
-        let hasAnyActivity = false;
-
-        // Check if any endpoint returned data
-        for (const response of [eventsResponse, referralsResponse, conversionsResponse]) {
-          if (response.status === 'fulfilled' && response.value.ok) {
-            const data = await response.value.json();
-            if (data.total > 0 || (data.items && data.items.length > 0)) {
-              hasAnyActivity = true;
-              break;
-            }
-          }
-        }
-
-        setHasEvents(hasAnyActivity);
-      } catch (error) {
-        console.error('Failed to check for activity:', error);
-        // If check fails, default to events page (safer for users with data)
-        setHasEvents(true);
-      } finally {
-        setCheckingEvents(false);
-      }
-    };
-
-    checkForActivity();
-  }, [project?.id, loading]);
-
-  if (loading || checkingEvents || hasEvents === null) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Redirect based on events availability
-  if (hasEvents) {
-    return <Navigate to="/events" replace />;
-  } else {
-    return <Navigate to={`/install?project_id=${project?.id}`} replace />;
-  }
-};
+// Landing Gate handles smart routing only for root path "/"
+// All other routes go directly to their pages without redirect logic
 
 // Public Route Component (redirects to home if already logged in)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
@@ -120,8 +60,10 @@ function AppRoutes() {
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/onboarding" element={<Onboarding />} />
 
-      {/* Protected Routes */}
-      <Route path="/" element={<SmartDefaultRoute />} />
+      {/* Smart landing only for root path - checks for data and redirects accordingly */}
+      <Route path="/" element={<LandingGate />} />
+
+      {/* Protected Routes - these load directly without redirect logic */}
       <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="/content" element={<ProtectedRoute><Content /></ProtectedRoute>} />
       <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
@@ -141,6 +83,9 @@ function AppRoutes() {
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/admin/health" element={<AdminHealth />} />
+
+      {/* SPA fallback - any unmatched route goes to events */}
+      <Route path="*" element={<ProtectedRoute><Events /></ProtectedRoute>} />
     </Routes>
   );
 }
