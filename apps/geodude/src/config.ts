@@ -9,7 +9,8 @@ const envCheck = {
   MODE: (import.meta as any).env.MODE,
   hardcoded: true
 };
-console.log("🔧 API CONFIG:", { API_BASE, env: envCheck });
+console.log("🔧 API CONFIG - DOMAIN FIX:", { API_BASE, env: envCheck });
+console.log("🎯 API_BASE SHOULD BE: https://api.optiview.ai (NOT optiview.ai)");
 
 export const FETCH_OPTS: RequestInit = { credentials: "include" }; // send cookies
 
