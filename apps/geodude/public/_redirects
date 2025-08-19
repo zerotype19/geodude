@@ -1,6 +1,28 @@
-# Forward API requests to the API worker domain (MUST be first)
+# Forward API requests to the API worker domain
 /api/* https://api.optiview.ai/api/:splat 302
 
-# SPA catch-all for React Router (MUST be last)
-# This handles all frontend routes including client-side navigation
-/* /index.html 200
+# Explicit frontend SPA routes (no catch-all)
+/ /index.html 200
+/login /index.html 200
+/onboarding /index.html 200
+/events /index.html 200
+/content /index.html 200
+/referrals /index.html 200
+/conversions /index.html 200
+/funnels /index.html 200
+/journeys /index.html 200
+/citations /index.html 200
+/recommendations /index.html 200
+/sources /index.html 200
+/install /index.html 200
+/settings /index.html 200
+/api-keys /index.html 200
+/data-policy /index.html 200
+/docs/* /index.html 200
+/terms /index.html 200
+/privacy /index.html 200
+/magic-link /index.html 200
+
+# Handle query parameters for SPA routes
+/install\?* /index.html 200
+/magic-link\?* /index.html 200
