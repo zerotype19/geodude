@@ -38,7 +38,7 @@ interface ReferralItem {
 }
 
 const Referrals: React.FC = () => {
-  const { project } = useAuth();
+  const { project, loading: authLoading } = useAuth();
   const [summary, setSummary] = useState<ReferralSummary | null>(null);
   const [referrals, setReferrals] = useState<ReferralItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,16 +116,16 @@ const Referrals: React.FC = () => {
   };
 
   useEffect(() => {
-    if (project?.id) {
+    if (!authLoading && project?.id) {
       fetchSummary();
     }
-  }, [project?.id, window]);
+  }, [authLoading, project?.id, window]);
 
   useEffect(() => {
-    if (project?.id) {
+    if (!authLoading && project?.id) {
       fetchReferrals();
     }
-  }, [project?.id, window, source, searchQuery, page]);
+  }, [authLoading, project?.id, window, source, searchQuery, page]);
 
   const handleWindowChange = (newWindow: '15m' | '24h' | '7d') => {
     setWindow(newWindow);
