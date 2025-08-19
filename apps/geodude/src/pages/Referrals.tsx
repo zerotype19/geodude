@@ -116,12 +116,16 @@ const Referrals: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchSummary();
-  }, [window]);
+    if (project?.id) {
+      fetchSummary();
+    }
+  }, [project?.id, window]);
 
   useEffect(() => {
-    fetchReferrals();
-  }, [window, source, searchQuery, page]);
+    if (project?.id) {
+      fetchReferrals();
+    }
+  }, [project?.id, window, source, searchQuery, page]);
 
   const handleWindowChange = (newWindow: '15m' | '24h' | '7d') => {
     setWindow(newWindow);
