@@ -1,8 +1,7 @@
-# Forward API requests to the API worker domain
+# Forward API requests to the API worker domain (MUST be first)
 /api/* https://api.optiview.ai/api/:splat 302
 
-# Explicit frontend SPA routes (no catch-all)
-/ /index.html 200
+# SPA routing - specific routes to avoid root conflicts
 /login /index.html 200
 /onboarding /index.html 200
 /events /index.html 200
@@ -18,7 +17,6 @@
 /settings /index.html 200
 /api-keys /index.html 200
 /data-policy /index.html 200
-/docs/* /index.html 200
 /terms /index.html 200
 /privacy /index.html 200
 /magic-link /index.html 200
@@ -26,3 +24,7 @@
 # Handle query parameters for SPA routes
 /install\?* /index.html 200
 /magic-link\?* /index.html 200
+
+# Docs and root - at end to avoid conflicts
+/docs/* /index.html 200
+/ /index.html 200
