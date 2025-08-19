@@ -1,4 +1,7 @@
-# Exact routes first (better performance - no splats/placeholders)
+# API routes first - highest priority
+/api/* https://api.optiview.ai/api/:splat 302
+
+# Exact SPA routes - MUST serve index.html without redirect
 /login /index.html 200
 /onboarding /index.html 200
 /events /index.html 200
@@ -18,7 +21,9 @@
 /privacy /index.html 200
 /magic-link /index.html 200
 
-# Wildcard routes after exact routes (splats/placeholders)
-/api/* https://api.optiview.ai/api/:splat 302
+# Wildcard routes for query parameters
 /install* /index.html 200
 /magic-link* /index.html 200
+
+# SPA fallback - ANY unmatched route should serve index.html
+/* /index.html 200
