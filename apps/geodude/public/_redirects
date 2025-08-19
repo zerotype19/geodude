@@ -1,7 +1,4 @@
-# Forward API requests to the API worker domain (MUST be first)
-/api/* https://api.optiview.ai/api/:splat 302
-
-# SPA routing - explicit routes to avoid infinite loops
+# Exact routes first (better performance - no splats/placeholders)
 /login /index.html 200
 /onboarding /index.html 200
 /events /index.html 200
@@ -21,6 +18,7 @@
 /privacy /index.html 200
 /magic-link /index.html 200
 
-# Handle query parameters
+# Wildcard routes after exact routes (splats/placeholders)
+/api/* https://api.optiview.ai/api/:splat 302
 /install* /index.html 200
 /magic-link* /index.html 200
