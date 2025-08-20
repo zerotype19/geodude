@@ -27,7 +27,10 @@ export async function ipRateLimit(
   }
 
   raw.count = count;
-  await kv.put(key, JSON.stringify(raw), { expirationTtl: Math.ceil((raw.resetAt - now) / 1000) + 5 });
+  const remainingTtl = Math.ceil((raw.resetAt - now) / 1000) + 5;
+  // Ensure TTL is at least 60 seconds (Cloudflare requirement)
+  const safeTtl = Math.max(remainingTtl, 60);
+  await kv.put(key, JSON.stringify(raw), { expirationTtl: safeTtl });
   metrics?.increment("ip_rl_allow_5m");
   return { ok: true, remaining: limit - count, resetAt: raw.resetAt };
 }

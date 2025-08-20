@@ -1658,9 +1658,17 @@ export async function handleApiRoutes(
 
             // Create or update session records for real-time dashboard
             try {
-                for (const event of events) {
+                for (let i = 0; i < events.length; i++) {
+                    const event = events[i];
                     const { metadata, occurred_at } = event;
                     const eventTime = occurred_at || now;
+                    
+                    // Get the corresponding event ID from insertResults
+                    const eventId = insertResults[i]?.meta?.last_row_id;
+                    if (!eventId) {
+                        console.error('No event ID found for event index:', i);
+                        continue; // Skip this event if we can't get the ID
+                    }
 
                     // Extract session and visitor info from metadata
                     const sessionId = metadata?.sid;
@@ -1754,7 +1762,7 @@ export async function handleApiRoutes(
                             await env.OPTIVIEW_DB.prepare(`
                                 INSERT INTO session_event_map (session_id, event_id)
                                 VALUES (?, ?)
-                            `).bind(currentSessionId, insertResults[insertResults.length - 1]?.meta?.last_row_id || null).run();
+                            `).bind(currentSessionId, eventId).run();
                         } catch (mapError) {
                             console.error('Error mapping event to session:', mapError);
                             // Don't fail the request, just log the error
