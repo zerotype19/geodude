@@ -1581,22 +1581,22 @@ export async function handleApiRoutes(
                         let contentResult = await env.OPTIVIEW_DB.prepare(`
                             SELECT id FROM content_assets WHERE url = ? AND project_id = ? LIMIT 1
                         `).bind(metadata.url, project_id).first();
-                        
+
                         if (contentResult?.id) {
                             contentId = contentResult.id;
                         } else {
                             // Create new content asset if it doesn't exist
                             const newContentResult = await env.OPTIVIEW_DB.prepare(`
-                                INSERT INTO content_assets (project_id, url, title, created_at, updated_at)
+                                INSERT INTO content_assets (project_id, property_id, url, type, created_at)
                                 VALUES (?, ?, ?, ?, ?)
                             `).bind(
-                                project_id, 
-                                metadata.url, 
-                                metadata.title || metadata.url,
-                                now,
+                                project_id,
+                                property_id,
+                                metadata.url,
+                                'page',
                                 now
                             ).run();
-                            
+
                             // Get the newly created content ID
                             contentId = newContentResult.meta?.last_row_id || null;
                         }
@@ -1661,24 +1661,116 @@ export async function handleApiRoutes(
                 for (const event of events) {
                     const { metadata, occurred_at } = event;
                     const eventTime = occurred_at || now;
-                    
+
                     // Extract session and visitor info from metadata
                     const sessionId = metadata?.sid;
                     const visitorId = metadata?.vid;
-                    
-                    // Create a new session for each event to ensure real-time data
-                    const contentId = await env.OPTIVIEW_DB.prepare(`
-                        SELECT id FROM content_assets WHERE url = ? AND project_id = ? LIMIT 1
-                    `).bind(metadata.url, project_id).first().then(r => r?.id || null);
 
+                    // Guard: if no vid, generate a server-side opaque vid per project+IP+UA daily
+                    // to avoid losing sessionization. Keep it short and safe.
+                    const finalVid = visitorId || `anon_${project_id}_${Date.now()}`;
+
+                    // 1) Ensure visitor row exists & bump last_seen_ts
                     await env.OPTIVIEW_DB.prepare(`
-                        INSERT INTO session_v1 (
-                            project_id, started_at, ended_at, events_count,
-                            ai_influenced, primary_ai_source_id
-                        ) VALUES (?, ?, ?, ?, ?, ?)
-                    `).bind(
-                        project_id, eventTime, eventTime, 1, 0, null
-                    ).run();
+                        INSERT OR IGNORE INTO visitor (project_id, visitor_key, first_seen, last_seen)
+                        VALUES (?, ?, ?, ?)
+                    `).bind(project_id, finalVid, eventTime, eventTime).run();
+
+                    // Get the visitor ID (either existing or newly created)
+                    const visitorRecord = await env.OPTIVIEW_DB.prepare(`
+                        SELECT id FROM visitor WHERE project_id = ? AND visitor_key = ?
+                    `).bind(project_id, finalVid).first();
+
+                    if (!visitorRecord?.id) {
+                        console.error('Failed to get visitor ID for:', finalVid);
+                        continue; // Skip this event if we can't create visitor
+                    }
+
+                    const visitorIdInt = visitorRecord.id;
+
+                    // Update last_seen for the visitor
+                    await env.OPTIVIEW_DB.prepare(`
+                        UPDATE visitor SET last_seen = ? WHERE id = ?
+                    `).bind(eventTime, visitorIdInt).run();
+
+                    // 2) Find an open session: ended_at IS NULL AND (now - started_at) <= 30 min
+                    const openSession = await env.OPTIVIEW_DB.prepare(`
+                        SELECT id, started_at, events_count
+                        FROM session_v1
+                        WHERE project_id = ? AND visitor_id = ? AND ended_at IS NULL
+                        ORDER BY started_at DESC LIMIT 1
+                    `).bind(project_id, visitorIdInt).first();
+
+                    // Decide if we can reuse it (<= 30m idle)
+                    const canReuse = openSession &&
+                        (Date.now() - new Date(openSession.started_at).getTime()) <= 30 * 60 * 1000;
+
+                    // 3) If cannot reuse, close any stale open sessions (>30m idle)
+                    if (openSession && !canReuse) {
+                        await env.OPTIVIEW_DB.prepare(`
+                            UPDATE session_v1
+                            SET ended_at = ?, 
+                                events_count = ?
+                            WHERE id = ? AND ended_at IS NULL
+                        `).bind(eventTime, openSession.events_count, openSession.id).run();
+                    }
+
+                    // 4) Get or create a current session
+                    let currentSessionId;
+                    if (canReuse) {
+                        currentSessionId = openSession.id;
+                    } else {
+                        // Create new session using the correct schema
+                        const contentId = await env.OPTIVIEW_DB.prepare(`
+                            SELECT id FROM content_assets WHERE url = ? AND project_id = ? LIMIT 1
+                        `).bind(metadata.url, project_id).first().then(r => r?.id || null);
+
+                        // Handle the unique constraint by using INSERT OR IGNORE
+                        const newSessionResult = await env.OPTIVIEW_DB.prepare(`
+                            INSERT OR IGNORE INTO session_v1 (
+                                project_id, visitor_id, started_at, ended_at, events_count,
+                                ai_influenced, primary_ai_source_id, entry_content_id, entry_url
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `).bind(
+                            project_id, visitorIdInt, eventTime, null, 1, 0, null, contentId, metadata.url || ''
+                        ).run();
+
+                        // If insert failed due to unique constraint, get the existing session
+                        if (newSessionResult.meta?.last_row_id) {
+                            currentSessionId = newSessionResult.meta.last_row_id;
+                        } else {
+                            // Session already exists, get its ID
+                            const existingSession = await env.OPTIVIEW_DB.prepare(`
+                                SELECT id FROM session_v1 
+                                WHERE project_id = ? AND visitor_id = ? AND started_at = ?
+                            `).bind(project_id, visitorIdInt, eventTime).first();
+                            currentSessionId = existingSession?.id;
+                        }
+                    }
+
+                    // 5) Map the event to the session (if mapping table exists)
+                    if (currentSessionId) {
+                        try {
+                            await env.OPTIVIEW_DB.prepare(`
+                                INSERT INTO session_event_map (session_id, event_id)
+                                VALUES (?, ?)
+                            `).bind(currentSessionId, insertResults[insertResults.length - 1]?.meta?.last_row_id || null).run();
+                        } catch (mapError) {
+                            console.error('Error mapping event to session:', mapError);
+                            // Don't fail the request, just log the error
+                        }
+                    }
+
+                    // 6) Update aggregates on the session
+                    if (currentSessionId) {
+                        await env.OPTIVIEW_DB.prepare(`
+                            UPDATE session_v1
+                            SET events_count = events_count + 1,
+                                ai_influenced = CASE WHEN ? IS NOT NULL THEN 1 ELSE ai_influenced END,
+                                primary_ai_source_id = COALESCE(primary_ai_source_id, ?)
+                            WHERE id = ?
+                        `).bind(null, null, currentSessionId).run();
+                    }
                 }
             } catch (sessionError) {
                 console.error('Error creating/updating sessions:', sessionError);
