@@ -209,5 +209,76 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
     }
   }
 
+  // Admin schema inspection endpoint
+  if (url.pathname === "/admin/selfcheck/schema") {
+    try {
+      // Check if user is admin (basic check for now)
+      if (!req.headers.get("authorization")?.includes("Bearer ")) {
+        const response = new Response(JSON.stringify({
+          error: "Unauthorized",
+          message: "Admin access required"
+        }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response, origin);
+      }
+
+      const tables = ['visitor', 'session_v1', 'session_event_map', 'interaction_events', 'content_assets'];
+      const schema = {};
+
+      for (const table of tables) {
+        try {
+          // Get table info
+          const tableInfo = await d1.prepare(`PRAGMA table_info('${table}')`).all();
+          
+          // Get table DDL
+          const tableDDL = await d1.prepare(`
+            SELECT name, sql FROM sqlite_master 
+            WHERE type='table' AND name='${table}'
+          `).first();
+          
+          // Get indexes
+          const indexes = await d1.prepare(`
+            SELECT name, sql FROM sqlite_master 
+            WHERE type='index' AND tbl_name='${table}'
+          `).all();
+
+          schema[table] = {
+            columns: tableInfo.results || [],
+            ddl: tableDDL || null,
+            indexes: indexes.results || []
+          };
+        } catch (e) {
+          schema[table] = {
+            error: e.message,
+            columns: [],
+            ddl: null,
+            indexes: []
+          };
+        }
+      }
+
+      const response = new Response(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        schema
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
+      return addCorsHeaders(response, origin);
+    } catch (e) {
+      console.error("Schema inspection error:", e);
+      const response = new Response(JSON.stringify({
+        error: "Failed to inspect schema",
+        message: e.message,
+        timestamp: new Date().toISOString()
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+      return addCorsHeaders(response, origin);
+    }
+  }
+
   return null; // Not handled by this router
 }

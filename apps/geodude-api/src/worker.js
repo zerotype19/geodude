@@ -1165,6 +1165,70 @@ export default {
         }
       }
 
+      // 1.6.5) Admin schema inspection endpoint
+      if (url.pathname === "/admin/selfcheck/schema") {
+        try {
+          // TODO: Add proper admin authentication later
+          // For now, allow access to inspect schema for debugging
+
+          const tables = ['visitor', 'session_v1', 'session_event_map', 'interaction_events', 'content_assets'];
+          const schema = {};
+
+                    for (const table of tables) {
+            try {
+              // Get table info using direct D1 methods
+              const tableInfoResult = await env.OPTIVIEW_DB.prepare(`PRAGMA table_info('${table}')`).all();
+              const tableInfo = tableInfoResult.results || [];
+              
+              // Get table DDL
+              const tableDDL = await env.OPTIVIEW_DB.prepare(`
+                SELECT name, sql FROM sqlite_master 
+                WHERE type='table' AND name='${table}'
+              `).first();
+              
+              // Get indexes
+              const indexesResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT name, sql FROM sqlite_master 
+                WHERE type='index' AND tbl_name='${table}'
+              `).all();
+              const indexes = indexesResult.results || [];
+
+              schema[table] = {
+                columns: tableInfo,
+                ddl: tableDDL || null,
+                indexes: indexes
+              };
+            } catch (e) {
+              schema[table] = {
+                error: e.message,
+                columns: [],
+                ddl: null,
+                indexes: []
+              };
+            }
+          }
+
+          const response = new Response(JSON.stringify({
+            timestamp: new Date().toISOString(),
+            schema
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (e) {
+          console.error("Schema inspection error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Failed to inspect schema",
+            message: e.message,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // 1.7) Admin environment check (for debugging)
       if (url.pathname === "/admin/env-check") {
         try {
