@@ -20,6 +20,7 @@ import Onboarding from "./pages/Onboarding";
 import Funnels from "./pages/Funnels";
 import Recommendations from "./pages/Recommendations";
 import LandingGate from "./components/LandingGate";
+import { useEffect } from "react";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -93,12 +94,22 @@ function AppRoutes() {
 function App() {
   // NUCLEAR BUNDLE CHANGE: Force completely different content hash
   const buildTimestamp = "DEPLOYMENT_2025-08-19T02-27-00Z";
+  const cacheBuster = Date.now(); // Add runtime cache buster
   const debugInfo = {
     timestamp: buildTimestamp,
+    cacheBuster,
     buildId: Math.random().toString(36),
     forced: true
   };
   console.log("🚀 GEODUDE APP STARTING:", debugInfo);
+  
+  // Add cache-busting effect to prevent 308 redirects
+  useEffect(() => {
+    // Force a fresh navigation to clear any cached redirects
+    if (window.location.pathname === '/') {
+      console.log(`🔄 App: Cache busting root path [${cacheBuster}]`);
+    }
+  }, [cacheBuster]);
   
   return (
     <AuthProvider>

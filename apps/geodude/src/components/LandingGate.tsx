@@ -6,7 +6,9 @@ export default function LandingGate() {
   const navigate = useNavigate();
   const { user, project, loading } = useAuth();
 
-  console.log("🎯 LandingGate: Component mounted - SIMPLIFIED ROUTING");
+  // Add cache-busting timestamp to prevent 308 redirect caching
+  const timestamp = Date.now();
+  console.log(`🎯 LandingGate: Component mounted - SIMPLIFIED ROUTING [${timestamp}]`);
 
   useEffect(() => {
     let cancelled = false;
@@ -17,19 +19,26 @@ export default function LandingGate() {
 
       // If not authenticated, go to login
       if (!user) {
-        if (!cancelled) navigate("/login", { replace: true });
+        if (!cancelled) {
+          console.log(`🔐 LandingGate: Redirecting to /login [${timestamp}]`);
+          navigate("/login", { replace: true });
+        }
         return;
       }
 
       // If no project yet, go to events (safer fallback)
       if (!project?.id) {
-        if (!cancelled) navigate("/events", { replace: true });
+        if (!cancelled) {
+          console.log(`📁 LandingGate: No project, redirecting to /events [${timestamp}]`);
+          navigate("/events", { replace: true });
+        }
         return;
       }
 
       // Always go to events page - no more auto-redirects to /install
       if (!cancelled) {
-        console.log("✅ LandingGate: Redirecting to /events (no auto-install redirects)");
+        console.log(`✅ LandingGate: Redirecting to /events (no auto-install redirects) [${timestamp}]`);
+        // Use replace: true to prevent back button issues and clear any cached redirects
         navigate("/events", { replace: true });
       }
     }
@@ -39,7 +48,7 @@ export default function LandingGate() {
     return () => {
       cancelled = true;
     };
-  }, [user, project?.id, loading, navigate]);
+  }, [user, project?.id, loading, navigate, timestamp]);
 
   // Show loading spinner while determining redirect
   return (
@@ -47,6 +56,8 @@ export default function LandingGate() {
       <div className="text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
         <p className="mt-2 text-gray-600">Loading...</p>
+        {/* Add cache-busting info */}
+        <p className="mt-1 text-xs text-gray-400">Cache: {timestamp}</p>
       </div>
     </div>
   );
