@@ -1,50 +1,87 @@
-/* Minimal JSON cache helpers + project versioning */
+/* Robust JSON cache helpers + project versioning */
 
-type KV = KVNamespace;
+type CacheKV = KVNamespace;
 
-const KEY_VERSION = (projectId: string) => `v:${projectId}`;
-
-export async function getProjectVersion(kv: KV, projectId: string): Promise<number> {
-  if (!kv) return 0;
-  const v = await kv.get(KEY_VERSION(projectId));
-  return v ? Number(v) || 0 : 0;
-}
-
-export async function bumpProjectVersion(kv: KV, projectId: string): Promise<number> {
-  if (!kv) return 0;
-  const now = Date.now(); // use timestamp as monotonic "version"
-  await kv.put(KEY_VERSION(projectId), String(now));
+// Project version bump (invalidation)
+export async function bumpProjectVersion(
+  kv: CacheKV | undefined,
+  projectId: string
+): Promise<number> {
+  if (!kv) throw new Error("CACHE binding missing");
+  const k = `pv:${projectId}`;
+  const now = Date.now();
+  await kv.put(k, String(now)); // no TTL (evergreen)
   return now;
 }
 
+export async function getProjectVersion(
+  kv: CacheKV | undefined,
+  projectId: string
+): Promise<string> {
+  if (!kv) throw new Error("CACHE binding missing");
+  return (await kv.get(`pv:${projectId}`)) ?? "0";
+}
+
+export async function cacheGetJSON(
+  kv: CacheKV | undefined,
+  key: string
+): Promise<any | null> {
+  if (!kv) throw new Error("CACHE binding missing");
+  try {
+    // Cloudflare KV supports { type: "json" }
+    const val = await kv.get(key, { type: "json" });
+    return val ?? null;
+  } catch (e) {
+    // increment cache_error_5m if metrics available
+    return null;
+  }
+}
+
+export async function cachePutJSON(
+  kv: CacheKV | undefined,
+  key: string,
+  value: any,
+  ttlSeconds: number
+): Promise<void> {
+  if (!kv) throw new Error("CACHE binding missing");
+  try {
+    // Trim very large payloads (guard)
+    const str = JSON.stringify(value);
+    if (str.length > 50_000) {
+      // increment cache_skip_oversize_5m
+      return;
+    }
+    await kv.put(key, str, { expirationTtl: Math.max(1, Math.floor(ttlSeconds)) });
+  } catch (e) {
+    // increment cache_error_5m
+  }
+}
+
 export async function getOrSetJSON<T>(
-  kv: KV,
+  kv: CacheKV | undefined,
   key: string,
   ttlSeconds: number,
   compute: () => Promise<T>,
-  env?: { CACHE_OFF?: string; metrics?: (name: string) => void }
+  opts?: { bypass?: boolean; metrics?: (kind: "hit"|"miss"|"bypass") => void }
 ): Promise<T> {
-  if (!kv || env?.CACHE_OFF === "1") {
-    env?.metrics?.("cache_bypass_5m");
-    return compute();
+  if (!kv) throw new Error("CACHE binding missing");
+  if (opts?.bypass) {
+    opts.metrics?.("bypass");
+    return await compute();
   }
-  const hit = await kv.get(key);
-  if (hit) {
-    env?.metrics?.("cache_hit_5m");
-    try { return JSON.parse(hit) as T; } catch { /* fallthrough */ }
+  // GET
+  const hit = await cacheGetJSON(kv, key);
+  if (hit !== null) {
+    opts?.metrics?.("hit");
+    return hit as T;
   }
-  const value = await compute();
-  // size guard
-  try {
-    const str = JSON.stringify(value);
-    if (str.length <= ((env as any)?.CACHE_PAYLOAD_LIMIT_BYTES || 50_000)) {
-      await kv.put(key, str, { expirationTtl: ttlSeconds });
-      env?.metrics?.(hit ? "cache_overwrite_5m" : "cache_miss_5m");
-    } else {
-      env?.metrics?.("cache_skip_oversize_5m");
-    }
-  } catch {
-    env?.metrics?.("cache_store_error_5m");
-  }
-  return value;
+  // MISS → compute + PUT
+  const val = await compute();
+  await cachePutJSON(kv, key, val, ttlSeconds);
+  opts?.metrics?.("miss");
+  return val;
 }
+
+// Legacy compatibility - keep old function names
+export const getProjectVersionLegacy = getProjectVersion;
+export const bumpProjectVersionLegacy = bumpProjectVersion;

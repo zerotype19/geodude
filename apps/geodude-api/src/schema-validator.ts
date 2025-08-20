@@ -26,27 +26,31 @@ export const ENDPOINT_SCHEMAS: Record<string, EndpointSchema> = {
   '/api/events': {
     maxBodySizeKB: 1,
     allowedFields: {
-      project_id: { required: true, type: 'number' },
+      project_id: { required: true, type: 'string' },
       property_id: { required: true, type: 'number' },
-      content_id: { required: false, type: 'number' },
-      ai_source_id: { required: false, type: 'number' },
-      event_type: { 
+      events: { 
         required: true, 
-        type: 'string',
-        enum: ['view', 'click', 'purchase', 'custom']
-      },
-      metadata: { 
-        required: false, 
-        type: 'object',
-        maxLength: 512, // 512 chars for metadata
+        type: 'array',
         nestedRules: {
-          // Limit metadata keys and values
-          _maxKeys: 20,
-          _maxValueLength: 200
+          event_type: { 
+            required: true, 
+            type: 'string',
+            enum: ['pageview', 'click', 'custom']
+          },
+          metadata: { 
+            required: false, 
+            type: 'object',
+            maxLength: 2048, // 2KB for metadata
+            nestedRules: {
+              _maxKeys: 50,
+              _maxValueLength: 500
+            }
+          },
+          occurred_at: { required: false, type: 'string' }
         }
       }
     },
-    requiredFields: ['project_id', 'property_id', 'event_type']
+    requiredFields: ['project_id', 'property_id', 'events']
   },
 
   '/api/referrals': {
@@ -189,7 +193,51 @@ function validateField(fieldName: string, value: any, rule: FieldRule): { valid:
     }
   }
 
+  // Array validation
+  if (rule.type === 'array' && rule.nestedRules && Array.isArray(value)) {
+    const arrayValidation = validateArray(value, rule.nestedRules);
+    if (!arrayValidation.valid) {
+      errors.push(...arrayValidation.errors);
+      return { valid: false, value: undefined, errors };
+    }
+  }
+
   return { valid: true, value, errors };
+}
+
+/**
+ * Validate array against nested rules
+ */
+function validateArray(arr: any[], rules: Record<string, FieldRule | number>): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  // Validate each array element
+  for (let i = 0; i < arr.length; i++) {
+    const element = arr[i];
+    if (typeof element !== 'object' || element === null) {
+      errors.push(`Array element ${i} must be an object`);
+      continue;
+    }
+
+    // Validate each field in the element
+    for (const [fieldName, rule] of Object.entries(rules)) {
+      if (rule === 'number') continue; // Skip numeric rules like _maxKeys
+      
+      if (rule.required && (element[fieldName] === undefined || element[fieldName] === null || element[fieldName] === '')) {
+        errors.push(`Array element ${i}: Missing required field: ${fieldName}`);
+        continue;
+      }
+
+      if (element[fieldName] !== undefined) {
+        const validation = validateField(`${fieldName}[${i}]`, element[fieldName], rule as FieldRule);
+        if (!validation.valid) {
+          errors.push(...validation.errors);
+        }
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
 }
 
 /**

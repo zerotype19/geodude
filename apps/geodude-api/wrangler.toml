@@ -48,6 +48,12 @@ binding    = "CACHE"
 id         = "351597e3c9e94f908fb256c50c8fe5c8"
 preview_id = "a2853f2e1d7c498d800ee0013eeec3d3"
 
+# KV used for rate limiting
+[[kv_namespaces]]
+binding = "RL"
+id = "828d43c4d01a4da59e1eb457a118b6f1"
+preview_id = "39fb95dccaf44f66a2a3e7384800fe08"
+
 # Production environment (for specific production deployments)
 [env.production]
 name = "geodude-api"
@@ -95,6 +101,11 @@ id = "571e1b9f739c4d0a9027b350cf091d20"
 binding    = "CACHE"
 id         = "351597e3c9e94f908fb256c50c8fe5c8"
 
+# KV used for rate limiting
+[[env.production.kv_namespaces]]
+binding = "RL"
+id = "828d43c4d01a4da59e1eb457a118b6f1"
+
 # Staging environment
 [env.staging.vars]
 PUBLIC_APP_URL = "https://staging.optiview.ai"
@@ -138,6 +149,10 @@ id = "571e1b9f739c4d0a9027b350cf091d20"
 binding = "CACHE"
 id = "351597e3c9e94f908fb256c50c8fe5c8"
 preview_id = "a2853f2e1d7c498d800ee0013eeec3d3"
+
+[[env.preview.kv_namespaces]]
+binding = "RL"
+id = "828d43c4d01a4da59e1eb457a118b6f1"
 
 # Auth & limits (staging defaults)
 SESSION_TTL_HOURS = "720"

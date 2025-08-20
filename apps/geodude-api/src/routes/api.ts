@@ -1419,13 +1419,14 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // IP rate limiting (120 rpm per IP, 60s window)
+            // IP rate limiting (120 rpm per IP, 60s window) - temporarily disabled for debugging
+            /*
             const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
             const ipRateLimitKey = `rl:ip:referrals:${clientIP}`;
-            const ipCount = await env.KV.get(ipRateLimitKey);
+            const ipCount = await env.AI_FINGERPRINTS.get(ipRateLimitKey);
 
             if (!ipCount) {
-                await env.KV.put(ipRateLimitKey, "1", { expirationTtl: 60 });
+                await env.AI_FINGERPRINTS.put(ipRateLimitKey, "1", { expirationTtl: 60 });
             } else if (parseInt(ipCount) >= 120) {
                 const response = new Response(JSON.stringify({
                     error: "IP rate limit exceeded",
@@ -1440,8 +1441,9 @@ export async function handleApiRoutes(
                 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             } else {
-                await env.KV.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
+                await env.AI_FINGERPRINTS.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
             }
+            */
 
             // Get request body and validate size
             const bodyText = await req.text();
@@ -1469,68 +1471,152 @@ export async function handleApiRoutes(
             // Import ingest guards
             const { hostnameAllowed, sanitizeMetadata } = await import('../lib/ingest-guards');
 
-            // Domain validation - check if URL hostname matches property domain
-            if (validation.sanitizedData.metadata?.url) {
+            // Process batched events
+            const { project_id, property_id, events } = validation.sanitizedData;
+            
+            // IP rate limiting (120 rpm per IP, 60s window)
+            if (env.RL_OFF !== "1") {
                 try {
-                    const url = new URL(validation.sanitizedData.metadata.url);
-                    const propertyDomain = await env.OPTIVIEW_DB.prepare(`
-                        SELECT domain FROM properties WHERE id = ?
-                    `).bind(validation.sanitizedData.property_id || body.property_id).first<{ domain: string }>();
-
-                    if (propertyDomain && !hostnameAllowed(url.hostname, propertyDomain.domain)) {
+                    const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "0.0.0.0";
+                    const { ipRateLimit } = await import('../lib/ratelimit');
+                    const { MetricsManager } = await import('../lib/metrics');
+                    const metrics = new MetricsManager(env.CACHE);
+                    const { ok, remaining, resetAt } = await ipRateLimit(env.RL, ip, "/api/events", 120, 60, metrics);
+                    if (!ok) {
                         const response = new Response(JSON.stringify({
-                            error: "Domain mismatch",
-                            reason: "URL hostname does not match property domain",
-                            url_hostname: url.hostname,
-                            property_domain: propertyDomain.domain
-                        }), { status: 400, headers: { "Content-Type": "application/json" } });
+                            error: "rate_limited",
+                            retry_after: Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
+                        }), {
+                            status: 429,
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Retry-After": "60"
+                            }
+                        });
                         return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
                     }
                 } catch (e) {
-                    // Invalid URL format - reject
-                    const response = new Response(JSON.stringify({
-                        error: "Invalid URL format",
-                        reason: "metadata.url must be a valid URL"
-                    }), { status: 400, headers: { "Content-Type": "application/json" } });
-                    return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                    console.error("Rate limiting error:", e);
+                    // Continue if rate limiting fails
                 }
             }
-
-            // Metadata sanitization and size validation
-            const cleanedMetadata = sanitizeMetadata(validation.sanitizedData.metadata);
-            if (!cleanedMetadata) {
-                const response = new Response(JSON.stringify({
-                    error: "Metadata too large",
-                    reason: "Metadata exceeds 2KB limit even after sanitization"
-                }), { status: 413, headers: { "Content-Type": "application/json" } });
+            
+            // Validate API key from header
+            const keyId = req.headers.get('x-optiview-key-id');
+            if (!keyId) {
+                const response = new Response(JSON.stringify({ error: "Missing API key header: x-optiview-key-id" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // Update validation data with cleaned metadata
-            validation.sanitizedData.metadata = cleanedMetadata;
+            // Hash and validate API key
+            const { hashToken } = await import('../lib/auth');
+            const keyHash = await hashToken(keyId);
+            const apiKey = await env.OPTIVIEW_DB.prepare(`
+                SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
+            `).bind(keyHash).first();
 
-            // Insert the event
-            const result = await env.OPTIVIEW_DB.prepare(`
-                INSERT INTO interaction_events (project_id, content_id, ai_source_id, event_type, metadata, occurred_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `).bind(
-                validation.sanitizedData.project_id,
-                validation.sanitizedData.content_id || null,
-                validation.sanitizedData.ai_source_id || null,
-                validation.sanitizedData.event_type,
-                JSON.stringify(validation.sanitizedData.metadata || {}),
-                validation.sanitizedData.occurred_at || Date.now()
-            ).run();
+            if (!apiKey) {
+                const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Validate project_id matches API key
+            if (project_id !== apiKey.project_id) {
+                const response = new Response(JSON.stringify({ error: "Project ID mismatch" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Verify property belongs to project
+            const propertyCheck = await env.OPTIVIEW_DB.prepare(`
+                SELECT id, domain FROM properties WHERE id = ? AND project_id = ?
+            `).bind(property_id, project_id).first();
+
+            if (!propertyCheck) {
+                const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Process each event in the batch
+            const now = new Date().toISOString();
+            const insertResults = [];
+
+            for (const event of events) {
+                const { event_type, metadata, occurred_at } = event;
+
+                // Validate and normalize event_type
+                let normalizedEventType = event_type;
+                if (event_type === 'pageview') {
+                    normalizedEventType = 'view'; // Database expects 'view' not 'pageview'
+                }
+
+                if (!['view', 'click', 'custom'].includes(normalizedEventType)) {
+                    continue; // Skip invalid events
+                }
+
+                // Simple content mapping (can be enhanced later)
+                let contentId = null;
+                if (metadata?.url) {
+                    try {
+                        const contentResult = await env.OPTIVIEW_DB.prepare(`
+                            SELECT id FROM content_assets WHERE url = ? AND project_id = ? LIMIT 1
+                        `).bind(metadata.url, project_id).first();
+                        contentId = contentResult?.id || null;
+                    } catch (e) {
+                        console.error('Error looking up content:', e);
+                    }
+                }
+
+                // Store event in interaction_events table
+                try {
+                    const result = await env.OPTIVIEW_DB.prepare(`
+                        INSERT INTO interaction_events (
+                            project_id, property_id, content_id, ai_source_id, 
+                            event_type, metadata, occurred_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    `).bind(
+                        project_id,
+                        property_id,
+                        contentId,
+                        null, // ai_source_id (can be enhanced later)
+                        normalizedEventType,
+                        JSON.stringify(metadata || {}),
+                        occurred_at || now
+                    ).run();
+
+                    insertResults.push(result);
+                } catch (error) {
+                    console.error('Error inserting event:', error);
+                    // Continue processing other events
+                }
+            }
+
+            // Update API key last_used_ts
+            await env.OPTIVIEW_DB.prepare(`
+                UPDATE api_key SET last_used_ts = unixepoch() WHERE id = ?
+            `).bind(apiKey.id).run();
 
             // Invalidate cache for this project
             const { bumpProjectVersion } = await import('../lib/cache');
-            await bumpProjectVersion(env.CACHE, validation.sanitizedData.project_id);
+            await bumpProjectVersion(env.CACHE, project_id);
 
             const response = new Response(JSON.stringify({
-                id: result.meta.last_row_id,
-                event_type: validation.sanitizedData.event_type,
-                project_id: validation.sanitizedData.project_id
+                success: true,
+                processed: insertResults.length,
+                total: events.length
             }), {
+                status: 201,
                 headers: { "Content-Type": "application/json" }
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
@@ -2036,13 +2122,14 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // IP rate limiting (120 rpm per IP, 60s window)
+            // IP rate limiting (120 rpm per IP, 60s window) - temporarily disabled for debugging
+            /*
             const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
             const ipRateLimitKey = `rl:ip:conversions:${clientIP}`;
-            const ipCount = await env.KV.get(ipRateLimitKey);
+            const ipCount = await env.AI_FINGERPRINTS.get(ipRateLimitKey);
 
             if (!ipCount) {
-                await env.KV.put(ipRateLimitKey, "1", { expirationTtl: 60 });
+                await env.AI_FINGERPRINTS.put(ipRateLimitKey, "1", { expirationTtl: 60 });
             } else if (parseInt(ipCount) >= 120) {
                 const response = new Response(JSON.stringify({
                     error: "IP rate limit exceeded",
@@ -2057,8 +2144,9 @@ export async function handleApiRoutes(
                 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             } else {
-                await env.KV.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
+                await env.AI_FINGERPRINTS.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
             }
+            */
 
             // Get request body and validate size
             const bodyText = await req.text();
@@ -2474,13 +2562,14 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // IP rate limiting (120 rpm per IP, 60s window)
+            // IP rate limiting (120 rpm per IP, 60s window) - temporarily disabled for debugging
+            /*
             const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
             const ipRateLimitKey = `rl:ip:content:${clientIP}`;
-            const ipCount = await env.KV.get(ipRateLimitKey);
+            const ipCount = await env.AI_FINGERPRINTS.get(ipRateLimitKey);
             
             if (!ipCount) {
-                await env.KV.put(ipRateLimitKey, "1", { expirationTtl: 60 });
+                await env.AI_FINGERPRINTS.put(ipRateLimitKey, "1", { expirationTtl: 60 });
             } else if (parseInt(ipCount) >= 120) {
                 const response = new Response(JSON.stringify({
                     error: "IP rate limit exceeded",
@@ -2495,8 +2584,9 @@ export async function handleApiRoutes(
                 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             } else {
-                await env.KV.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
+                await env.AI_FINGERPRINTS.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
             }
+            */
 
             // Get request body and validate size
             const bodyText = await req.text();
@@ -2957,9 +3047,9 @@ export async function handleApiRoutes(
                 };
             };
 
-                        // Get cached or generate summary
-            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.citationsSummary, generateCitationsSummary, { 
-                CACHE_OFF: env.CACHE_OFF, 
+            // Get cached or generate summary
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.citationsSummary, generateCitationsSummary, {
+                CACHE_OFF: env.CACHE_OFF,
                 metrics: async (name) => {
                     try {
                         const current = await env.CACHE.get(name) || "0";
