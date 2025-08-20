@@ -18,45 +18,7 @@ function normalizeUrl(url) {
   }
 }
 
-// Helper function to get content ID for an event
-async function getContentIdForEvent(event, projectId, d1) {
-  if (!event?.metadata) return null;
 
-  const urlToMatch = event.metadata.url || event.metadata.pathname;
-  if (!urlToMatch) return null;
-
-  try {
-    // First try exact URL match
-    let existingContent = await d1.prepare(`
-      SELECT id FROM content_assets WHERE url = ? AND project_id = ?
-    `).bind(urlToMatch, projectId).first();
-
-    // If no exact match, try normalized URL match
-    if (!existingContent) {
-      const normalizedUrl = normalizeUrl(urlToMatch);
-      existingContent = await d1.prepare(`
-        SELECT id FROM content_assets WHERE url = ? AND project_id = ?
-      `).bind(normalizedUrl, projectId).first();
-    }
-
-    // If still no match, try a simple domain-based match (safer than complex LIKE)
-    if (!existingContent) {
-      try {
-        const domain = new URL(urlToMatch).hostname;
-        existingContent = await d1.prepare(`
-          SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ? LIMIT 1
-        `).bind(`%${domain}%`, projectId).first();
-      } catch (urlError) {
-        // If URL parsing fails, skip domain matching
-      }
-    }
-
-    return existingContent?.id || null;
-  } catch (error) {
-    console.error('Error getting content ID:', error);
-    return null;
-  }
-}
 
 // D1 Error Tracer (temporary)
 function traceD1(d1) {
@@ -422,6 +384,49 @@ export default {
         return null;
       };
 
+      // Wrap D1 with tracer for this request
+      const d1 = traceD1(env.OPTIVIEW_DB);
+
+      // Helper function to get content ID for an event
+      const getContentIdForEvent = async (event, projectId, d1) => {
+        if (!event?.metadata) return null;
+
+        const urlToMatch = event.metadata.url || event.metadata.pathname;
+        if (!urlToMatch) return null;
+
+        try {
+          // First try exact URL match
+          let existingContent = await d1.prepare(`
+            SELECT id FROM content_assets WHERE url = ? AND project_id = ?
+          `).bind(urlToMatch, projectId).first();
+
+          // If no exact match, try normalized URL match
+          if (!existingContent) {
+            const normalizedUrl = normalizeUrl(urlToMatch);
+            existingContent = await d1.prepare(`
+              SELECT id FROM content_assets WHERE url = ? AND project_id = ?
+            `).bind(normalizedUrl, projectId).first();
+          }
+
+          // If still no match, try a simple domain-based match (safer than complex LIKE)
+          if (!existingContent) {
+            try {
+              const domain = new URL(urlToMatch).hostname;
+              existingContent = await d1.prepare(`
+                SELECT id FROM content_assets WHERE url LIKE ? AND project_id = ? LIMIT 1
+              `).bind(`%${domain}%`, projectId).first();
+            } catch (urlError) {
+              // If URL parsing fails, skip domain matching
+            }
+          }
+
+          return existingContent?.id || null;
+        } catch (error) {
+          console.error('Error getting content ID:', error);
+          return null;
+        }
+      };
+
       // Helper function to check rate limits
       const checkRateLimit = async (key, limit, windowMs) => {
         const now = Date.now();
@@ -464,9 +469,6 @@ export default {
           return { allowed: true, remaining: 1, resetTime: now + windowMs };
         }
       };
-
-      // Wrap D1 with tracer for this request
-      const d1 = traceD1(env.OPTIVIEW_DB);
 
       // 1) Health check
       if (url.pathname === "/health") {
@@ -817,6 +819,29 @@ export default {
             SELECT value FROM metrics WHERE key = ?
           `).bind(`projects_created_5m:${current5MinWindow}`).first();
 
+          // Get cache metrics from KV (5-minute counters)
+          const cacheMetrics = {
+            cache_hit_5m: 0,
+            cache_miss_5m: 0,
+            cache_overwrite_5m: 0,
+            cache_bypass_5m: 0,
+            cache_skip_oversize_5m: 0,
+            cache_store_error_5m: 0
+          };
+
+          try {
+            if (env.CACHE) {
+              for (const metric of Object.keys(cacheMetrics)) {
+                const value = await env.CACHE.get(metric);
+                if (value) {
+                  cacheMetrics[metric] = parseInt(value) || 0;
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Failed to fetch cache metrics:", e);
+          }
+
           const response = new Response(JSON.stringify({
             status: "healthy",
             timestamp: new Date().toISOString(),
@@ -894,6 +919,11 @@ export default {
             },
             projects: {
               created_5m: projectsCreated5m?.value || 0
+            },
+            cache: {
+              bound: !!env.CACHE,
+              cache_off: env.CACHE_OFF === "1",
+              metrics: cacheMetrics
             }
           }), {
             status: 200,
@@ -1023,7 +1053,7 @@ export default {
           // Check events ingestion endpoint
           let events_ingest_2xx = false;
           try {
-            const ingestResponse = await fetch(`${config.PUBLIC_BASE_URL}/api/events`, { 
+            const ingestResponse = await fetch(`${config.PUBLIC_BASE_URL}/api/events`, {
               method: 'OPTIONS',
               headers: { 'Origin': 'https://example.com' }
             });
@@ -1088,11 +1118,54 @@ export default {
           const missingKeys = getMissingConfigKeys(config);
           const configErrors = getConfigErrors(config);
 
+          // Check KV bindings
+          const cacheBound = !!env.CACHE;
+          const cacheBindingName = cacheBound ? "CACHE" : "NOT_BOUND";
+          const cacheIdsArePlaceholders = cacheBound && (
+            env.CACHE.toString().includes("REPLACE_WITH") ||
+            env.CACHE.toString().includes("placeholder")
+          );
+
+          // Guard: If KV is not bound in production, return error
+          if (config.NODE_ENV === "production" && !cacheBound) {
+            const response = new Response(JSON.stringify({
+              error: "KV cache not bound in production",
+              code: "kv_unbound"
+            }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
           const response = new Response(JSON.stringify({
             environment: config.NODE_ENV,
             config: configForEnvCheck,
             missing: missingKeys,
             errors: configErrors,
+            kv: {
+              cache: {
+                bound: cacheBound,
+                binding_name: cacheBindingName,
+                ids_are_placeholders: cacheIdsArePlaceholders,
+                id: cacheBound ? "351597e3c9e94f908fb256c50c8fe5c8" : null,
+                preview_id: cacheBound ? "a2853f2e1d7c498d800ee0013eeec3d3" : null
+              },
+              ai_fingerprints: {
+                bound: !!env.AI_FINGERPRINTS
+              }
+            },
+            cache: {
+              cache_off: config.CACHE_OFF || "false",
+              cache_off_effective: config.CACHE_OFF === "1"
+            },
+            database: {
+              d1_bound: !!env.OPTIVIEW_DB
+            },
+            cron: {
+              enabled: true, // We have cron triggers configured
+              schedules: ["*/5 * * * *", "0 * * * *", "0 3 * * *"]
+            },
             timestamp: new Date().toISOString(),
             worker_version: "1.0.0"
           }), {
@@ -3117,7 +3190,7 @@ export default {
           }));
 
           const response = new Response(JSON.stringify({ projects: transformedProjects }), {
-            headers: { 
+            headers: {
               "Content-Type": "application/json",
               "Cache-Control": "private, max-age=60"
             }
@@ -3215,7 +3288,7 @@ export default {
           // Generate project ID
           const projectId = `prj_${generateToken().substring(0, 12)}`;
           const nowTs = Math.floor(Date.now());
-          
+
           // Create slug from name (simple version)
           const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
@@ -3233,7 +3306,7 @@ export default {
             try {
               // Normalize domain (basic version - reuse your existing logic if more complex)
               const normalizedDomain = domain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
-              
+
               const propertyInsert = await d1.prepare(`
                 INSERT INTO properties (project_id, domain, name, created_ts, updated_ts)
                 VALUES (?, ?, ?, ?, ?)
@@ -3415,7 +3488,7 @@ export default {
           // Update project name
           const trimmedName = name.trim();
           const slug = trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-          
+
           await d1.prepare(`
             UPDATE project SET name = ?, slug = ? WHERE id = ?
           `).bind(trimmedName, slug, projectId).run();
@@ -4071,6 +4144,16 @@ export default {
 
           const contentId = result.meta.last_row_id || result.results?.[0]?.id;
 
+          // Invalidate cache for this project
+          try {
+            if (env.CACHE) {
+              const now = Date.now();
+              await env.CACHE.put(`v:${project_id}`, String(now));
+            }
+          } catch (e) {
+            console.error("Failed to invalidate cache:", e);
+          }
+
           const response = new Response(JSON.stringify({
             id: contentId,
             url,
@@ -4224,6 +4307,23 @@ export default {
             SET ${updateFields.join(', ')}
             WHERE id = ?
           `).bind(...updateParams).run();
+
+          // Get project_id for cache invalidation
+          const contentData = await d1.prepare(`
+            SELECT project_id FROM content_assets WHERE id = ?
+          `).bind(contentId).first();
+
+          // Invalidate cache for this project
+          if (contentData && contentData.project_id) {
+            try {
+              if (env.CACHE) {
+                const now = Date.now();
+                await env.CACHE.put(`v:${contentData.project_id}`, String(now));
+              }
+            } catch (e) {
+              console.error("Failed to invalidate cache:", e);
+            }
+          }
 
           const response = new Response(JSON.stringify({
             id: contentId,
@@ -4760,6 +4860,16 @@ export default {
               updated_at = excluded.updated_at
           `).bind(project_id, ai_source_id, notes || null, suggested_pattern_json ? JSON.stringify(suggested_pattern_json) : null).run();
 
+          // Invalidate cache for this project
+          try {
+            if (env.CACHE) {
+              const now = Date.now();
+              await env.CACHE.put(`v:${project_id}`, String(now));
+            }
+          } catch (e) {
+            console.error("Failed to invalidate cache:", e);
+          }
+
           const response = new Response(JSON.stringify({
             success: true,
             message: "AI source enabled successfully"
@@ -4846,6 +4956,16 @@ export default {
             SET enabled = 0, updated_at = CURRENT_TIMESTAMP
             WHERE project_id = ? AND ai_source_id = ?
           `).bind(project_id, ai_source_id).run();
+
+          // Invalidate cache for this project
+          try {
+            if (env.CACHE) {
+              const now = Date.now();
+              await env.CACHE.put(`v:${project_id}`, String(now));
+            }
+          } catch (e) {
+            console.error("Failed to invalidate cache:", e);
+          }
 
           // TODO: Increment metrics counter
           // sources_disable_clicked_5m
@@ -5014,6 +5134,26 @@ export default {
               return addCorsHeaders(response, origin);
             }
 
+            // IP rate limiting (120 rpm per IP, 60s window)
+            const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || "unknown";
+            const ipRateLimitKey = `rate_limit:events:ip:${clientIP}`;
+            const ipLimit = await checkRateLimit(ipRateLimitKey, 120, 60 * 1000);
+
+            if (!ipLimit.allowed) {
+              const response = new Response(JSON.stringify({
+                error: "IP rate limit exceeded",
+                code: "ip_ratelimit",
+                retry_after: Math.ceil((ipLimit.resetTime - Date.now()) / 1000)
+              }), {
+                status: 429,
+                headers: {
+                  "Content-Type": "application/json",
+                  "Retry-After": Math.ceil((ipLimit.resetTime - Date.now()) / 1000).toString()
+                }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
             // Validate project_id matches API key
             const actualProjectId = apiKey.project_id;
             if (project_id !== actualProjectId) {
@@ -5041,11 +5181,11 @@ export default {
             const propertyDomain = propertyCheck.domain;
             const expectedOrigin = `https://${propertyDomain}`;
             const expectedOriginWww = `https://www.${propertyDomain}`;
-            
+
             if (origin && origin !== expectedOrigin && origin !== expectedOriginWww) {
-              const response = new Response(JSON.stringify({ 
+              const response = new Response(JSON.stringify({
                 error: "Origin not allowed for this property",
-                details: "origin_denied" 
+                details: "origin_denied"
               }), {
                 status: 403,
                 headers: { "Content-Type": "application/json" }
@@ -5259,6 +5399,16 @@ export default {
             const metricsKey = `tag_events_5m:${Math.floor(Date.now() / 300000)}`;
             await incrementCounter(env.AI_FINGERPRINTS, metricsKey, 300);
 
+            // Invalidate cache for this project
+            try {
+              if (env.CACHE) {
+                const now = Date.now();
+                await env.CACHE.put(`v:${project_id}`, String(now));
+              }
+            } catch (e) {
+              console.error("Failed to invalidate cache:", e);
+            }
+
             const response = new Response(JSON.stringify({
               success: true,
               processed: insertResults.length,
@@ -5403,6 +5553,16 @@ export default {
             await d1.prepare(`
             UPDATE api_key SET last_used_ts = ? WHERE id = ?
           `).bind(Date.now(), apiKey.id).run();
+
+            // Invalidate cache for this project
+            try {
+              if (env.CACHE) {
+                const now = Date.now();
+                await env.CACHE.put(`v:${projectId}`, String(now));
+              }
+            } catch (e) {
+              console.error("Failed to invalidate cache:", e);
+            }
 
             const response = new Response(JSON.stringify({
               ok: true,
@@ -5617,11 +5777,11 @@ export default {
             const propertyDomain = propertyCheck.domain;
             const expectedOrigin = `https://${propertyDomain}`;
             const expectedOriginWww = `https://www.${propertyDomain}`;
-            
+
             if (origin && origin !== expectedOrigin && origin !== expectedOriginWww) {
-              const response = new Response(JSON.stringify({ 
+              const response = new Response(JSON.stringify({
                 error: "Origin not allowed for this property",
-                details: "origin_denied" 
+                details: "origin_denied"
               }), {
                 status: 403,
                 headers: { "Content-Type": "application/json" }
@@ -5684,6 +5844,16 @@ export default {
           await d1.prepare(`
             UPDATE api_key SET last_used_ts = ? WHERE id = ?
           `).bind(Date.now(), apiKey.id).run();
+
+          // Invalidate cache for this project
+          try {
+            if (env.CACHE) {
+              const now = Date.now();
+              await env.CACHE.put(`v:${project_id}`, String(now));
+            }
+          } catch (e) {
+            console.error("Failed to invalidate cache:", e);
+          }
 
           const response = new Response(JSON.stringify({
             ok: true,
@@ -8250,7 +8420,7 @@ export default {
             stack: e.stack,
             name: e.name
           });
-          const response = new Response(JSON.stringify({ 
+          const response = new Response(JSON.stringify({
             error: "Failed to get referrals list",
             debug: e.message // Include error message for debugging
           }), {
@@ -8957,6 +9127,16 @@ export default {
             confidence || null,
             metadata ? JSON.stringify(metadata) : null
           ).run();
+
+          // Invalidate cache for this project
+          try {
+            if (env.CACHE) {
+              const now = Date.now();
+              await env.CACHE.put(`v:${project_id}`, String(now));
+            }
+          } catch (e) {
+            console.error("Failed to invalidate cache:", e);
+          }
 
           const response = new Response(JSON.stringify({
             success: true,

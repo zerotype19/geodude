@@ -407,11 +407,15 @@ export async function handleApiRoutes(
             };
 
             // Get cached or generate summary
-            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.eventsSummary, generateSummary, { 
-                CACHE_OFF: env.CACHE_OFF, 
-                metrics: (name) => {
-                    // TODO: Add metrics recording when metrics system is available
-                    console.log(`cache_metric: ${name}`);
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.eventsSummary, generateSummary, {
+                CACHE_OFF: env.CACHE_OFF,
+                metrics: async (name) => {
+                    try {
+                        const current = await env.CACHE.get(name) || "0";
+                        await env.CACHE.put(name, String(parseInt(current) + 1), { expirationTtl: 300 }); // 5 minutes
+                    } catch (e) {
+                        console.error(`Failed to record metric ${name}:`, e);
+                    }
                 }
             });
 
@@ -1415,11 +1419,11 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-                        // IP rate limiting (120 rpm per IP, 60s window)
+            // IP rate limiting (120 rpm per IP, 60s window)
             const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
             const ipRateLimitKey = `rl:ip:referrals:${clientIP}`;
             const ipCount = await env.KV.get(ipRateLimitKey);
-            
+
             if (!ipCount) {
                 await env.KV.put(ipRateLimitKey, "1", { expirationTtl: 60 });
             } else if (parseInt(ipCount) >= 120) {
@@ -1427,12 +1431,12 @@ export async function handleApiRoutes(
                     error: "IP rate limit exceeded",
                     code: "ip_ratelimit",
                     retry_after: 60
-                }), { 
-                    status: 429, 
-                    headers: { 
+                }), {
+                    status: 429,
+                    headers: {
                         "Content-Type": "application/json",
                         "Retry-After": "60"
-                    } 
+                    }
                 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             } else {
@@ -1717,11 +1721,15 @@ export async function handleApiRoutes(
             };
 
             // Get cached or generate summary
-            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.referralsSummary, generateReferralsSummary, { 
-                CACHE_OFF: env.CACHE_OFF, 
-                metrics: (name) => {
-                    // TODO: Add metrics recording when metrics system is available
-                    console.log(`cache_metric: ${name}`);
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.referralsSummary, generateReferralsSummary, {
+                CACHE_OFF: env.CACHE_OFF,
+                metrics: async (name) => {
+                    try {
+                        const current = await env.CACHE.get(name) || "0";
+                        await env.CACHE.put(name, String(parseInt(current) + 1), { expirationTtl: 300 }); // 5 minutes
+                    } catch (e) {
+                        console.error(`Failed to record metric ${name}:`, e);
+                    }
                 }
             });
 
@@ -1843,7 +1851,7 @@ export async function handleApiRoutes(
                 const steps = (funnelSteps.results || []).map((step, index, array) => {
                     const previousStep = index > 0 ? array[index - 1] : null;
                     const conversionRate = previousStep ? (step.sessions / previousStep.sessions * 100) : 100;
-                    
+
                     return {
                         step_name: step.step_name,
                         step_order: step.step_order,
@@ -1863,10 +1871,15 @@ export async function handleApiRoutes(
             };
 
             // Get cached or generate summary
-            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.funnelsSummary, generateFunnelsSummary, { 
-                CACHE_OFF: env.CACHE_OFF, 
-                metrics: (name) => {
-                    console.log(`cache_metric: ${name}`);
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.funnelsSummary, generateFunnelsSummary, {
+                CACHE_OFF: env.CACHE_OFF,
+                metrics: async (name) => {
+                    try {
+                        const current = await env.CACHE.get(name) || "0";
+                        await env.CACHE.put(name, String(parseInt(current) + 1), { expirationTtl: 300 }); // 5 minutes
+                    } catch (e) {
+                        console.error(`Failed to record metric ${name}:`, e);
+                    }
                 }
             });
 
@@ -1984,10 +1997,15 @@ export async function handleApiRoutes(
             };
 
             // Get cached or generate summary
-            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.sessionsSummary, generateSessionsSummary, { 
-                CACHE_OFF: env.CACHE_OFF, 
-                metrics: (name) => {
-                    console.log(`cache_metric: ${name}`);
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.sessionsSummary, generateSessionsSummary, {
+                CACHE_OFF: env.CACHE_OFF,
+                metrics: async (name) => {
+                    try {
+                        const current = await env.CACHE.get(name) || "0";
+                        await env.CACHE.put(name, String(parseInt(current) + 1), { expirationTtl: 300 }); // 5 minutes
+                    } catch (e) {
+                        console.error(`Failed to record metric ${name}:`, e);
+                    }
                 }
             });
 
@@ -2022,7 +2040,7 @@ export async function handleApiRoutes(
             const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
             const ipRateLimitKey = `rl:ip:conversions:${clientIP}`;
             const ipCount = await env.KV.get(ipRateLimitKey);
-            
+
             if (!ipCount) {
                 await env.KV.put(ipRateLimitKey, "1", { expirationTtl: 60 });
             } else if (parseInt(ipCount) >= 120) {
@@ -2030,12 +2048,12 @@ export async function handleApiRoutes(
                     error: "IP rate limit exceeded",
                     code: "ip_ratelimit",
                     retry_after: 60
-                }), { 
-                    status: 429, 
-                    headers: { 
+                }), {
+                    status: 429,
+                    headers: {
                         "Content-Type": "application/json",
                         "Retry-After": "60"
-                    } 
+                    }
                 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             } else {
@@ -2075,7 +2093,7 @@ export async function handleApiRoutes(
                     const propertyDomain = await env.OPTIVIEW_DB.prepare(`
                         SELECT domain FROM properties WHERE id = ?
                     `).bind(validation.sanitizedData.property_id || body.property_id).first<{ domain: string }>();
-                    
+
                     if (propertyDomain && !hostnameAllowed(url.hostname, propertyDomain.domain)) {
                         const response = new Response(JSON.stringify({
                             error: "Domain mismatch",
@@ -2104,7 +2122,7 @@ export async function handleApiRoutes(
                 }), { status: 413, headers: { "Content-Type": "application/json" } });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
-            
+
             // Update validation data with cleaned metadata
             validation.sanitizedData.metadata = cleanedMetadata;
 
@@ -2339,7 +2357,394 @@ export async function handleApiRoutes(
         }
     }
 
-    // 6.12) Admin Environment Check API
+    // 6.12) Admin Health API
+    if (url.pathname === "/admin/health" && req.method === "GET") {
+        try {
+            // Check authentication (admin only)
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Check if user is admin
+            const userData = await env.OPTIVIEW_DB.prepare(`
+                SELECT is_admin FROM users WHERE id = ?
+            `).bind(sessionData.user_id).first<{ is_admin: number }>();
+
+            if (!userData || !userData.is_admin) {
+                const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get cache metrics from KV (5-minute counters)
+            const cacheMetrics = {
+                cache_hit_5m: 0,
+                cache_miss_5m: 0,
+                cache_overwrite_5m: 0,
+                cache_bypass_5m: 0,
+                cache_skip_oversize_5m: 0,
+                cache_store_error_5m: 0
+            };
+
+            try {
+                if (env.CACHE) {
+                    for (const metric of Object.keys(cacheMetrics)) {
+                        const value = await env.CACHE.get(metric);
+                        if (value) {
+                            (cacheMetrics as any)[metric] = parseInt(value) || 0;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch cache metrics:", e);
+            }
+
+            // Get system health info
+            const health = {
+                ok: true,
+                timestamp: new Date().toISOString(),
+                uptime: Date.now(),
+                environment: env.NODE_ENV || "unknown",
+                cache: {
+                    bound: !!env.CACHE,
+                    cache_off: env.CACHE_OFF === "1",
+                    metrics: cacheMetrics
+                },
+                database: {
+                    d1_bound: !!env.OPTIVIEW_DB,
+                    status: "healthy" // TODO: Add actual DB health check
+                },
+                cron: {
+                    enabled: true,
+                    last_run: "unknown", // TODO: Add actual cron tracking
+                    schedules: ["*/5 * * * *", "0 * * * *", "0 3 * * *"]
+                }
+            };
+
+            const response = new Response(JSON.stringify(health), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("health_check_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.13) Content API (with cache invalidation)
+    if (url.pathname === "/api/content" && req.method === "POST") {
+        try {
+            // Check Content-Type
+            const contentType = req.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // IP rate limiting (120 rpm per IP, 60s window)
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const ipRateLimitKey = `rl:ip:content:${clientIP}`;
+            const ipCount = await env.KV.get(ipRateLimitKey);
+            
+            if (!ipCount) {
+                await env.KV.put(ipRateLimitKey, "1", { expirationTtl: 60 });
+            } else if (parseInt(ipCount) >= 120) {
+                const response = new Response(JSON.stringify({
+                    error: "IP rate limit exceeded",
+                    code: "ip_ratelimit",
+                    retry_after: 60
+                }), { 
+                    status: 429, 
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Retry-After": "60"
+                    } 
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            } else {
+                await env.KV.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
+            }
+
+            // Get request body and validate size
+            const bodyText = await req.text();
+            if (bodyText.length > 1024) {
+                const response = new Response(JSON.stringify({
+                    error: "Request body too large",
+                    max_size_kb: 1,
+                    actual_size_kb: Math.round(bodyText.length / 1024)
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse and validate body
+            const body = JSON.parse(bodyText);
+            const { project_id, property_id, url, content_type, metadata } = body;
+
+            if (!project_id || !property_id || !url || !content_type) {
+                const response = new Response(JSON.stringify({
+                    error: "Missing required fields",
+                    required: ["project_id", "property_id", "url", "content_type"]
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Insert the content
+            const result = await env.OPTIVIEW_DB.prepare(`
+                INSERT INTO content_assets (project_id, property_id, url, content_type, metadata, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `).bind(
+                project_id,
+                property_id,
+                url,
+                content_type,
+                JSON.stringify(metadata || {}),
+                Date.now()
+            ).run();
+
+            // Invalidate cache for this project
+            const { bumpProjectVersion } = await import('../lib/cache');
+            await bumpProjectVersion(env.CACHE, project_id);
+
+            const response = new Response(JSON.stringify({
+                id: result.meta.last_row_id,
+                url,
+                content_type,
+                project_id
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("content_create_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    if (url.pathname === "/api/content" && req.method === "PATCH") {
+        try {
+            // Check Content-Type
+            const contentType = req.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get request body and validate size
+            const bodyText = await req.text();
+            if (bodyText.length > 1024) {
+                const response = new Response(JSON.stringify({
+                    error: "Request body too large",
+                    max_size_kb: 1,
+                    actual_size_kb: Math.round(bodyText.length / 1024)
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse and validate body
+            const body = JSON.parse(bodyText);
+            const { id, url, content_type, metadata } = body;
+
+            if (!id) {
+                const response = new Response(JSON.stringify({
+                    error: "Missing required field: id"
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get project_id for cache invalidation
+            const contentData = await env.OPTIVIEW_DB.prepare(`
+                SELECT project_id FROM content_assets WHERE id = ?
+            `).bind(id).first<{ project_id: string }>();
+
+            if (!contentData) {
+                const response = new Response(JSON.stringify({
+                    error: "Content not found"
+                }), { status: 404, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Update the content
+            const updateFields = [];
+            const updateValues = [];
+            let paramIndex = 1;
+
+            if (url !== undefined) {
+                updateFields.push(`url = ?`);
+                updateValues.push(url);
+                paramIndex++;
+            }
+            if (content_type !== undefined) {
+                updateFields.push(`content_type = ?`);
+                updateValues.push(content_type);
+                paramIndex++;
+            }
+            if (metadata !== undefined) {
+                updateFields.push(`metadata = ?`);
+                updateValues.push(JSON.stringify(metadata));
+                paramIndex++;
+            }
+
+            if (updateFields.length === 0) {
+                const response = new Response(JSON.stringify({
+                    error: "No fields to update"
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            updateFields.push(`updated_at = ?`);
+            updateValues.push(Date.now());
+            updateValues.push(id);
+
+            const result = await env.OPTIVIEW_DB.prepare(`
+                UPDATE content_assets 
+                SET ${updateFields.join(', ')}
+                WHERE id = ?
+            `).bind(...updateValues).run();
+
+            if (result.meta.changes === 0) {
+                const response = new Response(JSON.stringify({
+                    error: "Content not found or no changes made"
+                }), { status: 404, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Invalidate cache for this project
+            const { bumpProjectVersion } = await import('../lib/cache');
+            await bumpProjectVersion(env.CACHE, contentData.project_id);
+
+            const response = new Response(JSON.stringify({
+                success: true,
+                id,
+                changes: result.meta.changes
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("content_update_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    if (url.pathname === "/api/content" && req.method === "DELETE") {
+        try {
+            // Check Content-Type
+            const contentType = req.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get request body and validate size
+            const bodyText = await req.text();
+            if (bodyText.length > 1024) {
+                const response = new Response(JSON.stringify({
+                    error: "Request body too large",
+                    max_size_kb: 1,
+                    actual_size_kb: Math.round(bodyText.length / 1024)
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse and validate body
+            const body = JSON.parse(bodyText);
+            const { id } = body;
+
+            if (!id) {
+                const response = new Response(JSON.stringify({
+                    error: "Missing required field: id"
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get project_id for cache invalidation
+            const contentData = await env.OPTIVIEW_DB.prepare(`
+                SELECT project_id FROM content_assets WHERE id = ?
+            `).bind(id).first<{ project_id: string }>();
+
+            if (!contentData) {
+                const response = new Response(JSON.stringify({
+                    error: "Content not found"
+                }), { status: 404, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Delete the content
+            const result = await env.OPTIVIEW_DB.prepare(`
+                DELETE FROM content_assets WHERE id = ?
+            `).bind(id).run();
+
+            if (result.meta.changes === 0) {
+                const response = new Response(JSON.stringify({
+                    error: "Content not found or already deleted"
+                }), { status: 404, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Invalidate cache for this project
+            const { bumpProjectVersion } = await import('../lib/cache');
+            await bumpProjectVersion(env.CACHE, contentData.project_id);
+
+            const response = new Response(JSON.stringify({
+                success: true,
+                id,
+                deleted: true
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("content_delete_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.14) Admin Environment Check API
     if (url.pathname === "/admin/env-check" && req.method === "GET") {
         try {
             // Check authentication (admin only)
@@ -2391,9 +2796,21 @@ export async function handleApiRoutes(
             const cacheBound = !!env.CACHE;
             const cacheBindingName = cacheBound ? "CACHE" : "NOT_BOUND";
             const cacheIdsArePlaceholders = cacheBound && (
-                env.CACHE.toString().includes("REPLACE_WITH") || 
+                env.CACHE.toString().includes("REPLACE_WITH") ||
                 env.CACHE.toString().includes("placeholder")
             );
+
+            // Guard: If KV is not bound in production, return error
+            if (env.NODE_ENV === "production" && !cacheBound) {
+                const response = new Response(JSON.stringify({
+                    error: "KV cache not bound in production",
+                    code: "kv_unbound"
+                }), {
+                    status: 500,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
 
             // Check environment variables
             const envCheck = {
@@ -2404,7 +2821,9 @@ export async function handleApiRoutes(
                     cache: {
                         bound: cacheBound,
                         binding_name: cacheBindingName,
-                        ids_are_placeholders: cacheIdsArePlaceholders
+                        ids_are_placeholders: cacheIdsArePlaceholders,
+                        id: cacheBound ? "351597e3c9e94f908fb256c50c8fe5c8" : null,
+                        preview_id: cacheBound ? "a2853f2e1d7c498d800ee0013eeec3d3" : null
                     },
                     ai_fingerprints: {
                         bound: !!env.AI_FINGERPRINTS
@@ -2538,11 +2957,16 @@ export async function handleApiRoutes(
                 };
             };
 
-            // Get cached or generate summary
+                        // Get cached or generate summary
             const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.citationsSummary, generateCitationsSummary, { 
                 CACHE_OFF: env.CACHE_OFF, 
-                metrics: (name) => {
-                    console.log(`cache_metric: ${name}`);
+                metrics: async (name) => {
+                    try {
+                        const current = await env.CACHE.get(name) || "0";
+                        await env.CACHE.put(name, String(parseInt(current) + 1), { expirationTtl: 300 }); // 5 minutes
+                    } catch (e) {
+                        console.error(`Failed to record metric ${name}:`, e);
+                    }
                 }
             });
 

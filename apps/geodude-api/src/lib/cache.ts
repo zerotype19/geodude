@@ -37,7 +37,7 @@ export async function getOrSetJSON<T>(
   // size guard
   try {
     const str = JSON.stringify(value);
-    if (str.length <= (env as any)?.CACHE_PAYLOAD_LIMIT_BYTES ?? 50_000) {
+    if (str.length <= ((env as any)?.CACHE_PAYLOAD_LIMIT_BYTES || 50_000)) {
       await kv.put(key, str, { expirationTtl: ttlSeconds });
       env?.metrics?.(hit ? "cache_overwrite_5m" : "cache_miss_5m");
     } else {

@@ -45,8 +45,8 @@ preview_id = "dev_ai_fingerprints"
 # KV used for API response caching + project versioning
 [[kv_namespaces]]
 binding    = "CACHE"
-id         = "REPLACE_WITH_PROD_OPTIVIEW_CACHE_ID"
-preview_id = "REPLACE_WITH_DEV_OPTIVIEW_CACHE_ID"
+id         = "351597e3c9e94f908fb256c50c8fe5c8"
+preview_id = "a2853f2e1d7c498d800ee0013eeec3d3"
 
 # Production environment (for specific production deployments)
 [env.production]
@@ -93,13 +93,51 @@ id = "571e1b9f739c4d0a9027b350cf091d20"
 # KV used for API response caching + project versioning
 [[env.production.kv_namespaces]]
 binding    = "CACHE"
-id         = "REPLACE_WITH_PROD_OPTIVIEW_CACHE_ID"
+id         = "351597e3c9e94f908fb256c50c8fe5c8"
 
 # Staging environment
 [env.staging.vars]
 PUBLIC_APP_URL = "https://staging.optiview.ai"
 PUBLIC_BASE_URL = "https://staging.api.optiview.ai"
 CACHE_OFF = "false"
+
+# Preview environment (for testing)
+[env.preview.vars]
+PUBLIC_APP_URL = "https://preview.optiview.ai"
+PUBLIC_BASE_URL = "https://preview.api.optiview.ai"
+CSP_MODE = "development"
+NODE_ENV = "development"
+TEST_MODE = "1"
+DEV_MAIL_ECHO = "true"
+CACHE_OFF = "false"
+SESSION_TTL_HOURS = "720"
+MAGIC_LINK_EXP_MIN = "15"
+MAGIC_LINK_RPM_PER_IP = "10"
+MAGIC_LINK_RPD_PER_EMAIL = "50"
+INVITE_EXP_DAYS = "14"
+ADMIN_RPM_PER_IP = "30"
+INGEST_RATE_LIMIT_RPS = "10"
+INGEST_RATE_LIMIT_BURST = "50"
+RATE_LIMIT_RETRY_AFTER = "5"
+CSV_EXPORT_RATE_LIMIT_RPS = "1"
+RULES_REFRESH_TTL_SEC = "300"
+EMAIL_SENDER_NAME = "Optiview"
+EMAIL_FROM = "noreply@optiview.ai"
+
+# Preview environment bindings
+[[env.preview.d1_databases]]
+binding = "OPTIVIEW_DB"
+database_name = "optiview_db"
+database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+
+[[env.preview.kv_namespaces]]
+binding = "AI_FINGERPRINTS"
+id = "571e1b9f739c4d0a9027b350cf091d20"
+
+[[env.preview.kv_namespaces]]
+binding = "CACHE"
+id = "351597e3c9e94f908fb256c50c8fe5c8"
+preview_id = "a2853f2e1d7c498d800ee0013eeec3d3"
 
 # Auth & limits (staging defaults)
 SESSION_TTL_HOURS = "720"
@@ -129,7 +167,7 @@ id = "571e1b9f739c4d0a9027b350cf091d20"
 # KV used for API response caching + project versioning
 [[env.staging.kv_namespaces]]
 binding    = "CACHE"
-id         = "REPLACE_WITH_PROD_OPTIVIEW_CACHE_ID"
+id         = "351597e3c9e94f908fb256c50c8fe5c8"
 
 # Test/Development environment
 [env.test.vars]
@@ -174,8 +212,8 @@ preview_id = "dev_ai_fingerprints"
 # KV used for API response caching + project versioning
 [[env.test.kv_namespaces]]
 binding    = "CACHE"
-id         = "REPLACE_WITH_PROD_OPTIVIEW_CACHE_ID"
-preview_id = "REPLACE_WITH_DEV_OPTIVIEW_CACHE_ID"
+id         = "351597e3c9e94f908fb256c50c8fe5c8"
+preview_id = "a2853f2e1d7c498d800ee0013eeec3d3"
 
 # Dev environment (alias for test, used by deployment system)
 [env.dev]
@@ -223,8 +261,8 @@ preview_id = "dev_ai_fingerprints"
 # KV used for API response caching + project versioning
 [[env.dev.kv_namespaces]]
 binding    = "CACHE"
-id         = "REPLACE_WITH_PROD_OPTIVIEW_CACHE_ID"
-preview_id = "REPLACE_WITH_DEV_OPTIVIEW_CACHE_ID"
+id         = "351597e3c9e94f908fb256c50c8fe5c8"
+preview_id = "a2853f2e1d7c498d800ee0013eeec3d3"
 
 # Triggers (uncomment to enable after testing)
 [triggers]
