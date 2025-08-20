@@ -39,10 +39,12 @@ export default function LandingGate() {
         ]);
 
         let hasAnyActivity = false;
+        let apiCheckSuccessful = false;
 
         // Check if any endpoint returned data
         for (const response of [eventsResponse, referralsResponse, conversionsResponse]) {
           if (response.status === 'fulfilled' && response.value.ok) {
+            apiCheckSuccessful = true;
             const data = await response.value.json();
             if (data.total > 0 || (data.items && data.items.length > 0)) {
               hasAnyActivity = true;
@@ -55,9 +57,14 @@ export default function LandingGate() {
           if (hasAnyActivity) {
             console.log("✅ LandingGate: Found activity data - redirecting to /events");
             navigate("/events", { replace: true });
-          } else {
-            console.log("📋 LandingGate: No activity data - redirecting to /install");
+          } else if (apiCheckSuccessful && !hasAnyActivity) {
+            // Only redirect to install if we're absolutely certain there's no data
+            console.log("📋 LandingGate: Confirmed no activity data - redirecting to /install");
             navigate(`/install?project_id=${project.id}`, { replace: true });
+          } else {
+            // If API check failed or was inconclusive, default to events page (more user-friendly)
+            console.log("🔄 LandingGate: API check inconclusive - defaulting to /events");
+            navigate("/events", { replace: true });
           }
         }
       } catch (error) {
