@@ -2,6 +2,7 @@
 import { Env } from '../auth-middleware';
 import { addCorsHeaders } from '../cors';
 import { addBasicSecurityHeaders } from '../security-headers';
+import { validateRequestBody } from '../schema-validator';
 
 export async function handleApiRoutes(
     req: Request,
@@ -269,6 +270,14 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
+            // Import cache utilities
+            const { getOrSetJSON, getProjectVersion } = await import('../lib/cache');
+            const { CACHE_TTL } = await import('../lib/config');
+
+            // Get project version for cache invalidation
+            const v = await getProjectVersion(env.CACHE, project_id);
+            const cacheKey = `events:summary:v${v}:${project_id}:${window}:${from || ''}:${to || ''}:${legacy || ''}`;
+
             // Calculate time bounds from window or from/to override
             let fromTs: number, toTs: number;
             if (from && to) {
@@ -353,60 +362,57 @@ export async function handleApiRoutes(
             `).bind(project_id, fromSql, toSql, bucketFormat, bucketFormat).all<any>();
 
             // Build response based on legacy flag
-            if (legacy === "1") {
-                // Legacy format for backward compatibility
-                const legacySummary = {
-                    total: totalResult?.events || 0,
-                    breakdown: (classBreakdown.results || []).map(row => ({
-                        traffic_class: row.class,
+            const generateSummary = async () => {
+                if (legacy === "1") {
+                    // Legacy format for backward compatibility
+                    return {
+                        total: totalResult?.events || 0,
+                        breakdown: (classBreakdown.results || []).map(row => ({
+                            traffic_class: row.class,
+                            count: row.count
+                        })),
+                        top_sources: (topSources.results || []).map(row => ({
+                            source_slug: row.slug,
+                            source_name: row.name,
+                            count: row.count
+                        })),
+                        timeseries: (timeseries.results || []).map(row => ({
+                            day: row.ts?.split('T')[0], // Extract date part
+                            count: row.count
+                        }))
+                    };
+                }
+
+                // New format
+                return {
+                    totals: {
+                        events: totalResult?.events || 0,
+                        ai_influenced: aiInfluencedResult?.ai_influenced || 0
+                    },
+                    by_class: (classBreakdown.results || []).map(row => ({
+                        class: row.class,
                         count: row.count
                     })),
-                    top_sources: (topSources.results || []).map(row => ({
-                        source_slug: row.slug,
-                        source_name: row.name,
+                    by_source: (topSources.results || []).map(row => ({
+                        ai_source_id: row.ai_source_id,
+                        slug: row.slug,
+                        name: row.name,
                         count: row.count
                     })),
                     timeseries: (timeseries.results || []).map(row => ({
-                        day: row.ts?.split('T')[0], // Extract date part
+                        ts: row.ts,
                         count: row.count
                     }))
                 };
-
-                const response = new Response(JSON.stringify(legacySummary), {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Cache-Control": "private, max-age=10, stale-while-revalidate=30"
-                    }
-                });
-                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-            }
-
-            // New format
-            const summary = {
-                totals: {
-                    events: totalResult?.events || 0,
-                    ai_influenced: aiInfluencedResult?.ai_influenced || 0
-                },
-                by_class: (classBreakdown.results || []).map(row => ({
-                    class: row.class,
-                    count: row.count
-                })),
-                by_source: (topSources.results || []).map(row => ({
-                    ai_source_id: row.ai_source_id,
-                    slug: row.slug,
-                    name: row.name,
-                    count: row.count
-                })),
-                timeseries: (timeseries.results || []).map(row => ({
-                    ts: row.ts,
-                    count: row.count
-                }))
             };
+
+            // Get cached or generate summary
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.eventsSummary, generateSummary);
 
             const response = new Response(JSON.stringify(summary), {
                 headers: {
                     "Content-Type": "application/json",
-                    "Cache-Control": "private, max-age=10, stale-while-revalidate=30"
+                    "Cache-Control": "private, max-age=30, stale-while-revalidate=60"
                 }
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
@@ -1385,6 +1391,312 @@ export async function handleApiRoutes(
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
             console.error("sessions_journey_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.3.5) Events Ingestion API (with cache invalidation)
+    if (url.pathname === "/api/events" && req.method === "POST") {
+        try {
+            // Check Content-Type
+            const contentType = req.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get request body and validate size
+            const bodyText = await req.text();
+            if (bodyText.length > 1024) {
+                const response = new Response(JSON.stringify({
+                    error: "Request body too large",
+                    max_size_kb: 1,
+                    actual_size_kb: Math.round(bodyText.length / 1024)
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse and validate body
+            const body = JSON.parse(bodyText);
+            const validation = validateRequestBody("/api/events", body, bodyText.length);
+
+            if (!validation.valid) {
+                const response = new Response(JSON.stringify({
+                    error: "Validation failed",
+                    details: validation.errors
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Insert the event
+            const result = await env.OPTIVIEW_DB.prepare(`
+                INSERT INTO interaction_events (project_id, content_id, ai_source_id, event_type, metadata, occurred_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `).bind(
+                validation.sanitizedData.project_id,
+                validation.sanitizedData.content_id || null,
+                validation.sanitizedData.ai_source_id || null,
+                validation.sanitizedData.event_type,
+                JSON.stringify(validation.sanitizedData.metadata || {}),
+                validation.sanitizedData.occurred_at || Date.now()
+            ).run();
+
+            // Invalidate cache for this project
+            const { bumpProjectVersion } = await import('../lib/cache');
+            await bumpProjectVersion(env.CACHE, validation.sanitizedData.project_id);
+
+            const response = new Response(JSON.stringify({
+                id: result.meta.last_row_id,
+                event_type: validation.sanitizedData.event_type,
+                project_id: validation.sanitizedData.project_id
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("events_create_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.4) Referrals API (with schema validation)
+    if (url.pathname === "/api/referrals" && req.method === "POST") {
+        try {
+            // Check Content-Type
+            const contentType = req.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get request body and validate size
+            const bodyText = await req.text();
+            if (bodyText.length > 1024) {
+                const response = new Response(JSON.stringify({
+                    error: "Request body too large",
+                    max_size_kb: 1,
+                    actual_size_kb: Math.round(bodyText.length / 1024)
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse and validate body
+            const body = JSON.parse(bodyText);
+            const validation = validateRequestBody("/api/referrals", body, bodyText.length);
+
+            if (!validation.valid) {
+                const response = new Response(JSON.stringify({
+                    error: "Validation failed",
+                    details: validation.errors
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const result = await env.OPTIVIEW_DB.prepare(`
+                INSERT INTO ai_referrals (ai_source_id, content_id, ref_type, detected_at)
+                VALUES (?, ?, ?, ?)
+            `).bind(
+                validation.sanitizedData.ai_source_id,
+                validation.sanitizedData.content_id || null,
+                validation.sanitizedData.ref_type,
+                validation.sanitizedData.detected_at || Date.now()
+            ).run();
+
+            // Invalidate cache for this project (need to get project_id from content_assets)
+            if (validation.sanitizedData.content_id) {
+                const projectData = await env.OPTIVIEW_DB.prepare(`
+                    SELECT p.project_id FROM content_assets ca
+                    JOIN properties p ON p.id = ca.property_id
+                    WHERE ca.id = ?
+                `).bind(validation.sanitizedData.content_id).first<{ project_id: string }>();
+                
+                if (projectData?.project_id) {
+                    const { bumpProjectVersion } = await import('../lib/cache');
+                    await bumpProjectVersion(env.CACHE, projectData.project_id);
+                }
+            }
+
+            const response = new Response(JSON.stringify({
+                id: result.meta.last_row_id,
+                ai_source_id: validation.sanitizedData.ai_source_id,
+                ref_type: validation.sanitizedData.ref_type
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("referrals_create_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.5) Referrals Summary API (with caching)
+    if (url.pathname === "/api/referrals/summary" && req.method === "GET") {
+        try {
+            const { project_id, window = "24h", from, to } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response("missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Import cache utilities
+            const { getOrSetJSON, getProjectVersion } = await import('../lib/cache');
+            const { CACHE_TTL } = await import('../lib/config');
+
+            // Get project version for cache invalidation
+            const v = await getProjectVersion(env.CACHE, project_id);
+            const cacheKey = `referrals:summary:v${v}:${project_id}:${window}:${from || ''}:${to || ''}`;
+
+            // Calculate time bounds from window or from/to override
+            let fromTs: number, toTs: number;
+            if (from && to) {
+                fromTs = new Date(from).getTime();
+                toTs = new Date(to).getTime();
+            } else {
+                const now = Date.now();
+                switch (window) {
+                    case "15m": fromTs = now - 15 * 60 * 1000; break;
+                    case "24h": fromTs = now - 24 * 60 * 60 * 1000; break;
+                    case "7d": fromTs = now - 7 * 24 * 60 * 60 * 1000; break;
+                    default: fromTs = now - 24 * 60 * 60 * 1000; break;
+                }
+                toTs = now;
+            }
+
+            // Convert to SQL-compatible format (milliseconds -> seconds)
+            const fromSql = fromTs / 1000;
+            const toSql = toTs / 1000;
+
+            // Generate referrals summary with caching
+            const generateReferralsSummary = async () => {
+                // Get total referrals
+                const totalResult = await env.OPTIVIEW_DB.prepare(`
+                    SELECT COUNT(*) AS total
+                    FROM ai_referrals ar
+                    JOIN content_assets ca ON ca.id = ar.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    WHERE p.project_id = ? 
+                      AND ar.detected_at >= datetime(?, 'unixepoch')
+                      AND ar.detected_at <= datetime(?, 'unixepoch')
+                `).bind(project_id, fromSql, toSql).first<any>();
+
+                // Get referrals by AI source
+                const bySource = await env.OPTIVIEW_DB.prepare(`
+                    SELECT 
+                        ar.ai_source_id,
+                        ais.slug,
+                        ais.name,
+                        COUNT(*) AS count
+                    FROM ai_referrals ar
+                    JOIN content_assets ca ON ca.id = ar.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    JOIN ai_sources ais ON ais.id = ar.ai_source_id
+                    WHERE p.project_id = ? 
+                      AND ar.detected_at >= datetime(?, 'unixepoch')
+                      AND ar.detected_at <= datetime(?, 'unixepoch')
+                    GROUP BY ar.ai_source_id, ais.slug, ais.name
+                    ORDER BY count DESC
+                    LIMIT 10
+                `).bind(project_id, fromSql, toSql).all<any>();
+
+                // Get referrals by type
+                const byType = await env.OPTIVIEW_DB.prepare(`
+                    SELECT 
+                        ar.ref_type,
+                        COUNT(*) AS count
+                    FROM ai_referrals ar
+                    JOIN content_assets ca ON ca.id = ar.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    WHERE p.project_id = ? 
+                      AND ar.detected_at >= datetime(?, 'unixepoch')
+                      AND ar.detected_at <= datetime(?, 'unixepoch')
+                    GROUP BY ar.ref_type
+                    ORDER BY count DESC
+                `).bind(project_id, fromSql, toSql).all<any>();
+
+                return {
+                    totals: {
+                        referrals: totalResult?.total || 0
+                    },
+                    by_source: (bySource.results || []).map(row => ({
+                        ai_source_id: row.ai_source_id,
+                        slug: row.slug,
+                        name: row.name,
+                        count: row.count
+                    })),
+                    by_type: (byType.results || []).map(row => ({
+                        ref_type: row.ref_type,
+                        count: row.count
+                    }))
+                };
+            };
+
+            // Get cached or generate summary
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.referralsSummary, generateReferralsSummary);
+
+            const response = new Response(JSON.stringify(summary), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("referrals_summary_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.6) Top Referrals API
+    if (url.pathname === "/api/referrals/top" && req.method === "GET") {
+        try {
+            const { project_id, limit = "10" } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response("missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const referrals = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ar.id, ar.ref_type, ar.detected_at,
+                    ais.name as ai_source_name, ais.category,
+                    ca.url as content_url,
+                    COUNT(*) as referral_count
+                FROM ai_referrals ar
+                JOIN ai_sources ais ON ar.ai_source_id = ais.id
+                LEFT JOIN content_assets ca ON ar.content_id = ca.id
+                LEFT JOIN properties p ON ca.property_id = p.id
+                WHERE p.project_id = ? OR (p.project_id IS NULL AND ? IS NULL)
+                GROUP BY ar.content_id, ais.id
+                ORDER BY referral_count DESC
+                LIMIT ?
+            `).bind(project_id, project_id, parseInt(limit)).all<any>();
+
+            const response = new Response(JSON.stringify({ referrals: referrals.results || [] }), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "public, max-age=300"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("referrals_top_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message

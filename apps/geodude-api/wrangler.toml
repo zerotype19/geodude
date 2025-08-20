@@ -41,6 +41,11 @@ binding = "AI_FINGERPRINTS"
 id = "571e1b9f739c4d0a9027b350cf091d20"
 preview_id = "dev_ai_fingerprints"
 
+[[kv_namespaces]]
+binding = "CACHE"
+id = "prod_cache_namespace_id_placeholder"
+preview_id = "dev_cache_namespace_id_placeholder"
+
 # Production environment (for specific production deployments)
 [env.production]
 name = "geodude-api"
@@ -82,6 +87,10 @@ database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
 binding = "AI_FINGERPRINTS"
 id = "571e1b9f739c4d0a9027b350cf091d20"
 
+[[env.production.kv_namespaces]]
+binding = "CACHE"
+id = "prod_cache_namespace_id_placeholder"
+
 # Staging environment
 [env.staging.vars]
 PUBLIC_APP_URL = "https://staging.optiview.ai"
@@ -111,6 +120,10 @@ database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
 [[env.staging.kv_namespaces]]
 binding = "AI_FINGERPRINTS"
 id = "571e1b9f739c4d0a9027b350cf091d20"
+
+[[env.staging.kv_namespaces]]
+binding = "CACHE"
+id = "prod_cache_namespace_id_placeholder"
 
 # Test/Development environment
 [env.test.vars]
@@ -150,6 +163,11 @@ database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
 binding = "AI_FINGERPRINTS"
 id = "571e1b9f739c4d0a9027b350cf091d20"
 preview_id = "dev_ai_fingerprints"
+
+[[env.test.kv_namespaces]]
+binding = "CACHE"
+id = "prod_cache_namespace_id_placeholder"
+preview_id = "dev_cache_namespace_id_placeholder"
 
 # Dev environment (alias for test, used by deployment system)
 [env.dev]
@@ -193,6 +211,15 @@ binding = "AI_FINGERPRINTS"
 id = "571e1b9f739c4d0a9027b350cf091d20"
 preview_id = "dev_ai_fingerprints"
 
+[[env.dev.kv_namespaces]]
+binding = "CACHE"
+id = "prod_cache_namespace_id_placeholder"
+preview_id = "dev_cache_namespace_id_placeholder"
+
 # Triggers (uncomment to enable after testing)
 [triggers]
-# crons = ["*/30 * * * *"]
+crons = [
+  "*/5 * * * *",      # 5-minute metrics counters + health
+  "0 * * * *",        # hourly rollups / stale session close
+  "0 3 * * *"         # nightly maintenance/backfills
+]
