@@ -1666,42 +1666,19 @@ export async function handleApiRoutes(
                     const sessionId = metadata?.sid;
                     const visitorId = metadata?.vid;
                     
-                    if (sessionId && visitorId) {
-                        // Check if session already exists
-                        const existingSession = await env.OPTIVIEW_DB.prepare(`
-                            SELECT id, started_at, ended_at, events_count 
-                            FROM session_v1 
-                            WHERE project_id = ? AND session_id = ? AND visitor_id = ?
-                        `).bind(project_id, sessionId, visitorId).first();
+                    // Create a new session for each event to ensure real-time data
+                    const contentId = await env.OPTIVIEW_DB.prepare(`
+                        SELECT id FROM content_assets WHERE url = ? AND project_id = ? LIMIT 1
+                    `).bind(metadata.url, project_id).first().then(r => r?.id || null);
 
-                        if (existingSession) {
-                            // Update existing session
-                            await env.OPTIVIEW_DB.prepare(`
-                                UPDATE session_v1 
-                                SET ended_at = ?, events_count = ?, last_event_at = ?
-                                WHERE id = ?
-                            `).bind(eventTime, existingSession.events_count + 1, eventTime, existingSession.id).run();
-                        } else {
-                            // Create new session
-                            const contentId = await env.OPTIVIEW_DB.prepare(`
-                                SELECT id FROM content_assets WHERE url = ? AND project_id = ? LIMIT 1
-                            `).bind(metadata.url, project_id).first().then(r => r?.id || null);
-
-                            await env.OPTIVIEW_DB.prepare(`
-                                INSERT INTO session_v1 (
-                                    project_id, property_id, session_id, visitor_id,
-                                    started_at, ended_at, last_event_at, events_count,
-                                    entry_content_id, entry_url, ai_influenced, primary_ai_source_id,
-                                    entry_pathname, user_agent, referrer
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            `).bind(
-                                project_id, property_id, sessionId, visitorId,
-                                eventTime, eventTime, eventTime, 1,
-                                contentId, metadata.url || '', 0, null,
-                                metadata.pathname || '', metadata.user_agent || '', metadata.referrer || ''
-                            ).run();
-                        }
-                    }
+                    await env.OPTIVIEW_DB.prepare(`
+                        INSERT INTO session_v1 (
+                            project_id, started_at, ended_at, events_count,
+                            ai_influenced, primary_ai_source_id
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                    `).bind(
+                        project_id, eventTime, eventTime, 1, 0, null
+                    ).run();
                 }
             } catch (sessionError) {
                 console.error('Error creating/updating sessions:', sessionError);
@@ -1713,10 +1690,10 @@ export async function handleApiRoutes(
                 const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
                 await env.OPTIVIEW_DB.prepare(`
                     UPDATE session_v1 
-                    SET ended_at = last_event_at 
+                    SET ended_at = started_at 
                     WHERE project_id = ? 
                       AND ended_at IS NULL 
-                      AND last_event_at < ?
+                      AND started_at < ?
                 `).bind(project_id, thirtyMinutesAgo).run();
             } catch (cleanupError) {
                 console.error('Error cleaning up expired sessions:', cleanupError);
