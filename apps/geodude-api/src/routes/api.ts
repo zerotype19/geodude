@@ -1522,7 +1522,7 @@ export async function handleApiRoutes(
             }
 
             // Hash and validate API key
-            const { hashToken } = await import('../lib/auth');
+            const { hashToken } = await import('../auth');
             const keyHash = await hashToken(keyId);
             const apiKey = await env.OPTIVIEW_DB.prepare(`
                 SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
