@@ -1,6 +1,6 @@
 import { addCorsHeaders } from '../cors';
 import { EmailService } from '../email-service';
-import { hashToken, verifyToken } from '../auth';
+import { hashString } from '../utils';
 
 export async function handleAuthRoutes(url: URL, request: Request, env: any, d1: any, origin: string) {
   // Auth request code endpoint
@@ -63,7 +63,7 @@ export async function handleAuthRoutes(url: URL, request: Request, env: any, d1:
       }
 
       // Generate magic link token
-      const token = await hashToken(email + Date.now().toString());
+      const token = await hashString(email + Date.now().toString());
       const expiresAt = Date.now() + (15 * 60 * 1000); // 15 minutes
 
       // Store token in database
@@ -144,7 +144,7 @@ export async function handleAuthRoutes(url: URL, request: Request, env: any, d1:
       `).bind(token).run();
 
       // Generate session token
-      const sessionToken = await hashToken(user.id + Date.now().toString());
+      const sessionToken = await hashString(user.id + Date.now().toString());
       const sessionExpiresAt = Date.now() + (24 * 60 * 60 * 1000); // 24 hours
 
       // Store session
@@ -285,7 +285,7 @@ export async function handleAuthRoutes(url: URL, request: Request, env: any, d1:
       }
 
       const token = authHeader.substring(7);
-      
+
       // Get user from session
       const session = await d1.prepare(`
         SELECT us.*, u.email, u.created_at

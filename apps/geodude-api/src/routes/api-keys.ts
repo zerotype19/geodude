@@ -1,5 +1,5 @@
 import { addCorsHeaders } from '../cors';
-import { hashToken } from '../auth';
+import { hashString } from '../utils';
 
 export async function handleApiKeyRoutes(url: URL, request: Request, env: any, d1: any, origin: string) {
   // Get API keys endpoint
@@ -55,7 +55,7 @@ export async function handleApiKeyRoutes(url: URL, request: Request, env: any, d
 
       // Generate API key
       const keyId = `opt_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-      const keyHash = await hashToken(keyId);
+      const keyHash = await hashString(keyId);
 
       // Store API key
       const result = await d1.prepare(`

@@ -15,7 +15,7 @@ export async function handleApiRoutes(
 ): Promise<Response | null> {
     console.log('🔍 handleApiRoutes: Called for', url.pathname, req.method);
     console.log('🔍 handleApiRoutes: env keys:', Object.keys(env || {}));
-    
+
     // 6.1) API Keys Management
     if (url.pathname === "/api/keys" && req.method === "POST") {
         try {
@@ -1420,7 +1420,7 @@ export async function handleApiRoutes(
         console.log('🔍 Events API: POST /api/events called');
         console.log('🔍 Events API: env keys available:', Object.keys(env || {}));
         console.log('🔍 Events API: env.OPTIVIEW_DB available:', !!env.OPTIVIEW_DB);
-        
+
         try {
             // Check Content-Type
             const contentType = req.headers.get("content-type");
@@ -1483,7 +1483,7 @@ export async function handleApiRoutes(
 
             // Process batched events
             const { project_id, property_id, events } = validation.sanitizedData;
-            
+
             // IP rate limiting (120 rpm per IP, 60s window)
             if (env.RL_OFF !== "1") {
                 try {
@@ -1510,7 +1510,7 @@ export async function handleApiRoutes(
                     // Continue if rate limiting fails
                 }
             }
-            
+
             // Validate API key from header
             const keyId = req.headers.get('x-optiview-key-id');
             if (!keyId) {
@@ -1522,8 +1522,8 @@ export async function handleApiRoutes(
             }
 
             // Hash and validate API key
-            const { hashToken } = await import('../auth');
-            const keyHash = await hashToken(keyId);
+            const { hashString } = await import('../utils');
+            const keyHash = await hashString(keyId);
             const apiKey = await env.OPTIVIEW_DB.prepare(`
                 SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
             `).bind(keyHash).first();
@@ -1600,7 +1600,7 @@ export async function handleApiRoutes(
                         JSON.stringify(metadata || {}),
                         occurred_at || now
                     ];
-                    
+
                     console.log('🔍 Events API Debug - Insert values:', {
                         project_id,
                         property_id,

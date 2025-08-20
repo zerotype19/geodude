@@ -244,7 +244,7 @@ export async function handleProjectRoutes(url: URL, request: Request, env: any, 
 
       // Generate API key
       const keyId = `opt_${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-      const keyHash = await import('../auth').then(m => m.hashToken(keyId));
+      const keyHash = await import('../utils').then(m => m.hashString(keyId));
 
       // Store API key
       const result = await d1.prepare(`
