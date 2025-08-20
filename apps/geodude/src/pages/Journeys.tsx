@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { 
-  Clock, 
-  RefreshCw, 
-  ExternalLink, 
-  Search, 
+import {
+  Clock,
+  RefreshCw,
+  ExternalLink,
+  Search,
   Activity,
   Bot,
   User,
@@ -89,17 +89,17 @@ interface Journey {
 // Simple SVG chart component
 function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: string) => string }) {
   if (!data || data.length === 0) return null;
-  
+
   const maxValue = Math.max(...data.map(d => d.count));
   const minValue = Math.min(...data.map(d => d.count));
   const range = Math.max(1, maxValue - minValue);
-  
+
   const points = data.map((d, i) => {
     const x = (i / (data.length - 1)) * 300;
     const y = 100 - ((d.count - minValue) / range) * 80;
     return `${x},${y}`;
   }).join(' ');
-  
+
   return (
     <div className="relative h-64 w-full">
       <svg viewBox="0 0 300 120" className="w-full h-full">
@@ -134,7 +134,7 @@ function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: s
 export default function Journeys() {
   const { project } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   // State
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [recent, setRecent] = useState<SessionsRecent | null>(null);
@@ -185,14 +185,22 @@ export default function Journeys() {
   // API calls
   async function fetchSummary() {
     if (!project?.id) return;
-    
+
     setSummaryLoading(true);
     try {
-      const params = new URLSearchParams({ project_id: project.id, window });
-      const response = await fetch(`https://api.optiview.ai/api/sessions/summary?${params}`, {
-        credentials: 'include'
+      const params = new URLSearchParams({
+        project_id: project.id,
+        window,
+        _t: Date.now().toString() // Cache buster
       });
-      
+      const response = await fetch(`https://api.optiview.ai/api/sessions/summary?${params}`, {
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+
       if (response.ok) {
         const data = await response.json();
         setSummary(data);
@@ -218,13 +226,18 @@ export default function Journeys() {
         window,
         page: page.toString(),
         pageSize: "50",
-        ai: aiFilter
+        ai: aiFilter,
+        _t: Date.now().toString() // Cache buster
       });
       
       if (searchQuery) params.append("q", searchQuery);
 
       const response = await fetch(`https://api.optiview.ai/api/sessions/recent?${params}`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
       
       if (response.ok) {
@@ -252,9 +265,17 @@ export default function Journeys() {
     if (!project?.id) return;
     
     try {
-      const params = new URLSearchParams({ project_id: project.id, window: "15m" });
+      const params = new URLSearchParams({ 
+        project_id: project.id, 
+        window: "15m",
+        _t: Date.now().toString() // Cache buster
+      });
       const response = await fetch(`https://api.optiview.ai/api/events/has-any?${params}`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
       
       if (response.ok) {
@@ -271,9 +292,17 @@ export default function Journeys() {
     
     setJourneyLoading(true);
     try {
-      const params = new URLSearchParams({ project_id: project.id, session_id: sessionId.toString() });
+      const params = new URLSearchParams({ 
+        project_id: project.id, 
+        session_id: sessionId.toString(),
+        _t: Date.now().toString() // Cache buster
+      });
       const response = await fetch(`https://api.optiview.ai/api/sessions/journey?${params}`, {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
       
       if (response.ok) {
@@ -298,17 +327,17 @@ export default function Journeys() {
   function startAutoRefresh() {
     if (refreshInterval.current) clearInterval(refreshInterval.current);
     refreshCount.current = 0;
-    
+
     refreshInterval.current = setInterval(() => {
       refreshCount.current++;
       setAutoRefreshCount(refreshCount.current);
-      
+
       if (refreshCount.current >= 12) { // 12 * 10s = 2 minutes
         clearInterval(refreshInterval.current!);
         refreshInterval.current = null;
         return;
       }
-      
+
       if (document.visibilityState === 'visible') {
         refreshData();
       }
@@ -333,7 +362,7 @@ export default function Journeys() {
           startAutoRefresh();
         });
     }
-    
+
     return stopAutoRefresh;
   }, [project?.id, window, aiFilter, searchQuery, page]);
 
@@ -384,7 +413,7 @@ export default function Journeys() {
     const date = new Date(isoString);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    
+
     if (diff < 60000) return "just now";
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
@@ -452,7 +481,7 @@ export default function Journeys() {
             <h1 className="text-2xl font-bold text-gray-900">Journeys</h1>
             <p className="text-gray-600">Monitor visitor sessions and user journeys</p>
           </div>
-          
+
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -496,7 +525,7 @@ export default function Journeys() {
             <h1 className="text-2xl font-bold text-gray-900">Journeys</h1>
             <p className="text-gray-600">Monitor visitor sessions and user journeys</p>
           </div>
-          
+
           <div className="flex items-center gap-4">
             {/* Window Selector */}
             <div className="flex rounded-lg border border-gray-300">
@@ -504,17 +533,16 @@ export default function Journeys() {
                 <button
                   key={w}
                   onClick={() => handleWindowChange(w)}
-                  className={`px-3 py-1 text-sm font-medium ${
-                    window === w
+                  className={`px-3 py-1 text-sm font-medium ${window === w
                       ? "bg-blue-600 text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
-                  } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
+                    } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
                 >
                   {w}
                 </button>
               ))}
             </div>
-            
+
             {/* Refresh Button */}
             <button
               onClick={() => {
@@ -528,7 +556,7 @@ export default function Journeys() {
               <RefreshCw className={`h-4 w-4 ${(summaryLoading || recentLoading) ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            
+
             {lastUpdated && (
               <span className="text-xs text-gray-500">
                 Last updated: {lastUpdated.toLocaleTimeString()}
@@ -567,7 +595,7 @@ export default function Journeys() {
                 </div>
               </div>
             </Card>
-            
+
             <Card>
               <div className="p-4">
                 <div className="flex items-center">
@@ -581,7 +609,7 @@ export default function Journeys() {
                 </div>
               </div>
             </Card>
-            
+
             <Card>
               <div className="p-4">
                 <div className="flex items-center">
@@ -595,7 +623,7 @@ export default function Journeys() {
                 </div>
               </div>
             </Card>
-            
+
             <Card>
               <div className="p-4">
                 <div className="flex items-center">
@@ -620,8 +648,8 @@ export default function Journeys() {
                 <div className="p-4">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Sessions Over Time</h3>
                   {summary.timeseries.length > 0 ? (
-                    <SimpleLineChart 
-                      data={summary.timeseries} 
+                    <SimpleLineChart
+                      data={summary.timeseries}
                       formatTime={formatChartTime}
                     />
                   ) : (
@@ -643,11 +671,10 @@ export default function Journeys() {
                     <button
                       key={filter}
                       onClick={() => handleAIFilter(filter)}
-                      className={`px-3 py-1 rounded-full text-sm border ${
-                        aiFilter === filter || (aiFilter === "all" && filter === "all")
+                      className={`px-3 py-1 rounded-full text-sm border ${aiFilter === filter || (aiFilter === "all" && filter === "all")
                           ? "bg-blue-100 text-blue-800 border-blue-200"
                           : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       {filter === "all" ? "All" : filter === "only" ? "AI only" : "Non-AI"}
                     </button>
@@ -674,7 +701,7 @@ export default function Journeys() {
             <Card>
               <div className="p-4">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Sessions</h3>
-                
+
                 {recentLoading ? (
                   <div className="space-y-3">
                     {[...Array(5)].map((_, i) => (
@@ -710,7 +737,7 @@ export default function Journeys() {
                           {recent.items.map((item) => (
                             <tr key={item.id} className="border-b hover:bg-gray-50">
                               <td className="py-3 pr-4">
-                                <span 
+                                <span
                                   className="text-gray-600 cursor-help"
                                   title={new Date(item.started_at).toLocaleString()}
                                 >

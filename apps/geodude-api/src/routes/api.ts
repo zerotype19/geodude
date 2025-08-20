@@ -422,7 +422,10 @@ export async function handleApiRoutes(
             const response = new Response(JSON.stringify(summary), {
                 headers: {
                     "Content-Type": "application/json",
-                    "Cache-Control": "private, max-age=30, stale-while-revalidate=60"
+                    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                    "X-Cache-Buster": Date.now().toString()
                 }
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
@@ -1580,12 +1583,8 @@ export async function handleApiRoutes(
 
                 // Store event in interaction_events table
                 try {
-                    const result = await env.OPTIVIEW_DB.prepare(`
-                        INSERT INTO interaction_events (
-                            project_id, property_id, content_id, ai_source_id, 
-                            event_type, metadata, occurred_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    `).bind(
+                    // Debug logging to identify undefined values
+                    const insertValues = [
                         project_id,
                         property_id,
                         contentId,
@@ -1593,7 +1592,38 @@ export async function handleApiRoutes(
                         normalizedEventType,
                         JSON.stringify(metadata || {}),
                         occurred_at || now
-                    ).run();
+                    ];
+                    
+                    console.log('🔍 Events API Debug - Insert values:', {
+                        project_id,
+                        property_id,
+                        contentId,
+                        ai_source_id: null,
+                        event_type: normalizedEventType,
+                        metadata: JSON.stringify(metadata || {}),
+                        occurred_at: occurred_at || now,
+                        rawValues: insertValues
+                    });
+
+                    // Validate all values are defined before insertion
+                    if (insertValues.some(val => val === undefined)) {
+                        console.error('❌ Events API Error - Undefined values detected:', {
+                            project_id: typeof project_id,
+                            property_id: typeof property_id,
+                            contentId: typeof contentId,
+                            event_type: typeof normalizedEventType,
+                            metadata: typeof metadata,
+                            occurred_at: typeof occurred_at
+                        });
+                        throw new Error('Cannot insert undefined values into database');
+                    }
+
+                    const result = await env.OPTIVIEW_DB.prepare(`
+                        INSERT INTO interaction_events (
+                            project_id, property_id, content_id, ai_source_id, 
+                            event_type, metadata, occurred_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    `).bind(...insertValues).run();
 
                     insertResults.push(result);
                 } catch (error) {
