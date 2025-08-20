@@ -662,7 +662,7 @@ export async function handleApiRoutes(
     if (url.pathname === "/api/content" && req.method === "GET") {
         try {
             const params = Object.fromEntries(url.searchParams);
-            const { 
+            const {
                 project_id,
                 window = "24h",
                 q = "",
@@ -671,7 +671,7 @@ export async function handleApiRoutes(
                 page = "1",
                 pageSize = "50"
             } = params;
-            
+
             if (!project_id) {
                 const response = new Response("missing project_id", { status: 400 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
@@ -1409,6 +1409,30 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
+                        // IP rate limiting (120 rpm per IP, 60s window)
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const ipRateLimitKey = `rl:ip:referrals:${clientIP}`;
+            const ipCount = await env.KV.get(ipRateLimitKey);
+            
+            if (!ipCount) {
+                await env.KV.put(ipRateLimitKey, "1", { expirationTtl: 60 });
+            } else if (parseInt(ipCount) >= 120) {
+                const response = new Response(JSON.stringify({
+                    error: "IP rate limit exceeded",
+                    code: "ip_ratelimit",
+                    retry_after: 60
+                }), { 
+                    status: 429, 
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Retry-After": "60"
+                    } 
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            } else {
+                await env.KV.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
+            }
+
             // Get request body and validate size
             const bodyText = await req.text();
             if (bodyText.length > 1024) {
@@ -1431,6 +1455,49 @@ export async function handleApiRoutes(
                 }), { status: 400, headers: { "Content-Type": "application/json" } });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
+
+            // Import ingest guards
+            const { hostnameAllowed, sanitizeMetadata } = await import('../lib/ingest-guards');
+
+            // Domain validation - check if URL hostname matches property domain
+            if (validation.sanitizedData.metadata?.url) {
+                try {
+                    const url = new URL(validation.sanitizedData.metadata.url);
+                    const propertyDomain = await env.OPTIVIEW_DB.prepare(`
+                        SELECT domain FROM properties WHERE id = ?
+                    `).bind(validation.sanitizedData.property_id || body.property_id).first<{ domain: string }>();
+
+                    if (propertyDomain && !hostnameAllowed(url.hostname, propertyDomain.domain)) {
+                        const response = new Response(JSON.stringify({
+                            error: "Domain mismatch",
+                            reason: "URL hostname does not match property domain",
+                            url_hostname: url.hostname,
+                            property_domain: propertyDomain.domain
+                        }), { status: 400, headers: { "Content-Type": "application/json" } });
+                        return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                    }
+                } catch (e) {
+                    // Invalid URL format - reject
+                    const response = new Response(JSON.stringify({
+                        error: "Invalid URL format",
+                        reason: "metadata.url must be a valid URL"
+                    }), { status: 400, headers: { "Content-Type": "application/json" } });
+                    return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                }
+            }
+
+            // Metadata sanitization and size validation
+            const cleanedMetadata = sanitizeMetadata(validation.sanitizedData.metadata);
+            if (!cleanedMetadata) {
+                const response = new Response(JSON.stringify({
+                    error: "Metadata too large",
+                    reason: "Metadata exceeds 2KB limit even after sanitization"
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Update validation data with cleaned metadata
+            validation.sanitizedData.metadata = cleanedMetadata;
 
             // Insert the event
             const result = await env.OPTIVIEW_DB.prepare(`
@@ -1517,7 +1584,7 @@ export async function handleApiRoutes(
                     JOIN properties p ON p.id = ca.property_id
                     WHERE ca.id = ?
                 `).bind(validation.sanitizedData.content_id).first<{ project_id: string }>();
-                
+
                 if (projectData?.project_id) {
                     const { bumpProjectVersion } = await import('../lib/cache');
                     await bumpProjectVersion(env.CACHE, projectData.project_id);
