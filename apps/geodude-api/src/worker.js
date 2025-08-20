@@ -1532,17 +1532,29 @@ export default {
       }
 
       // Try API routes from routes/api.ts first
-      const apiResult = await handleApiRoutes(
-        request,
-        env,
-        url,
-        origin,
-        (resp) => resp, // attach function (identity for now)
-        (resp) => resp, // addBasicSecurityHeaders (identity for now) 
-        addCorsHeaders
-      );
+      console.log('🔍 Worker: Attempting to handle API routes for:', url.pathname);
+      let apiResult = null;
+      try {
+        apiResult = await handleApiRoutes(
+          request,
+          env,
+          url,
+          origin,
+          (resp) => resp, // attach function (identity for now)
+          (resp) => resp, // addBasicSecurityHeaders (identity for now) 
+          addCorsHeaders
+        );
+        console.log('✅ Worker: handleApiRoutes result:', apiResult ? 'Response returned' : 'No response (null)');
+      } catch (apiError) {
+        console.error('❌ Worker: handleApiRoutes error:', apiError);
+        // Continue to fallback logic
+      }
+
       if (apiResult) {
+        console.log('✅ Worker: Returning API response from routes/api.ts');
         return apiResult;
+      } else {
+        console.log('⚠️ Worker: No API response, falling back to worker logic');
       }
 
       // 3.1) Create Organization
@@ -5131,20 +5143,20 @@ export default {
 
       // Events POST endpoint is now handled by routes/api.ts
 
-// 7) Events recent endpoint
-if (url.pathname === "/api/events/recent" && request.method === "GET") {
-  try {
-    const projectId = url.searchParams.get("project_id");
-    if (!projectId) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 7) Events recent endpoint
+      if (url.pathname === "/api/events/recent" && request.method === "GET") {
+        try {
+          const projectId = url.searchParams.get("project_id");
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Get recent events from interaction_events table
-    const events = await d1.prepare(`
+          // Get recent events from interaction_events table
+          const events = await d1.prepare(`
             SELECT 
               ie.id,
               ie.event_type,
@@ -5161,37 +5173,37 @@ if (url.pathname === "/api/events/recent" && request.method === "GET") {
             LIMIT 100
           `).bind(projectId).all();
 
-    const response = new Response(JSON.stringify({
-      events: events.results || [],
-      total: events.results?.length || 0
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  } catch (e) {
-    console.error("Events recent error:", e);
-    const response = new Response(JSON.stringify({ error: "Failed to fetch events" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+          const response = new Response(JSON.stringify({
+            events: events.results || [],
+            total: events.results?.length || 0
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (e) {
+          console.error("Events recent error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to fetch events" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// 7) Events summary endpoint
-if (url.pathname === "/api/events/summary" && request.method === "GET") {
-  try {
-    const projectId = url.searchParams.get("project_id");
-    if (!projectId) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 7) Events summary endpoint
+      if (url.pathname === "/api/events/summary" && request.method === "GET") {
+        try {
+          const projectId = url.searchParams.get("project_id");
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Get summary data from interaction_events table
-    const summary = await d1.prepare(`
+          // Get summary data from interaction_events table
+          const summary = await d1.prepare(`
             SELECT 
               COUNT(*) as total,
               COUNT(CASE WHEN occurred_at >= datetime('now', '-15 minutes') THEN 1 END) as last_15m,
@@ -5201,303 +5213,303 @@ if (url.pathname === "/api/events/summary" && request.method === "GET") {
             WHERE project_id = ?
           `).bind(projectId).first();
 
-    const response = new Response(JSON.stringify({
-      total: summary?.total || 0,
-      last_15m: summary?.last_15m || 0,
-      ai_events: summary?.ai_events || 0,
-      unique_pages: summary?.unique_pages || 0,
-      breakdown: [],
-      top_sources: [],
-      timeseries: []
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  } catch (e) {
-    console.error("Events summary error:", e);
-    const response = new Response(JSON.stringify({
-      total: 0,
-      breakdown: [],
-      top_sources: [],
-      timeseries: []
-    }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.0.1) Conversions POST endpoint
-if (url.pathname === "/api/conversions" && request.method === "POST") {
-  try {
-    const body = await request.json();
-    const { project_id, property_id, content_id, url, amount_cents, currency, metadata } = body;
-
-    // Validate required fields
-    if (!project_id) {
-      const response = new Response(JSON.stringify({ error: "Missing required field: project_id" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate API key (same as events endpoint)
-    const authHeader = request.headers.get('x-optiview-key-id');
-    if (!authHeader) {
-      const response = new Response(JSON.stringify({ error: "Missing API key header: x-optiview-key-id" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate API key
-    const keyHash = await hashToken(authHeader);
-    const apiKey = await d1.prepare(`
-            SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
-          `).bind(keyHash).first();
-
-    if (!apiKey) {
-      const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Enforce project scope using the API key
-    if (apiKey.project_id !== project_id) {
-      const response = new Response(JSON.stringify({ error: "Project ID mismatch" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // IP rate limiting (120 rpm per IP, 60s window)
-    if (env.RL_OFF !== "1") {
-      try {
-        const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || "0.0.0.0";
-        const metrics = new MetricsManager(env.CACHE);
-        const { ok, remaining, resetAt } = await ipRateLimit(env.RL, ip, "/api/conversions", 120, 60, metrics);
-        if (!ok) {
           const response = new Response(JSON.stringify({
-            error: "rate_limited",
-            retry_after: Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
+            total: summary?.total || 0,
+            last_15m: summary?.last_15m || 0,
+            ai_events: summary?.ai_events || 0,
+            unique_pages: summary?.unique_pages || 0,
+            breakdown: [],
+            top_sources: [],
+            timeseries: []
           }), {
-            status: 429,
-            headers: {
-              "Content-Type": "application/json",
-              "Retry-After": "60"
-            }
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (e) {
+          console.error("Events summary error:", e);
+          const response = new Response(JSON.stringify({
+            total: 0,
+            breakdown: [],
+            top_sources: [],
+            timeseries: []
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
           });
           return addCorsHeaders(response, origin);
         }
-      } catch (e) {
-        console.error("Rate limiting error:", e);
-        // Continue if rate limiting fails
-      }
-    }
-
-    // Rate limiting: 60 rpm per key
-    const rateLimitKey = `conversions_create:${apiKey.id}`;
-    const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retry_after: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
-        }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    let finalContentId = content_id;
-    let finalPropertyId = property_id;
-
-    // If content_id missing but url present, upsert content_assets
-    if (!finalContentId && url) {
-      if (!finalPropertyId) {
-        const response = new Response(JSON.stringify({ error: "property_id required when url is provided" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        });
-        return addCorsHeaders(response, origin);
       }
 
-      // Verify property belongs to project and get domain for CORS
-      const propertyCheck = await d1.prepare(`
+      // 7.0.1) Conversions POST endpoint
+      if (url.pathname === "/api/conversions" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { project_id, property_id, content_id, url, amount_cents, currency, metadata } = body;
+
+          // Validate required fields
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "Missing required field: project_id" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate API key (same as events endpoint)
+          const authHeader = request.headers.get('x-optiview-key-id');
+          if (!authHeader) {
+            const response = new Response(JSON.stringify({ error: "Missing API key header: x-optiview-key-id" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate API key
+          const keyHash = await hashToken(authHeader);
+          const apiKey = await d1.prepare(`
+            SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
+          `).bind(keyHash).first();
+
+          if (!apiKey) {
+            const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Enforce project scope using the API key
+          if (apiKey.project_id !== project_id) {
+            const response = new Response(JSON.stringify({ error: "Project ID mismatch" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // IP rate limiting (120 rpm per IP, 60s window)
+          if (env.RL_OFF !== "1") {
+            try {
+              const ip = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip") || "0.0.0.0";
+              const metrics = new MetricsManager(env.CACHE);
+              const { ok, remaining, resetAt } = await ipRateLimit(env.RL, ip, "/api/conversions", 120, 60, metrics);
+              if (!ok) {
+                const response = new Response(JSON.stringify({
+                  error: "rate_limited",
+                  retry_after: Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))
+                }), {
+                  status: 429,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Retry-After": "60"
+                  }
+                });
+                return addCorsHeaders(response, origin);
+              }
+            } catch (e) {
+              console.error("Rate limiting error:", e);
+              // Continue if rate limiting fails
+            }
+          }
+
+          // Rate limiting: 60 rpm per key
+          const rateLimitKey = `conversions_create:${apiKey.id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          let finalContentId = content_id;
+          let finalPropertyId = property_id;
+
+          // If content_id missing but url present, upsert content_assets
+          if (!finalContentId && url) {
+            if (!finalPropertyId) {
+              const response = new Response(JSON.stringify({ error: "property_id required when url is provided" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+
+            // Verify property belongs to project and get domain for CORS
+            const propertyCheck = await d1.prepare(`
               SELECT id, domain FROM properties WHERE id = ? AND project_id = ?
             `).bind(finalPropertyId, project_id).first();
 
-      if (!propertyCheck) {
-        const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" }
-        });
-        return addCorsHeaders(response, origin);
-      }
+            if (!propertyCheck) {
+              const response = new Response(JSON.stringify({ error: "Property not found or not accessible" }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
 
-      // Enforce property-scoped CORS for conversions
-      const propertyDomain = propertyCheck.domain;
-      const expectedOrigin = `https://${propertyDomain}`;
-      const expectedOriginWww = `https://www.${propertyDomain}`;
+            // Enforce property-scoped CORS for conversions
+            const propertyDomain = propertyCheck.domain;
+            const expectedOrigin = `https://${propertyDomain}`;
+            const expectedOriginWww = `https://www.${propertyDomain}`;
 
-      if (origin && origin !== expectedOrigin && origin !== expectedOriginWww) {
-        const response = new Response(JSON.stringify({
-          error: "Origin not allowed for this property",
-          details: "origin_denied"
-        }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" }
-        });
-        return addCorsHeaders(response, expectedOrigin);
-      }
+            if (origin && origin !== expectedOrigin && origin !== expectedOriginWww) {
+              const response = new Response(JSON.stringify({
+                error: "Origin not allowed for this property",
+                details: "origin_denied"
+              }), {
+                status: 403,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, expectedOrigin);
+            }
 
-      // Upsert content asset
-      const existingContent = await d1.prepare(`
+            // Upsert content asset
+            const existingContent = await d1.prepare(`
               SELECT id FROM content_assets WHERE url = ? AND property_id = ?
             `).bind(url, finalPropertyId).first();
 
-      if (existingContent) {
-        finalContentId = existingContent.id;
-      } else {
-        const contentResult = await d1.prepare(`
+            if (existingContent) {
+              finalContentId = existingContent.id;
+            } else {
+              const contentResult = await d1.prepare(`
                 INSERT INTO content_assets (property_id, project_id, url, type, created_at)
                 VALUES (?, ?, ?, 'page', ?)
               `).bind(finalPropertyId, project_id, url, new Date().toISOString()).run();
-        finalContentId = contentResult.meta.last_row_id;
-      }
-    }
+              finalContentId = contentResult.meta.last_row_id;
+            }
+          }
 
-    // Sanitize metadata (≤1KB, drop PII keys)
-    let sanitizedMetadata = null;
-    if (metadata) {
-      const cleanMetadata = { ...metadata };
-      // Drop PII keys
-      delete cleanMetadata.ip;
-      delete cleanMetadata.ua;
-      delete cleanMetadata.email;
-      delete cleanMetadata.phone;
-      delete cleanMetadata.name;
-      delete cleanMetadata.address;
+          // Sanitize metadata (≤1KB, drop PII keys)
+          let sanitizedMetadata = null;
+          if (metadata) {
+            const cleanMetadata = { ...metadata };
+            // Drop PII keys
+            delete cleanMetadata.ip;
+            delete cleanMetadata.ua;
+            delete cleanMetadata.email;
+            delete cleanMetadata.phone;
+            delete cleanMetadata.name;
+            delete cleanMetadata.address;
 
-      const metadataStr = JSON.stringify(cleanMetadata);
-      if (metadataStr.length <= 1024) {
-        sanitizedMetadata = metadataStr;
-      }
-    }
+            const metadataStr = JSON.stringify(cleanMetadata);
+            if (metadataStr.length <= 1024) {
+              sanitizedMetadata = metadataStr;
+            }
+          }
 
-    // Insert conversion
-    const now = new Date().toISOString();
-    const result = await d1.prepare(`
+          // Insert conversion
+          const now = new Date().toISOString();
+          const result = await d1.prepare(`
             INSERT INTO conversion_event (
               project_id, property_id, content_id, amount_cents, 
               currency, metadata, occurred_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
           `).bind(
-      project_id,
-      finalPropertyId,
-      finalContentId,
-      amount_cents || null,
-      currency || 'USD',
-      sanitizedMetadata,
-      now
-    ).run();
+            project_id,
+            finalPropertyId,
+            finalContentId,
+            amount_cents || null,
+            currency || 'USD',
+            sanitizedMetadata,
+            now
+          ).run();
 
-    // Update last_used timestamp for API key
-    await d1.prepare(`
+          // Update last_used timestamp for API key
+          await d1.prepare(`
             UPDATE api_key SET last_used_ts = ? WHERE id = ?
           `).bind(Date.now(), apiKey.id).run();
 
-    // Invalidate cache for this project
-    try {
-      await bumpProjectVersion(env.CACHE, project_id);
-    } catch (e) {
-      console.error("Failed to invalidate cache:", e);
-    }
+          // Invalidate cache for this project
+          try {
+            await bumpProjectVersion(env.CACHE, project_id);
+          } catch (e) {
+            console.error("Failed to invalidate cache:", e);
+          }
 
-    const response = new Response(JSON.stringify({
-      ok: true,
-      id: result.meta.last_row_id,
-      occurred_at: now
-    }), {
-      status: 201,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            ok: true,
+            id: result.meta.last_row_id,
+            occurred_at: now
+          }), {
+            status: 201,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Conversion creation error:", e);
-    const response = new Response(JSON.stringify({ error: "Failed to create conversion" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.0.2) Conversions Summary endpoint
-if (url.pathname === "/api/conversions/summary" && request.method === "GET") {
-  try {
-    const { project_id, window = "7d" } = Object.fromEntries(url.searchParams);
-
-    if (!project_id) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate window parameter
-    if (!['24h', '7d', '30d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Rate limiting: 60 rpm
-    const rateLimitKey = `conversions_summary:${project_id}`;
-    const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retry_after: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
+        } catch (e) {
+          console.error("Conversion creation error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to create conversion" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
         }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      }
 
-    // Calculate time window
-    let timeFilter;
-    let bucketFormat;
-    if (window === '24h') {
-      timeFilter = "datetime('now','-1 day')";
-      bucketFormat = "strftime('%Y-%m-%d %H:00:00', datetime(?, 'unixepoch'))";
-    } else if (window === '7d') {
-      timeFilter = "datetime('now','-7 days')";
-      bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
-    } else { // 30d
-      timeFilter = "datetime('now','-30 days')";
-      bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
-    }
+      // 7.0.2) Conversions Summary endpoint
+      if (url.pathname === "/api/conversions/summary" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d" } = Object.fromEntries(url.searchParams);
 
-    // Get totals with attribution
-    const totals = await d1.prepare(`
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['24h', '7d', '30d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `conversions_summary:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          let timeFilter;
+          let bucketFormat;
+          if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+            bucketFormat = "strftime('%Y-%m-%d %H:00:00', datetime(?, 'unixepoch'))";
+          } else if (window === '7d') {
+            timeFilter = "datetime('now','-7 days')";
+            bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
+          } else { // 30d
+            timeFilter = "datetime('now','-30 days')";
+            bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
+          }
+
+          // Get totals with attribution
+          const totals = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -5547,8 +5559,8 @@ if (url.pathname === "/api/conversions/summary" && request.method === "GET") {
             )
           `).bind(project_id).first();
 
-    // Get breakdown by source
-    const bySource = await d1.prepare(`
+          // Get breakdown by source
+          const bySource = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -5602,8 +5614,8 @@ if (url.pathname === "/api/conversions/summary" && request.method === "GET") {
             ORDER BY conversions DESC
           `).bind(project_id).all();
 
-    // Get top content
-    const topContent = await d1.prepare(`
+          // Get top content
+          const topContent = await d1.prepare(`
             SELECT 
               ca.id as content_id,
               ca.url,
@@ -5617,8 +5629,8 @@ if (url.pathname === "/api/conversions/summary" && request.method === "GET") {
             LIMIT 10
           `).bind(project_id).all();
 
-    // Get timeseries data
-    const timeseries = await d1.prepare(`
+          // Get timeseries data
+          const timeseries = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -5663,117 +5675,117 @@ if (url.pathname === "/api/conversions/summary" && request.method === "GET") {
             ORDER BY ts
           `).bind(project_id, project_id).all();
 
-    const summary = {
-      totals: {
-        conversions: totals?.conversions || 0,
-        ai_attributed: totals?.ai_attributed || 0,
-        non_ai: totals?.non_ai || 0,
-        revenue_cents: totals?.revenue_cents || 0
-      },
-      by_source: bySource.results || [],
-      top_content: topContent.results || [],
-      timeseries: timeseries.results || []
-    };
+          const summary = {
+            totals: {
+              conversions: totals?.conversions || 0,
+              ai_attributed: totals?.ai_attributed || 0,
+              non_ai: totals?.non_ai || 0,
+              revenue_cents: totals?.revenue_cents || 0
+            },
+            by_source: bySource.results || [],
+            top_content: topContent.results || [],
+            timeseries: timeseries.results || []
+          };
 
-    const response = new Response(JSON.stringify(summary), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
-      }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify(summary), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Conversions summary error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.0.3) Conversions List endpoint
-if (url.pathname === "/api/conversions" && request.method === "GET") {
-  try {
-    const { project_id, window = "7d", source, q, page = "1", pageSize = "50", sort = "last_seen_desc" } = Object.fromEntries(url.searchParams);
-
-    if (!project_id) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate window parameter
-    if (!['24h', '7d', '30d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate sort parameter
-    if (!['last_seen_desc', 'conversions_desc'].includes(sort)) {
-      const response = new Response(JSON.stringify({ error: "Invalid sort. Must be one of: last_seen_desc, conversions_desc" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Rate limiting: 60 rpm
-    const rateLimitKey = `conversions_list:${project_id}`;
-    const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retry_after: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
+        } catch (e) {
+          console.error("Conversions summary error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
         }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const pageSizeNum = Math.min(100, Math.max(10, parseInt(pageSize, 10)));
-    const offset = (pageNum - 1) * pageSizeNum;
-
-    // window → since (ISO). Keep attribution lookback = 7d for v1 (constant).
-    const now = new Date();
-    const sinceISO = (() => {
-      if (window === "24h") return new Date(now.getTime() - 24 * 3600e3).toISOString();
-      if (window === "30d") return new Date(now.getTime() - 30 * 86400e3).toISOString();
-      return new Date(now.getTime() - 7 * 86400e3).toISOString(); // 7d default
-    })();
-    const lookbackMod = "-7 days"; // SQLite datetime(c.occurred_at, ?)
-
-    // SAFE sort whitelist
-    const sortSql = (() => {
-      switch (sort) {
-        case "conversions_desc": return "conversions DESC, last_seen DESC";
-        case "last_seen_desc":
-        default: return "last_seen DESC, conversions DESC";
       }
-    })();
 
-    // MAIN LIST QUERY (positional placeholders only)
-    // PARAM ORDER (9 total):
-    //  1: project_id
-    //  2: sinceISO
-    //  3: lookbackMod
-    //  4: q (nullable)
-    //  5: source (nullable)
-    //  6: source (same value, repeated)
-    //  7: pageSize (int)
-    //  8: offset (int)
-    const mainQuery = `
+      // 7.0.3) Conversions List endpoint
+      if (url.pathname === "/api/conversions" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d", source, q, page = "1", pageSize = "50", sort = "last_seen_desc" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['24h', '7d', '30d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate sort parameter
+          if (!['last_seen_desc', 'conversions_desc'].includes(sort)) {
+            const response = new Response(JSON.stringify({ error: "Invalid sort. Must be one of: last_seen_desc, conversions_desc" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `conversions_list:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const pageNum = Math.max(1, parseInt(page, 10));
+          const pageSizeNum = Math.min(100, Math.max(10, parseInt(pageSize, 10)));
+          const offset = (pageNum - 1) * pageSizeNum;
+
+          // window → since (ISO). Keep attribution lookback = 7d for v1 (constant).
+          const now = new Date();
+          const sinceISO = (() => {
+            if (window === "24h") return new Date(now.getTime() - 24 * 3600e3).toISOString();
+            if (window === "30d") return new Date(now.getTime() - 30 * 86400e3).toISOString();
+            return new Date(now.getTime() - 7 * 86400e3).toISOString(); // 7d default
+          })();
+          const lookbackMod = "-7 days"; // SQLite datetime(c.occurred_at, ?)
+
+          // SAFE sort whitelist
+          const sortSql = (() => {
+            switch (sort) {
+              case "conversions_desc": return "conversions DESC, last_seen DESC";
+              case "last_seen_desc":
+              default: return "last_seen DESC, conversions DESC";
+            }
+          })();
+
+          // MAIN LIST QUERY (positional placeholders only)
+          // PARAM ORDER (9 total):
+          //  1: project_id
+          //  2: sinceISO
+          //  3: lookbackMod
+          //  4: q (nullable)
+          //  5: source (nullable)
+          //  6: source (same value, repeated)
+          //  7: pageSize (int)
+          //  8: offset (int)
+          const mainQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS since, ? AS lookback, ? AS q
             ),
@@ -5835,21 +5847,21 @@ if (url.pathname === "/api/conversions" && request.method === "GET") {
             LIMIT ? OFFSET ?;
           `;
 
-    const bindList = [
-      project_id,
-      sinceISO,
-      lookbackMod,
-      q || null,              // 4
-      source || null,         // 5
-      source || null,         // 6 (same value)
-      pageSizeNum,            // 7
-      offset                  // 8
-    ];
+          const bindList = [
+            project_id,
+            sinceISO,
+            lookbackMod,
+            q || null,              // 4
+            source || null,         // 5
+            source || null,         // 6 (same value)
+            pageSizeNum,            // 7
+            offset                  // 8
+          ];
 
-    const items = await d1.prepare(mainQuery).bind(...bindList).all();
+          const items = await d1.prepare(mainQuery).bind(...bindList).all();
 
-    // COUNT query (same filters, no LIMIT/OFFSET)
-    const countQuery = `
+          // COUNT query (same filters, no LIMIT/OFFSET)
+          const countQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS since, ? AS lookback, ? AS q
             ),
@@ -5902,20 +5914,20 @@ if (url.pathname === "/api/conversions" && request.method === "GET") {
             FROM rows2;
           `;
 
-    const countBind = [
-      project_id,
-      sinceISO,
-      lookbackMod,
-      q || null,              // 4
-      source || null,         // 5
-      source || null          // 6
-    ];
+          const countBind = [
+            project_id,
+            sinceISO,
+            lookbackMod,
+            q || null,              // 4
+            source || null,         // 5
+            source || null          // 6
+          ];
 
-    const totalResult = await d1.prepare(countQuery).bind(...countBind).first();
-    const total = totalResult?.total || 0;
+          const totalResult = await d1.prepare(countQuery).bind(...countBind).first();
+          const total = totalResult?.total || 0;
 
-    // Get assists for each content+source combination
-    const assistsQuery = `
+          // Get assists for each content+source combination
+          const assistsQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS since, ? AS lookback
             ),
@@ -5959,125 +5971,125 @@ if (url.pathname === "/api/conversions" && request.method === "GET") {
             GROUP BY r.content_id, r.ai_source_id, ais.slug
           `;
 
-    const assists = await d1.prepare(assistsQuery).bind(project_id, sinceISO, lookbackMod).all();
+          const assists = await d1.prepare(assistsQuery).bind(project_id, sinceISO, lookbackMod).all();
 
-    // Group assists by content_id and source_slug
-    const assistsMap = {};
-    assists.results?.forEach(assist => {
-      const key = `${assist.content_id}_${assist.slug}`;
-      if (!assistsMap[key]) {
-        assistsMap[key] = [];
-      }
-      assistsMap[key].push({
-        slug: assist.slug,
-        count: assist.count
-      });
-    });
+          // Group assists by content_id and source_slug
+          const assistsMap = {};
+          assists.results?.forEach(assist => {
+            const key = `${assist.content_id}_${assist.slug}`;
+            if (!assistsMap[key]) {
+              assistsMap[key] = [];
+            }
+            assistsMap[key].push({
+              slug: assist.slug,
+              count: assist.count
+            });
+          });
 
-    // Add assists to items
-    const itemsWithAssists = items.results?.map(item => {
-      const key = `${item.content_id}_${item.source_slug || 'non_ai'}`;
-      return {
-        ...item,
-        assists: assistsMap[key] || []
-      };
-    }) || [];
+          // Add assists to items
+          const itemsWithAssists = items.results?.map(item => {
+            const key = `${item.content_id}_${item.source_slug || 'non_ai'}`;
+            return {
+              ...item,
+              assists: assistsMap[key] || []
+            };
+          }) || [];
 
-    const response = new Response(JSON.stringify({
-      items: itemsWithAssists,
-      page: pageNum,
-      pageSize: pageSizeNum,
-      total
-    }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
-      }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            items: itemsWithAssists,
+            page: pageNum,
+            pageSize: pageSizeNum,
+            total
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Conversions list error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.0.4) Conversions Detail endpoint
-if (url.pathname === "/api/conversions/detail" && request.method === "GET") {
-  try {
-    const { project_id, content_id, source, window = "7d" } = Object.fromEntries(url.searchParams);
-
-    if (!project_id || !content_id) {
-      const response = new Response(JSON.stringify({ error: "project_id and content_id are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate window parameter
-    if (!['24h', '7d', '30d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Rate limiting: 60 rpm
-    const rateLimitKey = `conversions_detail:${project_id}`;
-    const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retry_after: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
+        } catch (e) {
+          console.error("Conversions list error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
         }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      }
 
-    // Calculate time window
-    let timeFilter;
-    if (window === '24h') {
-      timeFilter = "datetime('now','-1 day')";
-    } else if (window === '7d') {
-      timeFilter = "datetime('now','-7 days')";
-    } else { // 30d
-      timeFilter = "datetime('now','-30 days')";
-    }
+      // 7.0.4) Conversions Detail endpoint
+      if (url.pathname === "/api/conversions/detail" && request.method === "GET") {
+        try {
+          const { project_id, content_id, source, window = "7d" } = Object.fromEntries(url.searchParams);
 
-    // Get content info
-    const content = await d1.prepare(`
+          if (!project_id || !content_id) {
+            const response = new Response(JSON.stringify({ error: "project_id and content_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['24h', '7d', '30d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 24h, 7d, 30d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `conversions_detail:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          let timeFilter;
+          if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+          } else if (window === '7d') {
+            timeFilter = "datetime('now','-7 days')";
+          } else { // 30d
+            timeFilter = "datetime('now','-30 days')";
+          }
+
+          // Get content info
+          const content = await d1.prepare(`
             SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?
           `).bind(content_id, project_id).first();
 
-    if (!content) {
-      const response = new Response(JSON.stringify({ error: "Content not found or not accessible" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!content) {
+            const response = new Response(JSON.stringify({ error: "Content not found or not accessible" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Get source info if specified
-    let sourceInfo = null;
-    if (source && source !== 'null') {
-      sourceInfo = await d1.prepare(`
+          // Get source info if specified
+          let sourceInfo = null;
+          if (source && source !== 'null') {
+            sourceInfo = await d1.prepare(`
               SELECT slug, name FROM ai_sources WHERE slug = ?
             `).bind(source).first();
-    }
+          }
 
-    // Get summary stats
-    const summary = await d1.prepare(`
+          // Get summary stats
+          const summary = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -6118,8 +6130,8 @@ if (url.pathname === "/api/conversions/detail" && request.method === "GET") {
             ${source && source !== 'null' ? 'AND lta.ai_source_id = (SELECT id FROM ai_sources WHERE slug = ?)' : ''}
           `).bind(project_id, content_id, project_id, content_id, ...(source && source !== 'null' ? [source] : [])).first();
 
-    // Get timeseries data
-    const timeseries = await d1.prepare(`
+          // Get timeseries data
+          const timeseries = await d1.prepare(`
             WITH conversion_attribution AS (
               SELECT 
                 ce.id,
@@ -6162,8 +6174,8 @@ if (url.pathname === "/api/conversions/detail" && request.method === "GET") {
             ORDER BY ts
           `).bind(project_id, content_id, project_id, content_id, ...(source && source !== 'null' ? [source] : [])).all();
 
-    // Get recent conversions
-    const recent = await d1.prepare(`
+          // Get recent conversions
+          const recent = await d1.prepare(`
             SELECT 
               occurred_at,
               amount_cents,
@@ -6175,8 +6187,8 @@ if (url.pathname === "/api/conversions/detail" && request.method === "GET") {
             LIMIT 10
           `).bind(project_id, content_id).all();
 
-    // Get assists
-    const assists = await d1.prepare(`
+          // Get assists
+          const assists = await d1.prepare(`
             SELECT 
               ais.slug,
               COUNT(DISTINCT ce.id) as count
@@ -6193,92 +6205,92 @@ if (url.pathname === "/api/conversions/detail" && request.method === "GET") {
             ORDER BY count DESC
           `).bind(project_id, content_id, ...(source && source !== 'null' ? [source] : [])).all();
 
-    const detail = {
-      content: {
-        id: content.id,
-        url: content.url
-      },
-      source: sourceInfo,
-      summary: {
-        conversions: summary?.conversions || 0,
-        revenue_cents: summary?.revenue_cents || 0,
-        last_seen: summary?.last_seen || null
-      },
-      timeseries: timeseries.results || [],
-      recent: recent.results || [],
-      assists: assists.results || []
-    };
+          const detail = {
+            content: {
+              id: content.id,
+              url: content.url
+            },
+            source: sourceInfo,
+            summary: {
+              conversions: summary?.conversions || 0,
+              revenue_cents: summary?.revenue_cents || 0,
+              last_seen: summary?.last_seen || null
+            },
+            timeseries: timeseries.results || [],
+            recent: recent.results || [],
+            assists: assists.results || []
+          };
 
-    const response = new Response(JSON.stringify(detail), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
-      }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify(detail), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Conversions detail error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.0.4) Funnels Summary endpoint
-if (url.pathname === "/api/funnels/summary" && request.method === "GET") {
-  try {
-    const { project_id, window = "7d" } = Object.fromEntries(url.searchParams);
-
-    if (!project_id) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate window parameter
-    if (!['15m', '24h', '7d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Rate limiting: 60 rpm
-    const rateLimitKey = `funnels_summary:${project_id}`;
-    const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retry_after: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
+        } catch (e) {
+          console.error("Conversions detail error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
         }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      }
 
-    // Calculate time window
-    const now = new Date();
-    let sinceISO;
-    if (window === "15m") {
-      sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
-    } else if (window === "24h") {
-      sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
-    } else { // 7d
-      sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
-    }
+      // 7.0.4) Funnels Summary endpoint
+      if (url.pathname === "/api/funnels/summary" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d" } = Object.fromEntries(url.searchParams);
 
-    // Get funnels summary data
-    const summaryQuery = `
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `funnels_summary:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Calculate time window
+          const now = new Date();
+          let sinceISO;
+          if (window === "15m") {
+            sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
+          } else if (window === "24h") {
+            sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+          } else { // 7d
+            sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
+          }
+
+          // Get funnels summary data
+          const summaryQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS since, '-7 days' AS lookback
             ),
@@ -6332,10 +6344,10 @@ if (url.pathname === "/api/funnels/summary" && request.method === "GET") {
              ORDER BY r.referrals DESC
            `;
 
-    const summaryResult = await d1.prepare(summaryQuery).bind(project_id, sinceISO).all();
+          const summaryResult = await d1.prepare(summaryQuery).bind(project_id, sinceISO).all();
 
-    // Get totals
-    const totalsQuery = `
+          // Get totals
+          const totalsQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS since
             )
@@ -6344,34 +6356,34 @@ if (url.pathname === "/api/funnels/summary" && request.method === "GET") {
               (SELECT COUNT(*) FROM conversion_event ce, params p WHERE ce.project_id = p.pid AND ce.occurred_at >= p.since) conversions
           `;
 
-    const totalsResult = await d1.prepare(totalsQuery).bind(project_id, sinceISO).first();
-    const totalReferrals = totalsResult?.referrals || 0;
-    const totalConversions = totalsResult?.conversions || 0;
-    const totalConvRate = totalReferrals > 0 ? totalConversions / totalReferrals : 0;
+          const totalsResult = await d1.prepare(totalsQuery).bind(project_id, sinceISO).first();
+          const totalReferrals = totalsResult?.referrals || 0;
+          const totalConversions = totalsResult?.conversions || 0;
+          const totalConvRate = totalReferrals > 0 ? totalConversions / totalReferrals : 0;
 
-    // Process TTC data and get source names
-    const bySource = [];
-    for (const row of summaryResult.results || []) {
-      const sourceQuery = `SELECT slug, name FROM ai_sources WHERE id = ?`;
-      const sourceResult = await d1.prepare(sourceQuery).bind(row.ai_source_id).first();
+          // Process TTC data and get source names
+          const bySource = [];
+          for (const row of summaryResult.results || []) {
+            const sourceQuery = `SELECT slug, name FROM ai_sources WHERE id = ?`;
+            const sourceResult = await d1.prepare(sourceQuery).bind(row.ai_source_id).first();
 
-      if (sourceResult) {
-        bySource.push({
-          slug: sourceResult.slug,
-          name: sourceResult.name,
-          referrals: row.referrals,
-          conversions: row.conversions,
-          conv_rate: Math.round(row.conv_rate * 100) / 100,
-          p50_ttc_min: 0,  // Placeholder - implement in detail endpoint
-          p90_ttc_min: 0   // Placeholder - implement in detail endpoint
-        });
-      }
-    }
+            if (sourceResult) {
+              bySource.push({
+                slug: sourceResult.slug,
+                name: sourceResult.name,
+                referrals: row.referrals,
+                conversions: row.conversions,
+                conv_rate: Math.round(row.conv_rate * 100) / 100,
+                p50_ttc_min: 0,  // Placeholder - implement in detail endpoint
+                p90_ttc_min: 0   // Placeholder - implement in detail endpoint
+              });
+            }
+          }
 
-    // Get timeseries data (daily buckets for 7d, hourly for 24h, 15-min for 15m)
-    let timeseriesQuery;
-    if (window === "15m") {
-      timeseriesQuery = `
+          // Get timeseries data (daily buckets for 7d, hourly for 24h, 15-min for 15m)
+          let timeseriesQuery;
+          if (window === "15m") {
+            timeseriesQuery = `
               WITH params AS (
                 SELECT ? AS pid, ? AS since
               ),
@@ -6389,8 +6401,8 @@ if (url.pathname === "/api/funnels/summary" && request.method === "GET") {
               FROM time_buckets tb
               ORDER BY tb.ts
             `;
-    } else if (window === "24h") {
-      timeseriesQuery = `
+          } else if (window === "24h") {
+            timeseriesQuery = `
               WITH params AS (
                 SELECT ? AS pid, ? AS since
               ),
@@ -6408,8 +6420,8 @@ if (url.pathname === "/api/funnels/summary" && request.method === "GET") {
               FROM time_buckets tb
               ORDER BY tb.ts
             `;
-    } else { // 7d
-      timeseriesQuery = `
+          } else { // 7d
+            timeseriesQuery = `
               WITH params AS (
                 SELECT ? AS pid, ? AS since
               ),
@@ -6427,130 +6439,130 @@ if (url.pathname === "/api/funnels/summary" && request.method === "GET") {
               FROM time_buckets tb
               ORDER BY tb.ts
             `;
-    }
+          }
 
-    const timeseriesResult = await d1.prepare(timeseriesQuery).bind(project_id, sinceISO).all();
+          const timeseriesResult = await d1.prepare(timeseriesQuery).bind(project_id, sinceISO).all();
 
-    // Record metrics: funnels summary viewed
-    try {
-      await d1.prepare(`
+          // Record metrics: funnels summary viewed
+          try {
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
                 value = value + 1, 
                 updated_at = ?
             `).bind(
-        `funnels_summary_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
-        new Date().toISOString(),
-        new Date().toISOString()
-      ).run();
-    } catch (e) {
-      // Metrics recording failed, but don't break the main flow
-      console.warn("Failed to record funnels summary view metric:", e);
-    }
+              `funnels_summary_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record funnels summary view metric:", e);
+          }
 
-    const response = new Response(JSON.stringify({
-      totals: {
-        referrals: totalReferrals,
-        conversions: totalConversions,
-        conv_rate: Math.round(totalConvRate * 100) / 100
-      },
-      by_source: bySource,
-      timeseries: timeseriesResult.results || []
-    }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
-      }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            totals: {
+              referrals: totalReferrals,
+              conversions: totalConversions,
+              conv_rate: Math.round(totalConvRate * 100) / 100
+            },
+            by_source: bySource,
+            timeseries: timeseriesResult.results || []
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Funnels summary error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.0.5) Funnels List endpoint
-if (url.pathname === "/api/funnels" && request.method === "GET") {
-  try {
-    const { project_id, window = "7d", source, q, sort = "conv_rate_desc", page = "1", pageSize = "50" } = Object.fromEntries(url.searchParams);
-
-    if (!project_id) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate window parameter
-    if (!['15m', '24h', '7d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate sort parameter
-    if (!['conv_rate_desc', 'conversions_desc', 'referrals_desc', 'last_conversion_desc'].includes(sort)) {
-      const response = new Response(JSON.stringify({ error: "Invalid sort. Must be one of: conv_rate_desc, conversions_desc, referrals_desc, last_conversion_desc" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Rate limiting: 60 rpm
-    const rateLimitKey = `funnels_list:${project_id}`;
-    const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retry_after: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
+        } catch (e) {
+          console.error("Funnels summary error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
         }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    const pageNum = Math.max(1, parseInt(page, 10));
-    const pageSizeNum = Math.min(100, Math.max(10, parseInt(pageSize, 10)));
-    const offset = (pageNum - 1) * pageSizeNum;
-
-    // Calculate time window
-    const now = new Date();
-    let sinceISO;
-    if (window === "15m") {
-      sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
-    } else if (window === "24h") {
-      sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
-    } else { // 7d
-      sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
-    }
-
-    // SAFE sort whitelist
-    const sortSql = (() => {
-      switch (sort) {
-        case "conversions_desc": return "conversions DESC, conv_rate DESC";
-        case "referrals_desc": return "referrals DESC, conv_rate DESC";
-        case "last_conversion_desc": return "last_conversion DESC, conv_rate DESC";
-        case "conv_rate_desc":
-        default: return "conv_rate DESC, conversions DESC";
       }
-    })();
 
-    // Main query with CTEs
-    const mainQuery = `
+      // 7.0.5) Funnels List endpoint
+      if (url.pathname === "/api/funnels" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d", source, q, sort = "conv_rate_desc", page = "1", pageSize = "50" } = Object.fromEntries(url.searchParams);
+
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate sort parameter
+          if (!['conv_rate_desc', 'conversions_desc', 'referrals_desc', 'last_conversion_desc'].includes(sort)) {
+            const response = new Response(JSON.stringify({ error: "Invalid sort. Must be one of: conv_rate_desc, conversions_desc, referrals_desc, last_conversion_desc" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `funnels_list:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const pageNum = Math.max(1, parseInt(page, 10));
+          const pageSizeNum = Math.min(100, Math.max(10, parseInt(pageSize, 10)));
+          const offset = (pageNum - 1) * pageSizeNum;
+
+          // Calculate time window
+          const now = new Date();
+          let sinceISO;
+          if (window === "15m") {
+            sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
+          } else if (window === "24h") {
+            sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+          } else { // 7d
+            sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
+          }
+
+          // SAFE sort whitelist
+          const sortSql = (() => {
+            switch (sort) {
+              case "conversions_desc": return "conversions DESC, conv_rate DESC";
+              case "referrals_desc": return "referrals DESC, conv_rate DESC";
+              case "last_conversion_desc": return "last_conversion DESC, conv_rate DESC";
+              case "conv_rate_desc":
+              default: return "conv_rate DESC, conversions DESC";
+            }
+          })();
+
+          // Main query with CTEs
+          const mainQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS since, '-7 days' AS lookback
             ),
@@ -6650,24 +6662,24 @@ if (url.pathname === "/api/funnels" && request.method === "GET") {
              LIMIT ? OFFSET ?
            `;
 
-    // Build bind parameters
-    let bindParams = [project_id, sinceISO, project_id, sinceISO];
-    if (source) bindParams.push(source);
-    if (q) bindParams.push(`%${q}%`);
-    bindParams.push(pageSizeNum, offset);
+          // Build bind parameters
+          let bindParams = [project_id, sinceISO, project_id, sinceISO];
+          if (source) bindParams.push(source);
+          if (q) bindParams.push(`%${q}%`);
+          bindParams.push(pageSizeNum, offset);
 
-    const items = await d1.prepare(mainQuery).bind(...bindParams).all();
+          const items = await d1.prepare(mainQuery).bind(...bindParams).all();
 
-    // Process items (TTC percentiles removed for performance)
-    const processedItems = items.results?.map(item => ({
-      ...item,
-      conv_rate: Math.round(item.conv_rate * 100) / 100,
-      p50_ttc_min: 0,  // Moved to detail endpoint for performance
-      p90_ttc_min: 0   // Moved to detail endpoint for performance
-    })) || [];
+          // Process items (TTC percentiles removed for performance)
+          const processedItems = items.results?.map(item => ({
+            ...item,
+            conv_rate: Math.round(item.conv_rate * 100) / 100,
+            p50_ttc_min: 0,  // Moved to detail endpoint for performance
+            p90_ttc_min: 0   // Moved to detail endpoint for performance
+          })) || [];
 
-    // Count query
-    const countQuery = `
+          // Count query
+          const countQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS since, '-7 days' AS lookback
             ),
@@ -6692,130 +6704,130 @@ if (url.pathname === "/api/funnels" && request.method === "GET") {
                 ${q ? 'AND ca.url LIKE ?' : ''}
           `;
 
-    const countBind = [project_id, sinceISO, project_id, sinceISO];
-    if (source) countBind.push(source);
-    if (q) countBind.push(`%${q}%`);
+          const countBind = [project_id, sinceISO, project_id, sinceISO];
+          if (source) countBind.push(source);
+          if (q) countBind.push(`%${q}%`);
 
-    const totalResult = await d1.prepare(countQuery).bind(...countBind).first();
-    const total = totalResult?.total || 0;
+          const totalResult = await d1.prepare(countQuery).bind(...countBind).first();
+          const total = totalResult?.total || 0;
 
-    // Record metrics: funnels list viewed
-    try {
-      await d1.prepare(`
+          // Record metrics: funnels list viewed
+          try {
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
                 value = value + 1, 
                 updated_at = ?
             `).bind(
-        `funnels_list_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
-        new Date().toISOString(),
-        new Date().toISOString()
-      ).run();
-    } catch (e) {
-      // Metrics recording failed, but don't break the main flow
-      console.warn("Failed to record funnels list view metric:", e);
-    }
+              `funnels_list_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record funnels list view metric:", e);
+          }
 
-    const response = new Response(JSON.stringify({
-      items: processedItems,
-      page: pageNum,
-      pageSize: pageSizeNum,
-      total
-    }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
-      }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            items: processedItems,
+            page: pageNum,
+            pageSize: pageSizeNum,
+            total
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Funnels list error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.0.6) Funnels Detail endpoint
-if (url.pathname === "/api/funnels/detail" && request.method === "GET") {
-  try {
-    const { project_id, content_id, source, window = "7d" } = Object.fromEntries(url.searchParams);
-
-    if (!project_id || !content_id || !source) {
-      const response = new Response(JSON.stringify({ error: "project_id, content_id, and source are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Validate window parameter
-    if (!['15m', '24h', '7d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Rate limiting: 60 rpm
-    const rateLimitKey = `funnels_detail:${project_id}`;
-    const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retry_after: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
+        } catch (e) {
+          console.error("Funnels list error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
         }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      }
 
-    // Calculate time window
-    const now = new Date();
-    let sinceISO;
-    if (window === "15m") {
-      sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
-    } else if (window === "24h") {
-      sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
-    } else { // 7d
-      sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
-    }
+      // 7.0.6) Funnels Detail endpoint
+      if (url.pathname === "/api/funnels/detail" && request.method === "GET") {
+        try {
+          const { project_id, content_id, source, window = "7d" } = Object.fromEntries(url.searchParams);
 
-    // Get content info
-    const contentQuery = `SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?`;
-    const contentResult = await d1.prepare(contentQuery).bind(content_id, project_id).first();
+          if (!project_id || !content_id || !source) {
+            const response = new Response(JSON.stringify({ error: "project_id, content_id, and source are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (!contentResult) {
-      const response = new Response(JSON.stringify({ error: "Content not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Get source info
-    const sourceQuery = `SELECT id, slug, name FROM ai_sources WHERE slug = ?`;
-    const sourceResult = await d1.prepare(sourceQuery).bind(source).first();
+          // Rate limiting: 60 rpm
+          const rateLimitKey = `funnels_detail:${project_id}`;
+          const rateLimitResult = await checkRateLimit(rateLimitKey, 60, 60 * 1000);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (!sourceResult) {
-      const response = new Response(JSON.stringify({ error: "Source not found" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Calculate time window
+          const now = new Date();
+          let sinceISO;
+          if (window === "15m") {
+            sinceISO = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
+          } else if (window === "24h") {
+            sinceISO = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+          } else { // 7d
+            sinceISO = new Date(now.getTime() - 7 * 86400 * 1000).toISOString();
+          }
 
-    // Get summary data
-    const summaryQuery = `
+          // Get content info
+          const contentQuery = `SELECT id, url FROM content_assets WHERE id = ? AND project_id = ?`;
+          const contentResult = await d1.prepare(contentQuery).bind(content_id, project_id).first();
+
+          if (!contentResult) {
+            const response = new Response(JSON.stringify({ error: "Content not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get source info
+          const sourceQuery = `SELECT id, slug, name FROM ai_sources WHERE slug = ?`;
+          const sourceResult = await d1.prepare(sourceQuery).bind(source).first();
+
+          if (!sourceResult) {
+            const response = new Response(JSON.stringify({ error: "Source not found" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get summary data
+          const summaryQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS cid, ? AS since, '-7 days' AS lookback
             ),
@@ -6863,18 +6875,18 @@ if (url.pathname === "/api/funnels/detail" && request.method === "GET") {
              LEFT JOIN attributed a ON 1=1
            `;
 
-    const summaryResult = await d1.prepare(summaryQuery).bind(
-      project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
-    ).first();
+          const summaryResult = await d1.prepare(summaryQuery).bind(
+            project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
+          ).first();
 
-    // TTC percentiles placeholder (implement later if needed)
-    let p50_ttc_min = 0;
-    let p90_ttc_min = 0;
+          // TTC percentiles placeholder (implement later if needed)
+          let p50_ttc_min = 0;
+          let p90_ttc_min = 0;
 
-    // Get timeseries data
-    let timeseriesQuery;
-    if (window === "15m") {
-      timeseriesQuery = `
+          // Get timeseries data
+          let timeseriesQuery;
+          if (window === "15m") {
+            timeseriesQuery = `
               WITH params AS (
                 SELECT ? AS pid, ? AS cid, ? AS since
               ),
@@ -6892,8 +6904,8 @@ if (url.pathname === "/api/funnels/detail" && request.method === "GET") {
               FROM time_buckets tb
               ORDER BY tb.ts
             `;
-    } else if (window === "24h") {
-      timeseriesQuery = `
+          } else if (window === "24h") {
+            timeseriesQuery = `
               WITH params AS (
                 SELECT ? AS pid, ? AS cid, ? AS since
               ),
@@ -6911,8 +6923,8 @@ if (url.pathname === "/api/funnels/detail" && request.method === "GET") {
               FROM time_buckets tb
               ORDER BY tb.ts
             `;
-    } else { // 7d
-      timeseriesQuery = `
+          } else { // 7d
+            timeseriesQuery = `
               WITH params AS (
                 SELECT ? AS pid, ? AS cid, ? AS since
               ),
@@ -6930,14 +6942,14 @@ if (url.pathname === "/api/funnels/detail" && request.method === "GET") {
               FROM time_buckets tb
               ORDER BY tb.ts
             `;
-    }
+          }
 
-    const timeseriesResult = await d1.prepare(timeseriesQuery).bind(
-      project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
-    ).all();
+          const timeseriesResult = await d1.prepare(timeseriesQuery).bind(
+            project_id, content_id, sinceISO, sourceResult.id, sourceResult.id
+          ).all();
 
-    // Get recent referral-conversion pairs
-    const recentQuery = `
+          // Get recent referral-conversion pairs
+          const recentQuery = `
             WITH params AS (
               SELECT ? AS pid, ? AS cid, ? AS since, '-7 days' AS lookback
             ),
@@ -6976,123 +6988,123 @@ if (url.pathname === "/api/funnels/detail" && request.method === "GET") {
             SELECT * FROM attributed
           `;
 
-    const recentResult = await d1.prepare(recentQuery).bind(
-      project_id, content_id, sinceISO
-    ).all();
+          const recentResult = await d1.prepare(recentQuery).bind(
+            project_id, content_id, sinceISO
+          ).all();
 
-    // Record metrics: funnels detail viewed
-    try {
-      await d1.prepare(`
+          // Record metrics: funnels detail viewed
+          try {
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
                 value = value + 1, 
                 updated_at = ?
             `).bind(
-        `funnels_detail_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
-        new Date().toISOString(),
-        new Date().toISOString()
-      ).run();
-    } catch (e) {
-      // Metrics recording failed, but don't break the main flow
-      console.warn("Failed to record funnels detail view metric:", e);
-    }
+              `funnels_detail_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            // Metrics recording failed, but don't break the main flow
+            console.warn("Failed to record funnels detail view metric:", e);
+          }
 
-    const response = new Response(JSON.stringify({
-      content: {
-        id: parseInt(content_id),
-        url: contentResult.url
-      },
-      source: {
-        slug: sourceResult.slug,
-        name: sourceResult.name
-      },
-      summary: {
-        referrals: summaryResult?.referrals || 0,
-        conversions: summaryResult?.conversions || 0,
-        conv_rate: Math.round((summaryResult?.conv_rate || 0) * 100) / 100,
-        p50_ttc_min,
-        p90_ttc_min
-      },
-      timeseries: timeseriesResult.results || [],
-      recent: recentResult.results?.map(r => ({
-        ref_detected_at: r.ref_detected_at,
-        conversion_at: r.conversion_at,
-        ttc_minutes: r.ttc_minutes,
-        amount_cents: r.amount_cents,
-        currency: r.currency
-      })) || []
-    }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=120"
+          const response = new Response(JSON.stringify({
+            content: {
+              id: parseInt(content_id),
+              url: contentResult.url
+            },
+            source: {
+              slug: sourceResult.slug,
+              name: sourceResult.name
+            },
+            summary: {
+              referrals: summaryResult?.referrals || 0,
+              conversions: summaryResult?.conversions || 0,
+              conv_rate: Math.round((summaryResult?.conv_rate || 0) * 100) / 100,
+              p50_ttc_min,
+              p90_ttc_min
+            },
+            timeseries: timeseriesResult.results || [],
+            recent: recentResult.results?.map(r => ({
+              ref_detected_at: r.ref_detected_at,
+              conversion_at: r.conversion_at,
+              ttc_minutes: r.ttc_minutes,
+              amount_cents: r.amount_cents,
+              currency: r.currency
+            })) || []
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=120"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Funnels detail error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
       }
-    });
-    return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Funnels detail error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
+      // =====================================
+      // RECOMMENDATIONS v1 ENDPOINTS
+      // =====================================
 
-// =====================================
-// RECOMMENDATIONS v1 ENDPOINTS
-// =====================================
+      // 7.1.1) List Recommendations endpoint
+      if (url.pathname === "/api/recommendations" && request.method === "GET") {
+        try {
+          const { project_id, window = "7d", status = "all", severity, type, q, sort = "impact_desc", page = "1", pageSize = "50" } = Object.fromEntries(url.searchParams);
 
-// 7.1.1) List Recommendations endpoint
-if (url.pathname === "/api/recommendations" && request.method === "GET") {
-  try {
-    const { project_id, window = "7d", status = "all", severity, type, q, sort = "impact_desc", page = "1", pageSize = "50" } = Object.fromEntries(url.searchParams);
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (!project_id) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Validate window parameter
+          if (!["15m", "24h", "7d"].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Validate window parameter
-    if (!["15m", "24h", "7d"].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Calculate time window
+          const now = new Date();
+          let sinceTime;
+          switch (window) {
+            case "15m":
+              sinceTime = new Date(now.getTime() - 15 * 60 * 1000);
+              break;
+            case "24h":
+              sinceTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+              break;
+            case "7d":
+            default:
+              sinceTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+              break;
+          }
+          const sinceISO = sinceTime.toISOString();
 
-    // Calculate time window
-    const now = new Date();
-    let sinceTime;
-    switch (window) {
-      case "15m":
-        sinceTime = new Date(now.getTime() - 15 * 60 * 1000);
-        break;
-      case "24h":
-        sinceTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case "7d":
-      default:
-        sinceTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-    }
-    const sinceISO = sinceTime.toISOString();
+          // Get environment thresholds (with defaults)
+          const minReferrals = parseInt(env.RECO_MIN_REFERRALS || "5");
+          const minDirect = parseInt(env.RECO_MIN_DIRECT || "20");
+          const minConvRate = parseFloat(env.RECO_MIN_CONV_RATE || "0.05");
+          const slowTtcMin = parseInt(env.RECO_SLOW_TTC_MIN || "120");
 
-    // Get environment thresholds (with defaults)
-    const minReferrals = parseInt(env.RECO_MIN_REFERRALS || "5");
-    const minDirect = parseInt(env.RECO_MIN_DIRECT || "20");
-    const minConvRate = parseFloat(env.RECO_MIN_CONV_RATE || "0.05");
-    const slowTtcMin = parseInt(env.RECO_SLOW_TTC_MIN || "120");
+          let recommendations = [];
 
-    let recommendations = [];
-
-    // R1: No-visibility source
-    const r1Query = `
+          // R1: No-visibility source
+          const r1Query = `
             WITH params AS (SELECT ? AS pid, ? AS since)
             SELECT s.slug, s.name, 0 AS referrals
             FROM project_ai_sources pas
@@ -7108,45 +7120,45 @@ if (url.pathname === "/api/recommendations" && request.method === "GET") {
               AND pas.enabled = 1;
           `;
 
-    const r1Results = await d1.prepare(r1Query).bind(project_id, sinceISO).all();
+          const r1Results = await d1.prepare(r1Query).bind(project_id, sinceISO).all();
 
-    for (const r1 of r1Results.results || []) {
-      // Check if other sources have referrals
-      const otherSourcesQuery = `
+          for (const r1 of r1Results.results || []) {
+            // Check if other sources have referrals
+            const otherSourcesQuery = `
               SELECT COUNT(*) AS total_refs
               FROM ai_referrals ar
               JOIN project_ai_sources pas ON pas.ai_source_id = ar.ai_source_id
               WHERE ar.project_id = ? AND ar.detected_at >= ? AND pas.enabled = 1;
             `;
-      const otherSourcesResult = await d1.prepare(otherSourcesQuery).bind(project_id, sinceISO).first();
-      const hasOtherTraffic = (otherSourcesResult?.total_refs || 0) > 0;
+            const otherSourcesResult = await d1.prepare(otherSourcesQuery).bind(project_id, sinceISO).first();
+            const hasOtherTraffic = (otherSourcesResult?.total_refs || 0) > 0;
 
-      recommendations.push({
-        rec_id: `R1:${r1.slug}`,
-        type: "R1",
-        severity: hasOtherTraffic ? "high" : "medium",
-        title: "No AI referrals from enabled source",
-        description: `${r1.name} is enabled but generated 0 referrals in the last ${window}.`,
-        impact_score: hasOtherTraffic ? 60 : 40,
-        effort: "low",
-        status: "open",
-        evidence: {
-          source_slug: r1.slug,
-          source_name: r1.name,
-          window,
-          referrals: 0
-        },
-        links: [
-          { label: "Configure Source", href: `/sources?source=${r1.slug}` },
-          { label: "View Funnels", href: `/funnels?source=${r1.slug}` }
-        ],
-        created_at: now.toISOString(),
-        updated_at: now.toISOString()
-      });
-    }
+            recommendations.push({
+              rec_id: `R1:${r1.slug}`,
+              type: "R1",
+              severity: hasOtherTraffic ? "high" : "medium",
+              title: "No AI referrals from enabled source",
+              description: `${r1.name} is enabled but generated 0 referrals in the last ${window}.`,
+              impact_score: hasOtherTraffic ? 60 : 40,
+              effort: "low",
+              status: "open",
+              evidence: {
+                source_slug: r1.slug,
+                source_name: r1.name,
+                window,
+                referrals: 0
+              },
+              links: [
+                { label: "Configure Source", href: `/sources?source=${r1.slug}` },
+                { label: "View Funnels", href: `/funnels?source=${r1.slug}` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
 
-    // R2: High referrals, weak conversions
-    const r2Query = `
+          // R2: High referrals, weak conversions
+          const r2Query = `
             WITH params AS (SELECT ? AS pid, ? AS since, '-7 days' AS lookback),
             refs AS (
               SELECT content_id, ai_source_id, COUNT(*) AS referrals
@@ -7182,38 +7194,38 @@ if (url.pathname === "/api/recommendations" && request.method === "GET") {
             WHERE a.referrals >= ? AND (CAST(a.conversions AS REAL)/a.referrals) < ?;
           `;
 
-    const r2Results = await d1.prepare(r2Query).bind(project_id, sinceISO, minReferrals, minConvRate).all();
+          const r2Results = await d1.prepare(r2Query).bind(project_id, sinceISO, minReferrals, minConvRate).all();
 
-    for (const r2 of r2Results.results || []) {
-      const convRate = r2.conversions / r2.referrals;
-      recommendations.push({
-        rec_id: `R2:${r2.content_id}:${r2.source_slug}`,
-        type: "R2",
-        severity: "high",
-        title: "High AI referrals but weak conversions",
-        description: `${r2.source_name} sends traffic to ${new URL(r2.url).pathname}, but conversion rate is ${Math.round(convRate * 1000) / 10}% (threshold ${minConvRate * 100}%).`,
-        impact_score: Math.min(100, Math.round(r2.referrals / 2 + (1 - convRate) * 100)),
-        effort: "medium",
-        status: "open",
-        evidence: {
-          url: r2.url,
-          source_slug: r2.source_slug,
-          source_name: r2.source_name,
-          referrals: r2.referrals,
-          conversions: r2.conversions,
-          conv_rate: Math.round(convRate * 1000) / 1000
-        },
-        links: [
-          { label: "Open in Funnels", href: `/funnels?source=${r2.source_slug}&q=${encodeURIComponent(new URL(r2.url).pathname)}` },
-          { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r2.url).pathname)}` }
-        ],
-        created_at: now.toISOString(),
-        updated_at: now.toISOString()
-      });
-    }
+          for (const r2 of r2Results.results || []) {
+            const convRate = r2.conversions / r2.referrals;
+            recommendations.push({
+              rec_id: `R2:${r2.content_id}:${r2.source_slug}`,
+              type: "R2",
+              severity: "high",
+              title: "High AI referrals but weak conversions",
+              description: `${r2.source_name} sends traffic to ${new URL(r2.url).pathname}, but conversion rate is ${Math.round(convRate * 1000) / 10}% (threshold ${minConvRate * 100}%).`,
+              impact_score: Math.min(100, Math.round(r2.referrals / 2 + (1 - convRate) * 100)),
+              effort: "medium",
+              status: "open",
+              evidence: {
+                url: r2.url,
+                source_slug: r2.source_slug,
+                source_name: r2.source_name,
+                referrals: r2.referrals,
+                conversions: r2.conversions,
+                conv_rate: Math.round(convRate * 1000) / 1000
+              },
+              links: [
+                { label: "Open in Funnels", href: `/funnels?source=${r2.source_slug}&q=${encodeURIComponent(new URL(r2.url).pathname)}` },
+                { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r2.url).pathname)}` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
 
-    // R3: Strong direct traffic, zero AI referrals
-    const r3Query = `
+          // R3: Strong direct traffic, zero AI referrals
+          const r3Query = `
             WITH params AS (SELECT ? AS pid, ? AS since),
             directs AS (
               SELECT content_id, COUNT(*) AS direct_cnt
@@ -7237,35 +7249,35 @@ if (url.pathname === "/api/recommendations" && request.method === "GET") {
             WHERE COALESCE(r.ref_cnt, 0) = 0 AND d.direct_cnt >= ?;
           `;
 
-    const r3Results = await d1.prepare(r3Query).bind(project_id, sinceISO, minDirect).all();
+          const r3Results = await d1.prepare(r3Query).bind(project_id, sinceISO, minDirect).all();
 
-    for (const r3 of r3Results.results || []) {
-      recommendations.push({
-        rec_id: `R3:${r3.content_id}`,
-        type: "R3",
-        severity: "medium",
-        title: "Strong direct traffic but zero AI referrals",
-        description: `${new URL(r3.url).pathname} has ${r3.direct_cnt} direct visits but 0 AI referrals in the last ${window}.`,
-        impact_score: Math.min(80, Math.round(r3.direct_cnt / 2)),
-        effort: "medium",
-        status: "open",
-        evidence: {
-          url: r3.url,
-          direct_count: r3.direct_cnt,
-          referrals: 0,
-          window
-        },
-        links: [
-          { label: "View Sources", href: `/sources` },
-          { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r3.url).pathname)}` }
-        ],
-        created_at: now.toISOString(),
-        updated_at: now.toISOString()
-      });
-    }
+          for (const r3 of r3Results.results || []) {
+            recommendations.push({
+              rec_id: `R3:${r3.content_id}`,
+              type: "R3",
+              severity: "medium",
+              title: "Strong direct traffic but zero AI referrals",
+              description: `${new URL(r3.url).pathname} has ${r3.direct_cnt} direct visits but 0 AI referrals in the last ${window}.`,
+              impact_score: Math.min(80, Math.round(r3.direct_cnt / 2)),
+              effort: "medium",
+              status: "open",
+              evidence: {
+                url: r3.url,
+                direct_count: r3.direct_cnt,
+                referrals: 0,
+                window
+              },
+              links: [
+                { label: "View Sources", href: `/sources` },
+                { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r3.url).pathname)}` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
 
-    // R4: Slow time-to-conversion
-    const r4Query = `
+          // R4: Slow time-to-conversion
+          const r4Query = `
             WITH params AS (SELECT ? AS pid, ? AS since, '-7 days' AS lookback),
             cv AS (
               SELECT ce.content_id, ce.occurred_at,
@@ -7301,202 +7313,202 @@ if (url.pathname === "/api/recommendations" && request.method === "GET") {
             HAVING avg_ttc_min > ? AND convs >= 2;
           `;
 
-    const r4Results = await d1.prepare(r4Query).bind(project_id, sinceISO, slowTtcMin).all();
+          const r4Results = await d1.prepare(r4Query).bind(project_id, sinceISO, slowTtcMin).all();
 
-    for (const r4 of r4Results.results || []) {
-      recommendations.push({
-        rec_id: `R4:${r4.content_id}:${r4.source_slug}`,
-        type: "R4",
-        severity: "medium",
-        title: "Slow time-to-conversion",
-        description: `Conversions from ${r4.source_name} to ${new URL(r4.url).pathname} take ${Math.round(r4.avg_ttc_min)} minutes on average (threshold ${slowTtcMin} min).`,
-        impact_score: Math.min(70, Math.round(r4.avg_ttc_min - slowTtcMin)),
-        effort: "medium",
-        status: "open",
-        evidence: {
-          url: r4.url,
-          source_slug: r4.source_slug,
-          source_name: r4.source_name,
-          avg_ttc_min: Math.round(r4.avg_ttc_min * 10) / 10,
-          conversions: r4.convs
-        },
-        links: [
-          { label: "Open in Funnels", href: `/funnels/detail?project_id=${project_id}&content_id=${r4.content_id}&source=${r4.source_slug}` },
-          { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r4.url).pathname)}` }
-        ],
-        created_at: now.toISOString(),
-        updated_at: now.toISOString()
-      });
-    }
+          for (const r4 of r4Results.results || []) {
+            recommendations.push({
+              rec_id: `R4:${r4.content_id}:${r4.source_slug}`,
+              type: "R4",
+              severity: "medium",
+              title: "Slow time-to-conversion",
+              description: `Conversions from ${r4.source_name} to ${new URL(r4.url).pathname} take ${Math.round(r4.avg_ttc_min)} minutes on average (threshold ${slowTtcMin} min).`,
+              impact_score: Math.min(70, Math.round(r4.avg_ttc_min - slowTtcMin)),
+              effort: "medium",
+              status: "open",
+              evidence: {
+                url: r4.url,
+                source_slug: r4.source_slug,
+                source_name: r4.source_name,
+                avg_ttc_min: Math.round(r4.avg_ttc_min * 10) / 10,
+                conversions: r4.convs
+              },
+              links: [
+                { label: "Open in Funnels", href: `/funnels/detail?project_id=${project_id}&content_id=${r4.content_id}&source=${r4.source_slug}` },
+                { label: "Open Content", href: `/content?search=${encodeURIComponent(new URL(r4.url).pathname)}` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
 
-    // R5: Pending fingerprint suggestions
-    const r5Query = `
+          // R5: Pending fingerprint suggestions
+          const r5Query = `
             SELECT COUNT(*) AS pending_count
             FROM rules_suggestions
             WHERE project_id = ? AND status = 'pending';
           `;
 
-    const r5Result = await d1.prepare(r5Query).bind(project_id).first();
+          const r5Result = await d1.prepare(r5Query).bind(project_id).first();
 
-    if (r5Result?.pending_count > 0) {
-      recommendations.push({
-        rec_id: "R5:rules_suggestions_pending",
-        type: "R5",
-        severity: "low",
-        title: "Pending fingerprint suggestions",
-        description: `You have ${r5Result.pending_count} pending fingerprint suggestions that need review.`,
-        impact_score: Math.min(40, r5Result.pending_count * 5),
-        effort: "low",
-        status: "open",
-        evidence: {
-          count: r5Result.pending_count
-        },
-        links: [
-          { label: "Review Suggestions", href: `/sources#suggestions` }
-        ],
-        created_at: now.toISOString(),
-        updated_at: now.toISOString()
-      });
-    }
+          if (r5Result?.pending_count > 0) {
+            recommendations.push({
+              rec_id: "R5:rules_suggestions_pending",
+              type: "R5",
+              severity: "low",
+              title: "Pending fingerprint suggestions",
+              description: `You have ${r5Result.pending_count} pending fingerprint suggestions that need review.`,
+              impact_score: Math.min(40, r5Result.pending_count * 5),
+              effort: "low",
+              status: "open",
+              evidence: {
+                count: r5Result.pending_count
+              },
+              links: [
+                { label: "Review Suggestions", href: `/sources#suggestions` }
+              ],
+              created_at: now.toISOString(),
+              updated_at: now.toISOString()
+            });
+          }
 
-    // Apply overrides from recommendation_override table
-    const overrideQuery = `
+          // Apply overrides from recommendation_override table
+          const overrideQuery = `
             SELECT rec_id, status, note, updated_at
             FROM recommendation_override
             WHERE project_id = ?;
           `;
 
-    const overrideResults = await d1.prepare(overrideQuery).bind(project_id).all();
-    const overrides = {};
-    for (const override of overrideResults.results || []) {
-      overrides[override.rec_id] = override;
-    }
+          const overrideResults = await d1.prepare(overrideQuery).bind(project_id).all();
+          const overrides = {};
+          for (const override of overrideResults.results || []) {
+            overrides[override.rec_id] = override;
+          }
 
-    // Apply overrides to recommendations
-    recommendations = recommendations.map(rec => {
-      if (overrides[rec.rec_id]) {
-        const override = overrides[rec.rec_id];
-        return {
-          ...rec,
-          status: override.status,
-          note: override.note,
-          updated_at: override.updated_at
-        };
-      }
-      return rec;
-    });
+          // Apply overrides to recommendations
+          recommendations = recommendations.map(rec => {
+            if (overrides[rec.rec_id]) {
+              const override = overrides[rec.rec_id];
+              return {
+                ...rec,
+                status: override.status,
+                note: override.note,
+                updated_at: override.updated_at
+              };
+            }
+            return rec;
+          });
 
-    // Apply filters
-    if (status !== "all") {
-      recommendations = recommendations.filter(rec => rec.status === status);
-    }
-    if (severity) {
-      recommendations = recommendations.filter(rec => rec.severity === severity);
-    }
-    if (type) {
-      recommendations = recommendations.filter(rec => rec.type === type);
-    }
-    if (q) {
-      const query = q.toLowerCase();
-      recommendations = recommendations.filter(rec =>
-        rec.title.toLowerCase().includes(query) ||
-        rec.description.toLowerCase().includes(query) ||
-        (rec.evidence.url && rec.evidence.url.toLowerCase().includes(query)) ||
-        (rec.evidence.source_name && rec.evidence.source_name.toLowerCase().includes(query))
-      );
-    }
+          // Apply filters
+          if (status !== "all") {
+            recommendations = recommendations.filter(rec => rec.status === status);
+          }
+          if (severity) {
+            recommendations = recommendations.filter(rec => rec.severity === severity);
+          }
+          if (type) {
+            recommendations = recommendations.filter(rec => rec.type === type);
+          }
+          if (q) {
+            const query = q.toLowerCase();
+            recommendations = recommendations.filter(rec =>
+              rec.title.toLowerCase().includes(query) ||
+              rec.description.toLowerCase().includes(query) ||
+              (rec.evidence.url && rec.evidence.url.toLowerCase().includes(query)) ||
+              (rec.evidence.source_name && rec.evidence.source_name.toLowerCase().includes(query))
+            );
+          }
 
-    // Apply sorting
-    const validSorts = ["impact_desc", "severity_desc", "type_asc", "url_asc"];
-    const actualSort = validSorts.includes(sort) ? sort : "impact_desc";
+          // Apply sorting
+          const validSorts = ["impact_desc", "severity_desc", "type_asc", "url_asc"];
+          const actualSort = validSorts.includes(sort) ? sort : "impact_desc";
 
-    recommendations.sort((a, b) => {
-      switch (actualSort) {
-        case "impact_desc":
-          return b.impact_score - a.impact_score;
-        case "severity_desc":
-          const severityOrder = { high: 3, medium: 2, low: 1 };
-          return severityOrder[b.severity] - severityOrder[a.severity];
-        case "type_asc":
-          return a.type.localeCompare(b.type);
-        case "url_asc":
-          return (a.evidence.url || "").localeCompare(b.evidence.url || "");
-        default:
-          return 0;
-      }
-    });
+          recommendations.sort((a, b) => {
+            switch (actualSort) {
+              case "impact_desc":
+                return b.impact_score - a.impact_score;
+              case "severity_desc":
+                const severityOrder = { high: 3, medium: 2, low: 1 };
+                return severityOrder[b.severity] - severityOrder[a.severity];
+              case "type_asc":
+                return a.type.localeCompare(b.type);
+              case "url_asc":
+                return (a.evidence.url || "").localeCompare(b.evidence.url || "");
+              default:
+                return 0;
+            }
+          });
 
-    // Apply pagination
-    const pageNum = Math.max(1, parseInt(page));
-    const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize)));
-    const total = recommendations.length;
-    const offset = (pageNum - 1) * pageSizeNum;
-    const items = recommendations.slice(offset, offset + pageSizeNum);
+          // Apply pagination
+          const pageNum = Math.max(1, parseInt(page));
+          const pageSizeNum = Math.min(100, Math.max(1, parseInt(pageSize)));
+          const total = recommendations.length;
+          const offset = (pageNum - 1) * pageSizeNum;
+          const items = recommendations.slice(offset, offset + pageSizeNum);
 
-    // Record metrics: recommendations list viewed
-    try {
-      await d1.prepare(`
+          // Record metrics: recommendations list viewed
+          try {
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
                 value = value + 1, 
                 updated_at = ?
             `).bind(
-        `reco_list_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
-        new Date().toISOString(),
-        new Date().toISOString()
-      ).run();
-    } catch (e) {
-      console.warn("Failed to record recommendations list metric:", e);
-    }
+              `reco_list_viewed_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            console.warn("Failed to record recommendations list metric:", e);
+          }
 
-    const response = new Response(JSON.stringify({
-      items,
-      page: pageNum,
-      pageSize: pageSizeNum,
-      total
-    }), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=120"
+          const response = new Response(JSON.stringify({
+            items,
+            page: pageNum,
+            pageSize: pageSizeNum,
+            total
+          }), {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=120"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Recommendations list error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
       }
-    });
-    return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Recommendations list error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
+      // 7.1.2) Update Recommendation Status endpoint
+      if (url.pathname === "/api/recommendations/status" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { project_id, rec_id, status, note } = body;
 
-// 7.1.2) Update Recommendation Status endpoint
-if (url.pathname === "/api/recommendations/status" && request.method === "POST") {
-  try {
-    const body = await request.json();
-    const { project_id, rec_id, status, note } = body;
+          if (!project_id || !rec_id || !status) {
+            const response = new Response(JSON.stringify({ error: "project_id, rec_id, and status are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (!project_id || !rec_id || !status) {
-      const response = new Response(JSON.stringify({ error: "project_id, rec_id, and status are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!["open", "dismissed", "resolved"].includes(status)) {
+            const response = new Response(JSON.stringify({ error: "status must be one of: open, dismissed, resolved" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (!["open", "dismissed", "resolved"].includes(status)) {
-      const response = new Response(JSON.stringify({ error: "status must be one of: open, dismissed, resolved" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Upsert into recommendation_override
-    await d1.prepare(`
+          // Upsert into recommendation_override
+          await d1.prepare(`
             INSERT INTO recommendation_override (project_id, rec_id, status, note, updated_at)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(project_id, rec_id) DO UPDATE SET
@@ -7504,185 +7516,185 @@ if (url.pathname === "/api/recommendations/status" && request.method === "POST")
               note = ?,
               updated_at = ?
           `).bind(
-      project_id, rec_id, status, note || null, new Date().toISOString(),
-      status, note || null, new Date().toISOString()
-    ).run();
+            project_id, rec_id, status, note || null, new Date().toISOString(),
+            status, note || null, new Date().toISOString()
+          ).run();
 
-    // Record metrics: recommendation status updated
-    try {
-      await d1.prepare(`
+          // Record metrics: recommendation status updated
+          try {
+            await d1.prepare(`
               INSERT INTO metrics (key, value, created_at) 
               VALUES (?, 1, ?) 
               ON CONFLICT(key) DO UPDATE SET 
                 value = value + 1, 
                 updated_at = ?
             `).bind(
-        `reco_status_updated_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
-        new Date().toISOString(),
-        new Date().toISOString()
-      ).run();
-    } catch (e) {
-      console.warn("Failed to record recommendation status metric:", e);
-    }
+              `reco_status_updated_5m:${Math.floor(Date.now() / (5 * 60 * 1000))}`,
+              new Date().toISOString(),
+              new Date().toISOString()
+            ).run();
+          } catch (e) {
+            console.warn("Failed to record recommendation status metric:", e);
+          }
 
-    const response = new Response(JSON.stringify({ ok: true }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({ ok: true }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Recommendation status update error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Recommendation status update error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// 7.1.3) Reset Recommendation Status endpoint
-if (url.pathname === "/api/recommendations/reset" && request.method === "POST") {
-  try {
-    const body = await request.json();
-    const { project_id, rec_id } = body;
+      // 7.1.3) Reset Recommendation Status endpoint
+      if (url.pathname === "/api/recommendations/reset" && request.method === "POST") {
+        try {
+          const body = await request.json();
+          const { project_id, rec_id } = body;
 
-    if (!project_id || !rec_id) {
-      const response = new Response(JSON.stringify({ error: "project_id and rec_id are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!project_id || !rec_id) {
+            const response = new Response(JSON.stringify({ error: "project_id and rec_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Delete from recommendation_override
-    await d1.prepare(`
+          // Delete from recommendation_override
+          await d1.prepare(`
             DELETE FROM recommendation_override 
             WHERE project_id = ? AND rec_id = ?
           `).bind(project_id, rec_id).run();
 
-    const response = new Response(JSON.stringify({ ok: true }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({ ok: true }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Recommendation reset error:", e);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: e.message
-    }), { status: 500, headers: { "Content-Type": "application/json" } });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Recommendation reset error:", e);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: e.message
+          }), { status: 500, headers: { "Content-Type": "application/json" } });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// =====================================
+      // =====================================
 
-// 7.1) Referrals summary endpoint
-if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
-  try {
-    // Session authentication
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 7.1) Referrals summary endpoint
+      if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
+        try {
+          // Session authentication
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT s.user_id, u.email 
             FROM session s 
             JOIN user u ON u.id = s.user_id 
             WHERE s.session_id = ? AND s.expires_at > CURRENT_TIMESTAMP
           `).bind(sessionId).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Rate limiting: 60 rpm per user
-    const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
-    const userKey = `rate_limit:referrals_summary:user:${sessionData.user_id}`;
-    const userLimit = await checkRateLimit(userKey, 60, 60 * 1000); // 60 rpm
+          // Rate limiting: 60 rpm per user
+          const clientIP = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "unknown";
+          const userKey = `rate_limit:referrals_summary:user:${sessionData.user_id}`;
+          const userLimit = await checkRateLimit(userKey, 60, 60 * 1000); // 60 rpm
 
-    if (!userLimit.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limited",
-        retry_after: Math.ceil(userLimit.retryAfter / 1000)
-      }), {
-        status: 429,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userLimit.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limited",
+              retry_after: Math.ceil(userLimit.retryAfter / 1000)
+            }), {
+              status: 429,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const projectId = url.searchParams.get("project_id");
-    const window = url.searchParams.get("window") || "24h";
+          const projectId = url.searchParams.get("project_id");
+          const window = url.searchParams.get("window") || "24h";
 
-    if (!projectId) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Verify user has access to this project
-    const userOrgMember = await d1.prepare(`
+          // Verify user has access to this project
+          const userOrgMember = await d1.prepare(`
             SELECT om.role 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
             WHERE p.id = ? AND om.user_id = ?
           `).bind(projectId, sessionData.user_id).first();
 
-    if (!userOrgMember) {
-      const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userOrgMember) {
+            const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Validate window parameter
-    if (!['15m', '24h', '7d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Calculate time window
-    let timeFilter;
-    let bucketFormat;
-    if (window === '15m') {
-      timeFilter = "datetime('now','-15 minutes')";
-      bucketFormat = "datetime(?, 'unixepoch')";
-    } else if (window === '24h') {
-      timeFilter = "datetime('now','-1 day')";
-      bucketFormat = "strftime('%Y-%m-%d %H:00:00', datetime(?, 'unixepoch'))";
-    } else { // 7d
-      timeFilter = "datetime('now','-7 days')";
-      bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
-    }
+          // Calculate time window
+          let timeFilter;
+          let bucketFormat;
+          if (window === '15m') {
+            timeFilter = "datetime('now','-15 minutes')";
+            bucketFormat = "datetime(?, 'unixepoch')";
+          } else if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+            bucketFormat = "strftime('%Y-%m-%d %H:00:00', datetime(?, 'unixepoch'))";
+          } else { // 7d
+            timeFilter = "datetime('now','-7 days')";
+            bucketFormat = "strftime('%Y-%m-%d', datetime(?, 'unixepoch'))";
+          }
 
-    // Get totals
-    const totals = await d1.prepare(`
+          // Get totals
+          const totals = await d1.prepare(`
             SELECT 
                               COUNT(*) referrals,
               COUNT(DISTINCT content_id) as contents,
@@ -7691,8 +7703,8 @@ if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
             WHERE project_id = ? AND detected_at >= ${timeFilter}
           `).bind(projectId).first();
 
-    // Get by source
-    const bySource = await d1.prepare(`
+          // Get by source
+          const bySource = await d1.prepare(`
             SELECT 
               s.slug,
               s.name,
@@ -7704,8 +7716,8 @@ if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
             ORDER BY count DESC
           `).bind(projectId).all();
 
-    // Get top content
-    const topContent = await d1.prepare(`
+          // Get top content
+          const topContent = await d1.prepare(`
             SELECT 
               ar.content_id,
               ca.url,
@@ -7718,15 +7730,15 @@ if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
             LIMIT 10
           `).bind(projectId).all();
 
-    // Get timeseries
-    let timeseries = [];
-    if (window === '15m') {
-      // For 15m, show 15 buckets of 1 minute each
-      const now = Math.floor(Date.now() / 1000);
-      for (let i = 14; i >= 0; i--) {
-        const bucketStart = now - (i * 60);
-        const bucketEnd = bucketStart + 60;
-        const count = await d1.prepare(`
+          // Get timeseries
+          let timeseries = [];
+          if (window === '15m') {
+            // For 15m, show 15 buckets of 1 minute each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 14; i >= 0; i--) {
+              const bucketStart = now - (i * 60);
+              const bucketEnd = bucketStart + 60;
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? 
@@ -7734,18 +7746,18 @@ if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, bucketStart, bucketEnd).first();
 
-        timeseries.push({
-          ts: new Date(bucketStart * 1000).toISOString(),
-          count: count?.count || 0
-        });
-      }
-    } else if (window === '24h') {
-      // For 24h, show 24 buckets of 1 hour each
-      const now = Math.floor(Date.now() / 1000);
-      for (let i = 23; i >= 0; i--) {
-        const bucketStart = now - (i * 3600);
-        const bucketEnd = bucketStart + 3600;
-        const count = await d1.prepare(`
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          } else if (window === '24h') {
+            // For 24h, show 24 buckets of 1 hour each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 23; i >= 0; i--) {
+              const bucketStart = now - (i * 3600);
+              const bucketEnd = bucketStart + 3600;
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? 
@@ -7753,18 +7765,18 @@ if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, bucketStart, bucketEnd).first();
 
-        timeseries.push({
-          ts: new Date(bucketStart * 1000).toISOString(),
-          count: count?.count || 0
-        });
-      }
-    } else { // 7d
-      // For 7d, show 7 buckets of 1 day each
-      const now = Math.floor(Date.now() / 1000);
-      for (let i = 6; i >= 0; i--) {
-        const bucketStart = now - (i * 86400);
-        const bucketEnd = bucketStart + 86400;
-        const count = await d1.prepare(`
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          } else { // 7d
+            // For 7d, show 7 buckets of 1 day each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 6; i >= 0; i--) {
+              const bucketStart = now - (i * 86400);
+              const bucketEnd = bucketStart + 86400;
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? 
@@ -7772,145 +7784,145 @@ if (url.pathname === "/api/referrals/summary" && request.method === "GET") {
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, bucketStart, bucketEnd).first();
 
-        timeseries.push({
-          ts: new Date(bucketStart * 1000).toISOString(),
-          count: count?.count || 0
-        });
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          }
+
+          const response = new Response(JSON.stringify({
+            totals: {
+              referrals: totals?.referrals || 0,
+              contents: totals?.contents || 0,
+              sources: totals?.sources || 0
+            },
+            by_source: bySource?.results || [],
+            top_content: topContent?.results || [],
+            timeseries: timeseries
+          }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Referrals summary error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to get referrals summary" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
       }
-    }
 
-    const response = new Response(JSON.stringify({
-      totals: {
-        referrals: totals?.referrals || 0,
-        contents: totals?.contents || 0,
-        sources: totals?.sources || 0
-      },
-      by_source: bySource?.results || [],
-      top_content: topContent?.results || [],
-      timeseries: timeseries
-    }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
-      }
-    });
-    return addCorsHeaders(response, origin);
+      // 7.2) Referrals list endpoint
+      if (url.pathname === "/api/referrals" && request.method === "GET") {
+        try {
+          // Session authentication (same pattern as content endpoints)
+          const sessionCookie = request.headers.get("cookie");
+          const sessionMatch = sessionCookie?.match(/optiview_session=([^;]+)/);
+          if (!sessionCookie || !sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-  } catch (e) {
-    console.error("Referrals summary error:", e);
-    const response = new Response(JSON.stringify({ error: "Failed to get referrals summary" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.2) Referrals list endpoint
-if (url.pathname === "/api/referrals" && request.method === "GET") {
-  try {
-    // Session authentication (same pattern as content endpoints)
-    const sessionCookie = request.headers.get("cookie");
-    const sessionMatch = sessionCookie?.match(/optiview_session=([^;]+)/);
-    if (!sessionCookie || !sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session 
             WHERE session_id = ? AND expires_at > CURRENT_TIMESTAMP
           `).bind(sessionId).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const projectId = url.searchParams.get("project_id");
-    const window = url.searchParams.get("window") || "24h";
+          const projectId = url.searchParams.get("project_id");
+          const window = url.searchParams.get("window") || "24h";
 
-    if (!projectId) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Verify user has access to this project
-    const accessCheck = await d1.prepare(`
+          // Verify user has access to this project
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
             WHERE p.id = ? AND om.user_id = ?
           `).bind(projectId, sessionData.user_id).first();
 
-    if (accessCheck.count === 0) {
-      const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-    const source = url.searchParams.get("source");
-    const q = url.searchParams.get("q");
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const pageSize = Math.min(parseInt(url.searchParams.get("pageSize") || "50"), 100);
+          if (accessCheck.count === 0) {
+            const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+          const source = url.searchParams.get("source");
+          const q = url.searchParams.get("q");
+          const page = parseInt(url.searchParams.get("page") || "1");
+          const pageSize = Math.min(parseInt(url.searchParams.get("pageSize") || "50"), 100);
 
-    if (!projectId) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Validate window parameter
-    if (!['15m', '24h', '7d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Calculate time window
-    let timeFilter;
-    if (window === '15m') {
-      timeFilter = "datetime('now','-15 minutes')";
-    } else if (window === '24h') {
-      timeFilter = "datetime('now','-1 day')";
-    } else { // 7d
-      timeFilter = "datetime('now','-7 days')";
-    }
+          // Calculate time window
+          let timeFilter;
+          if (window === '15m') {
+            timeFilter = "datetime('now','-15 minutes')";
+          } else if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+          } else { // 7d
+            timeFilter = "datetime('now','-7 days')";
+          }
 
-    // Build WHERE clause
-    let whereConditions = [`ar.project_id = ?`, `ar.detected_at >= ${timeFilter}`];
-    let params = [projectId];
+          // Build WHERE clause
+          let whereConditions = [`ar.project_id = ?`, `ar.detected_at >= ${timeFilter}`];
+          let params = [projectId];
 
-    if (source) {
-      whereConditions.push(`s.slug = ?`);
-      params.push(source);
-    }
+          if (source) {
+            whereConditions.push(`s.slug = ?`);
+            params.push(source);
+          }
 
-    if (q) {
-      whereConditions.push(`ca.url LIKE ?`);
-      params.push(`%${q}%`);
-    }
+          if (q) {
+            whereConditions.push(`ca.url LIKE ?`);
+            params.push(`%${q}%`);
+          }
 
-    const whereClause = whereConditions.join(" AND ");
+          const whereClause = whereConditions.join(" AND ");
 
-    // Get total count
-    const totalQuery = `
+          // Get total count
+          const totalQuery = `
             SELECT COUNT(*) as count
             FROM (
               SELECT DISTINCT ar.content_id, ar.ai_source_id
@@ -7920,12 +7932,12 @@ if (url.pathname === "/api/referrals" && request.method === "GET") {
               WHERE ${whereClause}
             )
           `;
-    const totalResult = await d1.prepare(totalQuery).bind(...params).first();
-    const total = totalResult?.count || 0;
+          const totalResult = await d1.prepare(totalQuery).bind(...params).first();
+          const total = totalResult?.count || 0;
 
-    // Get paginated results
-    const offset = (page - 1) * pageSize;
-    const listQuery = `
+          // Get paginated results
+          const offset = (page - 1) * pageSize;
+          const listQuery = `
             SELECT 
               ar.content_id,
               ca.url,
@@ -7942,144 +7954,144 @@ if (url.pathname === "/api/referrals" && request.method === "GET") {
             ORDER BY referrals_24h DESC, last_seen DESC
             LIMIT ? OFFSET ?
           `;
-    const listResult = await d1.prepare(listQuery).bind(...params, pageSize, offset).all();
+          const listResult = await d1.prepare(listQuery).bind(...params, pageSize, offset).all();
 
-    // Calculate share_of_ai for each row
-    const items = await Promise.all(listResult.results.map(async (row) => {
-      // Get total AI events for this content in the window
-      const totalAIEvents = await d1.prepare(`
+          // Calculate share_of_ai for each row
+          const items = await Promise.all(listResult.results.map(async (row) => {
+            // Get total AI events for this content in the window
+            const totalAIEvents = await d1.prepare(`
               SELECT COUNT(*) as count
               FROM interaction_events
               WHERE project_id = ? AND content_id = ? AND ai_source_id IS NOT NULL AND occurred_at >= ${timeFilter}
             `).bind(projectId, row.content_id).first();
 
-      const shareOfAI = totalAIEvents?.count > 0 ? (row.referrals_24h / totalAIEvents.count) : 0;
+            const shareOfAI = totalAIEvents?.count > 0 ? (row.referrals_24h / totalAIEvents.count) : 0;
 
-      return {
-        content_id: row.content_id,
-        url: row.url,
-        source_slug: row.source_slug,
-        source_name: row.source_name,
-        last_seen: row.last_seen,
-        referrals_15m: row.referrals_15m,
-        referrals_24h: row.referrals_24h,
-        share_of_ai: Math.round(shareOfAI * 100) / 100 // Round to 2 decimal places
-      };
-    }));
+            return {
+              content_id: row.content_id,
+              url: row.url,
+              source_slug: row.source_slug,
+              source_name: row.source_name,
+              last_seen: row.last_seen,
+              referrals_15m: row.referrals_15m,
+              referrals_24h: row.referrals_24h,
+              share_of_ai: Math.round(shareOfAI * 100) / 100 // Round to 2 decimal places
+            };
+          }));
 
-    const response = new Response(JSON.stringify({
-      items: items,
-      page: page,
-      pageSize: pageSize,
-      total: total
-    }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
-      }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            items: items,
+            page: page,
+            pageSize: pageSize,
+            total: total
+          }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=60"
+            }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Referrals list error:", e);
-    console.error("Error details:", {
-      message: e.message,
-      stack: e.stack,
-      name: e.name
-    });
-    const response = new Response(JSON.stringify({
-      error: "Failed to get referrals list",
-      debug: e.message // Include error message for debugging
-    }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 7.3) Referrals detail endpoint
-if (url.pathname === "/api/referrals/detail" && request.method === "GET") {
-  try {
-    // Rate limiting: 60 rpm per user
-    const rateLimitKey = `referrals_detail:${request.headers.get('x-optiview-request-id') || 'anonymous'}`;
-    const rateLimitResult = await checkRateLimit(env, rateLimitKey, 60, 60);
-    if (!rateLimitResult.allowed) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retry_after: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
+        } catch (e) {
+          console.error("Referrals list error:", e);
+          console.error("Error details:", {
+            message: e.message,
+            stack: e.stack,
+            name: e.name
+          });
+          const response = new Response(JSON.stringify({
+            error: "Failed to get referrals list",
+            debug: e.message // Include error message for debugging
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
         }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      }
 
-    const projectId = url.searchParams.get("project_id");
-    const contentId = url.searchParams.get("content_id");
-    const aiSourceId = url.searchParams.get("ai_source_id");
-    const window = url.searchParams.get("window") || "24h";
+      // 7.3) Referrals detail endpoint
+      if (url.pathname === "/api/referrals/detail" && request.method === "GET") {
+        try {
+          // Rate limiting: 60 rpm per user
+          const rateLimitKey = `referrals_detail:${request.headers.get('x-optiview-request-id') || 'anonymous'}`;
+          const rateLimitResult = await checkRateLimit(env, rateLimitKey, 60, 60);
+          if (!rateLimitResult.allowed) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retry_after: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (!projectId || !contentId || !aiSourceId) {
-      const response = new Response(JSON.stringify({ error: "project_id, content_id, and ai_source_id are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const projectId = url.searchParams.get("project_id");
+          const contentId = url.searchParams.get("content_id");
+          const aiSourceId = url.searchParams.get("ai_source_id");
+          const window = url.searchParams.get("window") || "24h";
 
-    // Validate window parameter
-    if (!['15m', '24h', '7d'].includes(window)) {
-      const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!projectId || !contentId || !aiSourceId) {
+            const response = new Response(JSON.stringify({ error: "project_id, content_id, and ai_source_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Calculate time window
-    let timeFilter;
-    if (window === '15m') {
-      timeFilter = "datetime('now','-15 minutes')";
-    } else if (window === '24h') {
-      timeFilter = "datetime('now','-1 day')";
-    } else { // 7d
-      timeFilter = "datetime('now','-7 days')";
-    }
+          // Validate window parameter
+          if (!['15m', '24h', '7d'].includes(window)) {
+            const response = new Response(JSON.stringify({ error: "Invalid window. Must be one of: 15m, 24h, 7d" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Get content info
-    const content = await d1.prepare(`
+          // Calculate time window
+          let timeFilter;
+          if (window === '15m') {
+            timeFilter = "datetime('now','-15 minutes')";
+          } else if (window === '24h') {
+            timeFilter = "datetime('now','-1 day')";
+          } else { // 7d
+            timeFilter = "datetime('now','-7 days')";
+          }
+
+          // Get content info
+          const content = await d1.prepare(`
             SELECT id, url FROM content_assets 
             WHERE id = ? AND project_id = ?
           `).bind(contentId, projectId).first();
 
-    if (!content) {
-      const response = new Response(JSON.stringify({ error: "Content not found or not accessible" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!content) {
+            const response = new Response(JSON.stringify({ error: "Content not found or not accessible" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Get source info
-    const source = await d1.prepare(`
+          // Get source info
+          const source = await d1.prepare(`
             SELECT id, slug, name FROM ai_sources WHERE id = ?
           `).bind(aiSourceId).first();
 
-    if (!source) {
-      const response = new Response(JSON.stringify({ error: "AI source not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!source) {
+            const response = new Response(JSON.stringify({ error: "AI source not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Get summary stats
-    const summary = await d1.prepare(`
+          // Get summary stats
+          const summary = await d1.prepare(`
             SELECT 
               SUM(CASE WHEN detected_at >= datetime('now','-15 minutes') THEN 1 ELSE 0 END) as referrals_15m,
               SUM(CASE WHEN detected_at >= datetime('now','-1 day') THEN 1 ELSE 0 END) as referrals_24h,
@@ -8088,15 +8100,15 @@ if (url.pathname === "/api/referrals/detail" && request.method === "GET") {
             WHERE project_id = ? AND content_id = ? AND ai_source_id = ? AND detected_at >= ${timeFilter}
           `).bind(projectId, contentId, aiSourceId).first();
 
-    // Get timeseries
-    let timeseries = [];
-    if (window === '15m') {
-      // For 15m, show 15 buckets of 1 minute each
-      const now = Math.floor(Date.now() / 1000);
-      for (let i = 14; i >= 0; i--) {
-        const bucketStart = now - (i * 60);
-        const bucketEnd = bucketStart + 60;
-        const count = await d1.prepare(`
+          // Get timeseries
+          let timeseries = [];
+          if (window === '15m') {
+            // For 15m, show 15 buckets of 1 minute each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 14; i >= 0; i--) {
+              const bucketStart = now - (i * 60);
+              const bucketEnd = bucketStart + 60;
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
@@ -8104,18 +8116,18 @@ if (url.pathname === "/api/referrals/detail" && request.method === "GET") {
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
 
-        timeseries.push({
-          ts: new Date(bucketStart * 1000).toISOString(),
-          count: count?.count || 0
-        });
-      }
-    } else if (window === '24h') {
-      // For 24h, show 24 buckets of 1 hour each
-      const now = Math.floor(Date.now() / 1000);
-      for (let i = 23; i >= 0; i--) {
-        const bucketStart = now - (i * 3600);
-        const bucketEnd = bucketStart + 3600;
-        const count = await d1.prepare(`
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          } else if (window === '24h') {
+            // For 24h, show 24 buckets of 1 hour each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 23; i >= 0; i--) {
+              const bucketStart = now - (i * 3600);
+              const bucketEnd = bucketStart + 3600;
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
@@ -8123,18 +8135,18 @@ if (url.pathname === "/api/referrals/detail" && request.method === "GET") {
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
 
-        timeseries.push({
-          ts: new Date(bucketStart * 1000).toISOString(),
-          count: count?.count || 0
-        });
-      }
-    } else { // 7d
-      // For 7d, show 7 buckets of 1 day each
-      const now = Math.floor(Date.now() / 1000);
-      for (let i = 6; i >= 0; i--) {
-        const bucketStart = now - (i * 86400);
-        const bucketEnd = bucketStart + 86400;
-        const count = await d1.prepare(`
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          } else { // 7d
+            // For 7d, show 7 buckets of 1 day each
+            const now = Math.floor(Date.now() / 1000);
+            for (let i = 6; i >= 0; i--) {
+              const bucketStart = now - (i * 86400);
+              const bucketEnd = bucketStart + 86400;
+              const count = await d1.prepare(`
                 SELECT COUNT(*) as count
                 FROM ai_referrals
                 WHERE project_id = ? AND content_id = ? AND ai_source_id = ?
@@ -8142,15 +8154,15 @@ if (url.pathname === "/api/referrals/detail" && request.method === "GET") {
                   AND detected_at < datetime(?, 'unixepoch')
               `).bind(projectId, contentId, aiSourceId, bucketStart, bucketEnd).first();
 
-        timeseries.push({
-          ts: new Date(bucketStart * 1000).toISOString(),
-          count: count?.count || 0
-        });
-      }
-    }
+              timeseries.push({
+                ts: new Date(bucketStart * 1000).toISOString(),
+                count: count?.count || 0
+              });
+            }
+          }
 
-    // Get recent referrals (last 10)
-    const recent = await d1.prepare(`
+          // Get recent referrals (last 10)
+          const recent = await d1.prepare(`
             SELECT 
               detected_at,
               ref_url,
@@ -8161,64 +8173,64 @@ if (url.pathname === "/api/referrals/detail" && request.method === "GET") {
             LIMIT 10
           `).bind(projectId, contentId, aiSourceId).all();
 
-    const response = new Response(JSON.stringify({
-      content: {
-        id: content.id,
-        url: content.url
-      },
-      source: {
-        id: source.id,
-        slug: source.slug,
-        name: source.name
-      },
-      summary: {
-        referrals_15m: summary?.referrals_15m || 0,
-        referrals_24h: summary?.referrals_24h || 0,
-        last_seen: summary?.last_seen || null
-      },
-      timeseries: timeseries,
-      recent: recent.results.map(row => ({
-        detected_at: row.detected_at,
-        ref_url: row.ref_url,
-        metadata: row.metadata ? JSON.parse(row.metadata) : {}
-      }))
-    }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "private, max-age=120"
+          const response = new Response(JSON.stringify({
+            content: {
+              id: content.id,
+              url: content.url
+            },
+            source: {
+              id: source.id,
+              slug: source.slug,
+              name: source.name
+            },
+            summary: {
+              referrals_15m: summary?.referrals_15m || 0,
+              referrals_24h: summary?.referrals_24h || 0,
+              last_seen: summary?.last_seen || null
+            },
+            timeseries: timeseries,
+            recent: recent.results.map(row => ({
+              detected_at: row.detected_at,
+              ref_url: row.ref_url,
+              metadata: row.metadata ? JSON.parse(row.metadata) : {}
+            }))
+          }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "private, max-age=120"
+            }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Referrals detail error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to get referrals detail" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
       }
-    });
-    return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Referrals detail error:", e);
-    const response = new Response(JSON.stringify({ error: "Failed to get referrals detail" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+      // 7.5) Events last-seen endpoint (for install verification)
+      if (url.pathname === "/api/events/last-seen" && request.method === "GET") {
+        try {
+          const projectId = url.searchParams.get("project_id");
+          const propertyId = url.searchParams.get("property_id");
 
-// 7.5) Events last-seen endpoint (for install verification)
-if (url.pathname === "/api/events/last-seen" && request.method === "GET") {
-  try {
-    const projectId = url.searchParams.get("project_id");
-    const propertyId = url.searchParams.get("property_id");
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (!projectId) {
-      const response = new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const fifteenMinutesAgo = new Date(Date.now() - (15 * 60 * 1000)).toISOString();
 
-    const fifteenMinutesAgo = new Date(Date.now() - (15 * 60 * 1000)).toISOString();
-
-    // Get events in the last 15 minutes for this project
-    const recentEventsQuery = `
+          // Get events in the last 15 minutes for this project
+          const recentEventsQuery = `
             SELECT COUNT(*) as count, event_type, 
                    json_extract(metadata, '$.class') as traffic_class
             FROM interaction_events 
@@ -8228,13 +8240,13 @@ if (url.pathname === "/api/events/last-seen" && request.method === "GET") {
             GROUP BY event_type, traffic_class
           `;
 
-    const recentEventsParams = [projectId, fifteenMinutesAgo];
-    if (propertyId) recentEventsParams.push(propertyId);
+          const recentEventsParams = [projectId, fifteenMinutesAgo];
+          if (propertyId) recentEventsParams.push(propertyId);
 
-    const recentEvents = await d1.prepare(recentEventsQuery).bind(...recentEventsParams).all();
+          const recentEvents = await d1.prepare(recentEventsQuery).bind(...recentEventsParams).all();
 
-    // Get the last event timestamp
-    const lastEventQuery = `
+          // Get the last event timestamp
+          const lastEventQuery = `
             SELECT occurred_at, event_type FROM interaction_events 
             WHERE project_id = ? 
               ${propertyId ? 'AND property_id = ?' : ''}
@@ -8242,634 +8254,634 @@ if (url.pathname === "/api/events/last-seen" && request.method === "GET") {
             LIMIT 1
           `;
 
-    const lastEventParams = [projectId];
-    if (propertyId) lastEventParams.push(propertyId);
+          const lastEventParams = [projectId];
+          if (propertyId) lastEventParams.push(propertyId);
 
-    const lastEvent = await d1.prepare(lastEventQuery).bind(...lastEventParams).first();
+          const lastEvent = await d1.prepare(lastEventQuery).bind(...lastEventParams).first();
 
-    // Count total events in last 15 minutes
-    const totalEventsQuery = `
+          // Count total events in last 15 minutes
+          const totalEventsQuery = `
             SELECT COUNT(*) as count FROM interaction_events 
             WHERE project_id = ? 
               AND occurred_at >= ?
               ${propertyId ? 'AND property_id = ?' : ''}
           `;
 
-    const totalEventsParams = [projectId, fifteenMinutesAgo];
-    if (propertyId) totalEventsParams.push(propertyId);
+          const totalEventsParams = [projectId, fifteenMinutesAgo];
+          if (propertyId) totalEventsParams.push(propertyId);
 
-    const totalEvents = await d1.prepare(totalEventsQuery).bind(...totalEventsParams).first();
+          const totalEvents = await d1.prepare(totalEventsQuery).bind(...totalEventsParams).first();
 
-    // Aggregate traffic class counts
-    const byClass = {
-      direct_human: 0,
-      human_via_ai: 0,
-      ai_agent_crawl: 0,
-      unknown_ai_like: 0
-    };
+          // Aggregate traffic class counts
+          const byClass = {
+            direct_human: 0,
+            human_via_ai: 0,
+            ai_agent_crawl: 0,
+            unknown_ai_like: 0
+          };
 
-    for (const event of recentEvents.results || []) {
-      const trafficClass = event.traffic_class || 'unknown_ai_like';
-      if (byClass.hasOwnProperty(trafficClass)) {
-        byClass[trafficClass] += event.count;
-      } else {
-        byClass.unknown_ai_like += event.count;
+          for (const event of recentEvents.results || []) {
+            const trafficClass = event.traffic_class || 'unknown_ai_like';
+            if (byClass.hasOwnProperty(trafficClass)) {
+              byClass[trafficClass] += event.count;
+            } else {
+              byClass.unknown_ai_like += event.count;
+            }
+          }
+
+          const response = new Response(JSON.stringify({
+            project_id: projectId,
+            property_id: propertyId || null,
+            events_15m: totalEvents?.count || 0,
+            by_class_15m: byClass,
+            last_event_ts: lastEvent?.occurred_at || null,
+            last_event_type: lastEvent?.event_type || null
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Last-seen query error:", e);
+          const response = new Response(JSON.stringify({ error: "Failed to query events" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
       }
-    }
 
-    const response = new Response(JSON.stringify({
-      project_id: projectId,
-      property_id: propertyId || null,
-      events_15m: totalEvents?.count || 0,
-      by_class_15m: byClass,
-      last_event_ts: lastEvent?.occurred_at || null,
-      last_event_type: lastEvent?.event_type || null
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+      // 8) Admin Purge endpoint - Proper implementation
+      if (url.pathname === "/admin/purge" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-  } catch (e) {
-    console.error("Last-seen query error:", e);
-    const response = new Response(JSON.stringify({ error: "Failed to query events" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-// 8) Admin Purge endpoint - Proper implementation
-if (url.pathname === "/admin/purge" && request.method === "POST") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Check if user is admin
-    const userData = await d1.prepare(`
+          // Check if user is admin
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
-    if (!userData || !userData.is_admin) {
-      const response = new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const body = await request.json();
-    const { type, dry_run, project_id } = body;
+          const body = await request.json();
+          const { type, dry_run, project_id } = body;
 
-    if (!type || !project_id) {
-      const response = new Response(JSON.stringify({ error: "Type and project_id are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!type || !project_id) {
+            const response = new Response(JSON.stringify({ error: "Type and project_id are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // For now, return a placeholder response since we don't have the full purge logic yet
-    // TODO: Implement actual data purging when we add the retention logic
-    const response = new Response(JSON.stringify({
-      project_id: project_id,
-      type: type,
-      dry_run: dry_run || false,
-      deleted_events: dry_run ? 0 : 0, // Placeholder
-      deleted_referrals: dry_run ? 0 : 0, // Placeholder
-      message: dry_run ? `Would delete expired ${type} data` : `Purged expired ${type} data`
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          // For now, return a placeholder response since we don't have the full purge logic yet
+          // TODO: Implement actual data purging when we add the retention logic
+          const response = new Response(JSON.stringify({
+            project_id: project_id,
+            type: type,
+            dry_run: dry_run || false,
+            deleted_events: dry_run ? 0 : 0, // Placeholder
+            deleted_referrals: dry_run ? 0 : 0, // Placeholder
+            message: dry_run ? `Would delete expired ${type} data` : `Purged expired ${type} data`
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Admin purge error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Admin purge error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// 9) Admin Sources endpoints
-if (url.pathname === "/admin/sources" && request.method === "POST") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 9) Admin Sources endpoints
+      if (url.pathname === "/admin/sources" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Check if user is admin
-    const userData = await d1.prepare(`
+          // Check if user is admin
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
-    if (!userData || !userData.is_admin) {
-      const response = new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const body = await request.json();
-    const { slug, name, category, is_active } = body;
+          const body = await request.json();
+          const { slug, name, category, is_active } = body;
 
-    if (!slug || !name || !category) {
-      const response = new Response(JSON.stringify({ error: "slug, name, and category are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!slug || !name || !category) {
+            const response = new Response(JSON.stringify({ error: "slug, name, and category are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Validate category enum
-    const validCategories = ['chat_assistant', 'search_engine', 'crawler', 'browser_ai', 'model_api', 'other'];
-    if (!validCategories.includes(category)) {
-      const response = new Response(JSON.stringify({ error: "Invalid category" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Validate category enum
+          const validCategories = ['chat_assistant', 'search_engine', 'crawler', 'browser_ai', 'model_api', 'other'];
+          if (!validCategories.includes(category)) {
+            const response = new Response(JSON.stringify({ error: "Invalid category" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Create new ai_source
-    const result = await d1.prepare(`
+          // Create new ai_source
+          const result = await d1.prepare(`
             INSERT INTO ai_sources (slug, name, category, is_active, created_at, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
           `).bind(slug, name, category, is_active !== false ? 1 : 0).run();
 
-    const response = new Response(JSON.stringify({
-      success: true,
-      message: "AI source created successfully",
-      id: result.meta.last_row_id,
-      slug,
-      name,
-      category,
-      is_active: is_active !== false
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: "AI source created successfully",
+            id: result.meta.last_row_id,
+            slug,
+            name,
+            category,
+            is_active: is_active !== false
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Admin create source error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Admin create source error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-if (url.pathname.startsWith("/admin/sources/") && request.method === "PATCH") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      if (url.pathname.startsWith("/admin/sources/") && request.method === "PATCH") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Check if user is admin
-    const userData = await d1.prepare(`
+          // Check if user is admin
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
-    if (!userData || !userData.is_admin) {
-      const response = new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sourceId = url.pathname.split('/').pop();
-    const body = await request.json();
-    const { name, category, is_active } = body;
+          const sourceId = url.pathname.split('/').pop();
+          const body = await request.json();
+          const { name, category, is_active } = body;
 
-    // Validate category if provided
-    if (category) {
-      const validCategories = ['chat_assistant', 'search_engine', 'crawler', 'browser_ai', 'model_api', 'other'];
-      if (!validCategories.includes(category)) {
-        const response = new Response(JSON.stringify({ error: "Invalid category" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" }
-        });
-        return addCorsHeaders(response, origin);
+          // Validate category if provided
+          if (category) {
+            const validCategories = ['chat_assistant', 'search_engine', 'crawler', 'browser_ai', 'model_api', 'other'];
+            if (!validCategories.includes(category)) {
+              const response = new Response(JSON.stringify({ error: "Invalid category" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+              });
+              return addCorsHeaders(response, origin);
+            }
+          }
+
+          // Build update query dynamically
+          const updates = [];
+          const values = [];
+          if (name !== undefined) {
+            updates.push("name = ?");
+            values.push(name);
+          }
+          if (category !== undefined) {
+            updates.push("category = ?");
+            values.push(category);
+          }
+          if (is_active !== undefined) {
+            updates.push("is_active = ?");
+            values.push(is_active ? 1 : 0);
+          }
+          updates.push("updated_at = CURRENT_TIMESTAMP");
+          values.push(sourceId);
+
+          if (updates.length === 1) { // Only updated_at
+            const response = new Response(JSON.stringify({ error: "No fields to update" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          const updateQuery = `UPDATE ai_sources SET ${updates.join(', ')} WHERE id = ?`;
+          await d1.prepare(updateQuery).bind(...values).run();
+
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: "AI source updated successfully",
+            id: sourceId
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Admin update source error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
       }
-    }
 
-    // Build update query dynamically
-    const updates = [];
-    const values = [];
-    if (name !== undefined) {
-      updates.push("name = ?");
-      values.push(name);
-    }
-    if (category !== undefined) {
-      updates.push("category = ?");
-      values.push(category);
-    }
-    if (is_active !== undefined) {
-      updates.push("is_active = ?");
-      values.push(is_active ? 1 : 0);
-    }
-    updates.push("updated_at = CURRENT_TIMESTAMP");
-    values.push(sourceId);
+      // 10) Admin Citations Ingestion endpoint
+      if (url.pathname === "/admin/citations/ingest" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (updates.length === 1) { // Only updated_at
-      const response = new Response(JSON.stringify({ error: "No fields to update" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const updateQuery = `UPDATE ai_sources SET ${updates.join(', ')} WHERE id = ?`;
-    await d1.prepare(updateQuery).bind(...values).run();
+          const sessionId = sessionMatch[1];
 
-    const response = new Response(JSON.stringify({
-      success: true,
-      message: "AI source updated successfully",
-      id: sourceId
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-
-  } catch (e) {
-    console.error("Admin update source error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 10) Admin Citations Ingestion endpoint
-if (url.pathname === "/admin/citations/ingest" && request.method === "POST") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    const sessionId = sessionMatch[1];
-
-    // Verify admin session
-    const session = await d1.prepare(`
+          // Verify admin session
+          const session = await d1.prepare(`
             SELECT s.*, u.email, u.is_admin 
             FROM session s 
             JOIN user u ON s.user_id = u.id 
             WHERE s.session_id = ? AND s.expires_at > datetime('now')
           `).bind(sessionId).first();
 
-    if (!session || !session.is_admin) {
-      const response = new Response(JSON.stringify({ error: "Admin privileges required" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!session || !session.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin privileges required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Rate limiting for admin citations endpoint (30 rpm per IP)
-    const clientIP = getClientIP(request);
-    const adminLimiter = createRateLimiter({ rps: 30 / 60, burst: 5, retryAfter: 60 });
-    const rateLimitResult = adminLimiter.tryConsume(`admin_citations_${clientIP}`);
+          // Rate limiting for admin citations endpoint (30 rpm per IP)
+          const clientIP = getClientIP(request);
+          const adminLimiter = createRateLimiter({ rps: 30 / 60, burst: 5, retryAfter: 60 });
+          const rateLimitResult = adminLimiter.tryConsume(`admin_citations_${clientIP}`);
 
-    if (!rateLimitResult.success) {
-      const response = new Response(JSON.stringify({
-        error: "Rate limit exceeded",
-        retryAfter: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": rateLimitResult.retryAfter.toString()
-        }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!rateLimitResult.success) {
+            const response = new Response(JSON.stringify({
+              error: "Rate limit exceeded",
+              retryAfter: rateLimitResult.retryAfter
+            }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": rateLimitResult.retryAfter.toString()
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const body = await request.json();
-    const { project_id, content_id, ai_source_id, ref_url, snippet, confidence, metadata } = body;
+          const body = await request.json();
+          const { project_id, content_id, ai_source_id, ref_url, snippet, confidence, metadata } = body;
 
-    // Validate required fields
-    if (!project_id || !ai_source_id) {
-      const response = new Response(JSON.stringify({
-        error: "Missing required fields: project_id, ai_source_id"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Validate required fields
+          if (!project_id || !ai_source_id) {
+            const response = new Response(JSON.stringify({
+              error: "Missing required fields: project_id, ai_source_id"
+            }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Validate optional fields
-    if (snippet && snippet.length > 500) {
-      const response = new Response(JSON.stringify({
-        error: "Snippet must be 500 characters or less"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          // Validate optional fields
+          if (snippet && snippet.length > 500) {
+            const response = new Response(JSON.stringify({
+              error: "Snippet must be 500 characters or less"
+            }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    if (confidence !== null && confidence !== undefined && (confidence < 0 || confidence > 1)) {
-      const response = new Response(JSON.stringify({
-        error: "Confidence must be between 0 and 1"
-      }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (confidence !== null && confidence !== undefined && (confidence < 0 || confidence > 1)) {
+            const response = new Response(JSON.stringify({
+              error: "Confidence must be between 0 and 1"
+            }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Insert citation with deduplication
-    const insertResult = await d1.prepare(`
+          // Insert citation with deduplication
+          const insertResult = await d1.prepare(`
             INSERT OR IGNORE INTO ai_citations 
             (project_id, content_id, ai_source_id, ref_url, snippet, confidence, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?)
           `).bind(
-      project_id,
-      content_id || null,
-      ai_source_id,
-      ref_url || null,
-      snippet || null,
-      confidence || null,
-      metadata ? JSON.stringify(metadata) : null
-    ).run();
+            project_id,
+            content_id || null,
+            ai_source_id,
+            ref_url || null,
+            snippet || null,
+            confidence || null,
+            metadata ? JSON.stringify(metadata) : null
+          ).run();
 
-    // Invalidate cache for this project
-    try {
-      await bumpProjectVersion(env.CACHE, project_id);
-    } catch (e) {
-      console.error("Failed to invalidate cache:", e);
-    }
+          // Invalidate cache for this project
+          try {
+            await bumpProjectVersion(env.CACHE, project_id);
+          } catch (e) {
+            console.error("Failed to invalidate cache:", e);
+          }
 
-    const response = new Response(JSON.stringify({
-      success: true,
-      citation_id: insertResult.meta.last_row_id,
-      changes: insertResult.meta.changes
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            success: true,
+            citation_id: insertResult.meta.last_row_id,
+            changes: insertResult.meta.changes
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (error) {
-    console.error("Admin citations ingest error:", error);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: error.message
-    }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (error) {
+          console.error("Admin citations ingest error:", error);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: error.message
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// 10.5) Admin Cache Diagnostic endpoint (temporary)
-if (url.pathname === "/admin/cache/diag" && request.method === "GET") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 10.5) Admin Cache Diagnostic endpoint (temporary)
+      if (url.pathname === "/admin/cache/diag" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Verify admin session
-    const session = await d1.prepare(`
+          // Verify admin session
+          const session = await d1.prepare(`
             SELECT s.*, u.email, u.is_admin 
             FROM session s 
             JOIN user u ON s.user_id = u.id 
             WHERE s.session_id = ? AND s.expires_at > datetime('now')
           `).bind(sessionId).first();
 
-    if (!session || !session.is_admin) {
-      const response = new Response(JSON.stringify({ error: "Admin privileges required" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!session || !session.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin privileges required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const { project_id } = Object.fromEntries(url.searchParams);
-    if (!project_id) {
-      const response = new Response(JSON.stringify({ error: "project_id required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const { project_id } = Object.fromEntries(url.searchParams);
+          if (!project_id) {
+            const response = new Response(JSON.stringify({ error: "project_id required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Read project version
-    const pv = await getProjectVersion(env.CACHE, project_id);
+          // Read project version
+          const pv = await getProjectVersion(env.CACHE, project_id);
 
-    // Test KV write/read
-    let putGetOk = false;
-    try {
-      await env.CACHE.put("diag:test", "ok", { expirationTtl: 60 });
-      const testVal = await env.CACHE.get("diag:test");
-      putGetOk = testVal === "ok";
-    } catch (e) {
-      console.error("Cache diag test failed:", e);
-    }
+          // Test KV write/read
+          let putGetOk = false;
+          try {
+            await env.CACHE.put("diag:test", "ok", { expirationTtl: 60 });
+            const testVal = await env.CACHE.get("diag:test");
+            putGetOk = testVal === "ok";
+          } catch (e) {
+            console.error("Cache diag test failed:", e);
+          }
 
-    const response = new Response(JSON.stringify({
-      kv_bound: !!env.CACHE,
-      pv,
-      put_get_ok: putGetOk,
-      timestamp: new Date().toISOString()
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            kv_bound: !!env.CACHE,
+            pv,
+            put_get_ok: putGetOk,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (error) {
-    console.error("Admin cache diag error:", error);
-    const response = new Response(JSON.stringify({
-      error: "Internal server error",
-      message: error.message
-    }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (error) {
+          console.error("Admin cache diag error:", error);
+          const response = new Response(JSON.stringify({
+            error: "Internal server error",
+            message: error.message
+          }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// 11) Admin Rules Suggestions endpoints
-if (url.pathname === "/admin/rules/suggestions" && request.method === "GET") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 11) Admin Rules Suggestions endpoints
+      if (url.pathname === "/admin/rules/suggestions" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Check if user is admin
-    const userData = await d1.prepare(`
+          // Check if user is admin
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
-    if (!userData || !userData.is_admin) {
-      const response = new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const status = url.searchParams.get('status') || 'pending';
+          const status = url.searchParams.get('status') || 'pending';
 
-    const suggestions = await d1.prepare(`
+          const suggestions = await d1.prepare(`
             SELECT rs.*, p.name as project_name, s.name as source_name, s.slug as source_slug, u.email as author_email
             FROM rules_suggestions rs
             JOIN project p ON p.id = rs.project_id
@@ -8879,232 +8891,232 @@ if (url.pathname === "/admin/rules/suggestions" && request.method === "GET") {
             ORDER BY rs.created_at DESC
           `).bind(status).all();
 
-    const response = new Response(JSON.stringify(suggestions.results), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify(suggestions.results), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Admin get suggestions error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Admin get suggestions error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-if (url.pathname.startsWith("/admin/rules/suggestions/") && request.method === "POST") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      if (url.pathname.startsWith("/admin/rules/suggestions/") && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Check if user is admin
-    const userData = await d1.prepare(`
+          // Check if user is admin
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
-    if (!userData || !userData.is_admin) {
-      const response = new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const suggestionId = url.pathname.split('/').pop();
-    const body = await request.json();
-    const { status, admin_comment, manifest_patch } = body;
+          const suggestionId = url.pathname.split('/').pop();
+          const body = await request.json();
+          const { status, admin_comment, manifest_patch } = body;
 
-    if (!status || !['approved', 'rejected'].includes(status)) {
-      const response = new Response(JSON.stringify({ error: "status must be 'approved' or 'rejected'" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!status || !['approved', 'rejected'].includes(status)) {
+            const response = new Response(JSON.stringify({ error: "status must be 'approved' or 'rejected'" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Update suggestion status
-    await d1.prepare(`
+          // Update suggestion status
+          await d1.prepare(`
             UPDATE rules_suggestions 
             SET status = ?, admin_comment = ?, decided_at = CURRENT_TIMESTAMP
             WHERE id = ?
           `).bind(status, admin_comment || null, suggestionId).run();
 
-    // If approved with manifest_patch, update KV manifest
-    if (status === 'approved' && manifest_patch) {
-      // TODO: Implement KV manifest update logic
-      // Load current manifest, validate patch, merge, increment version, write back
-      console.log("Manifest patch would be applied:", manifest_patch);
-    }
+          // If approved with manifest_patch, update KV manifest
+          if (status === 'approved' && manifest_patch) {
+            // TODO: Implement KV manifest update logic
+            // Load current manifest, validate patch, merge, increment version, write back
+            console.log("Manifest patch would be applied:", manifest_patch);
+          }
 
-    // TODO: Increment metrics counter
-    // rules_suggestion_approved_5m
+          // TODO: Increment metrics counter
+          // rules_suggestion_approved_5m
 
-    const response = new Response(JSON.stringify({
-      success: true,
-      message: `Suggestion ${status} successfully`,
-      suggestion_id: suggestionId,
-      status
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: `Suggestion ${status} successfully`,
+            suggestion_id: suggestionId,
+            status
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Admin decide suggestion error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Admin decide suggestion error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// 4.6) Switch organization/project context
-if (url.pathname === "/api/auth/switch-context" && request.method === "POST") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, request.headers.get("origin"));
-    }
+      // 4.6) Switch organization/project context
+      if (url.pathname === "/api/auth/switch-context" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, request.headers.get("origin"));
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, request.headers.get("origin"));
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
 
-    const body = await request.json();
-    const { organization_id, project_id } = body;
+          const body = await request.json();
+          const { organization_id, project_id } = body;
 
-    if (!organization_id || !project_id) {
-      const response = new Response(JSON.stringify({ error: "Organization ID and Project ID are required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, request.headers.get("origin"));
-    }
+          if (!organization_id || !project_id) {
+            const response = new Response(JSON.stringify({ error: "Organization ID and Project ID are required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
 
-    // Verify user has access to this organization and project
-    const accessCheck = await d1.prepare(`
+          // Verify user has access to this organization and project
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
             WHERE om.user_id = ? AND om.org_id = ? AND p.id = ?
           `).bind(sessionData.user_id, organization_id, project_id).first();
 
-    if (accessCheck.count === 0) {
-      const response = new Response(JSON.stringify({ error: "Access denied to organization/project" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, request.headers.get("origin"));
-    }
+          if (accessCheck.count === 0) {
+            const response = new Response(JSON.stringify({ error: "Access denied to organization/project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
 
-    // Update session with new context (we'll store this in a separate table)
-    // For now, we'll return success and let the frontend handle context switching
-    const response = new Response(JSON.stringify({
-      success: true,
-      message: "Context switch successful",
-      organization_id,
-      project_id
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, request.headers.get("origin"));
+          // Update session with new context (we'll store this in a separate table)
+          // For now, we'll return success and let the frontend handle context switching
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: "Context switch successful",
+            organization_id,
+            project_id
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
 
-  } catch (e) {
-    console.error("Switch context error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, request.headers.get("origin"));
-  }
-}
-
-// 4.5) Dev Test Endpoint - Magic Link Token Peek (TEST_MODE only)
-if (url.pathname === "/_test/magic-link" && request.method === "GET" && config.TEST_MODE) {
-  try {
-    const email = url.searchParams.get("email");
-    if (!email) {
-      const response = new Response(JSON.stringify({ error: "Email parameter required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
-
-    // Rate limiting for test endpoint
-    const clientIP = request.headers.get("cf-connecting-ip") || "unknown";
-    const ipKey = `rate_limit:test_magic_link:ip:${clientIP}`;
-    const ipLimit = await checkRateLimit(ipKey, config.ADMIN_RPM_PER_IP, 60 * 1000); // per minute per IP
-
-    if (!ipLimit.allowed) {
-      const response = new Response(JSON.stringify({ error: "Too many test requests from this IP" }), {
-        status: 429,
-        headers: {
-          "Content-Type": "application/json",
-          "Retry-After": Math.ceil((ipLimit.resetTime - Date.now()) / 1000)
+        } catch (e) {
+          console.error("Switch context error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
         }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      }
 
-    // Find the most recent unconsumed magic link for this email
-    // Query the D1 magic_link table
-    console.log("🔍 TEST MODE - Looking for magic link token for:", email);
+      // 4.5) Dev Test Endpoint - Magic Link Token Peek (TEST_MODE only)
+      if (url.pathname === "/_test/magic-link" && request.method === "GET" && config.TEST_MODE) {
+        try {
+          const email = url.searchParams.get("email");
+          if (!email) {
+            const response = new Response(JSON.stringify({ error: "Email parameter required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const magicLinkData = await d1.prepare(`
+          // Rate limiting for test endpoint
+          const clientIP = request.headers.get("cf-connecting-ip") || "unknown";
+          const ipKey = `rate_limit:test_magic_link:ip:${clientIP}`;
+          const ipLimit = await checkRateLimit(ipKey, config.ADMIN_RPM_PER_IP, 60 * 1000); // per minute per IP
+
+          if (!ipLimit.allowed) {
+            const response = new Response(JSON.stringify({ error: "Too many test requests from this IP" }), {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Retry-After": Math.ceil((ipLimit.resetTime - Date.now()) / 1000)
+              }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Find the most recent unconsumed magic link for this email
+          // Query the D1 magic_link table
+          console.log("🔍 TEST MODE - Looking for magic link token for:", email);
+
+          const magicLinkData = await d1.prepare(`
             SELECT ml.id, ml.email, ml.token_hash, ml.expires_at, ml.continue_path, ml.created_at, ml.consumed_at
             FROM magic_link ml
             WHERE ml.email = ? AND ml.consumed_at IS NULL AND ml.expires_at > ?
@@ -9112,500 +9124,500 @@ if (url.pathname === "/_test/magic-link" && request.method === "GET" && config.T
             LIMIT 1
           `).bind(email, new Date().toISOString()).first();
 
-    if (magicLinkData) {
-      const response = new Response(JSON.stringify({
-        message: "Magic link found",
-        email: email,
-        token: magicLinkData.token_hash,
-        token_hash: magicLinkData.token_hash,
-        continue_path: magicLinkData.continue_path,
-        expires_at: magicLinkData.expires_at,
-        created_at: magicLinkData.created_at,
-        consumed: magicLinkData.consumed_at !== null,
-        status: "found"
-      }), {
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    } else {
-      const response = new Response(JSON.stringify({
-        message: "No active magic link found for this email",
-        email: email,
-        note: "Try requesting a new magic link first",
-        status: "not_found"
-      }), {
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (magicLinkData) {
+            const response = new Response(JSON.stringify({
+              message: "Magic link found",
+              email: email,
+              token: magicLinkData.token_hash,
+              token_hash: magicLinkData.token_hash,
+              continue_path: magicLinkData.continue_path,
+              expires_at: magicLinkData.expires_at,
+              created_at: magicLinkData.created_at,
+              consumed: magicLinkData.consumed_at !== null,
+              status: "found"
+            }), {
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          } else {
+            const response = new Response(JSON.stringify({
+              message: "No active magic link found for this email",
+              email: email,
+              note: "Try requesting a new magic link first",
+              status: "not_found"
+            }), {
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-  } catch (e) {
-    console.error("Test magic link peek error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Test magic link peek error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// Onboarding endpoints
-if (url.pathname === "/api/onboarding/organization" && request.method === "POST") {
-  try {
-    const { name } = await request.json();
+      // Onboarding endpoints
+      if (url.pathname === "/api/onboarding/organization" && request.method === "POST") {
+        try {
+          const { name } = await request.json();
 
-    if (!name) {
-      return new Response(JSON.stringify({ error: "Name is required" }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+          if (!name) {
+            return new Response(JSON.stringify({ error: "Name is required" }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
 
-    // Auto-generate slug from name
-    const slug = name.toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single
-      .trim('-'); // Remove leading/trailing hyphens
+          // Auto-generate slug from name
+          const slug = name.toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/-+/g, '-') // Replace multiple hyphens with single
+            .trim('-'); // Remove leading/trailing hyphens
 
-    // Check if organization already exists
-    const existingOrg = await d1.prepare(`
+          // Check if organization already exists
+          const existingOrg = await d1.prepare(`
             SELECT id FROM organization WHERE name = ?
           `).bind(name).first();
 
-    if (existingOrg) {
-      return new Response(JSON.stringify({ error: "Organization with this name already exists" }), {
-        status: 409,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+          if (existingOrg) {
+            return new Response(JSON.stringify({ error: "Organization with this name already exists" }), {
+              status: 409,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
 
-    // Create organization
-    const orgId = generateToken();
-    const now = Math.floor(Date.now() / 1000);
+          // Create organization
+          const orgId = generateToken();
+          const now = Math.floor(Date.now() / 1000);
 
-    console.log('🔧 Attempting to create organization:', { orgId, name, now });
+          console.log('🔧 Attempting to create organization:', { orgId, name, now });
 
-    try {
-      await d1.prepare(`
+          try {
+            await d1.prepare(`
               INSERT INTO organization (id, name, created_ts)
               VALUES (?, ?, ?)
             `).bind(orgId, name, now).run();
 
-      console.log('✅ Organization created successfully');
-    } catch (insertError) {
-      console.error('❌ Organization insert failed:', insertError);
-      console.error('❌ Error details:', {
-        message: insertError.message,
-        code: insertError.code,
-        stack: insertError.stack
-      });
-      throw insertError;
-    }
+            console.log('✅ Organization created successfully');
+          } catch (insertError) {
+            console.error('❌ Organization insert failed:', insertError);
+            console.error('❌ Error details:', {
+              message: insertError.message,
+              code: insertError.code,
+              stack: insertError.stack
+            });
+            throw insertError;
+          }
 
-    console.log('✅ Organization created:', { id: orgId, name, slug });
+          console.log('✅ Organization created:', { id: orgId, name, slug });
 
-    const responseData = {
-      id: orgId,
-      name: name,
-      created_at: now,
-      user_id: userId,
-      org_member_created: !!userId
-    };
+          const responseData = {
+            id: orgId,
+            name: name,
+            created_at: now,
+            user_id: userId,
+            org_member_created: !!userId
+          };
 
-    console.log('📤 Sending response:', responseData);
+          console.log('📤 Sending response:', responseData);
 
-    return new Response(JSON.stringify(responseData), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
+          return new Response(JSON.stringify(responseData), {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' }
+          });
 
-  } catch (error) {
-    console.error('❌ Organization creation error:', error);
-    return new Response(JSON.stringify({ error: "Failed to create organization" }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
+        } catch (error) {
+          console.error('❌ Organization creation error:', error);
+          return new Response(JSON.stringify({ error: "Failed to create organization" }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
 
-if (url.pathname === "/api/onboarding/project" && request.method === "POST") {
-  try {
-    const { name, description, organizationId } = await request.json();
+      if (url.pathname === "/api/onboarding/project" && request.method === "POST") {
+        try {
+          const { name, description, organizationId } = await request.json();
 
-    if (!name || !organizationId) {
-      return new Response(JSON.stringify({ error: "Name and organization ID are required" }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+          if (!name || !organizationId) {
+            return new Response(JSON.stringify({ error: "Name and organization ID are required" }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
 
-    // Verify organization exists
-    const org = await d1.prepare(`
+          // Verify organization exists
+          const org = await d1.prepare(`
             SELECT id, name FROM organization WHERE id = ?
           `).bind(organizationId).first();
 
-    if (!org) {
-      return new Response(JSON.stringify({ error: "Organization not found" }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+          if (!org) {
+            return new Response(JSON.stringify({ error: "Organization not found" }), {
+              status: 404,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
 
-    // Create project
-    const projectId = generateToken();
-    const now = Math.floor(Date.now() / 1000);
-    const projectSlug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+          // Create project
+          const projectId = generateToken();
+          const now = Math.floor(Date.now() / 1000);
+          const projectSlug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-    await d1.prepare(`
+          await d1.prepare(`
             INSERT INTO project (id, name, slug, org_id, created_ts)
             VALUES (?, ?, ?, ?, ?)
           `).bind(projectId, name, projectSlug, organizationId, now).run();
 
-    console.log('✅ Project created:', { id: projectId, name, slug: projectSlug, orgId: organizationId });
+          console.log('✅ Project created:', { id: projectId, name, slug: projectSlug, orgId: organizationId });
 
-    return new Response(JSON.stringify({
-      success: true,
-      project: { id: projectId, name, slug: projectSlug, organizationId }
-    }), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
+          return new Response(JSON.stringify({
+            success: true,
+            project: { id: projectId, name, slug: projectSlug, organizationId }
+          }), {
+            status: 201,
+            headers: { 'Content-Type': 'application/json' }
+          });
 
-  } catch (error) {
-    console.error('❌ Project creation error:', error);
-    return new Response(JSON.stringify({ error: "Failed to create project" }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
+        } catch (error) {
+          console.error('❌ Project creation error:', error);
+          return new Response(JSON.stringify({ error: "Failed to create project" }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
 
-// 7) Project Settings endpoint - Proper implementation
-if (url.pathname.match(/^\/api\/projects\/[^\/]+\/settings$/) && request.method === "GET") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 7) Project Settings endpoint - Proper implementation
+      if (url.pathname.match(/^\/api\/projects\/[^\/]+\/settings$/) && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Extract project ID from URL
-    const urlObj = new URL(request.url);
-    const projectId = urlObj.pathname.split('/')[3];
+          // Extract project ID from URL
+          const urlObj = new URL(request.url);
+          const projectId = urlObj.pathname.split('/')[3];
 
-    // Verify user has access to this project
-    const accessCheck = await d1.prepare(`
+          // Verify user has access to this project
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
             WHERE om.user_id = ? AND p.id = ?
           `).bind(sessionData.user_id, projectId).first();
 
-    if (accessCheck.count === 0) {
-      const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (accessCheck.count === 0) {
+            const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // For now, return default project settings since we don't have a project_settings table yet
-    // TODO: Implement project settings when we add the project_settings table
-    const response = new Response(JSON.stringify({
-      project_id: projectId,
-      retention_days_events: 90,
-      retention_days_referrals: 365,
-      plan_tier: "starter",
-      xray_trace_enabled: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          // For now, return default project settings since we don't have a project_settings table yet
+          // TODO: Implement project settings when we add the project_settings table
+          const response = new Response(JSON.stringify({
+            project_id: projectId,
+            retention_days_events: 90,
+            retention_days_referrals: 365,
+            plan_tier: "starter",
+            xray_trace_enabled: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Get project settings error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Get project settings error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-if (url.pathname.match(/^\/api\/projects\/[^\/]+\/settings$/) && request.method === "PUT") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      if (url.pathname.match(/^\/api\/projects\/[^\/]+\/settings$/) && request.method === "PUT") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Extract project ID from URL
-    const urlObj = new URL(request.url);
-    const projectId = urlObj.pathname.split('/')[3];
+          // Extract project ID from URL
+          const urlObj = new URL(request.url);
+          const projectId = urlObj.pathname.split('/')[3];
 
-    // Verify user has access to this project
-    const accessCheck = await d1.prepare(`
+          // Verify user has access to this project
+          const accessCheck = await d1.prepare(`
             SELECT COUNT(*) as count 
             FROM org_member om
             JOIN project p ON p.org_id = om.org_id
             WHERE om.user_id = ? AND p.id = ?
           `).bind(sessionData.user_id, projectId).first();
 
-    if (accessCheck.count === 0) {
-      const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (accessCheck.count === 0) {
+            const response = new Response(JSON.stringify({ error: "Access denied to project" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const body = await request.json();
-    const { retention_days_events, retention_days_referrals } = body;
+          const body = await request.json();
+          const { retention_days_events, retention_days_referrals } = body;
 
-    // For now, return success since we don't have a project_settings table yet
-    // TODO: Implement project settings storage when we add the project_settings table
-    const response = new Response(JSON.stringify({
-      success: true,
-      message: "Project settings update not yet implemented"
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          // For now, return success since we don't have a project_settings table yet
+          // TODO: Implement project settings storage when we add the project_settings table
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: "Project settings update not yet implemented"
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Update project settings error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Update project settings error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// 9) Admin endpoint to promote users to admin
-if (url.pathname === "/admin/promote-user" && request.method === "POST") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 9) Admin endpoint to promote users to admin
+      if (url.pathname === "/admin/promote-user" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Check if user is admin
-    const userData = await d1.prepare(`
+          // Check if user is admin
+          const userData = await d1.prepare(`
             SELECT is_admin FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
-    if (!userData || !userData.is_admin) {
-      const response = new Response(JSON.stringify({ error: "Admin access required" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userData || !userData.is_admin) {
+            const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+              status: 403,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const body = await request.json();
-    const { email } = body;
+          const body = await request.json();
+          const { email } = body;
 
-    if (!email) {
-      const response = new Response(JSON.stringify({ error: "Email is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!email) {
+            const response = new Response(JSON.stringify({ error: "Email is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Update user to admin
-    const updateResult = await d1.prepare(`
+          // Update user to admin
+          const updateResult = await d1.prepare(`
             UPDATE user SET is_admin = 1 WHERE email = ?
           `).bind(email).run();
 
-    if (updateResult.changes === 0) {
-      const response = new Response(JSON.stringify({ error: "User not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (updateResult.changes === 0) {
+            const response = new Response(JSON.stringify({ error: "User not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const response = new Response(JSON.stringify({
-      success: true,
-      message: `User ${email} promoted to admin`
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
+          const response = new Response(JSON.stringify({
+            success: true,
+            message: `User ${email} promoted to admin`
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Admin promote user error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
+        } catch (e) {
+          console.error("Admin promote user error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
 
-// 10) Debug endpoint to show current user info
-if (url.pathname === "/debug/user-info" && request.method === "GET") {
-  try {
-    const sessionCookie = request.headers.get("cookie");
-    if (!sessionCookie) {
-      const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+      // 10) Debug endpoint to show current user info
+      if (url.pathname === "/debug/user-info" && request.method === "GET") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
-    if (!sessionMatch) {
-      const response = new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const sessionId = sessionMatch[1];
-    const sessionData = await d1.prepare(`
+          const sessionId = sessionMatch[1];
+          const sessionData = await d1.prepare(`
             SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
-    if (!sessionData) {
-      const response = new Response(JSON.stringify({ error: "Session expired" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!sessionData) {
+            const response = new Response(JSON.stringify({ error: "Session expired" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    // Get user data
-    const userData = await d1.prepare(`
+          // Get user data
+          const userData = await d1.prepare(`
             SELECT id, email, is_admin, created_ts, last_login_ts FROM user WHERE id = ?
           `).bind(sessionData.user_id).first();
 
-    if (!userData) {
-      const response = new Response(JSON.stringify({ error: "User not found" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" }
-      });
-      return addCorsHeaders(response, origin);
-    }
+          if (!userData) {
+            const response = new Response(JSON.stringify({ error: "User not found" }), {
+              status: 404,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
 
-    const response = new Response(JSON.stringify({
-      user: userData,
-      session: {
-        session_id: sessionId.substring(0, 8) + "...",
-        expires_at: sessionData.expires_at
+          const response = new Response(JSON.stringify({
+            user: userData,
+            session: {
+              session_id: sessionId.substring(0, 8) + "...",
+              expires_at: sessionData.expires_at
+            }
+          }), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+
+        } catch (e) {
+          console.error("Debug user info error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
       }
-    }), {
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
 
-  } catch (e) {
-    console.error("Debug user info error:", e);
-    const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-    return addCorsHeaders(response, origin);
-  }
-}
-
-// 8) Fallback response for any unmatched routes
-const fallbackResponse = new Response("Not Found", { status: 404 });
-return addCorsHeaders(fallbackResponse, origin);
+      // 8) Fallback response for any unmatched routes
+      const fallbackResponse = new Response("Not Found", { status: 404 });
+      return addCorsHeaders(fallbackResponse, origin);
 
     } catch (error) {
-  console.error("Worker error:", error);
+      console.error("Worker error:", error);
 
-  const response = new Response(JSON.stringify({ error: "Internal server error" }), {
-    status: 500,
-    headers: { "Content-Type": "application/json" }
-  });
+      const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
 
-  return response;
-}
+      return response;
+    }
   }
 };
