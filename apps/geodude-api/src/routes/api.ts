@@ -1521,12 +1521,10 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // Hash and validate API key
-            const { hashString } = await import('../utils');
-            const keyHash = await hashString(keyId);
+            // Look up API key by ID (not hash)
             const apiKey = await env.OPTIVIEW_DB.prepare(`
-                SELECT * FROM api_key WHERE hash = ? AND revoked_ts IS NULL
-            `).bind(keyHash).first();
+                SELECT * FROM api_key WHERE id = ? AND revoked_ts IS NULL
+            `).bind(keyId).first();
 
             if (!apiKey) {
                 const response = new Response(JSON.stringify({ error: "Invalid API key" }), {
