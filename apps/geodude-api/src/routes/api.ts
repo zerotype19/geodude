@@ -407,7 +407,13 @@ export async function handleApiRoutes(
             };
 
             // Get cached or generate summary
-            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.eventsSummary, generateSummary);
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.eventsSummary, generateSummary, { 
+                CACHE_OFF: env.CACHE_OFF, 
+                metrics: (name) => {
+                    // TODO: Add metrics recording when metrics system is available
+                    console.log(`cache_metric: ${name}`);
+                }
+            });
 
             const response = new Response(JSON.stringify(summary), {
                 headers: {
@@ -1711,7 +1717,13 @@ export async function handleApiRoutes(
             };
 
             // Get cached or generate summary
-            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.referralsSummary, generateReferralsSummary);
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.referralsSummary, generateReferralsSummary, { 
+                CACHE_OFF: env.CACHE_OFF, 
+                metrics: (name) => {
+                    // TODO: Add metrics recording when metrics system is available
+                    console.log(`cache_metric: ${name}`);
+                }
+            });
 
             const response = new Response(JSON.stringify(summary), {
                 headers: {
@@ -1764,6 +1776,785 @@ export async function handleApiRoutes(
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
             console.error("referrals_top_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.7) Funnels Summary API (with caching)
+    if (url.pathname === "/api/funnels/summary" && req.method === "GET") {
+        try {
+            const { project_id, window = "24h", from, to } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response("missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Import cache utilities
+            const { getOrSetJSON, getProjectVersion } = await import('../lib/cache');
+            const { CACHE_TTL } = await import('../lib/config');
+
+            // Get project version for cache invalidation
+            const v = await getProjectVersion(env.CACHE, project_id);
+            const cacheKey = `funnels:summary:v${v}:${project_id}:${window}:${from || ''}:${to || ''}`;
+
+            // Calculate time bounds from window or from/to override
+            let fromTs: number, toTs: number;
+            if (from && to) {
+                fromTs = new Date(from).getTime();
+                toTs = new Date(to).getTime();
+            } else {
+                const now = Date.now();
+                switch (window) {
+                    case "15m": fromTs = now - 15 * 60 * 1000; break;
+                    case "24h": fromTs = now - 24 * 60 * 60 * 1000; break;
+                    case "7d": fromTs = now - 7 * 24 * 60 * 60 * 1000; break;
+                    default: fromTs = now - 24 * 60 * 60 * 1000; break;
+                }
+                toTs = now;
+            }
+
+            // Convert to SQL-compatible format (milliseconds -> seconds)
+            const fromSql = fromTs / 1000;
+            const toSql = toTs / 1000;
+
+            // Generate funnels summary with caching
+            const generateFunnelsSummary = async () => {
+                // Get funnel steps and conversion rates
+                const funnelSteps = await env.OPTIVIEW_DB.prepare(`
+                    SELECT 
+                        step_name,
+                        step_order,
+                        COUNT(DISTINCT session_id) as sessions,
+                        COUNT(*) as events
+                    FROM funnel_steps fs
+                    JOIN session_v1 sv ON sv.id = fs.session_id
+                    WHERE sv.project_id = ? 
+                      AND sv.started_at >= datetime(?, 'unixepoch')
+                      AND sv.started_at <= datetime(?, 'unixepoch')
+                    GROUP BY step_name, step_order
+                    ORDER BY step_order
+                `).bind(project_id, fromSql, toSql).all<any>();
+
+                // Calculate conversion rates
+                const steps = (funnelSteps.results || []).map((step, index, array) => {
+                    const previousStep = index > 0 ? array[index - 1] : null;
+                    const conversionRate = previousStep ? (step.sessions / previousStep.sessions * 100) : 100;
+                    
+                    return {
+                        step_name: step.step_name,
+                        step_order: step.step_order,
+                        sessions: step.sessions,
+                        events: step.events,
+                        conversion_rate: Math.round(conversionRate * 100) / 100
+                    };
+                });
+
+                return {
+                    totals: {
+                        steps: steps.length,
+                        total_sessions: steps.length > 0 ? steps[0].sessions : 0
+                    },
+                    steps: steps
+                };
+            };
+
+            // Get cached or generate summary
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.funnelsSummary, generateFunnelsSummary, { 
+                CACHE_OFF: env.CACHE_OFF, 
+                metrics: (name) => {
+                    console.log(`cache_metric: ${name}`);
+                }
+            });
+
+            const response = new Response(JSON.stringify(summary), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=60, stale-while-revalidate=60"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("funnels_summary_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.8) Sessions Summary API (with caching)
+    if (url.pathname === "/api/sessions/summary" && req.method === "GET") {
+        try {
+            const { project_id, window = "24h", from, to } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response("missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Import cache utilities
+            const { getOrSetJSON, getProjectVersion } = await import('../lib/cache');
+            const { CACHE_TTL } = await import('../lib/config');
+
+            // Get project version for cache invalidation
+            const v = await getProjectVersion(env.CACHE, project_id);
+            const cacheKey = `sessions:summary:v${v}:${project_id}:${window}:${from || ''}:${to || ''}`;
+
+            // Calculate time bounds from window or from/to override
+            let fromTs: number, toTs: number;
+            if (from && to) {
+                fromTs = new Date(from).getTime();
+                toTs = new Date(to).getTime();
+            } else {
+                const now = Date.now();
+                switch (window) {
+                    case "15m": fromTs = now - 15 * 60 * 1000; break;
+                    case "24h": fromTs = now - 24 * 60 * 60 * 1000; break;
+                    case "7d": fromTs = now - 7 * 24 * 60 * 60 * 1000; break;
+                    default: fromTs = now - 24 * 60 * 60 * 1000; break;
+                }
+                toTs = now;
+            }
+
+            // Convert to SQL-compatible format (milliseconds -> seconds)
+            const fromSql = fromTs / 1000;
+            const toSql = toTs / 1000;
+
+            // Generate sessions summary with caching
+            const generateSessionsSummary = async () => {
+                // Get total sessions
+                const totalResult = await env.OPTIVIEW_DB.prepare(`
+                    SELECT COUNT(*) AS total
+                    FROM session_v1
+                    WHERE project_id = ? 
+                      AND started_at >= datetime(?, 'unixepoch')
+                      AND started_at <= datetime(?, 'unixepoch')
+                `).bind(project_id, fromSql, toSql).first<any>();
+
+                // Get sessions by AI source
+                const bySource = await env.OPTIVIEW_DB.prepare(`
+                    SELECT 
+                        sv.primary_ai_source_id,
+                        ais.slug,
+                        ais.name,
+                        COUNT(*) AS count
+                    FROM session_v1 sv
+                    LEFT JOIN ai_sources ais ON ais.id = sv.primary_ai_source_id
+                    WHERE sv.project_id = ? 
+                      AND sv.started_at >= datetime(?, 'unixepoch')
+                      AND sv.started_at <= datetime(?, 'unixepoch')
+                    GROUP BY sv.primary_ai_source_id, ais.slug, ais.name
+                    ORDER BY count DESC
+                    LIMIT 10
+                `).bind(project_id, fromSql, toSql).all<any>();
+
+                // Get session duration stats
+                const durationStats = await env.OPTIVIEW_DB.prepare(`
+                    SELECT 
+                        AVG(CAST((julianday(sv.ended_at) - julianday(sv.started_at)) * 86400 AS INTEGER)) as avg_duration_seconds,
+                        MIN(CAST((julianday(sv.ended_at) - julianday(sv.started_at)) * 86400 AS INTEGER)) as min_duration_seconds,
+                        MAX(CAST((julianday(sv.ended_at) - julianday(sv.started_at)) * 86400 AS INTEGER)) as max_duration_seconds
+                    FROM session_v1 sv
+                    WHERE sv.project_id = ? 
+                      AND sv.started_at >= datetime(?, 'unixepoch')
+                      AND sv.started_at <= datetime(?, 'unixepoch')
+                      AND sv.ended_at IS NOT NULL
+                `).bind(project_id, fromSql, toSql).first<any>();
+
+                return {
+                    totals: {
+                        sessions: totalResult?.total || 0
+                    },
+                    by_source: (bySource.results || []).map(row => ({
+                        ai_source_id: row.primary_ai_source_id,
+                        slug: row.slug || 'direct',
+                        name: row.name || 'Direct Traffic',
+                        count: row.count
+                    })),
+                    duration: {
+                        avg_seconds: Math.round(durationStats?.avg_duration_seconds || 0),
+                        min_seconds: durationStats?.min_duration_seconds || 0,
+                        max_seconds: durationStats?.max_duration_seconds || 0
+                    }
+                };
+            };
+
+            // Get cached or generate summary
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.sessionsSummary, generateSessionsSummary, { 
+                CACHE_OFF: env.CACHE_OFF, 
+                metrics: (name) => {
+                    console.log(`cache_metric: ${name}`);
+                }
+            });
+
+            const response = new Response(JSON.stringify(summary), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=30, stale-while-revalidate=60"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("sessions_summary_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.9) Conversions API (with cache invalidation)
+    if (url.pathname === "/api/conversions" && req.method === "POST") {
+        try {
+            // Check Content-Type
+            const contentType = req.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // IP rate limiting (120 rpm per IP, 60s window)
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const ipRateLimitKey = `rl:ip:conversions:${clientIP}`;
+            const ipCount = await env.KV.get(ipRateLimitKey);
+            
+            if (!ipCount) {
+                await env.KV.put(ipRateLimitKey, "1", { expirationTtl: 60 });
+            } else if (parseInt(ipCount) >= 120) {
+                const response = new Response(JSON.stringify({
+                    error: "IP rate limit exceeded",
+                    code: "ip_ratelimit",
+                    retry_after: 60
+                }), { 
+                    status: 429, 
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Retry-After": "60"
+                    } 
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            } else {
+                await env.KV.put(ipRateLimitKey, String(parseInt(ipCount) + 1), { expirationTtl: 60 });
+            }
+
+            // Get request body and validate size
+            const bodyText = await req.text();
+            if (bodyText.length > 1024) {
+                const response = new Response(JSON.stringify({
+                    error: "Request body too large",
+                    max_size_kb: 1,
+                    actual_size_kb: Math.round(bodyText.length / 1024)
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse and validate body
+            const body = JSON.parse(bodyText);
+            const validation = validateRequestBody("/api/conversions", body, bodyText.length);
+
+            if (!validation.valid) {
+                const response = new Response(JSON.stringify({
+                    error: "Validation failed",
+                    details: validation.errors
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Import ingest guards
+            const { hostnameAllowed, sanitizeMetadata } = await import('../lib/ingest-guards');
+
+            // Domain validation - check if URL hostname matches property domain
+            if (validation.sanitizedData.metadata?.url) {
+                try {
+                    const url = new URL(validation.sanitizedData.metadata.url);
+                    const propertyDomain = await env.OPTIVIEW_DB.prepare(`
+                        SELECT domain FROM properties WHERE id = ?
+                    `).bind(validation.sanitizedData.property_id || body.property_id).first<{ domain: string }>();
+                    
+                    if (propertyDomain && !hostnameAllowed(url.hostname, propertyDomain.domain)) {
+                        const response = new Response(JSON.stringify({
+                            error: "Domain mismatch",
+                            reason: "URL hostname does not match property domain",
+                            url_hostname: url.hostname,
+                            property_domain: propertyDomain.domain
+                        }), { status: 400, headers: { "Content-Type": "application/json" } });
+                        return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                    }
+                } catch (e) {
+                    // Invalid URL format - reject
+                    const response = new Response(JSON.stringify({
+                        error: "Invalid URL format",
+                        reason: "metadata.url must be a valid URL"
+                    }), { status: 400, headers: { "Content-Type": "application/json" } });
+                    return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                }
+            }
+
+            // Metadata sanitization and size validation
+            const cleanedMetadata = sanitizeMetadata(validation.sanitizedData.metadata);
+            if (!cleanedMetadata) {
+                const response = new Response(JSON.stringify({
+                    error: "Metadata too large",
+                    reason: "Metadata exceeds 2KB limit even after sanitization"
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+            
+            // Update validation data with cleaned metadata
+            validation.sanitizedData.metadata = cleanedMetadata;
+
+            // Insert the conversion
+            const result = await env.OPTIVIEW_DB.prepare(`
+                INSERT INTO conversion_event (project_id, content_id, ai_source_id, conversion_type, metadata, occurred_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `).bind(
+                validation.sanitizedData.project_id,
+                validation.sanitizedData.content_id || null,
+                validation.sanitizedData.ai_source_id || null,
+                validation.sanitizedData.conversion_type,
+                JSON.stringify(validation.sanitizedData.metadata || {}),
+                validation.sanitizedData.occurred_at || Date.now()
+            ).run();
+
+            // Invalidate cache for this project
+            const { bumpProjectVersion } = await import('../lib/cache');
+            await bumpProjectVersion(env.CACHE, validation.sanitizedData.project_id);
+
+            const response = new Response(JSON.stringify({
+                id: result.meta.last_row_id,
+                conversion_type: validation.sanitizedData.conversion_type,
+                project_id: validation.sanitizedData.project_id
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("conversions_create_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.10) Sources Enable/Disable API (with cache invalidation)
+    if (url.pathname === "/api/sources/enable" && req.method === "POST") {
+        try {
+            // Check Content-Type
+            const contentType = req.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get request body and validate size
+            const bodyText = await req.text();
+            if (bodyText.length > 1024) {
+                const response = new Response(JSON.stringify({
+                    error: "Request body too large",
+                    max_size_kb: 1,
+                    actual_size_kb: Math.round(bodyText.length / 1024)
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse and validate body
+            const body = JSON.parse(bodyText);
+            const { project_id, source_id, enabled } = body;
+
+            if (!project_id || !source_id || typeof enabled !== 'boolean') {
+                const response = new Response(JSON.stringify({
+                    error: "Missing required fields",
+                    required: ["project_id", "source_id", "enabled"]
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Update the source enabled status
+            const result = await env.OPTIVIEW_DB.prepare(`
+                UPDATE ai_sources 
+                SET enabled = ?, updated_at = datetime('now')
+                WHERE id = ? AND project_id = ?
+            `).bind(enabled ? 1 : 0, source_id, project_id).run();
+
+            if (result.meta.changes === 0) {
+                const response = new Response(JSON.stringify({
+                    error: "Source not found or no changes made"
+                }), { status: 404, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Invalidate cache for this project
+            const { bumpProjectVersion } = await import('../lib/cache');
+            await bumpProjectVersion(env.CACHE, project_id);
+
+            const response = new Response(JSON.stringify({
+                success: true,
+                source_id,
+                enabled,
+                project_id
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("sources_enable_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.11) Admin Citations Ingest API (with cache invalidation)
+    if (url.pathname === "/admin/citations/ingest" && req.method === "POST") {
+        try {
+            // Check authentication (admin only)
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Check if user is admin
+            const userData = await env.OPTIVIEW_DB.prepare(`
+                SELECT is_admin FROM users WHERE id = ?
+            `).bind(sessionData.user_id).first<{ is_admin: number }>();
+
+            if (!userData || !userData.is_admin) {
+                const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Check Content-Type
+            const contentType = req.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const response = new Response("Content-Type must be application/json", { status: 415 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get request body and validate size
+            const bodyText = await req.text();
+            if (bodyText.length > 10240) { // 10KB limit for admin endpoint
+                const response = new Response(JSON.stringify({
+                    error: "Request body too large",
+                    max_size_kb: 10,
+                    actual_size_kb: Math.round(bodyText.length / 1024)
+                }), { status: 413, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse and validate body
+            const body = JSON.parse(bodyText);
+            const { project_id, citations } = body;
+
+            if (!project_id || !Array.isArray(citations)) {
+                const response = new Response(JSON.stringify({
+                    error: "Missing required fields",
+                    required: ["project_id", "citations"]
+                }), { status: 400, headers: { "Content-Type": "application/json" } });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Process citations in batch
+            let created = 0;
+            let skipped = 0;
+            const errors: string[] = [];
+
+            for (const citation of citations) {
+                try {
+                    const result = await env.OPTIVIEW_DB.prepare(`
+                        INSERT INTO ai_citations (ai_source_id, content_id, citation_type, detected_at, metadata)
+                        VALUES (?, ?, ?, ?, ?)
+                    `).bind(
+                        citation.ai_source_id,
+                        citation.content_id || null,
+                        citation.citation_type || 'mention',
+                        citation.detected_at || Date.now(),
+                        JSON.stringify(citation.metadata || {})
+                    ).run();
+
+                    created++;
+                } catch (e: any) {
+                    skipped++;
+                    errors.push(`Citation ${created + skipped}: ${e.message}`);
+                }
+            }
+
+            // Invalidate cache for this project
+            const { bumpProjectVersion } = await import('../lib/cache');
+            await bumpProjectVersion(env.CACHE, project_id);
+
+            const response = new Response(JSON.stringify({
+                success: true,
+                created,
+                skipped,
+                errors: errors.length > 0 ? errors : undefined
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("admin_citations_ingest_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.12) Admin Environment Check API
+    if (url.pathname === "/admin/env-check" && req.method === "GET") {
+        try {
+            // Check authentication (admin only)
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Check if user is admin
+            const userData = await env.OPTIVIEW_DB.prepare(`
+                SELECT is_admin FROM users WHERE id = ?
+            `).bind(sessionData.user_id).first<{ is_admin: number }>();
+
+            if (!userData || !userData.is_admin) {
+                const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Check KV bindings
+            const cacheBound = !!env.CACHE;
+            const cacheBindingName = cacheBound ? "CACHE" : "NOT_BOUND";
+            const cacheIdsArePlaceholders = cacheBound && (
+                env.CACHE.toString().includes("REPLACE_WITH") || 
+                env.CACHE.toString().includes("placeholder")
+            );
+
+            // Check environment variables
+            const envCheck = {
+                ok: true,
+                timestamp: new Date().toISOString(),
+                environment: env.NODE_ENV || "unknown",
+                kv: {
+                    cache: {
+                        bound: cacheBound,
+                        binding_name: cacheBindingName,
+                        ids_are_placeholders: cacheIdsArePlaceholders
+                    },
+                    ai_fingerprints: {
+                        bound: !!env.AI_FINGERPRINTS
+                    }
+                },
+                cache: {
+                    cache_off: env.CACHE_OFF || "false",
+                    cache_off_effective: env.CACHE_OFF === "1"
+                },
+                database: {
+                    d1_bound: !!env.OPTIVIEW_DB
+                },
+                cron: {
+                    enabled: true, // We have cron triggers configured
+                    schedules: ["*/5 * * * *", "0 * * * *", "0 3 * * *"]
+                }
+            };
+
+            const response = new Response(JSON.stringify(envCheck), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("env_check_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.13) Citations Summary API (with caching)
+    if (url.pathname === "/api/citations/summary" && req.method === "GET") {
+        try {
+            const { project_id, window = "24h", from, to } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response("missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Import cache utilities
+            const { getOrSetJSON, getProjectVersion } = await import('../lib/cache');
+            const { CACHE_TTL } = await import('../lib/config');
+
+            // Get project version for cache invalidation
+            const v = await getProjectVersion(env.CACHE, project_id);
+            const cacheKey = `citations:summary:v${v}:${project_id}:${window}:${from || ''}:${to || ''}`;
+
+            // Calculate time bounds from window or from/to override
+            let fromTs: number, toTs: number;
+            if (from && to) {
+                fromTs = new Date(from).getTime();
+                toTs = new Date(to).getTime();
+            } else {
+                const now = Date.now();
+                switch (window) {
+                    case "15m": fromTs = now - 15 * 60 * 1000; break;
+                    case "24h": fromTs = now - 24 * 60 * 60 * 1000; break;
+                    case "7d": fromTs = now - 7 * 24 * 60 * 60 * 1000; break;
+                    default: fromTs = now - 24 * 60 * 60 * 1000; break;
+                }
+                toTs = now;
+            }
+
+            // Convert to SQL-compatible format (milliseconds -> seconds)
+            const fromSql = fromTs / 1000;
+            const toSql = toTs / 1000;
+
+            // Generate citations summary with caching
+            const generateCitationsSummary = async () => {
+                // Get total citations
+                const totalResult = await env.OPTIVIEW_DB.prepare(`
+                    SELECT COUNT(*) AS total
+                    FROM ai_citations ac
+                    JOIN content_assets ca ON ca.id = ac.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    WHERE p.project_id = ? 
+                      AND ac.detected_at >= datetime(?, 'unixepoch')
+                      AND ac.detected_at <= datetime(?, 'unixepoch')
+                `).bind(project_id, fromSql, toSql).first<any>();
+
+                // Get citations by AI source
+                const bySource = await env.OPTIVIEW_DB.prepare(`
+                    SELECT 
+                        ac.ai_source_id,
+                        ais.slug,
+                        ais.name,
+                        COUNT(*) AS count
+                    FROM ai_citations ac
+                    JOIN content_assets ca ON ca.id = ac.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    JOIN ai_sources ais ON ais.id = ac.ai_source_id
+                    WHERE p.project_id = ? 
+                      AND ac.detected_at >= datetime(?, 'unixepoch')
+                      AND ac.detected_at <= datetime(?, 'unixepoch')
+                    GROUP BY ac.ai_source_id, ais.slug, ais.name
+                    ORDER BY count DESC
+                    LIMIT 10
+                `).bind(project_id, fromSql, toSql).all<any>();
+
+                // Get citations by content type
+                const byContentType = await env.OPTIVIEW_DB.prepare(`
+                    SELECT 
+                        ca.content_type,
+                        COUNT(*) AS count
+                    FROM ai_citations ac
+                    JOIN content_assets ca ON ca.id = ac.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    WHERE p.project_id = ? 
+                      AND ac.detected_at >= datetime(?, 'unixepoch')
+                      AND ac.detected_at <= datetime(?, 'unixepoch')
+                    GROUP BY ca.content_type
+                    ORDER BY count DESC
+                `).bind(project_id, fromSql, toSql).all<any>();
+
+                return {
+                    totals: {
+                        citations: totalResult?.total || 0
+                    },
+                    by_source: (bySource.results || []).map(row => ({
+                        ai_source_id: row.ai_source_id,
+                        slug: row.slug,
+                        name: row.name,
+                        count: row.count
+                    })),
+                    by_content_type: (byContentType.results || []).map(row => ({
+                        content_type: row.content_type || 'unknown',
+                        count: row.count
+                    }))
+                };
+            };
+
+            // Get cached or generate summary
+            const summary = await getOrSetJSON(env.CACHE, cacheKey, CACHE_TTL.citationsSummary, generateCitationsSummary, { 
+                CACHE_OFF: env.CACHE_OFF, 
+                metrics: (name) => {
+                    console.log(`cache_metric: ${name}`);
+                }
+            });
+
+            const response = new Response(JSON.stringify(summary), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=120, stale-while-revalidate=60"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("citations_summary_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
