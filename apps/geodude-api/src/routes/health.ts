@@ -28,7 +28,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
       // Get org_id from session (for now, use a default org for testing)
       // TODO: Implement proper session-based org_id extraction
       const orgId = "org_default"; // Placeholder - replace with actual org_id from session
-      
+
       // KV & DB "connected" status
       const kvOk = !!env.METRICS;
       const dbOk = !!d1;
@@ -49,12 +49,12 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
       let aiLiteMetrics = null;
       try {
         const { getLast5MinuteRollups } = await import('../ai-lite/rollups');
-        
+
         // Get metrics for the actual project (prj_UHoetismrowc)
         const projectId = "prj_UHoetismrowc";
-        
+
         const rollupMetrics = await getLast5MinuteRollups(d1, projectId);
-        
+
         aiLiteMetrics = {
           ai_events_5m: rollupMetrics['human_via_ai'] || 0,
           ai_crawls_5m: rollupMetrics['ai_agent_crawl'] || 0,
@@ -84,18 +84,18 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         kv: { connected: kvOk },
         database: { connected: dbOk },
         cron: { last: lastCron },
-        requests_5m: { 
-          total: totalReq, 
-          error_rate_pct: errorRate, 
-          p50_ms: p50, 
-          p95_ms: p95, 
-          status_breakdown: statusBreakdown 
+        requests_5m: {
+          total: totalReq,
+          error_rate_pct: errorRate,
+          p50_ms: p50,
+          p95_ms: p95,
+          status_breakdown: statusBreakdown
         },
-        sessions_5m: { 
-          opened, 
-          closed, 
-          attached, 
-          status: opened > 0 && attached > 0 ? "healthy" : (opened === 0 && attached === 0 ? "watch" : "degraded") 
+        sessions_5m: {
+          opened,
+          closed,
+          attached,
+          status: opened > 0 && attached > 0 ? "healthy" : (opened === 0 && attached === 0 ? "watch" : "degraded")
         },
         projects_5m: { created },
         ai_lite: aiLiteMetrics, // AI-Lite specific metrics
@@ -146,7 +146,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         }
       }), {
         status: 200, // Return 200 with degraded status for monitoring
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store, no-cache, must-revalidate",
         }
@@ -307,13 +307,13 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         try {
           // Get table info
           const tableInfo = await d1.prepare(`PRAGMA table_info('${table}')`).all();
-          
+
           // Get table DDL
           const tableDDL = await d1.prepare(`
             SELECT name, sql FROM sqlite_master 
             WHERE type='table' AND name='${table}'
           `).first();
-          
+
           // Get indexes
           const indexes = await d1.prepare(`
             SELECT name, sql FROM sqlite_master 
@@ -362,11 +362,11 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
       const projectId = url.searchParams.get('project_id') || 'prj_UHoetismrowc';
       const window = url.searchParams.get('window') || '1h';
       const trafficClass = url.searchParams.get('class') || 'ai_agent_crawl';
-      
+
       // Get window duration in hours
       const hours = window.endsWith('h') ? parseInt(window.slice(0, -1)) : 1;
       const hoursAgo = new Date(Date.now() - hours * 60 * 60 * 1000);
-      
+
       // Get recent events for this class
       const recentEvents = await d1.prepare(`
         SELECT 
@@ -420,7 +420,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
           ts_hour_threshold: Math.floor(hoursAgo.getTime() / 1000 / 3600) * 3600
         }
       }, null, 2), {
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store, no-cache, must-revalidate"
         }
@@ -446,7 +446,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
       const projectId = url.searchParams.get('project_id') || 'prj_UHoetismrowc';
       const hours = parseInt(url.searchParams.get('hours') || '6');
       const hoursAgo = new Date(Date.now() - hours * 60 * 60 * 1000);
-      
+
       // Get all crawler events from the last N hours
       const crawlerEvents = await d1.prepare(`
         SELECT 
@@ -466,25 +466,25 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
       const events = crawlerEvents.results || [];
       let backfilled = 0;
       let errors = 0;
-      
+
       // Group events by hour and property
       const hourlyGroups: Record<string, { propertyId: number; count: number }> = {};
-      
+
       for (const event of events) {
         const eventTime = new Date(event.occurred_at);
         const hourBucket = Math.floor(eventTime.getTime() / 1000 / 3600) * 3600;
         const key = `${hourBucket}-${event.property_id}`;
-        
+
         if (!hourlyGroups[key]) {
           hourlyGroups[key] = { propertyId: event.property_id, count: 0 };
         }
         hourlyGroups[key].count++;
       }
-      
+
       // Backfill rollups for each hour/property group
       for (const [key, group] of Object.entries(hourlyGroups)) {
         const [hourBucket, propertyId] = key.split('-');
-        
+
         try {
           await d1.prepare(`
             INSERT INTO traffic_rollup_hourly 
@@ -499,7 +499,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
             group.count,
             group.count
           ).run();
-          
+
           backfilled += group.count;
         } catch (error) {
           console.error('Backfill error for', key, error);
@@ -526,7 +526,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
           };
         })
       }, null, 2), {
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store, no-cache, must-revalidate"
         }
@@ -537,6 +537,108 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
       console.error('Backfill endpoint error:', error);
       const response = new Response(JSON.stringify({
         error: "Failed to backfill crawler rollups",
+        details: error.message
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+      return addCorsHeaders(response, origin);
+    }
+  }
+
+  // Admin endpoint to backfill session AI classification
+  if (url.pathname === "/admin/backfill-sessions" && request.method === "POST") {
+    try {
+      // Basic admin check (you may want to enhance this)
+      const authHeader = request.headers.get('authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const response = new Response(JSON.stringify({
+          error: "Unauthorized - Admin access required"
+        }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response, origin);
+      }
+
+      const { project_id, limit = "100" } = await request.json();
+      if (!project_id) {
+        const response = new Response(JSON.stringify({
+          error: "Missing project_id parameter"
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+        return addCorsHeaders(response, origin);
+      }
+
+      // Get sessions without proper AI classification
+      const sessionsToUpdate = await d1.prepare(`
+        SELECT id, started_at, ended_at, events_count
+        FROM session_v1 
+        WHERE project_id = ? AND (ai_influenced IS NULL OR ai_influenced = 0)
+        ORDER BY started_at DESC LIMIT ?
+      `).bind(project_id, parseInt(limit)).all<any>();
+
+      let updated = 0;
+      let errors = 0;
+
+      for (const session of sessionsToUpdate.results || []) {
+        try {
+          // Check if this session has any AI-influenced events
+          const aiEventsResult = await d1.prepare(`
+            SELECT 
+              COUNT(*) as ai_count,
+              MAX(ai_source_id) as primary_ai_source_id
+            FROM interaction_events 
+            WHERE project_id = ? 
+              AND occurred_at >= ? 
+              AND occurred_at <= COALESCE(?, datetime('now'))
+              AND class IN ('human_via_ai', 'ai_agent_crawl')
+          `).bind(
+            project_id,
+            session.started_at,
+            session.ended_at
+          ).first<any>();
+
+          const aiCount = aiEventsResult?.ai_count || 0;
+          const primaryAiSourceId = aiEventsResult?.primary_ai_source_id || null;
+          const isAIInfluenced = aiCount > 0 ? 1 : 0;
+
+          // Update the session
+          await d1.prepare(`
+            UPDATE session_v1 
+            SET ai_influenced = ?, primary_ai_source_id = ?
+            WHERE id = ?
+          `).bind(isAIInfluenced, primaryAiSourceId, session.id).run();
+
+          updated++;
+        } catch (error) {
+          console.error('Error updating session', session.id, error);
+          errors++;
+        }
+      }
+
+      const response = new Response(JSON.stringify({
+        success: true,
+        backfill_summary: {
+          project_id,
+          sessions_found: (sessionsToUpdate.results || []).length,
+          sessions_updated: updated,
+          errors
+        }
+      }), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate"
+        }
+      });
+
+      return addCorsHeaders(response, origin);
+    } catch (error) {
+      console.error('Session backfill endpoint error:', error);
+      const response = new Response(JSON.stringify({
+        error: "Failed to backfill session AI classification",
         details: error.message
       }), {
         status: 500,
