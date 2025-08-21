@@ -66,17 +66,18 @@ interface EventItem {
   id: number;
   occurred_at: string;
   event_type: "pageview" | "click" | "custom";
-  traffic_class: "direct_human" | "human_via_ai" | "ai_agent_crawl" | "unknown_ai_like";
-  ai_source?: { id: number; slug: string; name: string } | null;
-  content?: { id: number; url: string } | null;
-  referrer?: string | null;
-  metadata_snippet?: Record<string, unknown>;
+  class: "direct_human" | "human_via_ai" | "ai_agent_crawl" | "search";
+  source?: { id: number; slug: string; name: string } | null;
+  url?: string;
+  content_id?: number;
+  property_id?: number;
+  metadata_preview?: Record<string, unknown>;
 }
 
 interface EventsSummary {
-  totals: { events: number; ai_influenced: number };
+  totals: { events: number; ai_influenced: number; active_sources: number };
   by_class: Array<{ class: string; count: number }>;
-  by_source: Array<{ ai_source_id: number; slug: string; name: string; count: number }>;
+  by_source_top: Array<{ ai_source_id: number; slug: string; name: string; count: number }>;
   timeseries: Array<{ ts: string; count: number }>;
 }
 
@@ -294,7 +295,7 @@ export default function Events() {
       case "direct_human": return "bg-gray-100 text-gray-800";
       case "human_via_ai": return "bg-blue-100 text-blue-800";
       case "ai_agent_crawl": return "bg-orange-100 text-orange-800";
-      case "unknown_ai_like": return "bg-slate-100 text-slate-800";
+      case "search": return "bg-green-100 text-green-800";
       default: return "bg-gray-100 text-gray-800";
     }
   }
@@ -346,7 +347,7 @@ export default function Events() {
   function renderMetadataPopover(item: EventItem) {
     if (!metadataPopover || metadataPopover.id !== item.id) return null;
     
-    const metadata = item.metadata_snippet || {};
+    const metadata = item.metadata_preview || {};
     const jsonString = JSON.stringify(metadata, null, 2);
     
     return (
@@ -563,7 +564,7 @@ export default function Events() {
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-500">Active Sources</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {summary.by_source.filter(s => s.ai_source_id).length}
+                      {summary.totals.active_sources}
                     </p>
                   </div>
                 </div>
@@ -627,7 +628,7 @@ export default function Events() {
             )}
 
             {/* Source Chips */}
-            {summary.by_source.length > 0 && (
+            {summary.by_source_top.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">AI Sources</h4>
                 <div className="flex flex-wrap gap-2">
@@ -641,7 +642,7 @@ export default function Events() {
                   >
                     All sources
                   </button>
-                  {summary.by_source.slice(0, 6).map((source) => (
+                  {summary.by_source_top.slice(0, 6).map((source) => (
                     <button
                       key={source.slug}
                       onClick={() => handleSourceFilter(source.slug)}
@@ -726,28 +727,28 @@ export default function Events() {
                             </span>
                           </td>
                           <td className="py-3 pr-4">
-                            <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(item.traffic_class)}`}>
-                              {item.traffic_class}
+                            <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(item.class)}`}>
+                              {item.class}
                             </span>
                           </td>
                           <td className="py-3 pr-4">
-                            {item.ai_source ? (
+                            {item.source ? (
                               <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                                {item.ai_source.name}
+                                {item.source.name}
                               </span>
                             ) : (
                               <span className="text-gray-400">—</span>
                             )}
                           </td>
                           <td className="py-3 pr-4">
-                            {item.content?.url ? (
+                            {item.url ? (
                               <a
-                                href={item.content.url}
+                                href={item.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 max-w-xs"
                               >
-                                <span className="truncate">{truncateUrl(item.content.url)}</span>
+                                <span className="truncate">{truncateUrl(item.url)}</span>
                                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
                               </a>
                             ) : (
@@ -755,9 +756,9 @@ export default function Events() {
                             )}
                           </td>
                           <td className="py-3 pr-4 relative">
-                            {item.metadata_snippet && Object.keys(item.metadata_snippet).length > 0 ? (
+                            {item.metadata_preview && Object.keys(item.metadata_preview).length > 0 ? (
                               <button
-                                onClick={() => setMetadataPopover({ id: item.id, metadata: item.metadata_snippet })}
+                                onClick={() => setMetadataPopover({ id: item.id, metadata: item.metadata_preview })}
                                 className="text-gray-400 hover:text-gray-600"
                               >
                                 <MoreVertical className="h-4 w-4" />
