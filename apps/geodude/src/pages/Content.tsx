@@ -91,7 +91,7 @@ const Content: React.FC = () => {
     aiOnly: false,
     page: 1,
     pageSize: 50,
-    groupBy: 'domain' // 'domain', 'type', 'none'
+    groupBy: 'page' // 'page', 'domain', 'type', 'none'
   });
   const [total, setTotal] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -205,6 +205,52 @@ const Content: React.FC = () => {
         totalAIReferrals: asset.ai_referrals_24h,
         topSources: asset.by_source_24h.slice(0, 3)
       }));
+    }
+
+         if (filters.groupBy === 'page') {
+       const groups: Record<string, GroupedContent> = {};
+       
+       assets.forEach(asset => {
+         const url = new URL(asset.url);
+         const canonicalUrl = asset.url;
+         const displayTitle = url.pathname === '/' ? url.hostname : url.pathname;
+         
+         if (!groups[canonicalUrl]) {
+           groups[canonicalUrl] = {
+             key: `page_${canonicalUrl}`,
+             title: displayTitle,
+             count: 1,
+             assets: [asset],
+             isExpanded: expandedGroups.has(`page_${canonicalUrl}`),
+             totalEvents: asset.events_24h,
+             totalAIReferrals: asset.ai_referrals_24h,
+             topSources: asset.by_source_24h.slice(0, 3)
+           };
+         } else {
+           // This shouldn't happen with page grouping, but just in case
+           groups[canonicalUrl].count++;
+           groups[canonicalUrl].assets.push(asset);
+           groups[canonicalUrl].totalEvents += asset.events_24h;
+           groups[canonicalUrl].totalAIReferrals += asset.ai_referrals_24h;
+         }
+       });
+
+      // Aggregate top sources across all assets in the group
+      Object.values(groups).forEach(group => {
+        const sourceMap: Record<string, number> = {};
+        group.assets.forEach(asset => {
+          asset.by_source_24h.forEach(source => {
+            sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
+          });
+        });
+        
+        group.topSources = Object.entries(sourceMap)
+          .map(([slug, events]) => ({ slug, events }))
+          .sort((a, b) => b.events - a.events)
+          .slice(0, 3);
+      });
+
+      return Object.values(groups).sort((a, b) => b.totalEvents - a.totalEvents);
     }
 
     if (filters.groupBy === 'domain') {
@@ -416,6 +462,7 @@ const Content: React.FC = () => {
                   onChange={(e) => setFilters(prev => ({ ...prev, groupBy: e.target.value, page: 1 }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
+                  <option value="page">By Page</option>
                   <option value="domain">By Domain</option>
                   <option value="type">By Type</option>
                   <option value="none">No Grouping</option>
@@ -580,21 +627,25 @@ const Content: React.FC = () => {
                                 <ChevronRight className="h-4 w-4" />
                               )}
                             </button>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {group.title}
-                                {group.count > 1 && (
-                                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                    {group.count} items
-                                  </span>
-                                )}
-                              </div>
-                              {group.count === 1 && (
-                                <div className="text-sm text-gray-500 truncate max-w-md">
-                                  {group.assets[0].url}
-                                </div>
-                              )}
-                            </div>
+                                                         <div>
+                               <div className="text-sm font-medium text-gray-900">
+                                 {group.title}
+                                 {group.count > 1 && (
+                                   <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                     {group.count} items
+                                   </span>
+                                 )}
+                               </div>
+                               {filters.groupBy === 'page' ? (
+                                 <div className="text-sm text-gray-500 truncate max-w-md">
+                                   {group.assets[0].url}
+                                 </div>
+                               ) : group.count === 1 && (
+                                 <div className="text-sm text-gray-500 truncate max-w-md">
+                                   {group.assets[0].url}
+                                 </div>
+                               )}
+                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
