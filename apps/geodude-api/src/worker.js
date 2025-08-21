@@ -74,8 +74,43 @@ export default {
         console.log('✅ Updated cron marker in METRICS KV');
       }
 
-      // Add your scheduled task logic here
-      // For now, just log the trigger
+      // Handle different cron schedules
+      if (event.cron === "*/5 * * * *") {
+        // Every 5 minutes - metrics and health monitoring
+        console.log('🔄 5-minute cron: metrics collection');
+        // This is handled by the existing metrics system
+        
+      } else if (event.cron === "0 * * * *") {
+        // Every hour - hourly rollups and session cleanup
+        console.log('🔄 Hourly cron: rollups and cleanup');
+        // TODO: Implement hourly rollup aggregation if needed
+        
+      } else if (event.cron === "0 3 * * *") {
+        // Daily at 3 AM - retention cleanup and backfill
+        console.log('🔄 Daily cron: retention cleanup and backfill');
+        
+        if (env.OPTIVIEW_DB) {
+          try {
+            // Import retention utilities
+            const { cleanupOldData, getRetentionConfig } = await import('./ai-lite/retention.ts');
+            const { backfillRollups, needsBackfill } = await import('./ai-lite/backfill.ts');
+            
+            const config = getRetentionConfig();
+            console.log('🧹 Starting retention cleanup...');
+            
+            // Clean up old data
+            const cleanupStats = await cleanupOldData(env.OPTIVIEW_DB, config);
+            console.log('✅ Retention cleanup completed:', cleanupStats);
+            
+            // Check if backfill is needed for any projects
+            // For now, we'll do this manually after deployment
+            console.log('📊 Retention cleanup completed successfully');
+            
+          } catch (error) {
+            console.error('❌ Retention cleanup failed:', error);
+          }
+        }
+      }
 
       return new Response('OK', { status: 200 });
     } catch (error) {

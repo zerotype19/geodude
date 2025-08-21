@@ -32,6 +32,13 @@ RULES_REFRESH_TTL_SEC = "300"
 EMAIL_SENDER_NAME = "Optiview"
 EMAIL_FROM = "noreply@optiview.ai"
 
+# AI-Lite tracking configuration
+AI_LITE_SAMPLE_PCT = "2"
+ENFORCE_AI_LITE = "false"
+RETENTION_AI_DAYS = "365"
+RETENTION_CRAWL_DAYS = "180"
+RETENTION_BASELINE_SAMPLED_DAYS = "14"
+
 # Database and KV bindings (shared across all environments)
 [[d1_databases]]
 binding = "OPTIVIEW_DB"
@@ -92,6 +99,13 @@ RULES_REFRESH_TTL_SEC = "300"
 # Email settings (production defaults)
 EMAIL_SENDER_NAME = "Optiview"
 EMAIL_FROM = "noreply@optiview.ai"
+
+# AI-Lite tracking configuration
+AI_LITE_SAMPLE_PCT = "2"
+ENFORCE_AI_LITE = "false"
+RETENTION_AI_DAYS = "365"
+RETENTION_CRAWL_DAYS = "180"
+RETENTION_BASELINE_SAMPLED_DAYS = "14"
 
 # Production environment bindings
 [[env.production.d1_databases]]
