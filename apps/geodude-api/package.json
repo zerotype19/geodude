@@ -2,6 +2,7 @@
   "name": "geodude-api",
   "version": "0.0.1",
   "type": "module",
+  "_comment": "Hardened AI Detection System - Fixed JSON syntax",
   "scripts": {
     "dev": "wrangler dev --env=test --local --port=8787",
     "dev:remote": "wrangler dev --env=test --remote --port=8787",
