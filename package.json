@@ -23,7 +23,8 @@
     "test:watch": "cd apps/geodude-api && vitest",
     "typecheck": "tsc -b",
     "token:gen": "tsx scripts/token-gen.ts",
-    "ai:capture": "tsx scripts/playwright/capture.ts"
+    "ai:capture": "tsx scripts/playwright/capture.ts",
+    "test-classifier": "tsx scripts/test-classifier.ts"
   },
   "devDependencies": {
     "typescript": "^5.5.4",

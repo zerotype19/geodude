@@ -1,4 +1,4 @@
-import type { Classification } from './classifier';
+import type { TrafficClassification } from '../ai-lite/classifier';
 import { ensureAiSource } from './ai-sources';
 
 export interface EventInsertData {
@@ -94,7 +94,7 @@ export async function insertEvent(
  */
 export async function processEventClassification(
   env: any,
-  classification: Classification
+  classification: TrafficClassification
 ): Promise<{ aiSourceId: number | null; category: string }> {
   if (!classification.aiSourceSlug) {
     return { aiSourceId: null, category: 'unknown' };
@@ -123,7 +123,7 @@ export async function processEventClassification(
  * Determine if an event should be inserted based on AI-Lite mode and classification
  */
 export function shouldInsertEvent(
-  classification: Classification,
+  classification: TrafficClassification,
   isAILite: boolean,
   samplePct: number
 ): { shouldInsert: boolean; isSampled: boolean } {
@@ -146,7 +146,7 @@ export function shouldInsertEvent(
 /**
  * Determine if an event should be attached to a session
  */
-export function shouldAttachToSession(classification: Classification): boolean {
+export function shouldAttachToSession(classification: TrafficClassification): boolean {
   // Crawlers never attach to sessions
   return classification.class !== 'ai_agent_crawl';
 }

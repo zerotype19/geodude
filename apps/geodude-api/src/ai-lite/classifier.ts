@@ -1,252 +1,315 @@
-export type TrafficClass = 'human_via_ai' | 'ai_agent_crawl' | 'search' | 'direct_human' | 'citation';
+export type TrafficClass = 'ai_agent_crawl' | 'human_via_ai' | 'search' | 'direct_human';
 
 export interface TrafficClassification {
   class: TrafficClass;
-  isAI: boolean;
-  shouldSample: boolean;
-  sampled: boolean;
+  aiSourceId?: number;
   aiSourceSlug?: string;
   aiSourceName?: string;
-}
-
-export interface SamplingConfig {
-  samplePct: number;
-  enforceAI: boolean;
-}
-
-/**
- * Classify traffic based on Cloudflare data, headers, and referrer
- * Implements proper precedence: verified bots → strong signals → AI referrers → search → direct
- */
-export function classifyTraffic(
-  referrer: string | null,
-  userAgent: string | null,
-  headers: Headers,
-  url: string | null,
-  cf?: any // Cloudflare request data
-): TrafficClassification {
-  const referrerLower = referrer?.toLowerCase() || '';
-  const userAgentLower = userAgent?.toLowerCase() || '';
-  const urlLower = url?.toLowerCase() || '';
-
-  // Check for explicit AI source overrides
-  const utmAI = new URLSearchParams(urlLower.split('?')[1] || '').get('utm_ai');
-  const headerAI = headers.get('x-optiview-ai-source');
-  
-  if (utmAI || headerAI) {
-    const aiSource = mapExplicitAISource(utmAI || headerAI);
-    return {
-      class: 'human_via_ai',
-      isAI: true,
-      shouldSample: false,
-      sampled: false,
-      aiSourceSlug: aiSource.slug,
-      aiSourceName: aiSource.name
-    };
-  }
-
-  // 1) Cloudflare verified bots (authoritative)
-  if (cf?.verifiedBotCategory) {
-    const { slug, name } = mapCrawlerSource(userAgentLower, headers.get('from') || '');
-    return {
-      class: 'ai_agent_crawl',
-      isAI: true,
-      shouldSample: false,
-      sampled: false,
-      aiSourceSlug: slug,
-      aiSourceName: name
-    };
-  }
-
-  // 2) Strong bot signals in headers / UA
-  if (isKnownCrawlerUA(userAgentLower) || 
-      headers.get('from')?.toLowerCase().includes('googlebot.com') || 
-      headers.get('from')?.toLowerCase().includes('bing.com')) {
-    const { slug, name } = mapCrawlerSource(userAgentLower, headers.get('from') || '');
-    return {
-      class: 'ai_agent_crawl',
-      isAI: true,
-      shouldSample: false,
-      sampled: false,
-      aiSourceSlug: slug,
-      aiSourceName: name
-    };
-  }
-
-  // 3) AI referrers (chat tools etc)
-  if (isAIReferrer(referrerLower)) {
-    const { slug, name } = mapAIReferrer(referrerLower);
-    return {
-      class: 'human_via_ai',
-      isAI: true,
-      shouldSample: false,
-      sampled: false,
-      aiSourceSlug: slug,
-      aiSourceName: name
-    };
-  }
-
-  // 4) Search engines (human clickthrough)
-  if (isSearchReferrer(referrerLower)) {
-    return {
-      class: 'search',
-      isAI: false,
-      shouldSample: true,
-      sampled: false
-    };
-  }
-
-  // 5) Default to direct human
-  return {
-    class: 'direct_human',
-    isAI: false,
-    shouldSample: true,
-    sampled: false
+  reason: string;            // concise, human-readable
+  evidence: {                // small, safe subset
+    cfVerifiedBot?: string;
+    referrerHost?: string;
+    uaHit?: string;
   };
 }
 
 /**
- * Determine if traffic should be sampled based on class and configuration
+ * Hardened traffic classification system with proper precedence
+ * Order: Verified crawlers → AI referrers → Search → Direct
  */
-export function shouldSampleTraffic(
-  classification: TrafficClassification,
-  config: SamplingConfig
-): boolean {
-  // AI traffic is never sampled
-  if (classification.isAI) {
-    return false;
+export function classifyTraffic(req: Request, cf: any, referrerUrl: string | null, userAgent: string | null): TrafficClassification {
+  const referrer = referrerUrl || '';
+  const ua = userAgent || '';
+  
+  // Normalize referrer host to lowercase, strip www
+  let referrerHost: string | undefined;
+  try {
+    if (referrer && referrer !== '') {
+      const url = new URL(referrer);
+      referrerHost = url.hostname.toLowerCase().replace(/^www\./, '');
+    }
+  } catch (e) {
+    // Invalid referrer URL, treat as no referrer
   }
 
-  // Only sample baseline traffic (direct_human, search)
-  if (!classification.shouldSample) {
-    return false;
+  const uaLower = ua.toLowerCase();
+  const evidence: TrafficClassification['evidence'] = {};
+
+  // 1) Verified crawlers → ai_agent_crawl (highest priority)
+  if (cf?.verifiedBotCategory) {
+    const category = cf.verifiedBotCategory;
+    evidence.cfVerifiedBot = category;
+    
+    if (category === 'Search Engine Crawler' || category === 'AI Chatbot Crawler') {
+      const { slug, name } = mapCrawlerSource(uaLower, req.headers.get('from') || '');
+      return {
+        class: 'ai_agent_crawl',
+        aiSourceSlug: slug,
+        aiSourceName: name,
+        reason: `cf.verifiedBotCategory=${category} → ai_agent_crawl (${name})`,
+        evidence
+      };
+    }
   }
 
-  // Apply sampling percentage
-  const random = Math.random() * 100;
-  return random < config.samplePct;
+  // Known crawler UAs (never mark as human)
+  if (isKnownCrawlerUA(uaLower)) {
+    evidence.uaHit = uaLower;
+    const { slug, name } = mapCrawlerSource(uaLower, req.headers.get('from') || '');
+    return {
+      class: 'ai_agent_crawl',
+      aiSourceSlug: slug,
+      aiSourceName: name,
+      reason: `UA matches known crawler → ai_agent_crawl (${name})`,
+      evidence
+    };
+  }
+
+  // Preview/unfurl bots (Slack, Facebook, Discord, etc.)
+  if (isPreviewBot(uaLower)) {
+    evidence.uaHit = uaLower;
+    const { slug, name } = mapPreviewBot(uaLower);
+    return {
+      class: 'ai_agent_crawl',
+      aiSourceSlug: slug,
+      aiSourceName: name,
+      reason: `Preview bot detected → ai_agent_crawl (${name})`,
+      evidence
+    };
+  }
+
+  // From header check (supporting signal, never solely decisive)
+  const fromHeader = req.headers.get('from') || '';
+  if (fromHeader && (fromHeader.includes('googlebot.com') || fromHeader.includes('bing.com'))) {
+    evidence.uaHit = fromHeader;
+    const { slug, name } = mapCrawlerSource(uaLower, fromHeader);
+    return {
+      class: 'ai_agent_crawl',
+      aiSourceSlug: slug,
+      aiSourceName: name,
+      reason: `From header indicates crawler → ai_agent_crawl (${name})`,
+      evidence
+    };
+  }
+
+  // 2) AI assistant referrers → human_via_ai
+  if (referrerHost && isAIReferrer(referrerHost)) {
+    evidence.referrerHost = referrerHost;
+    const { slug, name } = mapAIReferrer(referrerHost);
+    return {
+      class: 'human_via_ai',
+      aiSourceSlug: slug,
+      aiSourceName: name,
+      reason: `referrer host matched '${referrerHost}' → human_via_ai (${name})`,
+      evidence
+    };
+  }
+
+  // 3) Search engines → search
+  if (referrerHost && isSearchReferrer(referrerHost)) {
+    evidence.referrerHost = referrerHost;
+    return {
+      class: 'search',
+      reason: `search referrer '${referrerHost}' → search`,
+      evidence
+    };
+  }
+
+  // 4) Direct / unknown → direct_human
+  if (!referrerHost) {
+    return {
+      class: 'direct_human',
+      reason: 'no referrer → direct_human',
+      evidence
+    };
+  } else {
+    return {
+      class: 'direct_human',
+      reason: `referrer '${referrerHost}' (unmatched) → direct_human`,
+      evidence
+    };
+  }
 }
 
 /**
  * Detect known crawler user agents
  */
 function isKnownCrawlerUA(ua: string): boolean {
-  return /googlebot|bingbot|duckduckbot|yandexbot|baiduspider|applebot|bytespider|ahrefsbot|semrushbot|mj12bot|sogou|facebot|ia_archiver|ccbot|petalbot|gptbot|anthropic|google-extended|claude|chatgpt|ai-client|ai-bot/i.test(ua);
+  const crawlerPatterns = [
+    'googlebot', 'bingbot', 'duckduckbot', 'applebot', 'yandexbot', 'baiduspider',
+    'ahrefsbot', 'semrushbot', 'commoncrawl', 'facebookexternalhit', 'linkedinbot',
+    'slackbot-linkexpanding', 'twitterbot', 'discordbot', 'whatsapp', 'telegrambot',
+    'gptbot', 'anthropic', 'google-extended', 'claude', 'chatgpt', 'ai-client', 'ai-bot',
+    'bytespider', 'mj12bot', 'sogou', 'facebot', 'ia_archiver', 'ccbot', 'petalbot'
+  ];
+  
+  return crawlerPatterns.some(pattern => ua.includes(pattern.toLowerCase()));
+}
+
+/**
+ * Detect preview/unfurl bots
+ */
+function isPreviewBot(ua: string): boolean {
+  const previewPatterns = [
+    'slackbot', 'facebookexternalhit', 'discordbot', 'linkedinbot', 'whatsapp', 'telegrambot'
+  ];
+  
+  return previewPatterns.some(pattern => ua.includes(pattern.toLowerCase()));
 }
 
 /**
  * Map crawler sources to slugs and names
  */
-function mapCrawlerSource(ua: string, fromHdr: string): { slug: string; name: string } {
-  if (/googlebot/i.test(ua) || fromHdr.includes('googlebot.com')) {
-    return { slug: 'googlebot', name: 'Googlebot' };
+function mapCrawlerSource(ua: string, fromHeader: string): { slug: string; name: string } {
+  if (/googlebot/i.test(ua) || fromHeader.includes('googlebot.com')) {
+    return { slug: 'google', name: 'Google' };
   }
-  if (/bingbot/i.test(ua)) {
-    return { slug: 'bingbot', name: 'Bingbot' };
+  if (/bingbot/i.test(ua) || fromHeader.includes('bing.com')) {
+    return { slug: 'microsoft_bing', name: 'Microsoft/Bing' };
   }
   if (/duckduckbot/i.test(ua)) {
-    return { slug: 'duckduckbot', name: 'DuckDuckBot' };
-  }
-  if (/bytespider/i.test(ua)) {
-    return { slug: 'bytespider', name: 'ByteSpider' };
+    return { slug: 'duckduckgo', name: 'DuckDuckGo' };
   }
   if (/applebot/i.test(ua)) {
-    return { slug: 'applebot', name: 'Applebot' };
+    return { slug: 'apple', name: 'Apple' };
   }
   if (/yandexbot/i.test(ua)) {
-    return { slug: 'yandexbot', name: 'YandexBot' };
+    return { slug: 'yandex', name: 'Yandex' };
   }
   if (/baiduspider/i.test(ua)) {
-    return { slug: 'baiduspider', name: 'BaiduSpider' };
+    return { slug: 'baidu', name: 'Baidu' };
   }
   if (/ahrefsbot/i.test(ua)) {
-    return { slug: 'ahrefsbot', name: 'AhrefsBot' };
+    return { slug: 'ahrefs', name: 'Ahrefs' };
   }
   if (/semrushbot/i.test(ua)) {
-    return { slug: 'semrushbot', name: 'SemrushBot' };
+    return { slug: 'semrush', name: 'Semrush' };
+  }
+  if (/ccbot|commoncrawl/i.test(ua)) {
+    return { slug: 'commoncrawl', name: 'CommonCrawl' };
+  }
+  if (/facebookexternalhit/i.test(ua)) {
+    return { slug: 'meta', name: 'Meta' };
+  }
+  if (/linkedinbot/i.test(ua)) {
+    return { slug: 'linkedin', name: 'LinkedIn' };
+  }
+  if (/slackbot/i.test(ua)) {
+    return { slug: 'slack', name: 'Slack' };
+  }
+  if (/twitterbot/i.test(ua)) {
+    return { slug: 'twitter', name: 'Twitter' };
+  }
+  if (/discordbot/i.test(ua)) {
+    return { slug: 'discord', name: 'Discord' };
+  }
+  if (/whatsapp/i.test(ua)) {
+    return { slug: 'whatsapp', name: 'WhatsApp' };
+  }
+  if (/telegrambot/i.test(ua)) {
+    return { slug: 'telegram', name: 'Telegram' };
   }
   if (/gptbot|chatgpt/i.test(ua)) {
-    return { slug: 'openai_gptbot', name: 'OpenAI GPTBot' };
+    return { slug: 'openai', name: 'OpenAI' };
   }
   if (/anthropic|claude/i.test(ua)) {
-    return { slug: 'anthropic_claude', name: 'Anthropic Claude' };
+    return { slug: 'anthropic', name: 'Anthropic' };
   }
   if (/google-extended/i.test(ua)) {
     return { slug: 'google_extended', name: 'Google Extended' };
   }
-  return { slug: 'generic_crawler', name: 'Crawler' };
+  
+  return { slug: 'generic_crawler', name: 'Generic Crawler' };
+}
+
+/**
+ * Map preview bots
+ */
+function mapPreviewBot(ua: string): { slug: string; name: string } {
+  if (/slackbot/i.test(ua)) {
+    return { slug: 'slack', name: 'Slack' };
+  }
+  if (/facebookexternalhit/i.test(ua)) {
+    return { slug: 'meta', name: 'Meta' };
+  }
+  if (/discordbot/i.test(ua)) {
+    return { slug: 'discord', name: 'Discord' };
+  }
+  if (/linkedinbot/i.test(ua)) {
+    return { slug: 'linkedin', name: 'LinkedIn' };
+  }
+  if (/whatsapp/i.test(ua)) {
+    return { slug: 'whatsapp', name: 'WhatsApp' };
+  }
+  if (/telegrambot/i.test(ua)) {
+    return { slug: 'telegram', name: 'Telegram' };
+  }
+  
+  return { slug: 'preview_bot', name: 'Preview Bot' };
 }
 
 /**
  * Detect AI referrers
  */
-function isAIReferrer(ref: string): boolean {
-  return /chat\.openai\.com|claude\.ai|perplexity\.ai|gemini\.google\.com|copilot\.microsoft\.com|poe\.com|you\.com|phind\.com|arc\.net\/exp/i.test(ref);
+function isAIReferrer(host: string): boolean {
+  const aiHosts = [
+    'chat.openai.com', 'chatgpt.com', 'claude.ai', 'perplexity.ai', 'poe.com', 'you.com',
+    'copilot.microsoft.com', 'bing.com', 'gemini.google.com', 'bard.google.com', 'arc.net',
+    'phind.com', 'metaphor.systems'
+  ];
+  
+  return aiHosts.some(aiHost => host === aiHost || host.endsWith('.' + aiHost));
 }
 
 /**
  * Map AI referrers to slugs and names
  */
-function mapAIReferrer(ref: string): { slug: string; name: string } {
-  if (/chat\.openai\.com/i.test(ref)) {
-    return { slug: 'openai_chatgpt', name: 'ChatGPT' };
+function mapAIReferrer(host: string): { slug: string; name: string } {
+  if (host.includes('chat.openai.com') || host.includes('chatgpt.com')) {
+    return { slug: 'openai_chatgpt', name: 'OpenAI/ChatGPT' };
   }
-  if (/claude\.ai/i.test(ref)) {
-    return { slug: 'anthropic_claude', name: 'Claude' };
+  if (host.includes('claude.ai')) {
+    return { slug: 'anthropic_claude', name: 'Anthropic/Claude' };
   }
-  if (/perplexity\.ai/i.test(ref)) {
+  if (host.includes('perplexity.ai')) {
     return { slug: 'perplexity', name: 'Perplexity' };
   }
-  if (/gemini\.google\.com/i.test(ref)) {
-    return { slug: 'google_gemini', name: 'Gemini' };
+  if (host.includes('gemini.google.com') || host.includes('bard.google.com')) {
+    return { slug: 'google_gemini', name: 'Google Gemini' };
   }
-  if (/copilot\.microsoft\.com/i.test(ref)) {
+  if (host.includes('copilot.microsoft.com')) {
     return { slug: 'microsoft_copilot', name: 'Microsoft Copilot' };
   }
-  if (/poe\.com/i.test(ref)) {
+  if (host.includes('bing.com')) {
+    return { slug: 'microsoft_copilot', name: 'Microsoft Copilot' };
+  }
+  if (host.includes('poe.com')) {
     return { slug: 'poe', name: 'Poe' };
   }
-  if (/you\.com/i.test(ref)) {
+  if (host.includes('you.com')) {
     return { slug: 'you', name: 'You.com' };
   }
-  if (/phind\.com/i.test(ref)) {
+  if (host.includes('arc.net')) {
+    return { slug: 'arc', name: 'Arc' };
+  }
+  if (host.includes('phind.com')) {
     return { slug: 'phind', name: 'Phind' };
   }
-  if (/arc\.net\/exp/i.test(ref)) {
-    return { slug: 'arc_explore', name: 'Arc Explore' };
+  if (host.includes('metaphor.systems')) {
+    return { slug: 'metaphor', name: 'Metaphor' };
   }
+  
   return { slug: 'ai_referrer', name: 'AI Assistant' };
-}
-
-/**
- * Map explicit AI source overrides
- */
-function mapExplicitAISource(source: string): { slug: string; name: string } {
-  const sourceLower = source.toLowerCase();
-  if (sourceLower.includes('chatgpt') || sourceLower.includes('gpt')) {
-    return { slug: 'openai_chatgpt', name: 'ChatGPT' };
-  }
-  if (sourceLower.includes('claude')) {
-    return { slug: 'anthropic_claude', name: 'Claude' };
-  }
-  if (sourceLower.includes('perplexity')) {
-    return { slug: 'perplexity', name: 'Perplexity' };
-  }
-  if (sourceLower.includes('gemini')) {
-    return { slug: 'google_gemini', name: 'Gemini' };
-  }
-  if (sourceLower.includes('copilot')) {
-    return { slug: 'microsoft_copilot', name: 'Microsoft Copilot' };
-  }
-  if (sourceLower.includes('poe')) {
-    return { slug: 'poe', name: 'Poe' };
-  }
-  return { slug: sourceLower, name: source };
 }
 
 /**
  * Detect search referrers
  */
-function isSearchReferrer(ref: string): boolean {
-  return /google\./i.test(ref) || /bing\./i.test(ref) || /duckduckgo\.com/i.test(ref) || /search\.brave\.com/i.test(ref) || /yandex\./i.test(ref);
+function isSearchReferrer(host: string): boolean {
+  const searchHosts = [
+    'google.com', 'bing.com', 'duckduckgo.com', 'search.brave.com', 'yahoo.com',
+    'yandex.com', 'ecosia.org', 'baidu.com', 'ask.com'
+  ];
+  
+  return searchHosts.some(searchHost => host === searchHost || host.endsWith('.' + searchHost));
 }

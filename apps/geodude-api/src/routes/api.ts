@@ -1498,7 +1498,220 @@ export async function handleApiRoutes(
         }
     }
 
-    // 6.3.5) Events Ingestion API (with cache invalidation)
+    // 6.3.4) Admin Debug Classification Endpoint
+    if (url.pathname === "/admin/debug/classification" && req.method === "GET") {
+        try {
+            // Rate limiting: 10 rpm per IP
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const rateLimitKey = `debug_classification:${clientIP}`;
+            const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+
+            if (parseInt(currentCount) >= 10) {
+                const response = new Response(JSON.stringify({
+                    error: "Rate limit exceeded",
+                    message: "Maximum 10 requests per minute per IP",
+                    retry_after: 60
+                }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Increment rate limit counter
+            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+
+            // Get event ID from query params
+            const urlObj = new URL(req.url);
+            const eventId = urlObj.searchParams.get("event_id");
+
+            if (!eventId) {
+                const response = new Response(JSON.stringify({
+                    error: "Missing event_id parameter"
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get event from database
+            const event = await env.OPTIVIEW_DB.prepare(`
+            SELECT * FROM interaction_events WHERE id = ?
+          `).bind(eventId).first();
+
+            if (!event) {
+                const response = new Response(JSON.stringify({
+                    error: "Event not found"
+                }), {
+                    status: 404,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse metadata to get classification info
+            const metadata = JSON.parse(event.metadata || '{}');
+            const referrer = metadata.referrer || metadata.referer || null;
+            const userAgent = metadata.user_agent || null;
+
+            // Re-run classification for this event
+            const { classifyTraffic } = await import('../ai-lite/classifier');
+            const classification = classifyTraffic(req, (req as any).cf, referrer, userAgent);
+
+            // Get AI source details if available
+            let aiSourceDetails = null;
+            if (event.ai_source_id) {
+                aiSourceDetails = await env.OPTIVIEW_DB.prepare(`
+              SELECT id, slug, name, category FROM ai_sources WHERE id = ?
+            `).bind(event.ai_source_id).first();
+            }
+
+            const response = new Response(JSON.stringify({
+                event_id: eventId,
+                classification: {
+                    class: classification.class,
+                    aiSourceId: classification.aiSourceId,
+                    aiSourceSlug: classification.aiSourceSlug,
+                    aiSourceName: classification.aiSourceName,
+                    reason: classification.reason,
+                    evidence: classification.evidence
+                },
+                ai_source_details: aiSourceDetails,
+                raw_data: {
+                    referrer_host: referrer ? new URL(referrer).hostname : null,
+                    user_agent_first_80: userAgent ? userAgent.substring(0, 80) : null,
+                    cf_verified_bot_category: (req as any).cf?.verifiedBotCategory || null
+                },
+                timestamp: new Date().toISOString()
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("Debug classification error:", error);
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: error.message
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                 }
+       }
+
+       // 6.3.4.5) Admin Backfill Rollups Endpoint
+       if (url.pathname === "/admin/backfill/rollups" && req.method === "POST") {
+         try {
+           // Rate limiting: 5 rpm per IP
+           const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+           const rateLimitKey = `backfill_rollups:${clientIP}`;
+           const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+           
+           if (parseInt(currentCount) >= 5) {
+             const response = new Response(JSON.stringify({
+               error: "Rate limit exceeded",
+               message: "Maximum 5 requests per minute per IP",
+               retry_after: 60
+             }), {
+               status: 429,
+               headers: { "Content-Type": "application/json" }
+             });
+             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           }
+           
+           // Increment rate limit counter
+           await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+           
+           const body = await req.json();
+           const { project_id, hours_back = 24 } = body;
+           
+           if (!project_id) {
+             const response = new Response(JSON.stringify({
+               error: "Missing project_id parameter"
+             }), {
+               status: 400,
+               headers: { "Content-Type": "application/json" }
+             });
+             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           }
+           
+           // Get events that need rollup backfill
+           const cutoffTime = new Date(Date.now() - (hours_back * 60 * 60 * 1000));
+           const events = await env.OPTIVIEW_DB.prepare(`
+             SELECT id, project_id, property_id, occurred_at, class, ai_source_id
+             FROM interaction_events 
+             WHERE project_id = ? AND occurred_at > ? AND class IS NOT NULL
+             ORDER BY occurred_at DESC
+           `).bind(project_id, cutoffTime.toISOString()).all();
+           
+           if (!events.results || events.results.length === 0) {
+             const response = new Response(JSON.stringify({
+               message: "No events found for backfill",
+               project_id,
+               hours_back,
+               events_count: 0
+             }), {
+               headers: { "Content-Type": "application/json" }
+             });
+             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           }
+           
+           // Process each event for rollup backfill
+           let processedCount = 0;
+           let errorCount = 0;
+           
+           for (const event of events.results) {
+             try {
+               const timestamp = new Date(event.occurred_at);
+               const { updateRollup } = await import('../lib/events-utils');
+               
+               await updateRollup(env, {
+                 project_id: event.project_id,
+                 property_id: event.property_id,
+                 timestamp,
+                 trafficClass: event.class,
+                 isSampled: false
+               });
+               
+               processedCount++;
+             } catch (error) {
+               console.error(`Error backfilling rollup for event ${event.id}:`, error);
+               errorCount++;
+             }
+           }
+           
+           const response = new Response(JSON.stringify({
+             message: "Rollup backfill completed",
+             project_id,
+             hours_back,
+             total_events: events.results.length,
+             processed_count: processedCount,
+             error_count: errorCount,
+             timestamp: new Date().toISOString()
+           }), {
+             headers: { "Content-Type": "application/json" }
+           });
+           
+           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           
+         } catch (error) {
+           console.error("Backfill rollups error:", error);
+           const response = new Response(JSON.stringify({
+             error: "Internal server error",
+             message: error.message
+           }), {
+             status: 500,
+             headers: { "Content-Type": "application/json" }
+           });
+           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+         }
+       }
+
+       // 6.3.5) Events Ingestion API (with cache invalidation)
     if (url.pathname === "/api/events" && req.method === "POST") {
 
 
@@ -1507,20 +1720,20 @@ export async function handleApiRoutes(
             const contentType = req.headers.get("content-type");
             const isJsonContent = contentType && contentType.includes("application/json");
             const isTextContent = contentType && contentType.includes("text/plain");
-            
+
             if (!isJsonContent && !isTextContent) {
                 const response = new Response(JSON.stringify({
                     error: "Unsupported Content-Type",
                     message: "Content-Type must be application/json or text/plain",
                     received: contentType || "none",
                     supported: ["application/json", "text/plain"]
-                }), { 
+                }), {
                     status: 415,
                     headers: { "Content-Type": "application/json" }
                 });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
-            
+
             // Log content type for debugging
             if (isTextContent) {
                 console.log(`📝 Accepting text/plain content from ${req.headers.get("cf-connecting-ip") || "unknown IP"}`);
@@ -1655,8 +1868,8 @@ export async function handleApiRoutes(
 
             // Get AI-Lite configuration for this project
             const { getProjectAILiteConfig } = await import('../ai-lite');
-            const { classifyTraffic } = await import('../lib/classifier');
-            const { loadHeuristics } = await import('../lib/kv-rules');
+            const { classifyTraffic } = await import('../ai-lite/classifier');
+            const { ensureAISourceWithMapping } = await import('../ai-lite/ai-source-manager');
             const { updateRollup, insertEvent, processEventClassification, shouldInsertEvent, shouldAttachToSession } = await import('../lib/events-utils');
 
             const aiLiteConfig = await getProjectAILiteConfig(env.OPTIVIEW_DB, project_id, env);
@@ -1725,23 +1938,12 @@ export async function handleApiRoutes(
                     // Extract referrer and user agent from metadata
                     const referrer = metadata?.referrer || metadata?.referer || null;
                     const userAgent = metadata?.user_agent || null;
-                    const url = metadata?.url || null;
-
-                    // Load heuristics for classification
-                    const heuristics = await loadHeuristics(env);
 
                     // Get Cloudflare data for traffic classification
                     const cfData = (req as any).cf;
 
                     // Classify traffic with hardened system
-                    classification = classifyTraffic({
-                        cf: cfData,
-                        headers: req.headers,
-                        url: url || '',
-                        referrer: referrer || '',
-                        userAgent: userAgent || '',
-                        heuristics
-                    });
+                    classification = classifyTraffic(req, cfData, referrer, userAgent);
 
                     trafficClass = classification.class;
 
@@ -1755,9 +1957,16 @@ export async function handleApiRoutes(
                     // Store classification result for session handling
                     classificationResults.push(classification);
 
-                    // Process classification and determine insertion behavior
-                    const { aiSourceId: processedAiSourceId } = await processEventClassification(env, classification);
-                    aiSourceId = processedAiSourceId;
+                    // Ensure AI source exists and get ID
+                    if (classification.aiSourceSlug) {
+                        const category = trafficClass === 'ai_agent_crawl' ? 'crawler' : 'assistant';
+                        aiSourceId = await ensureAISourceWithMapping(
+                            env,
+                            classification.aiSourceSlug,
+                            classification.aiSourceName || classification.aiSourceSlug,
+                            category
+                        );
+                    }
 
                     // Determine if we should insert a row based on AI-Lite mode and classification
                     const { shouldInsert, isSampled: shouldSample } = shouldInsertEvent(classification, isAILite, aiLiteConfig.samplePct);
