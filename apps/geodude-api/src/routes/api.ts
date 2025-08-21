@@ -2922,41 +2922,28 @@ export async function handleApiRoutes(
                 ) grouped_results
             `).bind(...params).first<any>();
 
-            // Get referrals with pagination using window function for proper ordering
+            // Get referrals with pagination - simple approach
             const referrals = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    content_id,
-                    url,
-                    source_slug,
-                    source_name,
-                    last_seen,
-                    event_class,
-                    classification_reason,
-                    classification_confidence,
-                    debug_raw,
-                    referrals_24h
-                FROM (
-                    SELECT 
-                        ie.content_id,
-                        ca.url,
-                        COALESCE(ais.slug, 'unknown') as source_slug,
-                        COALESCE(ais.name, 'Unknown AI Source') as source_name,
-                        MAX(ie.occurred_at) as last_seen,
-                        ie.class as event_class,
-                        COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
-                        COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
-                        COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw,
-                        COUNT(*) as referrals_24h,
-                        ROW_NUMBER() OVER (ORDER BY MAX(ie.occurred_at) DESC) as rn
-                    FROM interaction_events ie
-                    JOIN content_assets ca ON ca.id = ie.content_id
-                    JOIN properties p ON p.id = ca.property_id
-                    LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                    WHERE ${whereConditions.join(' AND ')}
-                    GROUP BY ie.content_id, ie.ai_source_id, ca.url, ie.class
-                ) ranked_results
-                WHERE rn > ? AND rn <= ?
-            `).bind(...params, offset, offset + pageSizeNum).all<any>();
+                    ie.content_id,
+                    ca.url,
+                    COALESCE(ais.slug, 'unknown') as source_slug,
+                    COALESCE(ais.name, 'Unknown AI Source') as source_name,
+                    MAX(ie.occurred_at) as last_seen,
+                    ie.class as event_class,
+                    COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
+                    COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
+                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw,
+                    COUNT(*) as referrals_24h
+                FROM interaction_events ie
+                JOIN content_assets ca ON ca.id = ie.content_id
+                JOIN properties p ON p.id = ca.property_id
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                WHERE ${whereConditions.join(' AND ')}
+                GROUP BY ie.content_id, ie.ai_source_id, ca.url, ie.class
+                ORDER BY MAX(ie.occurred_at) DESC
+                LIMIT ? OFFSET ?
+            `).bind(...params, pageSizeNum, offset).all<any>();
 
                             // Calculate 15m referrals for each item and process debug field
                 const referralsWith15m = await Promise.all(
