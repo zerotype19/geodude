@@ -466,7 +466,7 @@ export default function Events() {
         <div className="p-6 space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Events</h1>
-            <p className="text-gray-600">Monitor AI traffic and user interactions</p>
+            <p className="text-gray-600">Monitor real-time traffic with hardened AI classification</p>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
@@ -510,7 +510,7 @@ export default function Events() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Events</h1>
-            <p className="text-gray-600">Monitor AI traffic and user interactions</p>
+            <p className="text-gray-600">Monitor real-time traffic with hardened AI classification</p>
             {summary?.tracking_mode && (
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">

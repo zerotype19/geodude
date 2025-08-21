@@ -998,68 +998,62 @@ export async function handleApiRoutes(
             }
             const fromTs = now - windowMs;
 
-            // Get citations data from interaction_events table
+            // Get citations data from ai_citation_event table (real citations, not just AI traffic)
             const totalResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT COUNT(*) as citations
-                FROM interaction_events ie
-                JOIN project p ON p.id = ie.project_id
+                FROM ai_citation_event ace
+                JOIN project p ON p.id = ace.project_id
                 WHERE p.id = ? 
-                  AND ie.occurred_at >= datetime(?, 'unixepoch')
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-            `).bind(project_id, Math.floor(fromTs / 1000)).first();
+                  AND ace.ts >= ?
+            `).bind(project_id, fromTs).first();
 
             // Get by source breakdown
             const bySourceResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    COALESCE(ais.slug, 'unknown') as source_slug,
-                    COALESCE(ais.name, 'Unknown AI Source') as source_name,
+                    ace.surface as source_slug,
+                    ace.surface as source_name,
                     COUNT(*) as count
-                FROM interaction_events ie
-                JOIN project p ON p.id = ie.project_id
-                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                FROM ai_citation_event ace
+                JOIN project p ON p.id = ace.project_id
                 WHERE p.id = ?
-                  AND ie.occurred_at >= datetime(?, 'unixepoch')
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                GROUP BY ie.ai_source_id, ais.slug, ais.name
+                  AND ace.ts >= ?
+                GROUP BY ace.surface
                 ORDER BY count DESC
                 LIMIT 10
-            `).bind(project_id, Math.floor(fromTs / 1000)).all();
+            `).bind(project_id, fromTs).all();
 
             // Get top content breakdown
             const topContentResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    ie.content_id,
-                    ca.url,
+                    ace.url as content_url,
+                    ace.url,
                     COUNT(*) as count
-                FROM interaction_events ie
-                JOIN project p ON p.id = ie.project_id
-                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                FROM ai_citation_event ace
+                JOIN project p ON p.id = ace.project_id
                 WHERE p.id = ?
-                  AND ie.occurred_at >= datetime(?, 'unixepoch')
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                  AND ie.content_id IS NOT NULL
-                GROUP BY ie.content_id, ca.url
+                  AND ace.ts >= ?
+                  AND ace.url IS NOT NULL
+                GROUP BY ace.url
                 ORDER BY count DESC
                 LIMIT 10
-            `).bind(project_id, Math.floor(fromTs / 1000)).all();
+            `).bind(project_id, fromTs).all();
 
             // Get timeseries data
             const timeseriesResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    strftime('%Y-%m-%d', ie.occurred_at) as day,
+                    strftime('%Y-%m-%d', datetime(ace.ts/1000, 'unixepoch')) as day,
                     COUNT(*) as count
-                FROM interaction_events ie
-                JOIN project p ON p.id = ie.project_id
+                FROM ai_citation_event ace
+                JOIN project p ON p.id = ace.project_id
                 WHERE p.id = ?
-                  AND ie.occurred_at >= datetime(?, 'unixepoch')
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                GROUP BY strftime('%Y-%m-%d', ie.occurred_at)
+                  AND ace.ts >= ?
+                GROUP BY strftime('%Y-%m-%d', datetime(ace.ts/1000, 'unixepoch'))
                 ORDER BY day
-            `).bind(project_id, Math.floor(fromTs / 1000)).all();
+            `).bind(project_id, fromTs).all();
 
             const summary = {
-                totals: { 
-                    citations: totalResult?.citations || 0, 
+                totals: {
+                    citations: totalResult?.citations || 0,
                     by_source: (bySourceResult.results || []).map(row => ({
                         slug: row.source_slug,
                         name: row.source_name,
@@ -1125,27 +1119,24 @@ export async function handleApiRoutes(
             const pageNum = Math.max(1, parseInt(page));
             const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
 
-            // Get citations data from interaction_events table
+            // Get citations data from ai_citation_event table (real citations, not just AI traffic)
             let countQuery = `
                 SELECT COUNT(*) as total
-                FROM interaction_events ie
-                JOIN project p ON p.id = ie.project_id
-                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                FROM ai_citation_event ace
+                JOIN project p ON p.id = ace.project_id
                 WHERE p.id = ? 
-                  AND ie.occurred_at >= datetime(?, 'unixepoch')
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                  AND ace.ts >= ?
             `;
 
-            let countParams = [project_id, Math.floor(fromTs / 1000)];
+            let countParams = [project_id, fromTs];
 
             if (source) {
-                countQuery += ' AND COALESCE(ais.slug, "unknown") = ?';
+                countQuery += ' AND ace.surface = ?';
                 countParams.push(source);
             }
 
             if (q.trim()) {
-                countQuery += ' AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)';
+                countQuery += ' AND (ace.url LIKE ? OR ace.query LIKE ?)';
                 countParams.push(`%${q.trim()}%`);
                 countParams.push(`%${q.trim()}%`);
             }
@@ -1154,24 +1145,20 @@ export async function handleApiRoutes(
 
             let itemsQuery = `
                 SELECT 
-                    ie.id,
-                    ie.occurred_at as detected_at,
-                    ie.class as event_class,
-                    COALESCE(ais.slug, 'unknown') as source_slug,
-                    COALESCE(ais.name, 'Unknown AI Source') as source_name,
-                    ie.content_id,
-                    ca.url as content_url,
-                    json_extract(ie.metadata, '$.referrer_url') as ref_url,
-                    COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
-                    COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
-                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw
-                FROM interaction_events ie
-                JOIN project p ON p.id = ie.project_id
-                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                    ace.id,
+                    datetime(ace.ts/1000, 'unixepoch') as detected_at,
+                    'ai_citation' as event_class,
+                    ace.surface as source_slug,
+                    ace.surface as source_name,
+                    ace.url as content_url,
+                    ace.query as ref_url,
+                    'AI citation detected' as classification_reason,
+                    1.0 as classification_confidence,
+                    '[]' as debug_raw
+                FROM ai_citation_event ace
+                JOIN project p ON p.id = ace.project_id
                 WHERE p.id = ? 
-                  AND ie.occurred_at >= datetime(?, 'unixepoch')
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                  AND ace.ts >= ?
             `;
 
             let itemsParams = [project_id, Math.floor(fromTs / 1000)];
@@ -1182,12 +1169,12 @@ export async function handleApiRoutes(
             }
 
             if (q.trim()) {
-                itemsQuery += ' AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)';
+                itemsQuery += ' AND (ace.url LIKE ? OR ace.query LIKE ?)';
                 itemsParams.push(`%${q.trim()}%`);
                 itemsParams.push(`%${q.trim()}%`);
             }
 
-            itemsQuery += ' ORDER BY ie.occurred_at DESC LIMIT ? OFFSET ?';
+            itemsQuery += ' ORDER BY ace.ts DESC LIMIT ? OFFSET ?';
             itemsParams.push(pageSizeNum, (pageNum - 1) * pageSizeNum);
 
             const itemsResult = await env.OPTIVIEW_DB.prepare(itemsQuery).bind(...itemsParams).all();
@@ -1198,7 +1185,7 @@ export async function handleApiRoutes(
                     detected_at: row.detected_at,
                     event_class: row.event_class,
                     source: { slug: row.source_slug, name: row.source_name },
-                    content: row.content_id ? { id: row.content_id, url: row.content_url } : null,
+                    content: row.content_url ? { url: row.content_url } : null,
                     ref_url: row.ref_url,
                     classification_reason: row.classification_reason,
                     classification_confidence: row.classification_confidence,
@@ -1235,24 +1222,21 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // Get citation detail from interaction_events table
+            // Get citation detail from ai_citation_event table
             const citationQuery = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    ie.id,
-                    ie.occurred_at as detected_at,
-                    ie.class as event_class,
-                    COALESCE(ais.slug, 'unknown') as source_slug,
-                    COALESCE(ais.name, 'Unknown AI Source') as source_name,
-                    ie.content_id,
-                    ca.url as content_url,
-                    json_extract(ie.metadata, '$.referrer_url') as ref_url,
-                    COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
-                    COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
-                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw
-                FROM interaction_events ie
-                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                LEFT JOIN content_assets ca ON ca.id = ie.content_id
-                WHERE ie.id = ? AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                    ace.id,
+                    datetime(ace.ts/1000, 'unixepoch') as detected_at,
+                    'ai_citation' as event_class,
+                    ace.surface as source_slug,
+                    ace.surface as source_name,
+                    ace.url as content_url,
+                    ace.query as ref_url,
+                    'AI citation detected' as classification_reason,
+                    1.0 as classification_confidence,
+                    '[]' as debug_raw
+                FROM ai_citation_event ace
+                WHERE ace.id = ?
             `).bind(id).first();
 
             if (!citationQuery) {
@@ -1263,43 +1247,38 @@ export async function handleApiRoutes(
             // Get related recent citations for the same content
             const relatedContentQuery = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    ie.id,
-                    ie.occurred_at as detected_at,
-                    COALESCE(ais.slug, 'unknown') as source_slug,
-                    COALESCE(ais.name, 'Unknown AI Source') as source_name
-                FROM interaction_events ie
-                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                WHERE ie.content_id = ? 
-                  AND ie.id != ? 
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                ORDER BY ie.occurred_at DESC
+                    ace.id,
+                    datetime(ace.ts/1000, 'unixepoch') as detected_at,
+                    ace.surface as source_slug,
+                    ace.surface as source_name
+                FROM ai_citation_event ace
+                WHERE ace.url = ? 
+                  AND ace.id != ? 
+                ORDER BY ace.ts DESC
                 LIMIT 5
-            `).bind(citationQuery.content_id, id).all();
+            `).bind(citationQuery.content_url, id).all();
 
-            // Get related recent referrals from the same source
+            // Get related recent citations from the same source
             const relatedReferralsQuery = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    ie.id,
-                    ie.occurred_at as detected_at,
-                    json_extract(ie.metadata, '$.referrer_url') as ref_url,
-                    COALESCE(ais.slug, 'unknown') as source_slug,
-                    COALESCE(ais.name, 'Unknown AI Source') as source_name
-                FROM interaction_events ie
-                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                WHERE ie.ai_source_id = ? 
-                  AND ie.id != ? 
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                  AND json_extract(ie.metadata, '$.referrer_url') IS NOT NULL
-                ORDER BY ie.occurred_at DESC
+                    ace.id,
+                    datetime(ace.ts/1000, 'unixepoch') as detected_at,
+                    ace.query as ref_url,
+                    ace.surface as source_slug,
+                    ace.surface as source_name
+                FROM ai_citation_event ace
+                WHERE ace.surface = ? 
+                  AND ace.id != ? 
+                ORDER BY ace.ts DESC
                 LIMIT 5
-            `).bind(citationQuery.ai_source_id || 0, id).all();
+            `).bind(citationQuery.source_slug, id).all();
 
             const citation = {
                 id: citationQuery.id,
                 detected_at: citationQuery.detected_at,
                 event_class: citationQuery.event_class,
                 source: { slug: citationQuery.source_slug, name: citationQuery.source_name },
-                content: citationQuery.content_id ? { id: citationQuery.content_id, url: citationQuery.content_url } : null,
+                content: citationQuery.content_url ? { url: citationQuery.content_url } : null,
                 ref_url: citationQuery.ref_url,
                 classification_reason: citationQuery.classification_reason,
                 classification_confidence: citationQuery.classification_confidence,
