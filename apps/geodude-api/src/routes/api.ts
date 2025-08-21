@@ -2927,16 +2927,16 @@ export async function handleApiRoutes(
                     COALESCE(ais.name, 'Unknown AI Source') as source_name,
                     ie.occurred_at as last_seen,
                     ie.class as event_class,
-                    json_extract(ie.metadata, '$.classification_reason') as classification_reason,
-                    json_extract(ie.metadata, '$.classification_confidence') as classification_confidence,
-                    json_extract(ie.metadata, '$.debug') as debug,
+                    COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
+                    COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
+                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug,
                     COUNT(*) as referrals_24h
                 FROM interaction_events ie
                 JOIN content_assets ca ON ca.id = ie.content_id
                 JOIN properties p ON p.id = ca.property_id
                 LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                 WHERE ${whereConditions.join(' AND ')}
-                GROUP BY ie.content_id, ie.ai_source_id, ca.url, ais.slug, ais.name, ie.class, ie.metadata
+                GROUP BY ie.content_id, ie.ai_source_id, ca.url, ais.slug, ais.name, ie.class
                 ORDER BY ie.occurred_at DESC
                 LIMIT ? OFFSET ?
             `).bind(...params, pageSizeNum, offset).all<any>();
