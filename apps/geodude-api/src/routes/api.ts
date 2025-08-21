@@ -1600,291 +1600,294 @@ export async function handleApiRoutes(
                 headers: { "Content-Type": "application/json" }
             });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-                 }
-       }
+        }
+    }
 
-       // 6.3.4.5) Admin Backfill Rollups Endpoint
-       if (url.pathname === "/admin/backfill/rollups" && req.method === "POST") {
-         try {
-           // Rate limiting: 5 rpm per IP
-           const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
-           const rateLimitKey = `backfill_rollups:${clientIP}`;
-           const currentCount = await env.CACHE.get(rateLimitKey) || "0";
-           
-           if (parseInt(currentCount) >= 5) {
-             const response = new Response(JSON.stringify({
-               error: "Rate limit exceeded",
-               message: "Maximum 5 requests per minute per IP",
-               retry_after: 60
-             }), {
-               status: 429,
-               headers: { "Content-Type": "application/json" }
-             });
-             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           }
-           
-           // Increment rate limit counter
-           await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
-           
-           const body = await req.json();
-           const { project_id, hours_back = 24 } = body;
-           
-           if (!project_id) {
-             const response = new Response(JSON.stringify({
-               error: "Missing project_id parameter"
-             }), {
-               status: 400,
-               headers: { "Content-Type": "application/json" }
-             });
-             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           }
-           
-           // Get events that need rollup backfill
-           const cutoffTime = new Date(Date.now() - (hours_back * 60 * 60 * 1000));
-           const events = await env.OPTIVIEW_DB.prepare(`
+    // 6.3.4.5) Admin Backfill Rollups Endpoint
+    if (url.pathname === "/admin/backfill/rollups" && req.method === "POST") {
+        try {
+            // Rate limiting: 5 rpm per IP
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const rateLimitKey = `backfill_rollups:${clientIP}`;
+            const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+
+            if (parseInt(currentCount) >= 5) {
+                const response = new Response(JSON.stringify({
+                    error: "Rate limit exceeded",
+                    message: "Maximum 5 requests per minute per IP",
+                    retry_after: 60
+                }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Increment rate limit counter
+            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+
+            const body = await req.json();
+            const { project_id, hours_back = 24 } = body;
+
+            if (!project_id) {
+                const response = new Response(JSON.stringify({
+                    error: "Missing project_id parameter"
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get events that need rollup backfill
+            const cutoffTime = new Date(Date.now() - (hours_back * 60 * 60 * 1000));
+            const events = await env.OPTIVIEW_DB.prepare(`
              SELECT id, project_id, property_id, occurred_at, class, ai_source_id
              FROM interaction_events 
              WHERE project_id = ? AND occurred_at > ? AND class IS NOT NULL
              ORDER BY occurred_at DESC
            `).bind(project_id, cutoffTime.toISOString()).all();
-           
-           if (!events.results || events.results.length === 0) {
-             const response = new Response(JSON.stringify({
-               message: "No events found for backfill",
-               project_id,
-               hours_back,
-               events_count: 0
-             }), {
-               headers: { "Content-Type": "application/json" }
-             });
-             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           }
-           
-           // Process each event for rollup backfill
-           let processedCount = 0;
-           let errorCount = 0;
-           
-           for (const event of events.results) {
-             try {
-               const timestamp = new Date(event.occurred_at);
-               const { updateRollup } = await import('../lib/events-utils');
-               
-               await updateRollup(env, {
-                 project_id: event.project_id,
-                 property_id: event.property_id,
-                 timestamp,
-                 trafficClass: event.class,
-                 isSampled: false
-               });
-               
-               processedCount++;
-             } catch (error) {
-               console.error(`Error backfilling rollup for event ${event.id}:`, error);
-               errorCount++;
-             }
-           }
-           
-           const response = new Response(JSON.stringify({
-             message: "Rollup backfill completed",
-             project_id,
-             hours_back,
-             total_events: events.results.length,
-             processed_count: processedCount,
-             error_count: errorCount,
-             timestamp: new Date().toISOString()
-           }), {
-             headers: { "Content-Type": "application/json" }
-           });
-           
-           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           
-         } catch (error) {
-           console.error("Backfill rollups error:", error);
-           const response = new Response(JSON.stringify({
-             error: "Internal server error",
-             message: error.message
-           }), {
-             status: 500,
-             headers: { "Content-Type": "application/json" }
-           });
-           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-         }
-       }
 
-       // 6.3.6) Admin Classifier Manifest Management
-       if (url.pathname === "/admin/classifier/manifest" && req.method === "POST") {
-         try {
-           // Rate limiting: 5 rpm per IP
-           const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
-           const rateLimitKey = `classifier_manifest:${clientIP}`;
-           const currentCount = await env.CACHE.get(rateLimitKey) || "0";
-           
-           if (parseInt(currentCount) >= 5) {
-             const response = new Response(JSON.stringify({
-               error: "Rate limit exceeded",
-               message: "Maximum 5 requests per minute per IP",
-               retry_after: 60
-             }), {
-               status: 429,
-               headers: { "Content-Type": "application/json" }
-             });
-             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           }
-           
-           // Increment rate limit counter
-           await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
-           
-           const body = await req.json();
-           
-           // Validate manifest structure (basic validation)
-           if (!body.version || !body.assistants || !body.search_engines || !body.crawlers) {
-             const response = new Response(JSON.stringify({
-               error: "Invalid manifest structure",
-               message: "Manifest must include version, assistants, search_engines, and crawlers"
-             }), {
-               status: 400,
-               headers: { "Content-Type": "application/json" }
-             });
-             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           }
-           
-           // Update KV with new manifest
-           const manifestVersion = `v${Date.now()}`;
-           const updatedManifest = { ...body, version: manifestVersion };
-           
-           await env.AI_FINGERPRINTS.put('classifier_v2', JSON.stringify(updatedManifest));
-           
-           // Bump cache version
-           await env.CACHE.put('classifier_manifest_version', manifestVersion, { expirationTtl: 86400 });
-           
-           const response = new Response(JSON.stringify({
-             message: "Manifest updated successfully",
-             version: manifestVersion,
-             sections: {
-               assistants: Object.keys(body.assistants).length,
-               search_engines: Object.keys(body.search_engines).length,
-               crawlers: Object.keys(body.crawlers).length,
-               preview_bots: Object.keys(body.preview_bots || {}).length,
-               ua_patterns: Object.keys(body.ua_patterns || {}).length
-             },
-             timestamp: new Date().toISOString()
-           }), {
-             headers: { "Content-Type": "application/json" }
-           });
-           
-           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           
-         } catch (error) {
-           console.error("Classifier manifest update error:", error);
-           const response = new Response(JSON.stringify({
-             error: "Internal server error",
-             message: error.message
-           }), {
-             status: 500,
-             headers: { "Content-Type": "application/json" }
-           });
-           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-         }
-       }
+            if (!events.results || events.results.length === 0) {
+                const response = new Response(JSON.stringify({
+                    message: "No events found for backfill",
+                    project_id,
+                    hours_back,
+                    events_count: 0
+                }), {
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
 
-       // 6.3.7) Admin AI Backfill Reclassification
-       if (url.pathname === "/admin/ai-backfill/reclassify" && (req.method === "GET" || req.method === "POST")) {
-         try {
-           // Rate limiting: 5 rpm per IP
-           const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
-           const rateLimitKey = `ai_backfill:${clientIP}`;
-           const currentCount = await env.CACHE.get(rateLimitKey) || "0";
-           
-           if (parseInt(currentCount) >= 5) {
-             const response = new Response(JSON.stringify({
-               error: "Rate limit exceeded",
-               message: "Maximum 5 requests per minute per IP",
-               retry_after: 60
-             }), {
-               status: 429,
-               headers: { "Content-Type": "application/json" }
-             });
-             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           }
-           
-           // Increment rate limit counter
-           await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
-           
-           let startTime: Date;
-           let endTime: Date;
-           let batchSize: number = 100;
-           
-           if (req.method === "POST") {
-             // POST: Use provided time range and batch size
-             const body = await req.json();
-             const { start_time, end_time, batch_size = 100 } = body;
-             
-             if (!start_time || !end_time) {
-               const response = new Response(JSON.stringify({
-                 error: "Missing required parameters",
-                 message: "start_time and end_time are required for POST requests"
-               }), {
-                 status: 400,
-                 headers: { "Content-Type": "application/json" }
-               });
-               return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-             }
-             
-             startTime = new Date(start_time);
-             endTime = new Date(end_time);
-             batchSize = Math.min(Math.max(1, batch_size), 500); // Limit batch size
-           } else {
-             // GET: Use hours parameter (backward compatibility)
-             const urlObj = new URL(req.url);
-             const hours = parseInt(urlObj.searchParams.get("hours") || "72");
-             endTime = new Date();
-             startTime = new Date(Date.now() - (hours * 60 * 60 * 1000));
-           }
-           
-           // Get events for reclassification within the time range
-           const events = await env.OPTIVIEW_DB.prepare(`
-             SELECT id, project_id, property_id, occurred_at, metadata
+            // Process each event for rollup backfill
+            let processedCount = 0;
+            let errorCount = 0;
+
+            for (const event of events.results) {
+                try {
+                    const timestamp = new Date(event.occurred_at);
+                    const { updateRollup } = await import('../lib/events-utils');
+
+                    await updateRollup(env, {
+                        project_id: event.project_id,
+                        property_id: event.property_id,
+                        timestamp,
+                        trafficClass: event.class,
+                        isSampled: false
+                    });
+
+                    processedCount++;
+                } catch (error) {
+                    console.error(`Error backfilling rollup for event ${event.id}:`, error);
+                    errorCount++;
+                }
+            }
+
+            const response = new Response(JSON.stringify({
+                message: "Rollup backfill completed",
+                project_id,
+                hours_back,
+                total_events: events.results.length,
+                processed_count: processedCount,
+                error_count: errorCount,
+                timestamp: new Date().toISOString()
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("Backfill rollups error:", error);
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: error.message
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.3.6) Admin Classifier Manifest Management
+    if (url.pathname === "/admin/classifier/manifest" && req.method === "POST") {
+        try {
+            // Rate limiting: 5 rpm per IP
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const rateLimitKey = `classifier_manifest:${clientIP}`;
+            const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+
+            if (parseInt(currentCount) >= 5) {
+                const response = new Response(JSON.stringify({
+                    error: "Rate limit exceeded",
+                    message: "Maximum 5 requests per minute per IP",
+                    retry_after: 60
+                }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Increment rate limit counter
+            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+
+            const body = await req.json();
+
+            // Validate manifest structure (basic validation)
+            if (!body.version || !body.assistants || !body.search_engines || !body.crawlers) {
+                const response = new Response(JSON.stringify({
+                    error: "Invalid manifest structure",
+                    message: "Manifest must include version, assistants, search_engines, and crawlers"
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Update KV with new manifest
+            const manifestVersion = `v${Date.now()}`;
+            const updatedManifest = { ...body, version: manifestVersion };
+
+            await env.AI_FINGERPRINTS.put('classifier_v2', JSON.stringify(updatedManifest));
+
+            // Bump cache version
+            await env.CACHE.put('classifier_manifest_version', manifestVersion, { expirationTtl: 86400 });
+
+            const response = new Response(JSON.stringify({
+                message: "Manifest updated successfully",
+                version: manifestVersion,
+                sections: {
+                    assistants: Object.keys(body.assistants).length,
+                    search_engines: Object.keys(body.search_engines).length,
+                    crawlers: Object.keys(body.crawlers).length,
+                    preview_bots: Object.keys(body.preview_bots || {}).length,
+                    ua_patterns: Object.keys(body.ua_patterns || {}).length
+                },
+                timestamp: new Date().toISOString()
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("Classifier manifest update error:", error);
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: error.message
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.3.7) Admin AI Backfill Reclassification
+    if (url.pathname === "/admin/ai-backfill/reclassify" && (req.method === "GET" || req.method === "POST")) {
+        try {
+            // Rate limiting: 5 rpm per IP
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const rateLimitKey = `ai_backfill:${clientIP}`;
+            const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+
+            if (parseInt(currentCount) >= 5) {
+                const response = new Response(JSON.stringify({
+                    error: "Rate limit exceeded",
+                    message: "Maximum 5 requests per minute per IP",
+                    retry_after: 60
+                }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Increment rate limit counter
+            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+
+            let startTime: Date;
+            let endTime: Date;
+            let batchSize: number = 100;
+
+            if (req.method === "POST") {
+                // POST: Use provided time range and batch size
+                const body = await req.json();
+                const { start_time, end_time, batch_size = 100 } = body;
+
+                if (!start_time || !end_time) {
+                    const response = new Response(JSON.stringify({
+                        error: "Missing required parameters",
+                        message: "start_time and end_time are required for POST requests"
+                    }), {
+                        status: 400,
+                        headers: { "Content-Type": "application/json" }
+                    });
+                    return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                }
+
+                startTime = new Date(start_time);
+                endTime = new Date(end_time);
+                batchSize = Math.min(Math.max(1, batch_size), 500); // Limit batch size
+            } else {
+                // GET: Use hours parameter (backward compatibility)
+                const urlObj = new URL(req.url);
+                const hours = parseInt(urlObj.searchParams.get("hours") || "72");
+                endTime = new Date();
+                startTime = new Date(Date.now() - (hours * 60 * 60 * 1000));
+            }
+
+            // Get events for reclassification within the time range
+            // Include events that need initial classification OR might have old classification values
+            const events = await env.OPTIVIEW_DB.prepare(`
+             SELECT id, project_id, property_id, occurred_at, metadata, class as current_class
              FROM interaction_events 
-             WHERE occurred_at >= ? AND occurred_at <= ? AND (class IS NULL OR class = 'unknown')
+             WHERE occurred_at >= ? AND occurred_at <= ? 
+               AND (class IS NULL OR class = 'unknown' OR 
+                    json_extract(metadata,'$.classification_reason') IS NULL)
              ORDER BY occurred_at ASC
              LIMIT ?
            `).bind(startTime.toISOString(), endTime.toISOString(), batchSize).all();
-           
-           if (!events.results || events.results.length === 0) {
-             const response = new Response(JSON.stringify({
-               message: "No events found for reclassification",
-               time_range: {
-                 start: startTime.toISOString(),
-                 end: endTime.toISOString()
-               },
-               events_count: 0
-             }), {
-               headers: { "Content-Type": "application/json" }
-             });
-             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           }
-           
-           // Reclassify events using Classifier v2
-           let processedCount = 0;
-           let updatedCount = 0;
-           let errorCount = 0;
-           const { classifyTraffic } = await import('../ai-lite/classifier');
-           
-           for (const event of events.results) {
-             try {
-               const metadata = JSON.parse(event.metadata || '{}');
-               const referrer = metadata.referrer || metadata.referer || null;
-               const userAgent = metadata.user_agent || null;
-               
-               // Create mock request for classification
-               const mockReq = {
-                 headers: new Headers(),
-                 url: 'https://api.optiview.ai/api/events'
-               } as Request;
-               
-               const classification = classifyTraffic(mockReq, {}, referrer, userAgent);
-               
-               // Update event with new classification
+
+            if (!events.results || events.results.length === 0) {
+                const response = new Response(JSON.stringify({
+                    message: "No events found for reclassification",
+                    time_range: {
+                        start: startTime.toISOString(),
+                        end: endTime.toISOString()
+                    },
+                    events_count: 0
+                }), {
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Reclassify events using Classifier v2
+            let processedCount = 0;
+            let updatedCount = 0;
+            let errorCount = 0;
+            const { classifyTraffic } = await import('../ai-lite/classifier');
+
+            for (const event of events.results) {
+                try {
+                    const metadata = JSON.parse(event.metadata || '{}');
+                    const referrer = metadata.referrer || metadata.referer || null;
+                    const userAgent = metadata.user_agent || null;
+
+                    // Create mock request for classification
+                    const mockReq = {
+                        headers: new Headers(),
+                        url: 'https://api.optiview.ai/api/events'
+                    } as Request;
+
+                    const classification = classifyTraffic(mockReq, {}, referrer, userAgent);
+
+                                   // Update event with new classification
                await env.OPTIVIEW_DB.prepare(`
                  UPDATE interaction_events 
                  SET class = ?, 
@@ -1898,137 +1901,137 @@ export async function handleApiRoutes(
                ).run();
                
                processedCount++;
-               if (event.class !== classification.class) {
+               if (event.current_class !== classification.class) {
                  updatedCount++;
                }
-             } catch (error) {
-               console.error(`Error reclassifying event ${event.id}:`, error);
-               errorCount++;
-             }
-           }
-           
-           // Bump cache version
-           await env.CACHE.put('classification_cache_version', String(Date.now()), { expirationTtl: 86400 });
-           
-           const response = new Response(JSON.stringify({
-             success: true,
-             message: "Reclassification completed",
-             time_range: {
-               start: startTime.toISOString(),
-               end: endTime.toISOString()
-             },
-             batch_size: batchSize,
-             total_events: events.results.length,
-             processed: processedCount,
-             updated: updatedCount,
-             errors: errorCount
-           }), {
-             headers: { "Content-Type": "application/json" }
-           });
-           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-         } catch (error) {
-           console.error("AI backfill reclassification error:", error);
-           const response = new Response(JSON.stringify({
-             error: "Internal server error",
-             message: error.message
-           }), {
-             status: 500,
-             headers: { "Content-Type": "application/json" }
-           });
-           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-         }
-       }
+                } catch (error) {
+                    console.error(`Error reclassifying event ${event.id}:`, error);
+                    errorCount++;
+                }
+            }
 
-       // 6.3.8) Admin Debug Classify (for testing classification)
-       if (url.pathname === "/admin/debug/classify" && req.method === "GET") {
-         try {
-           // Rate limiting: 10 rpm per IP
-           const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
-           const rateLimitKey = `debug_classify:${clientIP}`;
-           const currentCount = await env.CACHE.get(rateLimitKey) || "0";
-           
-           if (parseInt(currentCount) >= 10) {
-             const response = new Response(JSON.stringify({
-               error: "Rate limit exceeded",
-               message: "Maximum 10 requests per minute per IP",
-               retry_after: 60
-             }), {
-               status: 429,
-               headers: { "Content-Type": "application/json" }
-             });
-             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           }
-           
-           // Increment rate limit counter
-           await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
-           
-           // Get mock data from headers for testing
-           const mockReferrer = req.headers.get("x-mock-referrer");
-           const mockUserAgent = req.headers.get("user-agent") || "Mozilla/5.0 (Test) AppleWebKit/537.36";
-           
-           // Create mock request for classification
-           const mockReq = {
-             headers: new Headers(),
-             url: 'https://api.optiview.ai/api/events'
-           } as Request;
-           
-           // Add any AI client headers for testing
-           const aiClientHeader = req.headers.get("sec-ai-client") || req.headers.get("x-ai-client");
-           if (aiClientHeader) {
-             mockReq.headers.set("sec-ai-client", aiClientHeader);
-           }
-           
-           // Run classification
-           const { classifyTraffic } = await import('../ai-lite/classifier');
-           const classification = classifyTraffic(mockReq, {}, mockReferrer, mockUserAgent);
-           
-           // Get current manifest info
-           const { getClassifierManifest } = await import('../ai-lite/classifier-manifest');
-           const manifest = await getClassifierManifest(env);
-           
-           const response = new Response(JSON.stringify({
-             classification: {
-               class: classification.class,
-               aiSourceSlug: classification.aiSourceSlug,
-               aiSourceName: classification.aiSourceName,
-               reason: classification.reason,
-               confidence: classification.confidence,
-               evidence: classification.evidence
-             },
-             manifest_info: {
-               version: manifest.version,
-               sample_hosts: {
-                 assistants: Object.keys(manifest.assistants).slice(0, 3),
-                 search_engines: Object.keys(manifest.search_engines).slice(0, 3),
-                 crawlers: Object.keys(manifest.crawlers).slice(0, 3)
-               }
-             },
-             test_data: {
-               referrer: mockReferrer,
-               user_agent: mockUserAgent.substring(0, 80),
-               ai_client_header: aiClientHeader || null
-             },
-             timestamp: new Date().toISOString()
-           }), {
-             headers: { "Content-Type": "application/json" }
-           });
-           
-           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           
-         } catch (error) {
-           console.error("Debug classify error:", error);
-           const response = new Response(JSON.stringify({
-             error: "Internal server error",
-             message: error.message
-           }), {
-             status: 500,
-             headers: { "Content-Type": "application/json" }
-           });
-           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-         }
-       }
+            // Bump cache version
+            await env.CACHE.put('classification_cache_version', String(Date.now()), { expirationTtl: 86400 });
 
-       // 6.3.5) Events Ingestion API (with cache invalidation)
+            const response = new Response(JSON.stringify({
+                success: true,
+                message: "Reclassification completed",
+                time_range: {
+                    start: startTime.toISOString(),
+                    end: endTime.toISOString()
+                },
+                batch_size: batchSize,
+                total_events: events.results.length,
+                processed: processedCount,
+                updated: updatedCount,
+                errors: errorCount
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (error) {
+            console.error("AI backfill reclassification error:", error);
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: error.message
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.3.8) Admin Debug Classify (for testing classification)
+    if (url.pathname === "/admin/debug/classify" && req.method === "GET") {
+        try {
+            // Rate limiting: 10 rpm per IP
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const rateLimitKey = `debug_classify:${clientIP}`;
+            const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+
+            if (parseInt(currentCount) >= 10) {
+                const response = new Response(JSON.stringify({
+                    error: "Rate limit exceeded",
+                    message: "Maximum 10 requests per minute per IP",
+                    retry_after: 60
+                }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Increment rate limit counter
+            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+
+            // Get mock data from headers for testing
+            const mockReferrer = req.headers.get("x-mock-referrer");
+            const mockUserAgent = req.headers.get("user-agent") || "Mozilla/5.0 (Test) AppleWebKit/537.36";
+
+            // Create mock request for classification
+            const mockReq = {
+                headers: new Headers(),
+                url: 'https://api.optiview.ai/api/events'
+            } as Request;
+
+            // Add any AI client headers for testing
+            const aiClientHeader = req.headers.get("sec-ai-client") || req.headers.get("x-ai-client");
+            if (aiClientHeader) {
+                mockReq.headers.set("sec-ai-client", aiClientHeader);
+            }
+
+            // Run classification
+            const { classifyTraffic } = await import('../ai-lite/classifier');
+            const classification = classifyTraffic(mockReq, {}, mockReferrer, mockUserAgent);
+
+            // Get current manifest info
+            const { getClassifierManifest } = await import('../ai-lite/classifier-manifest');
+            const manifest = await getClassifierManifest(env);
+
+            const response = new Response(JSON.stringify({
+                classification: {
+                    class: classification.class,
+                    aiSourceSlug: classification.aiSourceSlug,
+                    aiSourceName: classification.aiSourceName,
+                    reason: classification.reason,
+                    confidence: classification.confidence,
+                    evidence: classification.evidence
+                },
+                manifest_info: {
+                    version: manifest.version,
+                    sample_hosts: {
+                        assistants: Object.keys(manifest.assistants).slice(0, 3),
+                        search_engines: Object.keys(manifest.search_engines).slice(0, 3),
+                        crawlers: Object.keys(manifest.crawlers).slice(0, 3)
+                    }
+                },
+                test_data: {
+                    referrer: mockReferrer,
+                    user_agent: mockUserAgent.substring(0, 80),
+                    ai_client_header: aiClientHeader || null
+                },
+                timestamp: new Date().toISOString()
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("Debug classify error:", error);
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: error.message
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.3.5) Events Ingestion API (with cache invalidation)
     if (url.pathname === "/api/events" && req.method === "POST") {
 
 
