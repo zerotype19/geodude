@@ -17,6 +17,7 @@ import {
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../contexts/AuthContext";
+import { API_BASE, FETCH_OPTS } from '../config';
 
 interface SessionSummary {
   totals: {
@@ -199,13 +200,7 @@ export default function Journeys() {
         window,
         _t: Date.now().toString() // Cache buster
       });
-      const response = await fetch(`https://api.optiview.ai/api/sessions/summary?${params}`, {
-        credentials: 'include',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
+      const response = await fetch(`${API_BASE}/api/sessions/summary?${params}`, FETCH_OPTS);
 
       if (response.ok) {
         const data = await response.json();
@@ -238,13 +233,7 @@ export default function Journeys() {
       
       if (searchQuery) params.append("q", searchQuery);
 
-      const response = await fetch(`https://api.optiview.ai/api/sessions/recent?${params}`, {
-        credentials: 'include',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
+      const response = await fetch(`${API_BASE}/api/sessions/recent?${params}`, FETCH_OPTS);
       
       if (response.ok) {
         const data = await response.json();
@@ -276,13 +265,7 @@ export default function Journeys() {
         window: "15m",
         _t: Date.now().toString() // Cache buster
       });
-      const response = await fetch(`https://api.optiview.ai/api/events/has-any?${params}`, {
-        credentials: 'include',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
+      const response = await fetch(`${API_BASE}/api/events/has-any?${params}`, FETCH_OPTS);
       
       if (response.ok) {
         const data = await response.json();
@@ -303,7 +286,7 @@ export default function Journeys() {
         session_id: sessionId.toString(),
         _t: Date.now().toString() // Cache buster
       });
-      const response = await fetch(`https://api.optiview.ai/api/sessions/journey?${params}`, {
+      const response = await fetch(`${API_BASE}/api/sessions/journey?${params}`, {
         credentials: 'include',
         headers: {
           'Cache-Control': 'no-cache',

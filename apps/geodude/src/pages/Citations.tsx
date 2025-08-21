@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, Quote, ExternalLink, Search, Filter, Calendar, BarChart3 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import Shell from "../components/Shell";
+import { API_BASE, FETCH_OPTS } from '../config';
 
 interface Citation {
   id: number;
@@ -73,9 +74,7 @@ export default function Citations() {
 
   const loadSummary = async () => {
     try {
-      const response = await fetch(`https://api.optiview.ai/api/citations/summary?project_id=${project?.id}&window=${window}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_BASE}/api/citations/summary?project_id=${project?.id}&window=${window}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
         setSummary(data);
@@ -98,9 +97,7 @@ export default function Citations() {
       if (sourceFilter) params.append('source', sourceFilter);
       if (searchQuery.trim()) params.append('q', searchQuery.trim());
 
-      const response = await fetch(`https://api.optiview.ai/api/citations?${params}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_BASE}/api/citations?${params}`, FETCH_OPTS);
       
       if (response.ok) {
         const data = await response.json();
@@ -116,9 +113,7 @@ export default function Citations() {
 
   const loadCitationDetail = async (citationId: number) => {
     try {
-      const response = await fetch(`https://api.optiview.ai/api/citations/detail?id=${citationId}`, {
-        credentials: 'include'
-      });
+      const response = await fetch(`${API_BASE}/api/citations/detail?id=${citationId}`, FETCH_OPTS);
       
       if (response.ok) {
         const data = await response.json();
