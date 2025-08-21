@@ -177,38 +177,7 @@ function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: s
   );
 }
 
-// Traffic classification helper functions
-function getTrafficClassColor(className: string): string {
-  switch (className) {
-    case "ai_agent_crawl": return "bg-orange-100 text-orange-800";
-    case "human_via_ai": return "bg-blue-100 text-blue-800";
-    case "search": return "bg-green-100 text-green-800";
-    case "direct_human": return "bg-gray-100 text-gray-800";
-    default: return "bg-gray-100 text-gray-800";
-  }
-}
 
-function getTrafficClassLabel(className: string): string {
-  switch (className) {
-    case "direct_human": return "Direct Human";
-    case "human_via_ai": return "Human via AI";
-    case "ai_agent_crawl": return "AI Agent Crawl";
-    case "search": return "Search";
-    case "unknown": return "Unknown";
-    default: return className;
-  }
-}
-
-function getTrafficClassDescription(className: string): string {
-  switch (className) {
-    case "direct_human": return "No referrer, direct visits";
-    case "human_via_ai": return "AI assistant referrers (ChatGPT, Claude, etc.)";
-    case "ai_agent_crawl": return "Cloudflare verified bots and crawlers";
-    case "search": return "Search engine referrers (Google, Bing, etc.)";
-    case "unknown": return "Unclassified traffic";
-    default: return "Traffic classification";
-  }
-}
 
 export default function Journeys() {
   const { project } = useAuth();
