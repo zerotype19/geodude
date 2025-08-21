@@ -375,7 +375,7 @@ export async function handleApiRoutes(
                         SELECT COUNT(*) AS ai_influenced
                         FROM interaction_events
                         WHERE project_id = ? AND occurred_at >= ?
-                          AND (ai_source_id IS NOT NULL OR json_extract(metadata,'$.traffic_class') IN ('human_via_ai','ai_agent_crawl'))
+                          AND class IN ('human_via_ai','ai_agent_crawl','citation')
                     `).bind(project_id, sinceISO).first<any>();
 
                     totals = {
@@ -384,16 +384,10 @@ export async function handleApiRoutes(
                         ai_pct: (totalResult?.events || 0) > 0 ? ((aiInfluencedResult?.ai_influenced || 0) / (totalResult?.events || 0)) : 0
                     };
 
-                    // Get breakdown by class with traffic classification
+                    // Get breakdown by class using the stored classification
                     const classBreakdown = await env.OPTIVIEW_DB.prepare(`
                         SELECT 
-                            CASE 
-                                WHEN ai_source_id IS NOT NULL THEN 'human_via_ai'
-                                WHEN json_extract(metadata,'$.traffic_class') IS NOT NULL THEN json_extract(metadata,'$.traffic_class')
-                                WHEN json_extract(metadata,'$.referrer') LIKE '%google.com%' OR json_extract(metadata,'$.referrer') LIKE '%bing.com%' THEN 'search'
-                                WHEN json_extract(metadata,'$.user_agent') LIKE '%bot%' OR json_extract(metadata,'$.user_agent') LIKE '%crawler%' THEN 'ai_agent_crawl'
-                                ELSE 'direct_human'
-                            END AS class,
+                            COALESCE(class, 'unknown') AS class,
                             COUNT(*) AS count
                         FROM interaction_events
                         WHERE project_id = ? AND occurred_at >= ?
