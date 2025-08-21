@@ -62,8 +62,8 @@ async function updateSourcesIndex(
       updated_at: new Date().toISOString()
     };
     
-    // Store updated mapping
-    await env.AI_FINGERPRINTS.put('sources:index', JSON.stringify(sourcesIndex), { expirationTtl: 0 });
+    // Store updated mapping (no expiration for sources index)
+    await env.AI_FINGERPRINTS.put('sources:index', JSON.stringify(sourcesIndex));
     
     console.log('Updated sources:index KV for:', { slug, sourceId, name });
   } catch (error) {
