@@ -25,7 +25,8 @@
     "typecheck": "tsc -b",
     "token:gen": "tsx scripts/token-gen.ts",
     "ai:capture": "tsx scripts/playwright/capture.ts",
-    "test-classifier": "tsx scripts/test-classifier.ts"
+    "test-classifier": "tsx scripts/test-classifier.ts",
+    "test:hardened": "tsx scripts/test-hardened-system.ts"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
