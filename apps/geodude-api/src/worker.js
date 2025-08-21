@@ -61,6 +61,21 @@ function traceD1(d1) {
 }
 
 export default {
+  async scheduled(event, env, ctx) {
+    // Handle cron triggers
+    try {
+      console.log(`[${new Date().toISOString()}] Cron trigger: ${event.cron}`);
+      
+      // Add your scheduled task logic here
+      // For now, just log the trigger
+      
+      return new Response('OK', { status: 200 });
+    } catch (error) {
+      console.error('Scheduled task error:', error);
+      return new Response('Error', { status: 500 });
+    }
+  },
+
   async fetch(request, env, ctx) {
     try {
       // Load and validate configuration
