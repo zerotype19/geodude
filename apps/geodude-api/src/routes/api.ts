@@ -2908,14 +2908,18 @@ export async function handleApiRoutes(
             const pageSizeNum = Math.min(parseInt(pageSize), 100);
             const offset = (pageNum - 1) * pageSizeNum;
 
-            // Get total count
+            // Get total count of grouped results (matching the main query grouping)
             const totalResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT COUNT(*) AS total
-                FROM interaction_events ie
-                JOIN content_assets ca ON ca.id = ie.content_id
-                JOIN properties p ON p.id = ca.property_id
-                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                WHERE ${whereConditions.join(' AND ')}
+                FROM (
+                    SELECT ie.content_id, ie.ai_source_id
+                    FROM interaction_events ie
+                    JOIN content_assets ca ON ca.id = ie.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                    WHERE ${whereConditions.join(' AND ')}
+                    GROUP BY ie.content_id, ie.ai_source_id
+                ) grouped_results
             `).bind(...params).first<any>();
 
             // Get referrals with pagination - simplified grouping to fix pagination
