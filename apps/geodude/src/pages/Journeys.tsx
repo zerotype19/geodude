@@ -30,6 +30,10 @@ interface SessionSummary {
     name: string;
     count: number;
   }>;
+  by_class: Array<{
+    class: string;
+    count: number;
+  }>;
   entry_pages: Array<{
     content_id: number;
     url: string;
@@ -85,12 +89,47 @@ interface JourneyEvent {
     slug: string;
     name: string;
   } | null;
+  classification_reason?: string;
+  classification_confidence?: number;
   debug?: string[];
 }
 
 interface Journey {
   session: SessionItem;
   events: JourneyEvent[];
+}
+
+// Traffic classification helper functions
+function getTrafficClassColor(className: string): string {
+  switch (className) {
+    case "ai_agent_crawl": return "bg-orange-100 text-orange-800 border-orange-200";
+    case "human_via_ai": return "bg-blue-100 text-blue-800 border-blue-200";
+    case "search": return "bg-green-100 text-green-800 border-green-200";
+    case "direct_human": return "bg-gray-100 text-gray-800 border-gray-200";
+    default: return "bg-gray-100 text-gray-800 border-gray-200";
+  }
+}
+
+function getTrafficClassLabel(className: string): string {
+  switch (className) {
+    case "direct_human": return "Direct Human";
+    case "human_via_ai": return "Human via AI";
+    case "ai_agent_crawl": return "AI Agent Crawl";
+    case "search": return "Search";
+    case "unknown": return "Unknown";
+    default: return className;
+  }
+}
+
+function getTrafficClassDescription(className: string): string {
+  switch (className) {
+    case "direct_human": return "No referrer, direct visits";
+    case "human_via_ai": return "AI assistant referrers (ChatGPT, Claude, etc.)";
+    case "ai_agent_crawl": return "Cloudflare verified bots and crawlers";
+    case "search": return "Search engine referrers (Google, Bing, etc.)";
+    case "unknown": return "Unclassified traffic";
+    default: return "Traffic classification";
+  }
 }
 
 // Simple SVG chart component
@@ -252,7 +291,7 @@ export default function Journeys() {
 
   async function fetchRecent() {
     if (!project?.id) return;
-    
+
     setRecentLoading(true);
     try {
       const params = new URLSearchParams({
@@ -263,15 +302,15 @@ export default function Journeys() {
         ai: aiFilter,
         _t: Date.now().toString() // Cache buster
       });
-      
+
       if (searchQuery) params.append("q", searchQuery);
 
       const response = await fetch(`${API_BASE}/api/sessions/recent?${params}`, FETCH_OPTS);
-      
+
       if (response.ok) {
         const data = await response.json();
         setRecent(data);
-        
+
         // Set hasAnySessions based on whether we have any sessions at all
         if (data.total > 0) {
           setHasAnySessions(true);
@@ -291,15 +330,15 @@ export default function Journeys() {
 
   async function checkHasAnyEvents() {
     if (!project?.id) return;
-    
+
     try {
-      const params = new URLSearchParams({ 
-        project_id: project.id, 
+      const params = new URLSearchParams({
+        project_id: project.id,
         window: "15m",
         _t: Date.now().toString() // Cache buster
       });
       const response = await fetch(`${API_BASE}/api/events/has-any?${params}`, FETCH_OPTS);
-      
+
       if (response.ok) {
         const data = await response.json();
         setHasAnySessions(data.has_any);
@@ -311,11 +350,11 @@ export default function Journeys() {
 
   async function fetchJourney(sessionId: number) {
     if (!project?.id) return;
-    
+
     setJourneyLoading(true);
     try {
-      const params = new URLSearchParams({ 
-        project_id: project.id, 
+      const params = new URLSearchParams({
+        project_id: project.id,
         session_id: sessionId.toString(),
         _t: Date.now().toString() // Cache buster
       });
@@ -326,7 +365,7 @@ export default function Journeys() {
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setSelectedJourney(data);
@@ -570,6 +609,12 @@ export default function Journeys() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Hardened AI Detection System Badge */}
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200">
+              <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+              Hardened AI Detection System
+            </div>
+            
             {/* Window Selector */}
             <div className="flex rounded-lg border border-gray-300">
               {["15m", "24h", "7d"].map((w) => (
@@ -577,8 +622,8 @@ export default function Journeys() {
                   key={w}
                   onClick={() => handleWindowChange(w)}
                   className={`px-3 py-1 text-sm font-medium ${window === w
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50"
                     } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
                 >
                   {w}
@@ -683,6 +728,70 @@ export default function Journeys() {
           </div>
         )}
 
+        {/* Breakdown Row */}
+        {summary && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* AI Sources Breakdown */}
+            <Card>
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">AI Sources</h3>
+                {summary.by_source && summary.by_source.length > 0 ? (
+                  <div className="space-y-2">
+                    {summary.by_source.map((source, index) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">{source.name}</span>
+                        <span className="text-sm font-medium text-gray-900">{source.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No AI sources found</p>
+                )}
+              </div>
+            </Card>
+
+            {/* Traffic Class Breakdown */}
+            <Card>
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Traffic Classes</h3>
+                {summary.by_class && summary.by_class.length > 0 ? (
+                  <div className="space-y-2">
+                    {summary.by_class.map((cls, index) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(cls.class)}`}>
+                          {getTrafficClassLabel(cls.class)}
+                        </span>
+                        <span className="text-sm font-medium text-gray-900">{cls.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No traffic class data</p>
+                )}
+              </div>
+            </Card>
+
+            {/* Entry Pages Breakdown */}
+            <Card>
+              <div className="p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Entry Pages</h3>
+                {summary.entry_pages && summary.entry_pages.length > 0 ? (
+                  <div className="space-y-2">
+                    {summary.entry_pages.slice(0, 5).map((page, index) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 truncate max-w-xs">{page.url}</span>
+                        <span className="text-sm font-medium text-gray-900">{page.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No entry page data</p>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3 space-y-6">
             {/* Timeseries Chart */}
@@ -715,15 +824,15 @@ export default function Journeys() {
                       key={filter}
                       onClick={() => handleAIFilter(filter)}
                       className={`px-3 py-1 rounded-full text-sm border ${aiFilter === filter || (aiFilter === "all" && filter === "all")
-                          ? "bg-blue-100 text-blue-800 border-blue-200"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                        ? "bg-blue-100 text-blue-800 border-blue-200"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                         }`}
                     >
                       {filter === "all" ? "All" : filter === "only" ? "AI only" : "Non-AI"}
                     </button>
                   ))}
                 </div>
-                
+
                 {/* AI-Lite Mode Note */}
                 {summary?.ai_lite && (
                   <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
@@ -941,8 +1050,8 @@ export default function Journeys() {
                 <div className="text-sm text-gray-600">
                   <p className="font-medium mb-1">AI-Lite Mode Active</p>
                   <p>
-                    Non-AI sessions are not retained as detailed journeys in AI-Lite mode. 
-                    Only AI-influenced sessions appear in the table above. For baseline traffic counts, 
+                    Non-AI sessions are not retained as detailed journeys in AI-Lite mode.
+                    Only AI-influenced sessions appear in the table above. For baseline traffic counts,
                     see the Events page which shows rollup data for direct human and search traffic.
                   </p>
                 </div>
@@ -1085,6 +1194,16 @@ export default function Journeys() {
                                       <Info className="h-3 w-3 text-gray-400 cursor-help" />
                                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
                                         {getTrafficClassDescription(event.event_class)}
+                                        {event.classification_reason && (
+                                          <div className="mt-1 pt-1 border-t border-gray-700">
+                                            <strong>Reason:</strong> {event.classification_reason}
+                                          </div>
+                                        )}
+                                        {event.classification_confidence && (
+                                          <div className="mt-1 pt-1 border-t border-gray-700">
+                                            <strong>Confidence:</strong> {(event.classification_confidence * 100).toFixed(0)}%
+                                          </div>
+                                        )}
                                         {event.debug && event.debug.length > 0 && (
                                           <div className="mt-1 pt-1 border-t border-gray-700">
                                             <strong>Debug:</strong> {event.debug.join(', ')}

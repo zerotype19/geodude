@@ -1174,6 +1174,22 @@ export async function handleApiRoutes(
                 LIMIT 10
             `).bind(project_id, sinceTime).all();
 
+            // Get AI traffic class breakdown
+            const byClassQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.class as event_class,
+                    COUNT(*) as count
+                FROM session_event_map sem
+                JOIN interaction_events ie ON ie.id = sem.event_id
+                WHERE sem.session_id IN (
+                    SELECT id FROM session_v1 
+                    WHERE project_id = ? AND started_at >= datetime(?, 'unixepoch')
+                )
+                AND ie.class IS NOT NULL
+                GROUP BY ie.class
+                ORDER BY count DESC
+            `).bind(project_id, sinceTime).all();
+
             // Get entry_pages breakdown  
             const entryPagesQuery = await env.OPTIVIEW_DB.prepare(`
                 SELECT sv.entry_content_id as content_id, ca.url, COUNT(*) as count
@@ -1214,6 +1230,10 @@ export async function handleApiRoutes(
                 by_source: (bySourceQuery?.results || []).map(row => ({
                     slug: row.slug,
                     name: row.name,
+                    count: row.count
+                })),
+                by_class: (byClassQuery?.results || []).map(row => ({
+                    class: row.event_class,
                     count: row.count
                 })),
                 entry_pages: (entryPagesQuery?.results || []).map(row => ({
@@ -1431,11 +1451,15 @@ export async function handleApiRoutes(
                     ie.id,
                     ie.occurred_at,
                     ie.event_type,
+                    ie.class as event_class,
                     ie.content_id,
                     ca.url as content_url,
                     s.id as ai_source_id,
                     s.slug as ai_source_slug,
-                    s.name as ai_source_name
+                    s.name as ai_source_name,
+                    COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
+                    COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
+                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw
                 FROM session_event_map sem
                 JOIN interaction_events ie ON ie.id = sem.event_id
                 LEFT JOIN content_assets ca ON ca.id = ie.content_id
@@ -1468,6 +1492,7 @@ export async function handleApiRoutes(
                 id: row.id,
                 occurred_at: row.occurred_at,
                 event_type: row.event_type,
+                event_class: row.event_class || 'unknown',
                 content: row.content_id ? {
                     id: row.content_id,
                     url: row.content_url
@@ -1475,7 +1500,10 @@ export async function handleApiRoutes(
                 ai_source: row.ai_source_id ? {
                     slug: row.ai_source_slug,
                     name: row.ai_source_name
-                } : null
+                } : null,
+                classification_reason: row.classification_reason,
+                classification_confidence: row.classification_confidence,
+                debug: row.debug_raw && row.debug_raw !== '[]' ? JSON.parse(row.debug_raw) : []
             }));
 
             const response = new Response(JSON.stringify({
