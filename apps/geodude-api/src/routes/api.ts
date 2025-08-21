@@ -1887,23 +1887,23 @@ export async function handleApiRoutes(
 
                     const classification = classifyTraffic(mockReq, {}, referrer, userAgent);
 
-                                   // Update event with new classification
-               await env.OPTIVIEW_DB.prepare(`
+                    // Update event with new classification
+                    await env.OPTIVIEW_DB.prepare(`
                  UPDATE interaction_events 
                  SET class = ?, 
                      metadata = json_set(metadata, '$.classification_reason', ?, '$.classification_confidence', ?)
                  WHERE id = ?
                `).bind(
-                 classification.class,
-                 classification.reason,
-                 classification.confidence,
-                 event.id
-               ).run();
-               
-               processedCount++;
-               if (event.current_class !== classification.class) {
-                 updatedCount++;
-               }
+                        classification.class,
+                        classification.reason,
+                        classification.confidence,
+                        event.id
+                    ).run();
+
+                    processedCount++;
+                    if (event.current_class !== classification.class) {
+                        updatedCount++;
+                    }
                 } catch (error) {
                     console.error(`Error reclassifying event ${event.id}:`, error);
                     errorCount++;
@@ -2747,10 +2747,10 @@ export async function handleApiRoutes(
                     JOIN content_assets ca ON ca.id = ie.content_id
                     JOIN properties p ON p.id = ca.property_id
                     WHERE p.project_id = ? 
-                      AND ie.occurred_at >= datetime(?, 'unixepoch')
-                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.occurred_at >= ?
+                      AND ie.occurred_at <= ?
                       AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                `).bind(project_id, fromSql, toSql).first<any>();
+                `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).first<any>();
 
                 // Get referrals by AI source from interaction_events
                 const bySource = await env.OPTIVIEW_DB.prepare(`
@@ -2764,13 +2764,13 @@ export async function handleApiRoutes(
                     JOIN properties p ON p.id = ca.property_id
                     LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                     WHERE p.project_id = ? 
-                      AND ie.occurred_at >= datetime(?, 'unixepoch')
-                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.occurred_at >= ?
+                      AND ie.occurred_at <= ?
                       AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                     GROUP BY ie.ai_source_id, ais.slug, ais.name
                     ORDER BY count DESC
                     LIMIT 10
-                `).bind(project_id, fromSql, toSql).all<any>();
+                `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).all<any>();
 
                 // Get referrals by traffic class
                 const byClass = await env.OPTIVIEW_DB.prepare(`
@@ -2781,12 +2781,12 @@ export async function handleApiRoutes(
                     JOIN content_assets ca ON ca.id = ie.content_id
                     JOIN properties p ON p.id = ca.property_id
                     WHERE p.project_id = ? 
-                      AND ie.occurred_at >= datetime(?, 'unixepoch')
-                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.occurred_at >= ?
+                      AND ie.occurred_at <= ?
                       AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                     GROUP BY ie.class
                     ORDER BY count DESC
-                `).bind(project_id, fromSql, toSql).all<any>();
+                `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).all<any>();
 
                 // Get total contents and sources for additional metrics
                 const contentsResult = await env.OPTIVIEW_DB.prepare(`
@@ -2795,10 +2795,10 @@ export async function handleApiRoutes(
                     JOIN content_assets ca ON ca.id = ie.content_id
                     JOIN properties p ON p.id = ca.property_id
                     WHERE p.project_id = ? 
-                      AND ie.occurred_at >= datetime(?, 'unixepoch')
-                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.occurred_at >= ?
+                      AND ie.occurred_at <= ?
                       AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                `).bind(project_id, fromSql, toSql).first<any>();
+                `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).first<any>();
 
                 const sourcesResult = await env.OPTIVIEW_DB.prepare(`
                     SELECT COUNT(DISTINCT ie.ai_source_id) AS total_sources
@@ -2806,11 +2806,11 @@ export async function handleApiRoutes(
                     JOIN content_assets ca ON ca.id = ie.content_id
                     JOIN properties p ON p.id = ca.property_id
                     WHERE p.project_id = ? 
-                      AND ie.occurred_at >= datetime(?, 'unixepoch')
-                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.occurred_at >= ?
+                      AND ie.occurred_at <= ?
                       AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                       AND ie.ai_source_id IS NOT NULL
-                `).bind(project_id, fromSql, toSql).first<any>();
+                `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).first<any>();
 
                 return {
                     totals: {
@@ -2891,8 +2891,8 @@ export async function handleApiRoutes(
             const toSql = toTs / 1000;
 
             // Build WHERE clause
-            let whereConditions = [`p.project_id = ?`, `ie.occurred_at >= datetime(?, 'unixepoch')`, `ie.occurred_at <= datetime(?, 'unixepoch')`, `ie.class IN ('ai_agent_crawl', 'human_via_ai')`];
-            let params = [project_id, fromSql, toSql];
+            let whereConditions = [`p.project_id = ?`, `ie.occurred_at >= ?`, `ie.occurred_at <= ?`, `ie.class IN ('ai_agent_crawl', 'human_via_ai')`];
+            let params = [project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()];
 
             if (source) {
                 whereConditions.push(`ais.slug = ?`);
@@ -2940,10 +2940,10 @@ export async function handleApiRoutes(
                 LIMIT ? OFFSET ?
             `).bind(...params, pageSizeNum, offset).all<any>();
 
-                            // Calculate 15m referrals for each item and process debug field
-                const referralsWith15m = await Promise.all(
-                    (referrals.results || []).map(async (referral) => {
-                        const recent15m = await env.OPTIVIEW_DB.prepare(`
+            // Calculate 15m referrals for each item and process debug field
+            const referralsWith15m = await Promise.all(
+                (referrals.results || []).map(async (referral) => {
+                    const recent15m = await env.OPTIVIEW_DB.prepare(`
                             SELECT COUNT(*) as count
                             FROM interaction_events ie
                             JOIN content_assets ca ON ca.id = ie.content_id
@@ -2954,28 +2954,28 @@ export async function handleApiRoutes(
                               AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                         `).bind(project_id, referral.content_id).first<any>();
 
-                        // Process debug field to ensure it's always an array
-                        let debug = [];
-                        if (referral.debug_raw && referral.debug_raw !== 'null') {
-                            try {
-                                if (referral.debug_raw !== '[]') {
-                                    const parsed = JSON.parse(referral.debug_raw);
-                                    debug = Array.isArray(parsed) ? parsed : [];
-                                }
-                            } catch (e) {
-                                console.warn('Failed to parse debug field:', referral.debug_raw);
-                                debug = [];
+                    // Process debug field to ensure it's always an array
+                    let debug = [];
+                    if (referral.debug_raw && referral.debug_raw !== 'null') {
+                        try {
+                            if (referral.debug_raw !== '[]') {
+                                const parsed = JSON.parse(referral.debug_raw);
+                                debug = Array.isArray(parsed) ? parsed : [];
                             }
+                        } catch (e) {
+                            console.warn('Failed to parse debug field:', referral.debug_raw);
+                            debug = [];
                         }
+                    }
 
-                        return {
-                            ...referral,
-                            debug: debug,
-                            referrals_15m: recent15m?.count || 0,
-                            share_of_ai: 0.5 // Default value for now
-                        };
-                    })
-                );
+                    return {
+                        ...referral,
+                        debug: debug,
+                        referrals_15m: recent15m?.count || 0,
+                        share_of_ai: 0.5 // Default value for now
+                    };
+                })
+            );
 
             const response = new Response(JSON.stringify({
                 items: referralsWith15m,
