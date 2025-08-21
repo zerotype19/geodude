@@ -291,7 +291,7 @@ export default function Citations() {
                 <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search URLs or snippets..."
+                  placeholder="Search URLs or referrer URLs..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 pr-3 py-2 border border-gray-300 rounded-md w-full"
@@ -537,19 +537,33 @@ export default function Citations() {
                     </div>
                   )}
 
-                  {selectedCitation.citation.snippet && (
+                  {selectedCitation.citation.classification_reason && (
                     <div>
-                      <h3 className="text-sm font-medium text-gray-700">Snippet</h3>
+                      <h3 className="text-sm font-medium text-gray-700">Classification Reason</h3>
                       <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-md">
-                        "{selectedCitation.citation.snippet}"
+                        {selectedCitation.citation.classification_reason}
                       </p>
                     </div>
                   )}
 
-                  {selectedCitation.citation.confidence && (
+                  {selectedCitation.citation.classification_confidence && (
                     <div>
-                      <h3 className="text-sm font-medium text-gray-700">Confidence</h3>
-                      <p className="text-sm text-gray-900">{(selectedCitation.citation.confidence * 100).toFixed(1)}%</p>
+                      <h3 className="text-sm font-medium text-gray-700">Classification Confidence</h3>
+                      <p className="text-sm text-gray-900">{(selectedCitation.citation.classification_confidence * 100).toFixed(1)}%</p>
+                    </div>
+                  )}
+
+                  {selectedCitation.citation.event_class && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700">Traffic Class</h3>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(selectedCitation.citation.event_class)}`}>
+                          {getTrafficClassLabel(selectedCitation.citation.event_class)}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {getTrafficClassDescription(selectedCitation.citation.event_class)}
+                        </span>
+                      </div>
                     </div>
                   )}
 
