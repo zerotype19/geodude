@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, Quote, ExternalLink, Search, Filter, Calendar, BarChart3 } from "lucide-react";
+import { Link, Quote, ExternalLink, Search, Filter, Calendar, BarChart3, Info } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import Shell from "../components/Shell";
 import { API_BASE, FETCH_OPTS } from '../config';
@@ -7,6 +7,7 @@ import { API_BASE, FETCH_OPTS } from '../config';
 interface Citation {
   id: number;
   detected_at: string;
+  event_class: string;
   source: {
     slug: string;
     name: string;
@@ -16,7 +17,9 @@ interface Citation {
     url: string;
   } | null;
   ref_url: string | null;
-  snippet: string | null;
+  classification_reason?: string;
+  classification_confidence?: number;
+  debug?: string[];
 }
 
 interface CitationSummary {
@@ -29,10 +32,7 @@ interface CitationSummary {
 }
 
 interface CitationDetail {
-  citation: Citation & {
-    confidence: number | null;
-    metadata: string | null;
-  };
+  citation: Citation;
   related: {
     recent_for_content: Array<{
       id: number;
@@ -48,6 +48,39 @@ interface CitationDetail {
   };
 }
 
+// Traffic classification helper functions
+function getTrafficClassColor(className: string): string {
+  switch (className) {
+    case "ai_agent_crawl": return "bg-orange-100 text-orange-800 border-orange-200";
+    case "human_via_ai": return "bg-blue-100 text-blue-800 border-blue-200";
+    case "search": return "bg-green-100 text-green-800 border-green-200";
+    case "direct_human": return "bg-gray-100 text-gray-800 border-gray-200";
+    default: return "bg-gray-100 text-gray-800 border-gray-200";
+  }
+}
+
+function getTrafficClassLabel(className: string): string {
+  switch (className) {
+    case "direct_human": return "Direct Human";
+    case "human_via_ai": return "Human via AI";
+    case "ai_agent_crawl": return "AI Agent Crawl";
+    case "search": return "Search";
+    case "unknown": return "Unknown";
+    default: return className;
+  }
+}
+
+function getTrafficClassDescription(className: string): string {
+  switch (className) {
+    case "direct_human": return "No referrer, direct visits";
+    case "human_via_ai": return "AI assistant referrers (ChatGPT, Claude, etc.)";
+    case "ai_agent_crawl": return "Cloudflare verified bots and crawlers";
+    case "search": return "Search engine referrers (Google, Bing, etc.)";
+    case "unknown": return "Unclassified traffic";
+    default: return "Traffic classification";
+  }
+}
+
 export default function Citations() {
   const { project } = useAuth();
   const [summary, setSummary] = useState<CitationSummary | null>(null);
@@ -55,14 +88,14 @@ export default function Citations() {
   const [selectedCitation, setSelectedCitation] = useState<CitationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  
+
   // Filters
   const [window, setWindow] = useState("7d");
   const [sourceFilter, setSourceFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  
+
   const pageSize = 50;
 
   useEffect(() => {
@@ -93,12 +126,12 @@ export default function Citations() {
         page: page.toString(),
         pageSize: pageSize.toString()
       });
-      
+
       if (sourceFilter) params.append('source', sourceFilter);
       if (searchQuery.trim()) params.append('q', searchQuery.trim());
 
       const response = await fetch(`${API_BASE}/api/citations?${params}`, FETCH_OPTS);
-      
+
       if (response.ok) {
         const data = await response.json();
         setCitations(data.items);
@@ -114,7 +147,7 @@ export default function Citations() {
   const loadCitationDetail = async (citationId: number) => {
     try {
       const response = await fetch(`${API_BASE}/api/citations/detail?id=${citationId}`, FETCH_OPTS);
-      
+
       if (response.ok) {
         const data = await response.json();
         setSelectedCitation(data);
@@ -168,6 +201,13 @@ export default function Citations() {
             </h1>
             <p className="text-gray-600">Track where your content is referenced in AI tools</p>
           </div>
+          <div className="flex items-center space-x-4">
+            {/* Hardened AI Detection System Badge */}
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200">
+              <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+              Hardened AI Detection System
+            </div>
+          </div>
         </div>
 
         {/* KPI Row */}
@@ -181,7 +221,7 @@ export default function Citations() {
               <div className="text-2xl font-bold text-gray-900">{summary.totals.citations}</div>
               <div className="text-xs text-gray-500">{getWindowLabel(window)}</div>
             </div>
-            
+
             <div className="bg-white p-4 rounded-lg border">
               <div className="flex items-center gap-2">
                 <Link className="h-4 w-4 text-green-500" />
@@ -220,11 +260,10 @@ export default function Citations() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setSourceFilter("")}
-                className={`px-3 py-1 rounded-full text-sm ${
-                  sourceFilter === ""
+                className={`px-3 py-1 rounded-full text-sm ${sourceFilter === ""
                     ? "bg-blue-100 text-blue-800 border-blue-200"
                     : "bg-gray-100 text-gray-700 border-gray-200"
-                } border hover:bg-blue-50`}
+                  } border hover:bg-blue-50`}
               >
                 All ({summary.totals.citations})
               </button>
@@ -232,11 +271,10 @@ export default function Citations() {
                 <button
                   key={source.slug}
                   onClick={() => setSourceFilter(source.slug)}
-                  className={`px-3 py-1 rounded-full text-sm ${
-                    sourceFilter === source.slug
+                  className={`px-3 py-1 rounded-full text-sm ${sourceFilter === source.slug
                       ? "bg-blue-100 text-blue-800 border-blue-200"
                       : "bg-gray-100 text-gray-700 border-gray-200"
-                  } border hover:bg-blue-50`}
+                    } border hover:bg-blue-50`}
                 >
                   {source.name} ({source.count})
                 </button>
@@ -287,11 +325,14 @@ export default function Citations() {
                     Source
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Content URL
+                    Traffic Class
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Snippet
+                    Content URL
                   </th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Classification
+                      </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ref URL
                   </th>
@@ -300,13 +341,13 @@ export default function Citations() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center">
+                    <td colSpan={6} className="px-4 py-8 text-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
                     </td>
                   </tr>
                 ) : citations.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center">
+                    <td colSpan={6} className="px-4 py-8 text-center">
                       <div className="text-gray-500">
                         <Quote className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         <h3 className="text-lg font-medium mb-1">No citations yet</h3>
@@ -336,6 +377,36 @@ export default function Citations() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(citation.event_class)}`}>
+                            {getTrafficClassLabel(citation.event_class)}
+                          </span>
+                          {citation.event_class !== 'unknown' && (
+                            <div className="relative group">
+                              <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                                {getTrafficClassDescription(citation.event_class)}
+                                {citation.classification_reason && (
+                                  <div className="mt-1 pt-1 border-t border-gray-700">
+                                    <strong>Reason:</strong> {citation.classification_reason}
+                                  </div>
+                                )}
+                                {citation.classification_confidence && (
+                                  <div className="mt-1 pt-1 border-t border-gray-700">
+                                    <strong>Confidence:</strong> {(citation.classification_confidence * 100).toFixed(0)}%
+                                  </div>
+                                )}
+                                {citation.debug && citation.debug.length > 0 && (
+                                  <div className="mt-1 pt-1 border-t border-gray-700">
+                                    <strong>Debug:</strong> {citation.debug.join(', ')}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
                         {citation.content ? (
                           <a
                             href={citation.content.url}
@@ -351,10 +422,12 @@ export default function Citations() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
-                        {citation.snippet ? (
-                          <span className="truncate block">{citation.snippet}</span>
+                        {citation.classification_reason ? (
+                          <span className="truncate block" title={citation.classification_reason}>
+                            {citation.classification_reason}
+                          </span>
                         ) : (
-                          <span className="text-gray-400">No snippet</span>
+                          <span className="text-gray-400">No classification reason</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm">

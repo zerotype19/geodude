@@ -998,14 +998,64 @@ export async function handleApiRoutes(
             }
             const fromTs = now - windowMs;
 
-            // Citations table doesn't exist yet - return empty results gracefully
-            // TODO: Replace with actual ai_citations table queries when implemented
-            const totalResult = { citations: 0 };
-            const bySourceResult = { results: [] };
-            const topContentResult = { results: [] };
+            // Get citations data from interaction_events table
+            const totalResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as citations
+                FROM interaction_events ie
+                JOIN projects p ON p.id = ie.project_id
+                WHERE p.project_id = ? 
+                  AND ie.occurred_at >= datetime(?, 'unixepoch')
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+            `).bind(project_id, Math.floor(fromTs / 1000)).first();
 
-            // Get timeseries data (also empty for now)
-            const timeseriesResult = { results: [] };
+            // Get by source breakdown
+            const bySourceResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    COALESCE(ais.slug, 'unknown') as source_slug,
+                    COALESCE(ais.name, 'Unknown AI Source') as source_name,
+                    COUNT(*) as count
+                FROM interaction_events ie
+                JOIN projects p ON p.id = ie.project_id
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                WHERE p.project_id = ? 
+                  AND ie.occurred_at >= datetime(?, 'unixepoch')
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                GROUP BY ie.ai_source_id, ais.slug, ais.name
+                ORDER BY count DESC
+                LIMIT 10
+            `).bind(project_id, Math.floor(fromTs / 1000)).all();
+
+            // Get top content breakdown
+            const topContentResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.content_id,
+                    ca.url,
+                    COUNT(*) as count
+                FROM interaction_events ie
+                JOIN projects p ON p.id = ie.project_id
+                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                WHERE p.project_id = ? 
+                  AND ie.occurred_at >= datetime(?, 'unixepoch')
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                  AND ie.content_id IS NOT NULL
+                GROUP BY ie.content_id, ca.url
+                ORDER BY count DESC
+                LIMIT 10
+            `).bind(project_id, Math.floor(fromTs / 1000)).all();
+
+            // Get timeseries data
+            const timeseriesResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    strftime('%Y-%m-%d', ie.occurred_at) as day,
+                    COUNT(*) as count
+                FROM interaction_events ie
+                JOIN projects p ON p.id = ie.project_id
+                WHERE p.project_id = ? 
+                  AND ie.occurred_at >= datetime(?, 'unixepoch')
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                GROUP BY strftime('%Y-%m-%d', ie.occurred_at)
+                ORDER BY day
+            `).bind(project_id, Math.floor(fromTs / 1000)).all();
 
             const summary = {
                 totals: { citations: totalResult?.citations || 0, by_source: bySourceResult.results || [] },
@@ -1068,19 +1118,67 @@ export async function handleApiRoutes(
             const pageNum = Math.max(1, parseInt(page));
             const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
 
-            // Citations table doesn't exist yet - return empty results gracefully
-            // TODO: Replace with actual ai_citations table queries when implemented
-            const countResult = { total: 0 };
-            const itemsResult = { results: [] };
+            // Get citations data from interaction_events table
+            const countResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) as total
+                FROM interaction_events ie
+                JOIN projects p ON p.id = ie.project_id
+                WHERE p.project_id = ? 
+                  AND ie.occurred_at >= datetime(?, 'unixepoch')
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                  ${sourceFilter ? 'AND COALESCE(ais.slug, "unknown") = ?' : ''}
+                  ${searchQuery.trim() ? 'AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)' : ''}
+            `).bind(
+                project_id, 
+                Math.floor(fromTs / 1000),
+                ...(sourceFilter ? [sourceFilter] : []),
+                ...(searchQuery.trim() ? [`%${searchQuery.trim()}%`, `%${searchQuery.trim()}%`] : [])
+            ).first();
+
+            const itemsResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.id,
+                    ie.occurred_at as detected_at,
+                    ie.class as event_class,
+                    COALESCE(ais.slug, 'unknown') as source_slug,
+                    COALESCE(ais.name, 'Unknown AI Source') as source_name,
+                    ie.content_id,
+                    ca.url as content_url,
+                    json_extract(ie.metadata, '$.referrer_url') as ref_url,
+                    COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
+                    COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
+                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw
+                FROM interaction_events ie
+                JOIN projects p ON p.id = ie.project_id
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                WHERE p.project_id = ? 
+                  AND ie.occurred_at >= datetime(?, 'unixepoch')
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                  ${sourceFilter ? 'AND COALESCE(ais.slug, "unknown") = ?' : ''}
+                  ${searchQuery.trim() ? 'AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)' : ''}
+                ORDER BY ie.occurred_at DESC
+                LIMIT ? OFFSET ?
+            `).bind(
+                project_id, 
+                Math.floor(fromTs / 1000),
+                ...(sourceFilter ? [sourceFilter] : []),
+                ...(searchQuery.trim() ? [`%${searchQuery.trim()}%`, `%${searchQuery.trim()}%`] : []),
+                pageSizeNum,
+                (pageNum - 1) * pageSizeNum
+            ).all();
 
             const result = {
                 items: (itemsResult.results || []).map(row => ({
                     id: row.id,
                     detected_at: row.detected_at,
+                    event_class: row.event_class,
                     source: { slug: row.source_slug, name: row.source_name },
                     content: row.content_id ? { id: row.content_id, url: row.content_url } : null,
                     ref_url: row.ref_url,
-                    snippet: row.snippet
+                    classification_reason: row.classification_reason,
+                    classification_confidence: row.classification_confidence,
+                    debug: row.debug_raw && row.debug_raw !== '[]' ? JSON.parse(row.debug_raw) : []
                 })),
                 page: pageNum,
                 pageSize: pageSizeNum,
@@ -1113,9 +1211,97 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
-            // Citations table doesn't exist yet - return 404 gracefully
-            // TODO: Replace with actual ai_citations table queries when implemented
-            const response = new Response("Citations feature not yet implemented", { status: 404 });
+            // Get citation detail from interaction_events table
+            const citationQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.id,
+                    ie.occurred_at as detected_at,
+                    ie.class as event_class,
+                    COALESCE(ais.slug, 'unknown') as source_slug,
+                    COALESCE(ais.name, 'Unknown AI Source') as source_name,
+                    ie.content_id,
+                    ca.url as content_url,
+                    json_extract(ie.metadata, '$.referrer_url') as ref_url,
+                    COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
+                    COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
+                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw
+                FROM interaction_events ie
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                WHERE ie.id = ? AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+            `).bind(id).first();
+
+            if (!citationQuery) {
+                const response = new Response("Citation not found", { status: 404 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get related recent citations for the same content
+            const relatedContentQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.id,
+                    ie.occurred_at as detected_at,
+                    COALESCE(ais.slug, 'unknown') as source_slug,
+                    COALESCE(ais.name, 'Unknown AI Source') as source_name
+                FROM interaction_events ie
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                WHERE ie.content_id = ? 
+                  AND ie.id != ? 
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                ORDER BY ie.occurred_at DESC
+                LIMIT 5
+            `).bind(citationQuery.content_id, id).all();
+
+            // Get related recent referrals from the same source
+            const relatedReferralsQuery = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.id,
+                    ie.occurred_at as detected_at,
+                    json_extract(ie.metadata, '$.referrer_url') as ref_url,
+                    COALESCE(ais.slug, 'unknown') as source_slug,
+                    COALESCE(ais.name, 'Unknown AI Source') as source_name
+                FROM interaction_events ie
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                WHERE ie.ai_source_id = ? 
+                  AND ie.id != ? 
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                  AND json_extract(ie.metadata, '$.referrer_url') IS NOT NULL
+                ORDER BY ie.occurred_at DESC
+                LIMIT 5
+            `).bind(citationQuery.ai_source_id || 0, id).all();
+
+            const citation = {
+                id: citationQuery.id,
+                detected_at: citationQuery.detected_at,
+                event_class: citationQuery.event_class,
+                source: { slug: citationQuery.source_slug, name: citationQuery.source_name },
+                content: citationQuery.content_id ? { id: citationQuery.content_id, url: citationQuery.content_url } : null,
+                ref_url: citationQuery.ref_url,
+                classification_reason: citationQuery.classification_reason,
+                classification_confidence: citationQuery.classification_confidence,
+                debug: citationQuery.debug_raw && citationQuery.debug_raw !== '[]' ? JSON.parse(citationQuery.debug_raw) : []
+            };
+
+            const related = {
+                recent_for_content: (relatedContentQuery?.results || []).map(row => ({
+                    id: row.id,
+                    detected_at: row.detected_at,
+                    source: { slug: row.source_slug, name: row.source_name }
+                })),
+                recent_referrals: (relatedReferralsQuery?.results || []).map(row => ({
+                    id: row.id,
+                    detected_at: row.detected_at,
+                    ref_url: row.ref_url,
+                    source: { slug: row.source_slug, name: row.source_name }
+                }))
+            };
+
+            const response = new Response(JSON.stringify({ citation, related }), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=120, stale-while-revalidate=120"
+                }
+            });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
             console.error("citations_detail_error", { error: e.message, stack: e.stack });
