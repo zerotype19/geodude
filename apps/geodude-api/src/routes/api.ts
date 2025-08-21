@@ -1788,7 +1788,7 @@ export async function handleApiRoutes(
        }
 
        // 6.3.7) Admin AI Backfill Reclassification
-       if (url.pathname === "/admin/ai-backfill/reclassify" && req.method === "GET") {
+       if (url.pathname === "/admin/ai-backfill/reclassify" && (req.method === "GET" || req.method === "POST")) {
          try {
            // Rate limiting: 5 rpm per IP
            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
@@ -1810,23 +1810,53 @@ export async function handleApiRoutes(
            // Increment rate limit counter
            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
            
-           const urlObj = new URL(req.url);
-           const hours = parseInt(urlObj.searchParams.get("hours") || "72");
+           let startTime: Date;
+           let endTime: Date;
+           let batchSize: number = 100;
            
-           // Get recent events for reclassification
-           const cutoffTime = new Date(Date.now() - (hours * 60 * 60 * 1000));
+           if (req.method === "POST") {
+             // POST: Use provided time range and batch size
+             const body = await req.json();
+             const { start_time, end_time, batch_size = 100 } = body;
+             
+             if (!start_time || !end_time) {
+               const response = new Response(JSON.stringify({
+                 error: "Missing required parameters",
+                 message: "start_time and end_time are required for POST requests"
+               }), {
+                 status: 400,
+                 headers: { "Content-Type": "application/json" }
+               });
+               return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+             }
+             
+             startTime = new Date(start_time);
+             endTime = new Date(end_time);
+             batchSize = Math.min(Math.max(1, batch_size), 500); // Limit batch size
+           } else {
+             // GET: Use hours parameter (backward compatibility)
+             const urlObj = new URL(req.url);
+             const hours = parseInt(urlObj.searchParams.get("hours") || "72");
+             endTime = new Date();
+             startTime = new Date(Date.now() - (hours * 60 * 60 * 1000));
+           }
+           
+           // Get events for reclassification within the time range
            const events = await env.OPTIVIEW_DB.prepare(`
              SELECT id, project_id, property_id, occurred_at, metadata
              FROM interaction_events 
-             WHERE occurred_at > ? AND (class IS NULL OR class = 'unknown')
-             ORDER BY occurred_at DESC
-             LIMIT 1000
-           `).bind(cutoffTime.toISOString()).all();
+             WHERE occurred_at >= ? AND occurred_at <= ? AND (class IS NULL OR class = 'unknown')
+             ORDER BY occurred_at ASC
+             LIMIT ?
+           `).bind(startTime.toISOString(), endTime.toISOString(), batchSize).all();
            
            if (!events.results || events.results.length === 0) {
              const response = new Response(JSON.stringify({
                message: "No events found for reclassification",
-               hours,
+               time_range: {
+                 start: startTime.toISOString(),
+                 end: endTime.toISOString()
+               },
                events_count: 0
              }), {
                headers: { "Content-Type": "application/json" }
@@ -1836,6 +1866,7 @@ export async function handleApiRoutes(
            
            // Reclassify events using Classifier v2
            let processedCount = 0;
+           let updatedCount = 0;
            let errorCount = 0;
            const { classifyTraffic } = await import('../ai-lite/classifier');
            
@@ -1867,6 +1898,9 @@ export async function handleApiRoutes(
                ).run();
                
                processedCount++;
+               if (event.class !== classification.class) {
+                 updatedCount++;
+               }
              } catch (error) {
                console.error(`Error reclassifying event ${event.id}:`, error);
                errorCount++;
@@ -1877,19 +1911,21 @@ export async function handleApiRoutes(
            await env.CACHE.put('classification_cache_version', String(Date.now()), { expirationTtl: 86400 });
            
            const response = new Response(JSON.stringify({
+             success: true,
              message: "Reclassification completed",
-             hours,
+             time_range: {
+               start: startTime.toISOString(),
+               end: endTime.toISOString()
+             },
+             batch_size: batchSize,
              total_events: events.results.length,
-             processed_count: processedCount,
-             error_count: errorCount,
-             cache_version_bumped: true,
-             timestamp: new Date().toISOString()
+             processed: processedCount,
+             updated: updatedCount,
+             errors: errorCount
            }), {
              headers: { "Content-Type": "application/json" }
            });
-           
            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
-           
          } catch (error) {
            console.error("AI backfill reclassification error:", error);
            const response = new Response(JSON.stringify({
