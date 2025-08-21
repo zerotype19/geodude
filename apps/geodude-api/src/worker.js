@@ -5,6 +5,7 @@ import { handleApiRoutes } from './routes/api.ts';
 import { getOrSetJSON, getProjectVersion, bumpProjectVersion } from './lib/cache.ts';
 import { ipRateLimit } from './lib/ratelimit.ts';
 import { MetricsManager } from './lib/metrics.ts';
+import { recordRequestMetrics } from './metrics/collector.js';
 
 // Helper function to normalize URL for matching
 function normalizeUrl(url) {
@@ -66,6 +67,12 @@ export default {
     try {
       console.log(`[${new Date().toISOString()}] Cron trigger: ${event.cron}`);
       
+      // Update cron marker for health monitoring
+      if (env.METRICS) {
+        await env.METRICS.put("cron:last", new Date().toISOString(), { expirationTtl: 7 * 24 * 3600 });
+        console.log('✅ Updated cron marker in METRICS KV');
+      }
+      
       // Add your scheduled task logic here
       // For now, just log the trigger
       
@@ -77,6 +84,9 @@ export default {
   },
 
   async fetch(request, env, ctx) {
+    const started = Date.now();
+    let res;
+    
     try {
       // Load and validate configuration
       let config;
@@ -95,7 +105,8 @@ export default {
             status: 500,
             headers: { "Content-Type": "application/json" }
           });
-          return addCorsHeaders(response, request.headers.get("origin"));
+          res = addCorsHeaders(response, request.headers.get("origin"));
+          return res;
         }
 
         // In development, continue with defaults
@@ -9686,7 +9697,8 @@ export default {
 
       // 8) Fallback response for any unmatched routes
       const fallbackResponse = new Response("Not Found", { status: 404 });
-      return addCorsHeaders(fallbackResponse, origin);
+      res = addCorsHeaders(fallbackResponse, origin);
+      return res;
 
     } catch (error) {
       console.error("Worker error:", error);
@@ -9696,7 +9708,12 @@ export default {
         headers: { "Content-Type": "application/json" }
       });
 
-      return response;
+      res = response;
+      return res;
+    } finally {
+      const duration = Date.now() - started;
+      // Record metrics without blocking response
+      ctx.waitUntil(recordRequestMetrics(env, (res?.status || 500), duration));
     }
   }
 };

@@ -1,5 +1,13 @@
 import { addCorsHeaders } from '../cors';
 import { MetricsManager } from '../lib/metrics';
+import { readWindow } from '../metrics/collector';
+import {
+  qSessionsOpened5m,
+  qSessionsClosed5m,
+  qSessionEventsAttached5m,
+  qProjectsCreated5m,
+  qLastCron,
+} from '../metrics/queries';
 
 export async function handleHealthRoutes(url: URL, request: Request, env: any, d1: any, origin: string) {
   // Health check endpoint
@@ -14,66 +22,89 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
     return addCorsHeaders(response, origin);
   }
 
-  // Admin health endpoint with detailed metrics
+  // Admin health endpoint with real metrics
   if (url.pathname === "/admin/health") {
     try {
-      const metrics = new MetricsManager(env.CACHE);
+      // Get org_id from session (for now, use a default org for testing)
+      // TODO: Implement proper session-based org_id extraction
+      const orgId = "org_default"; // Placeholder - replace with actual org_id from session
       
-      // Get cache metrics
-      const cacheHit = await metrics.getMetric("cache_hit_5m");
-      const cacheMiss = await metrics.getMetric("cache_miss_5m");
-      const cacheBypass = await metrics.getMetric("cache_bypass_5m");
-      const cacheOverwrite = await metrics.getMetric("cache_overwrite_5m");
-      const cacheSkipOversize = await metrics.getMetric("cache_skip_oversize_5m");
-      const cacheStoreError = await metrics.getMetric("cache_store_error_5m");
+      // KV & DB "connected" status
+      const kvOk = !!env.METRICS;
+      const dbOk = !!d1;
 
-      // Get rate limiting metrics
-      const ipAllow = await metrics.getMetric("ip_rl_allow_5m");
-      const ipBlock = await metrics.getMetric("ip_rl_block_5m");
+      // KV metrics (requests, errors, latency, breakdown)
+      const { totalReq, totalErr, p50, p95, statusBreakdown } = await readWindow(env as any);
 
-      // Calculate rate limit status
-      let rateLimitStatus = "healthy";
-      if (ipBlock > 50 && ipAllow / ipBlock < 5) {
-        rateLimitStatus = "degraded";
-      } else if (ipBlock > 0) {
-        rateLimitStatus = "watch";
-      }
+      // D1 truth queries
+      const [opened, closed, attached, created, lastCron] = await Promise.all([
+        qSessionsOpened5m(d1, orgId),
+        qSessionsClosed5m(d1, orgId),
+        qSessionEventsAttached5m(d1, orgId),
+        qProjectsCreated5m(d1, orgId),
+        qLastCron(env as any),
+      ]);
 
-      const response = new Response(JSON.stringify({
-        status: "healthy",
-        timestamp: new Date().toISOString(),
-        uptime: Date.now() - (env.START_TIME || Date.now()),
-        cache: {
-          hit_5m: cacheHit,
-          miss_5m: cacheMiss,
-          bypass_5m: cacheBypass,
-          overwrite_5m: cacheOverwrite,
-          skip_oversize_5m: cacheSkipOversize,
-          store_error_5m: cacheStoreError,
-          status: "healthy"
+      const errorRate = totalReq > 0 ? +((totalErr / totalReq) * 100).toFixed(2) : 0;
+
+      const payload = {
+        kv: { connected: kvOk },
+        database: { connected: dbOk },
+        cron: { last: lastCron },
+        requests_5m: { 
+          total: totalReq, 
+          error_rate_pct: errorRate, 
+          p50_ms: p50, 
+          p95_ms: p95, 
+          status_breakdown: statusBreakdown 
         },
-        rate_limit: {
-          ip_allow_5m: ipAllow,
-          ip_block_5m: ipBlock,
-          status: rateLimitStatus
+        sessions_5m: { 
+          opened, 
+          closed, 
+          attached, 
+          status: opened > 0 && attached > 0 ? "healthy" : (opened === 0 && attached === 0 ? "watch" : "degraded") 
         },
-        database: {
-          status: "healthy",
-          last_check: new Date().toISOString()
+        projects_5m: { created },
+        // Legacy fields for backward compatibility
+        kv_ok: kvOk,
+        d1_ok: dbOk,
+        last_cron_ts: lastCron,
+        ingest: {
+          total_5m: totalReq,
+          error_rate_5m: errorRate / 100, // Convert back to decimal for legacy
+          p50_ms_5m: p50,
+          p95_ms_5m: p95,
+          by_error_5m: Object.fromEntries(statusBreakdown.map(({ status, count }) => [status, count])),
+          top_error_keys_5m: [],
+          top_error_projects_5m: []
         }
-      }), {
-        headers: { "Content-Type": "application/json" }
+      };
+
+      return new Response(JSON.stringify(payload), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
       });
-      return addCorsHeaders(response, origin);
-    } catch (e) {
-      console.error("Admin health error:", e);
+    } catch (error) {
+      console.error("Admin health error:", error);
       const response = new Response(JSON.stringify({
-        status: "error",
-        message: "Failed to get health metrics",
-        timestamp: new Date().toISOString()
+        status: "degraded",
+        timestamp: new Date().toISOString(),
+        error: "Failed to get health metrics",
+        message: error.message,
+        kv: { connected: false },
+        database: { connected: false },
+        cron: { last: null },
+        requests_5m: { total: 0, error_rate_pct: 0, p50_ms: 0, p95_ms: 0, status_breakdown: [] },
+        sessions_5m: { opened: 0, closed: 0, attached: 0, status: "degraded" },
+        projects_5m: { created: 0 }
       }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" }
+        status: 200, // Return 200 with degraded status for monitoring
+        headers: { 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        }
       });
       return addCorsHeaders(response, origin);
     }

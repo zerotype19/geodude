@@ -6,6 +6,24 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 interface HealthMetrics {
+  kv: { connected: boolean };
+  database: { connected: boolean };
+  cron: { last: string | null };
+  requests_5m: { 
+    total: number; 
+    error_rate_pct: number; 
+    p50_ms: number; 
+    p95_ms: number; 
+    status_breakdown: Array<{status: number; count: number}> 
+  };
+  sessions_5m: { 
+    opened: number; 
+    closed: number; 
+    attached: number; 
+    status: "healthy" | "watch" | "degraded" 
+  };
+  projects_5m: { created: number };
+  // Legacy fields for backward compatibility
   kv_ok: boolean;
   d1_ok: boolean;
   last_cron_ts: string | null;
@@ -113,9 +131,7 @@ export default function AdminHealth() {
     return status ? "✓" : "✗";
   }
 
-  function formatErrorRate(rate: number): string {
-    return `${(rate * 100).toFixed(2)}%`;
-  }
+
 
   function formatTimestamp(timestamp: string | null): string {
     if (!timestamp) return "Never";
@@ -254,13 +270,13 @@ export default function AdminHealth() {
               <Card title="KV Storage">
                 <div className="p-6">
                   <div className="flex items-center">
-                    <div className={`text-2xl ${getStatusColor(health.kv_ok)}`}>
-                      {getStatusIcon(health.kv_ok)}
+                    <div className={`text-2xl ${getStatusColor(health.kv.connected)}`}>
+                      {getStatusIcon(health.kv.connected)}
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-500">KV Storage</p>
-                      <p className={`text-lg font-semibold ${getStatusColor(health.kv_ok)}`}>
-                        {health.kv_ok ? "Connected" : "Error"}
+                      <p className={`text-lg font-semibold ${getStatusColor(health.kv.connected)}`}>
+                        {health.kv.connected ? "Connected" : "Error"}
                       </p>
                     </div>
                   </div>
@@ -270,13 +286,13 @@ export default function AdminHealth() {
               <Card title="Database">
                 <div className="p-6">
                   <div className="flex items-center">
-                    <div className={`text-2xl ${getStatusColor(health.d1_ok)}`}>
-                      {getStatusIcon(health.d1_ok)}
+                    <div className={`text-2xl ${getStatusColor(health.database.connected)}`}>
+                      {getStatusIcon(health.database.connected)}
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-500">Database</p>
-                      <p className={`text-lg font-semibold ${getStatusColor(health.d1_ok)}`}>
-                        {health.d1_ok ? "Connected" : "Error"}
+                      <p className={`text-lg font-semibold ${getStatusColor(health.database.connected)}`}>
+                        {health.database.connected ? "Connected" : "Error"}
                       </p>
                     </div>
                   </div>
@@ -290,7 +306,7 @@ export default function AdminHealth() {
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-500">Last Cron</p>
                       <p className="text-lg font-semibold text-gray-900">
-                        {formatTimestamp(health.last_cron_ts)}
+                        {formatTimestamp(health.cron.last)}
                       </p>
                     </div>
                   </div>
@@ -304,7 +320,7 @@ export default function AdminHealth() {
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-500">Total (5m)</p>
                       <p className="text-lg font-semibold text-gray-900">
-                        {health.ingest.total_5m.toLocaleString()}
+                        {health.requests_5m.total.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -318,31 +334,31 @@ export default function AdminHealth() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium text-gray-900">Sessions (last 5m)</h3>
                   <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    health.sessions.status === 'healthy' 
+                    health.sessions_5m.status === 'healthy' 
                       ? 'bg-green-100 text-green-800' 
-                      : health.sessions.status === 'watch'
+                      : health.sessions_5m.status === 'watch'
                       ? 'bg-yellow-100 text-yellow-800'
                       : 'bg-red-100 text-red-800'
                   }`}>
-                    {health.sessions.status}
+                    {health.sessions_5m.status}
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {health.sessions.opened_5m}
+                      {health.sessions_5m.opened}
                     </div>
                     <div className="text-sm text-gray-600">Opened</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-600">
-                      {health.sessions.closed_5m}
+                      {health.sessions_5m.closed}
                     </div>
                     <div className="text-sm text-gray-600">Closed</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-purple-600">
-                      {health.sessions.attach_5m}
+                      {health.sessions_5m.attached}
                     </div>
                     <div className="text-sm text-gray-600">Events attached</div>
                   </div>
@@ -361,7 +377,7 @@ export default function AdminHealth() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
-                    {health.projects.created_5m}
+                    {health.projects_5m.created}
                   </div>
                   <div className="text-sm text-gray-600">Created</div>
                 </div>
@@ -377,10 +393,10 @@ export default function AdminHealth() {
                 <div className="p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Error Rate (5m)</h3>
                   <div className="text-3xl font-bold text-red-600">
-                    {formatErrorRate(health.ingest.error_rate_5m)}
+                    {health.requests_5m.error_rate_pct.toFixed(2)}%
                   </div>
                   <p className="text-sm text-gray-500 mt-1">
-                    {Object.values(health.ingest.by_error_5m).reduce((sum, count) => sum + count, 0)} errors
+                    {health.requests_5m.status_breakdown.filter(s => s.status >= 500).reduce((sum, s) => sum + s.count, 0)} errors
                   </p>
                 </div>
               </Card>
@@ -389,7 +405,7 @@ export default function AdminHealth() {
                 <div className="p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Latency P50 (5m)</h3>
                   <div className="text-3xl font-bold text-blue-600">
-                    {health.ingest.p50_ms_5m}ms
+                    {health.requests_5m.p50_ms}ms
                   </div>
                   <p className="text-sm text-gray-500 mt-1">Median response time</p>
                 </div>
@@ -399,7 +415,7 @@ export default function AdminHealth() {
                 <div className="p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Latency P95 (5m)</h3>
                   <div className="text-3xl font-bold text-orange-600">
-                    {health.ingest.p95_ms_5m}ms
+                    {health.requests_5m.p95_ms}ms
                   </div>
                   <p className="text-sm text-gray-500 mt-1">95th percentile</p>
                 </div>
@@ -411,11 +427,11 @@ export default function AdminHealth() {
               <div className="p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Error Breakdown (5m)</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {Object.entries(health.ingest.by_error_5m).map(([errorCode, count]) => (
-                    <div key={errorCode} className="text-center">
+                  {health.requests_5m.status_breakdown.map(({ status, count }) => (
+                    <div key={status} className="text-center">
                       <div className="text-2xl font-bold text-red-600">{count}</div>
                       <div className="text-sm text-gray-600 capitalize">
-                        {errorCode.replace(/_/g, ' ')}
+                        {status}
                       </div>
                     </div>
                   ))}

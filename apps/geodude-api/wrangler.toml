@@ -11,6 +11,7 @@ NODE_ENV = "production"
 TEST_MODE = "false"
 DEV_MAIL_ECHO = "false"
 CACHE_OFF = "false"
+METRICS_OFF = "false"
 
 # Auth & limits (production defaults)
 SESSION_TTL_HOURS = "720"
@@ -53,6 +54,12 @@ preview_id = "a2853f2e1d7c498d800ee0013eeec3d3"
 binding = "RL"
 id = "828d43c4d01a4da59e1eb457a118b6f1"
 preview_id = "39fb95dccaf44f66a2a3e7384800fe08"
+
+# KV used for metrics collection
+[[kv_namespaces]]
+binding = "METRICS"
+id = "cfde18666cfc4904b64f63259f62e09f"
+preview_id = "cfde18666cfc4904b64f63259f62e09f"
 
 # Production environment (for specific production deployments)
 [env.production]
