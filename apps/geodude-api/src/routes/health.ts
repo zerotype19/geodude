@@ -103,7 +103,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         // Hardened Classification System Health Tiles
         hardened_classification: await getHardenedClassificationHealth(d1, orgId),
         citations: await getCitationsHealth(d1, orgId),
-        classifier_info: await getClassifierInfo(env),
+        // classifier_info: await getClassifierInfo(env), // Temporarily disabled due to build issues
 
         // Legacy fields for backward compatibility
         kv_ok: kvOk,
@@ -861,11 +861,13 @@ async function getCitationsHealth(d1: any, orgId: string) {
 
 /**
  * Get classifier information and version details
+ * Temporarily disabled due to build issues
  */
+/*
 async function getClassifierInfo(env: any) {
   try {
     // Get current classifier manifest version
-    const { getClassifierManifest } = await import('./ai-lite/classifier-manifest');
+    const { getClassifierManifest } = await import('../ai-lite/classifier-manifest');
     const manifest = await getClassifierManifest(env);
     
     // Get KV fallback counter (incremented when static manifest is used)
@@ -890,6 +892,7 @@ async function getClassifierInfo(env: any) {
     };
   }
 }
+*/
 
 /**
  * Calculate trend arrow based on current vs previous values
