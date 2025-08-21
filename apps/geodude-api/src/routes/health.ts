@@ -102,6 +102,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         
         // Hardened Classification System Health Tiles
         hardened_classification: await getHardenedClassificationHealth(d1, orgId),
+        citations: await getCitationsHealth(d1, orgId),
         
         // Legacy fields for backward compatibility
         kv_ok: kvOk,
@@ -146,6 +147,12 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
           sample_pct: parseInt(env.AI_LITE_SAMPLE_PCT || '2'),
           tracking_mode: 'unknown',
           rollups_available: false,
+          error: 'Health check failed'
+        },
+        citations: {
+          ingested_24h: 0,
+          sources_citing_24h: 0,
+          evidence_types: {},
           error: 'Health check failed'
         },
         hardened_classification: {
@@ -762,6 +769,66 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
     
   } catch (error) {
     console.error('Error getting hardened classification health:', error);
+    return {
+      error: error.message,
+      status: "error"
+    };
+  }
+}
+
+/**
+ * Get citations health metrics
+ */
+async function getCitationsHealth(d1: any, orgId: string) {
+  try {
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Get citations ingested in last 24h
+    const ingestedCount = await d1.prepare(`
+      SELECT COUNT(*) as total
+      FROM ai_citation_event ace
+      JOIN properties p ON p.id = ace.property_id
+      JOIN projects pr ON pr.id = p.project_id
+      WHERE pr.org_id = ? AND ace.created_at >= ?
+    `).bind(orgId, last24h.toISOString()).first();
+    
+    // Get distinct sources citing in last 24h
+    const sourcesCount = await d1.prepare(`
+      SELECT COUNT(DISTINCT ace.surface) as total
+      FROM ai_citation_event ace
+      JOIN properties p ON p.id = ace.property_id
+      JOIN projects pr ON pr.id = p.project_id
+      WHERE pr.org_id = ? AND ace.created_at >= ?
+    `).bind(orgId, last24h.toISOString()).first();
+    
+    // Get evidence type breakdown
+    const evidenceTypes = await d1.prepare(`
+      SELECT 
+        ace.evidence_type,
+        COUNT(*) as count
+      FROM ai_citation_event ace
+      JOIN properties p ON p.id = ace.property_id
+      JOIN projects pr ON pr.id = p.project_id
+      WHERE pr.org_id = ? AND ace.created_at >= ?
+      GROUP BY ace.evidence_type
+      ORDER BY count DESC
+    `).bind(orgId, last24h.toISOString()).all();
+    
+    const evidenceTypeMap = {};
+    (evidenceTypes.results || []).forEach(row => {
+      evidenceTypeMap[row.evidence_type] = row.count;
+    });
+    
+    return {
+      ingested_24h: ingestedCount?.total || 0,
+      sources_citing_24h: sourcesCount?.total || 0,
+      evidence_types: evidenceTypeMap,
+      status: ingestedCount?.total > 0 ? "active" : "no_citations"
+    };
+    
+  } catch (error) {
+    console.error('Error getting citations health:', error);
     return {
       error: error.message,
       status: "error"

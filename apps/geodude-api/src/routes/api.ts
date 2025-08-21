@@ -999,12 +999,12 @@ export async function handleApiRoutes(
             const fromTs = now - windowMs;
 
             // Get citations data from ai_citation_event table (real citations, not just AI traffic)
-            // Note: ai_citation_event doesn't have project_id, so we'll get all citations for now
             const totalResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT COUNT(*) as citations
                 FROM ai_citation_event ace
-                WHERE ace.ts >= ?
-            `).bind(fromTs).first();
+                JOIN properties p ON p.id = ace.property_id
+                WHERE p.project_id = ? AND ace.occurred_at >= ?
+            `).bind(project_id, fromTs).first();
 
             // Get by source breakdown
             const bySourceResult = await env.OPTIVIEW_DB.prepare(`
@@ -1013,11 +1013,12 @@ export async function handleApiRoutes(
                     ace.surface as source_name,
                     COUNT(*) as count
                 FROM ai_citation_event ace
-                WHERE ace.ts >= ?
+                JOIN properties p ON p.id = ace.property_id
+                WHERE p.project_id = ? AND ace.occurred_at >= ?
                 GROUP BY ace.surface
                 ORDER BY count DESC
                 LIMIT 10
-            `).bind(fromTs).all();
+            `).bind(project_id, fromTs).all();
 
             // Get top content breakdown
             const topContentResult = await env.OPTIVIEW_DB.prepare(`
@@ -1026,23 +1027,25 @@ export async function handleApiRoutes(
                     ace.url,
                     COUNT(*) as count
                 FROM ai_citation_event ace
-                WHERE ace.ts >= ?
+                JOIN properties p ON p.id = ace.property_id
+                WHERE p.project_id = ? AND ace.occurred_at >= ?
                   AND ace.url IS NOT NULL
                 GROUP BY ace.url
                 ORDER BY count DESC
                 LIMIT 10
-            `).bind(fromTs).all();
+            `).bind(project_id, fromTs).all();
 
             // Get timeseries data
             const timeseriesResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    strftime('%Y-%m-%d', datetime(ace.ts/1000, 'unixepoch')) as day,
+                    strftime('%Y-%m-%d', ace.occurred_at) as day,
                     COUNT(*) as count
                 FROM ai_citation_event ace
-                WHERE ace.ts >= ?
-                GROUP BY strftime('%Y-%m-%d', datetime(ace.ts/1000, 'unixepoch'))
+                JOIN properties p ON p.id = ace.property_id
+                WHERE p.project_id = ? AND ace.occurred_at >= ?
+                GROUP BY strftime('%Y-%m-%d', ace.occurred_at)
                 ORDER BY day
-            `).bind(fromTs).all();
+            `).bind(project_id, fromTs).all();
 
             const summary = {
                 totals: {
@@ -1113,14 +1116,14 @@ export async function handleApiRoutes(
             const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
 
             // Get citations data from ai_citation_event table (real citations, not just AI traffic)
-            // Note: ai_citation_event doesn't have project_id, so we'll get all citations for now
             let countQuery = `
                 SELECT COUNT(*) as total
                 FROM ai_citation_event ace
-                WHERE ace.ts >= ?
+                JOIN properties p ON p.id = ace.property_id
+                WHERE p.project_id = ? AND ace.occurred_at >= ?
             `;
 
-            let countParams = [fromTs];
+            let countParams = [project_id, fromTs];
 
             if (source) {
                 countQuery += ' AND ace.surface = ?';
@@ -1138,7 +1141,7 @@ export async function handleApiRoutes(
             let itemsQuery = `
                 SELECT 
                     ace.id,
-                    datetime(ace.ts/1000, 'unixepoch') as detected_at,
+                    ace.occurred_at as detected_at,
                     'ai_citation' as event_class,
                     ace.surface as source_slug,
                     ace.surface as source_name,
@@ -1148,10 +1151,11 @@ export async function handleApiRoutes(
                     1.0 as classification_confidence,
                     '[]' as debug_raw
                 FROM ai_citation_event ace
-                WHERE ace.ts >= ?
+                JOIN properties p ON p.id = ace.property_id
+                WHERE p.project_id = ? AND ace.occurred_at >= ?
             `;
 
-            let itemsParams = [fromTs];
+            let itemsParams = [project_id, fromTs];
 
             if (source) {
                 itemsQuery += ' AND ace.surface = ?';
@@ -1216,7 +1220,7 @@ export async function handleApiRoutes(
             const citationQuery = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
                     ace.id,
-                    datetime(ace.ts/1000, 'unixepoch') as detected_at,
+                    ace.occurred_at as detected_at,
                     'ai_citation' as event_class,
                     ace.surface as source_slug,
                     ace.surface as source_name,
@@ -1238,13 +1242,13 @@ export async function handleApiRoutes(
             const relatedContentQuery = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
                     ace.id,
-                    datetime(ace.ts/1000, 'unixepoch') as detected_at,
+                    ace.occurred_at as detected_at,
                     ace.surface as source_slug,
                     ace.surface as source_name
                 FROM ai_citation_event ace
                 WHERE ace.url = ? 
                   AND ace.id != ? 
-                ORDER BY ace.ts DESC
+                ORDER BY ace.occurred_at DESC
                 LIMIT 5
             `).bind(citationQuery.content_url, id).all();
 
@@ -1252,14 +1256,14 @@ export async function handleApiRoutes(
             const relatedReferralsQuery = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
                     ace.id,
-                    datetime(ace.ts/1000, 'unixepoch') as detected_at,
+                    ace.occurred_at as detected_at,
                     ace.query as ref_url,
                     ace.surface as source_slug,
                     ace.surface as source_name
                 FROM ai_citation_event ace
                 WHERE ace.surface = ? 
                   AND ace.id != ? 
-                ORDER BY ace.ts DESC
+                ORDER BY ace.occurred_at DESC
                 LIMIT 5
             `).bind(citationQuery.source_slug, id).all();
 
@@ -1992,9 +1996,9 @@ export async function handleApiRoutes(
                     if (url) {
                         // Ensure content asset exists
                         const contentId = await ensureContentAsset(
-                            env.OPTIVIEW_DB, 
-                            event.project_id, 
-                            event.property_id, 
+                            env.OPTIVIEW_DB,
+                            event.project_id,
+                            event.property_id,
                             url
                         );
 
@@ -2556,7 +2560,7 @@ export async function handleApiRoutes(
                     try {
                         const { ensureContentAsset } = await import('../lib/content-asset-manager');
                         contentId = await ensureContentAsset(env.OPTIVIEW_DB, project_id, property_id, metadata.url);
-                        
+
                         if (contentId) {
                             console.log(`🔗 Linked event to content asset: ${contentId} (${metadata.url})`);
                         } else {
@@ -4735,6 +4739,252 @@ export async function handleApiRoutes(
                 error: "Internal server error",
                 message: e.message
             }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.12) Citations Ingestion API (Admin Only)
+    if (url.pathname === "/admin/citations/ingest" && req.method === "POST") {
+        try {
+            // Rate limiting: 10 rpm per IP
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const rateLimitKey = `citations_ingest:${clientIP}`;
+            const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+
+            if (parseInt(currentCount) >= 10) {
+                const response = new Response(JSON.stringify({
+                    error: "Rate limit exceeded",
+                    message: "Maximum 10 requests per minute per IP",
+                    retry_after: 60
+                }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Increment rate limit counter
+            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+
+            const body = await req.json();
+            const { citations } = body;
+
+            if (!Array.isArray(citations)) {
+                const response = new Response(JSON.stringify({
+                    error: "Invalid request body",
+                    message: "citations must be an array"
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const results = [];
+            const { ensureContentAsset } = await import('../lib/content-asset-manager');
+            const { ensureAISourceWithMapping } = await import('../ai-lite/ai-source-manager');
+
+            for (const citation of citations) {
+                try {
+                    const {
+                        property_id,
+                        domain,
+                        content_url,
+                        ai_source_slug,
+                        answer_url,
+                        query,
+                        snippet,
+                        confidence = 0.8,
+                        evidence_type = 'manual',
+                        occurred_at
+                    } = citation;
+
+                    // Resolve property_id from domain if needed
+                    let resolvedPropertyId = property_id;
+                    if (!resolvedPropertyId && domain) {
+                        const propertyResult = await env.OPTIVIEW_DB.prepare(`
+                            SELECT id FROM properties WHERE domain = ? LIMIT 1
+                        `).bind(domain).first();
+                        resolvedPropertyId = propertyResult?.id;
+                    }
+
+                    if (!resolvedPropertyId) {
+                        results.push({
+                            status: 'error',
+                            error: 'Could not resolve property_id or domain',
+                            citation
+                        });
+                        continue;
+                    }
+
+                    // Get project_id from property
+                    const projectResult = await env.OPTIVIEW_DB.prepare(`
+                        SELECT project_id FROM properties WHERE id = ?
+                    `).bind(resolvedPropertyId).first();
+
+                    if (!projectResult?.project_id) {
+                        results.push({
+                            status: 'error',
+                            error: 'Property not found',
+                            citation
+                        });
+                        continue;
+                    }
+
+                    // Ensure content asset exists
+                    let contentId = null;
+                    if (content_url) {
+                        contentId = await ensureContentAsset(
+                            env.OPTIVIEW_DB,
+                            projectResult.project_id,
+                            resolvedPropertyId,
+                            content_url
+                        );
+                    }
+
+                    // Ensure AI source exists
+                    let aiSourceId = null;
+                    if (ai_source_slug) {
+                        aiSourceId = await ensureAISourceWithMapping(
+                            env,
+                            ai_source_slug,
+                            ai_source_slug, // Use slug as name if not provided
+                            'assistant'
+                        );
+                    }
+
+                    // Insert citation
+                    const now = new Date().toISOString();
+                    const insertResult = await env.OPTIVIEW_DB.prepare(`
+                        INSERT INTO ai_citation_event (
+                            property_id, content_id, ai_source_id, surface, query, url,
+                            answer_url, snippet, confidence, evidence_type, occurred_at, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    `).bind(
+                        resolvedPropertyId,
+                        contentId,
+                        aiSourceId,
+                        ai_source_slug || 'unknown',
+                        query || '',
+                        content_url || '',
+                        answer_url || '',
+                        snippet || '',
+                        confidence,
+                        evidence_type,
+                        occurred_at || now,
+                        now
+                    ).run();
+
+                    const citationId = insertResult.meta?.last_row_id;
+                    results.push({
+                        status: 'success',
+                        citation_id: citationId,
+                        citation
+                    });
+
+                } catch (error) {
+                    results.push({
+                        status: 'error',
+                        error: error.message,
+                        citation
+                    });
+                }
+            }
+
+            const response = new Response(JSON.stringify({
+                message: "Citations ingestion completed",
+                total_processed: citations.length,
+                results
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("Citations ingestion error:", error);
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: error.message
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.13) Citations Import: ChatGPT Share (Admin Only)
+    if (url.pathname === "/admin/citations/import/chatgpt-share" && req.method === "POST") {
+        try {
+            // Rate limiting: 5 rpm per IP
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const rateLimitKey = `chatgpt_import:${clientIP}`;
+            const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+
+            if (parseInt(currentCount) >= 5) {
+                const response = new Response(JSON.stringify({
+                    error: "Rate limit exceeded",
+                    message: "Maximum 5 requests per minute per IP",
+                    retry_after: 60
+                }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Increment rate limit counter
+            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+
+            const body = await req.json();
+            const { property_id, share_url } = body;
+
+            if (!property_id || !share_url) {
+                const response = new Response(JSON.stringify({
+                    error: "Missing required parameters",
+                    message: "property_id and share_url are required"
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Validate share URL format
+            if (!share_url.includes('chatgpt.com/share/')) {
+                const response = new Response(JSON.stringify({
+                    error: "Invalid share URL",
+                    message: "URL must be a ChatGPT share link"
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // For now, return a placeholder response
+            // TODO: Implement actual ChatGPT share page fetching and parsing
+            const response = new Response(JSON.stringify({
+                message: "ChatGPT share import endpoint created",
+                note: "Actual implementation requires ChatGPT share page parsing",
+                property_id,
+                share_url
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("ChatGPT import error:", error);
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: error.message
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         }
     }
