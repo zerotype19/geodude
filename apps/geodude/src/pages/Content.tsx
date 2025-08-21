@@ -380,6 +380,19 @@ const Content: React.FC = () => {
         {/* Filters */}
         <Card className="mb-6">
           <div className="p-6">
+            {/* Filter Info */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-start">
+                <Info className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium">Content Filters</p>
+                  <p className="mt-1">
+                    Use these filters to narrow down your content assets. The <strong>AI Traffic Only</strong> filter shows only content that has received traffic from AI sources like Google's AI features, Bing AI, ChatGPT, and other AI assistants.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               {/* Window Filter */}
               <div>
@@ -440,14 +453,30 @@ const Content: React.FC = () => {
 
               {/* AI Only Filter */}
               <div className="flex items-end">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={filters.aiOnly}
-                    onChange={(e) => setFilters(prev => ({ ...prev, aiOnly: e.target.checked, page: 1 }))}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">AI Traffic Only</span>
+                <label className="flex items-center cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={filters.aiOnly}
+                      onChange={(e) => setFilters(prev => ({ ...prev, aiOnly: e.target.checked, page: 1 }))}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-colors"
+                    />
+                    {filters.aiOnly && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    )}
+                  </div>
+                  <span className={`ml-2 text-sm font-medium transition-colors ${
+                    filters.aiOnly 
+                      ? 'text-blue-700' 
+                      : 'text-gray-700 group-hover:text-blue-600'
+                  }`}>
+                    AI Traffic Only
+                  </span>
+                  {filters.aiOnly && (
+                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Active
+                    </span>
+                  )}
                 </label>
               </div>
 
@@ -469,6 +498,30 @@ const Content: React.FC = () => {
           </div>
         </Card>
 
+        {/* Content Summary */}
+        {!loading && (
+          <div className="mb-4 flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center space-x-4">
+              <span>
+                Showing {groupedContent.length} of {totalGroups} groups
+                {filters.aiOnly && (
+                  <span className="ml-2 text-blue-600 font-medium">
+                    (AI Traffic Only)
+                  </span>
+                )}
+              </span>
+              {filters.aiOnly && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Filtered to show only content with AI referrals
+                </span>
+              )}
+            </div>
+            <div className="text-right">
+              <span className="font-medium">{total}</span> total content assets
+            </div>
+          </div>
+        )}
+
         {/* Content Table */}
         <Card>
           <div className="overflow-hidden">
@@ -483,10 +536,15 @@ const Content: React.FC = () => {
               </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className={`${filters.aiOnly ? 'bg-blue-50' : 'bg-gray-50'}`}>
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Content
+                      {filters.aiOnly && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          AI Only
+                        </span>
+                      )}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Traffic (24h)

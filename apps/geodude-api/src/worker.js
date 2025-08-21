@@ -3628,23 +3628,56 @@ export default {
           const mainParams = [...baseParams, pageSize, (page - 1) * pageSize];
           const mainResult = await d1.prepare(mainQuery).bind(...mainParams).all();
 
-          // Response with real metrics
-          const items = mainResult.results.map(row => ({
-            id: row.id,
-            url: row.url,
-            type: row.type,
-            last_seen: row.last_seen,
-            events_15m: row.events_15m || 0,
-            events_24h: row.events_24h || 0,
-            ai_referrals_24h: 0, // Will add this next
-            by_source_24h: [], // Will add this next
-            coverage_score: row.events_24h > 0 ? 50 : 0 // Simple coverage based on 24h events
+          // Enhanced response with real AI referrals data
+          const items = await Promise.all(mainResult.results.map(async (row) => {
+            // Get AI referrals count for 24h
+            const aiReferralsResult = await d1.prepare(`
+              SELECT COUNT(*) as ai_count
+              FROM ai_referrals ar
+              WHERE ar.project_id = ? AND ar.content_id = ? AND ar.detected_at >= datetime('now','-1 day')
+            `).bind(projectId, row.id).first();
+
+            // Get AI referrals by source for 24h
+            const aiSourcesResult = await d1.prepare(`
+              SELECT 
+                ai_sources.slug,
+                COUNT(*) as events
+              FROM ai_referrals ar
+              JOIN ai_sources ON ar.ai_source_id = ai_sources.id
+              WHERE ar.project_id = ? AND ar.content_id = ? AND ar.detected_at >= datetime('now','-1 day')
+              GROUP BY ai_sources.slug
+              ORDER BY events DESC
+              LIMIT 5
+            `).bind(projectId, row.id).all();
+
+            // If aiOnly filter is enabled, only include content with AI referrals
+            if (aiOnly && (aiReferralsResult?.ai_count || 0) === 0) {
+              return null; // This item will be filtered out
+            }
+
+            return {
+              id: row.id,
+              url: row.url,
+              type: row.type,
+              last_seen: row.last_seen,
+              events_15m: row.events_15m || 0,
+              events_24h: row.events_24h || 0,
+              ai_referrals_24h: aiReferralsResult?.ai_count || 0,
+              by_source_24h: aiSourcesResult.results.map(source => ({
+                slug: source.slug,
+                events: source.events
+              })),
+              coverage_score: row.events_24h > 0 ? 50 : 0
+            };
           }));
 
+          // Filter out null items (when aiOnly is true and no AI referrals)
+          const filteredItems = items.filter(item => item !== null);
+
           const response = new Response(JSON.stringify({
-            items,
+            items: filteredItems,
             page,
-            total,
+            total: aiOnly ? filteredItems.length : total,
             pageSize
           }), {
             headers: {
