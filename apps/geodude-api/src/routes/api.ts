@@ -999,13 +999,12 @@ export async function handleApiRoutes(
             const fromTs = now - windowMs;
 
             // Get citations data from ai_citation_event table (real citations, not just AI traffic)
+            // Note: ai_citation_event doesn't have project_id, so we'll get all citations for now
             const totalResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT COUNT(*) as citations
                 FROM ai_citation_event ace
-                JOIN project p ON p.id = ace.project_id
-                WHERE p.id = ? 
-                  AND ace.ts >= ?
-            `).bind(project_id, fromTs).first();
+                WHERE ace.ts >= ?
+            `).bind(fromTs).first();
 
             // Get by source breakdown
             const bySourceResult = await env.OPTIVIEW_DB.prepare(`
@@ -1014,13 +1013,11 @@ export async function handleApiRoutes(
                     ace.surface as source_name,
                     COUNT(*) as count
                 FROM ai_citation_event ace
-                JOIN project p ON p.id = ace.project_id
-                WHERE p.id = ?
-                  AND ace.ts >= ?
+                WHERE ace.ts >= ?
                 GROUP BY ace.surface
                 ORDER BY count DESC
                 LIMIT 10
-            `).bind(project_id, fromTs).all();
+            `).bind(fromTs).all();
 
             // Get top content breakdown
             const topContentResult = await env.OPTIVIEW_DB.prepare(`
@@ -1029,14 +1026,12 @@ export async function handleApiRoutes(
                     ace.url,
                     COUNT(*) as count
                 FROM ai_citation_event ace
-                JOIN project p ON p.id = ace.project_id
-                WHERE p.id = ?
-                  AND ace.ts >= ?
+                WHERE ace.ts >= ?
                   AND ace.url IS NOT NULL
                 GROUP BY ace.url
                 ORDER BY count DESC
                 LIMIT 10
-            `).bind(project_id, fromTs).all();
+            `).bind(fromTs).all();
 
             // Get timeseries data
             const timeseriesResult = await env.OPTIVIEW_DB.prepare(`
@@ -1044,12 +1039,10 @@ export async function handleApiRoutes(
                     strftime('%Y-%m-%d', datetime(ace.ts/1000, 'unixepoch')) as day,
                     COUNT(*) as count
                 FROM ai_citation_event ace
-                JOIN project p ON p.id = ace.project_id
-                WHERE p.id = ?
-                  AND ace.ts >= ?
+                WHERE ace.ts >= ?
                 GROUP BY strftime('%Y-%m-%d', datetime(ace.ts/1000, 'unixepoch'))
                 ORDER BY day
-            `).bind(project_id, fromTs).all();
+            `).bind(fromTs).all();
 
             const summary = {
                 totals: {
@@ -1120,15 +1113,14 @@ export async function handleApiRoutes(
             const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
 
             // Get citations data from ai_citation_event table (real citations, not just AI traffic)
+            // Note: ai_citation_event doesn't have project_id, so we'll get all citations for now
             let countQuery = `
                 SELECT COUNT(*) as total
                 FROM ai_citation_event ace
-                JOIN project p ON p.id = ace.project_id
-                WHERE p.id = ? 
-                  AND ace.ts >= ?
+                WHERE ace.ts >= ?
             `;
 
-            let countParams = [project_id, fromTs];
+            let countParams = [fromTs];
 
             if (source) {
                 countQuery += ' AND ace.surface = ?';
@@ -1156,15 +1148,13 @@ export async function handleApiRoutes(
                     1.0 as classification_confidence,
                     '[]' as debug_raw
                 FROM ai_citation_event ace
-                JOIN project p ON p.id = ace.project_id
-                WHERE p.id = ? 
-                  AND ace.ts >= ?
+                WHERE ace.ts >= ?
             `;
 
-            let itemsParams = [project_id, Math.floor(fromTs / 1000)];
+            let itemsParams = [fromTs];
 
             if (source) {
-                itemsQuery += ' AND COALESCE(ais.slug, "unknown") = ?';
+                itemsQuery += ' AND ace.surface = ?';
                 itemsParams.push(source);
             }
 
