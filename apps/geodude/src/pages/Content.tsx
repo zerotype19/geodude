@@ -20,7 +20,14 @@ interface ContentDetail {
   asset: { id: number; url: string; type: string };
   by_source: Array<{ slug: string; events: number }>;
   timeseries: Array<{ ts: string; events: number; ai_referrals: number }>;
-  recent_events: Array<{ occurred_at: string; event_type: string; source: string; path: string }>;
+  recent_events: Array<{
+    occurred_at: string;
+    event_type: string;
+    event_class: string;
+    source_name?: string;
+    path: string;
+    debug?: string[];
+  }>;
 }
 
 const Content: React.FC = () => {
@@ -72,7 +79,7 @@ const Content: React.FC = () => {
 
   const loadAssets = async () => {
     if (!project?.id) return;
-    
+
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -207,314 +214,329 @@ const Content: React.FC = () => {
           >
             Add Content
           </button>
-          </div>
-
-      {/* Filters */}
-      <Card title="Filters">
-        <div className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-              <input
-                type="text"
-                placeholder="Search URLs..."
-                value={filters.q}
-                onChange={(e) => setFilters(prev => ({ ...prev, q: e.target.value, page: 1 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-              <select
-                value={filters.type}
-                onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value, page: 1 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Types</option>
-                <option value="page">Page</option>
-                <option value="article">Article</option>
-                <option value="product">Product</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Time Window</label>
-              <select
-                value={filters.window}
-                onChange={(e) => setFilters(prev => ({ ...prev, window: e.target.value, page: 1 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="15m">Last 15 minutes</option>
-                <option value="24h">Last 24 hours</option>
-                <option value="7d">Last 7 days</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={filters.aiOnly}
-                  onChange={(e) => setFilters(prev => ({ ...prev, aiOnly: e.target.checked, page: 1 }))}
-                  className="mr-2"
-                />
-                <span className="text-sm text-gray-700">AI activity only</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Content Table */}
-      <Card title={`Content Assets (${total} total)`}>
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="p-6 text-center text-gray-500">Loading...</div>
-          ) : assets.length === 0 ? (
-            <div className="p-6 text-center">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <div className="flex items-center justify-center mb-4">
-                  <svg className="h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-blue-800 mb-2">No manual content assets yet</h3>
-                <p className="text-blue-700 mb-4">
-                  You can manually add content URLs to track, or view existing AI activity in Referrals.
-                </p>
-                <div className="flex justify-center gap-3">
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Add Content
-                  </button>
-                  <a
-                    href="/referrals"
-                    className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    View AI Activity
-                  </a>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">15m</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">24h</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Referrals</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {assets.map((asset) => {
-                  const coverageBadge = getCoverageBadge(asset.coverage_score);
-                  const isExpanded = expandedRows.has(asset.id);
-                  
-                  return (
-                    <React.Fragment key={asset.id}>
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm font-medium text-gray-900" title={asset.url}>
-                              {truncateUrl(asset.url)}
-                            </span>
-                            <button
-                              onClick={() => navigator.clipboard.writeText(asset.url)}
-                              className="text-gray-400 hover:text-gray-600"
-                              title="Copy URL"
-                            >
-                              📋
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
-                          {asset.type}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {asset.last_seen ? new Date(asset.last_seen).toLocaleString() : 'Never'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {asset.events_15m}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {asset.events_24h}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {asset.ai_referrals_24h}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${coverageBadge.color}`}>
-                            {coverageBadge.label} ({asset.coverage_score})
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button
-                            onClick={() => toggleRowExpansion(asset.id)}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            {isExpanded ? 'Hide' : 'View'} Details
-                          </button>
-                        </td>
-                      </tr>
-                      
-                      {/* Expanded Row */}
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={8} className="px-6 py-4 bg-gray-50">
-                            <div className="space-y-4">
-                              {/* By Source Breakdown */}
-                              <div>
-                                <h4 className="font-medium text-gray-900 mb-2">By Source (24h)</h4>
-                                <div className="flex flex-wrap gap-2">
-                                  {asset.by_source_24h.length > 0 ? (
-                                    asset.by_source_24h.map((source) => (
-                                      <span
-                                        key={source.slug}
-                                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                                      >
-                                        {source.slug}: {source.events}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-gray-500">No AI source activity</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Recent Events */}
-                              {assetDetails[asset.id] && (
-                                <div>
-                                  <h4 className="font-medium text-gray-900 mb-2">Recent Events</h4>
-                                  <div className="space-y-2">
-                                    {assetDetails[asset.id].recent_events.length > 0 ? (
-                                      assetDetails[asset.id].recent_events.map((event, idx) => (
-                                        <div key={idx} className="flex items-center space-x-4 text-sm text-gray-600">
-                                          <span>{new Date(event.occurred_at).toLocaleString()}</span>
-                                          <span className="capitalize">{event.event_type}</span>
-                                          <span>via {event.source}</span>
-                                          {event.path && <span>at {event.path}</span>}
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <span className="text-gray-500">No recent events</span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
         </div>
 
-        {/* Pagination */}
-        {total > filters.pageSize && (
-          <div className="px-6 py-4 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Showing {((filters.page - 1) * filters.pageSize) + 1} to {Math.min(filters.page * filters.pageSize, total)} of {total}
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
-                  disabled={filters.page === 1}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
-                  disabled={filters.page * filters.pageSize >= total}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Add Asset Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Add Content Asset</h3>
-            
-            {addError && (
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
-                <p className="text-sm text-red-700">{addError}</p>
-              </div>
-            )}
-            
-            <div className="space-y-4">
+        {/* Filters */}
+        <Card title="Filters">
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
                 <input
-                  type="url"
-                  placeholder="https://example.com/page"
-                  value={newAsset.url}
-                  onChange={(e) => setNewAsset(prev => ({ ...prev, url: e.target.value }))}
-                  disabled={addingAsset}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  type="text"
+                  placeholder="Search URLs..."
+                  value={filters.q}
+                  onChange={(e) => setFilters(prev => ({ ...prev, q: e.target.value, page: 1 }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                 <select
-                  value={newAsset.type}
-                  onChange={(e) => setNewAsset(prev => ({ ...prev, type: e.target.value }))}
-                  disabled={addingAsset}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  value={filters.type}
+                  onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value, page: 1 }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  <option value="">All Types</option>
                   <option value="page">Page</option>
                   <option value="article">Article</option>
                   <option value="product">Product</option>
                   <option value="other">Other</option>
                 </select>
               </div>
-            </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setAddError('');
-                  setNewAsset({ url: '', type: 'page' });
-                }}
-                disabled={addingAsset}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddAsset}
-                disabled={!newAsset.url.trim() || addingAsset}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
-              >
-                {addingAsset && (
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                )}
-                {addingAsset ? 'Adding...' : 'Add Asset'}
-              </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Time Window</label>
+                <select
+                  value={filters.window}
+                  onChange={(e) => setFilters(prev => ({ ...prev, window: e.target.value, page: 1 }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="15m">Last 15 minutes</option>
+                  <option value="24h">Last 24 hours</option>
+                  <option value="7d">Last 7 days</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={filters.aiOnly}
+                    onChange={(e) => setFilters(prev => ({ ...prev, aiOnly: e.target.checked, page: 1 }))}
+                    className="mr-2"
+                  />
+                  <span className="text-sm text-gray-700">AI activity only</span>
+                </label>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        </Card>
+
+        {/* Content Table */}
+        <Card title={`Content Assets (${total} total)`}>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="p-6 text-center text-gray-500">Loading...</div>
+            ) : assets.length === 0 ? (
+              <div className="p-6 text-center">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <div className="flex items-center justify-center mb-4">
+                    <svg className="h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-blue-800 mb-2">No manual content assets yet</h3>
+                  <p className="text-blue-700 mb-4">
+                    You can manually add content URLs to track, or view existing AI activity in Referrals.
+                  </p>
+                  <div className="flex justify-center gap-3">
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Add Content
+                    </button>
+                    <a
+                      href="/referrals"
+                      className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      View AI Activity
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">15m</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">24h</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Referrals</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {assets.map((asset) => {
+                    const coverageBadge = getCoverageBadge(asset.coverage_score);
+                    const isExpanded = expandedRows.has(asset.id);
+
+                    return (
+                      <React.Fragment key={asset.id}>
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm font-medium text-gray-900" title={asset.url}>
+                                {truncateUrl(asset.url)}
+                              </span>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(asset.url)}
+                                className="text-gray-400 hover:text-gray-600"
+                                title="Copy URL"
+                              >
+                                📋
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
+                            {asset.type}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {asset.last_seen ? new Date(asset.last_seen).toLocaleString() : 'Never'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {asset.events_15m}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {asset.events_24h}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {asset.ai_referrals_24h}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${coverageBadge.color}`}>
+                              {coverageBadge.label} ({asset.coverage_score})
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => toggleRowExpansion(asset.id)}
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              {isExpanded ? 'Hide' : 'View'} Details
+                            </button>
+                          </td>
+                        </tr>
+
+                        {/* Expanded Row */}
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={8} className="px-6 py-4 bg-gray-50">
+                              <div className="space-y-4">
+                                {/* By Source Breakdown */}
+                                <div>
+                                  <h4 className="font-medium text-gray-900 mb-2">By Source (24h)</h4>
+                                  <div className="flex flex-wrap gap-2">
+                                    {asset.by_source_24h.length > 0 ? (
+                                      asset.by_source_24h.map((source) => (
+                                        <span
+                                          key={source.slug}
+                                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
+                                        >
+                                          {source.slug}: {source.events}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="text-gray-500">No AI source activity</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Recent Events */}
+                                {assetDetails[asset.id] && (
+                                  <div>
+                                    <h4 className="font-medium text-gray-900 mb-2">Recent Events</h4>
+                                    <div className="space-y-2">
+                                      {assetDetails[asset.id].recent_events.length > 0 ? (
+                                        assetDetails[asset.id].recent_events.map((event, idx) => (
+                                          <div key={idx} className="flex items-center space-x-4 text-sm text-gray-600">
+                                            <span>{new Date(event.occurred_at).toLocaleString()}</span>
+                                            <span className="capitalize">{event.event_type}</span>
+                                            <span className={`px-2 py-1 text-xs rounded-full ${event.event_class === 'ai_agent_crawl' ? 'bg-orange-100 text-orange-800' :
+                                                event.event_class === 'human_via_ai' ? 'bg-blue-100 text-blue-800' :
+                                                  event.event_class === 'search' ? 'bg-green-100 text-green-800' :
+                                                    'bg-gray-100 text-gray-800'
+                                              }`}>
+                                              {event.event_class}
+                                              {event.debug && event.debug.length > 0 && (
+                                                <span
+                                                  className="ml-1 text-gray-400 cursor-help"
+                                                  title={`Classification: ${event.debug.join(', ')}`}
+                                                >
+                                                  ℹ️
+                                                </span>
+                                              )}
+                                            </span>
+                                            <span>via {event.source_name || 'unknown'}</span>
+                                            {event.path && <span>at {event.path}</span>}
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <span className="text-gray-500">No recent events</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {total > filters.pageSize && (
+            <div className="px-6 py-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing {((filters.page - 1) * filters.pageSize) + 1} to {Math.min(filters.page * filters.pageSize, total)} of {total}
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
+                    disabled={filters.page === 1}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
+                    disabled={filters.page * filters.pageSize >= total}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Add Asset Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Content Asset</h3>
+
+              {addError && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+                  <p className="text-sm text-red-700">{addError}</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                  <input
+                    type="url"
+                    placeholder="https://example.com/page"
+                    value={newAsset.url}
+                    onChange={(e) => setNewAsset(prev => ({ ...prev, url: e.target.value }))}
+                    disabled={addingAsset}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <select
+                    value={newAsset.type}
+                    onChange={(e) => setNewAsset(prev => ({ ...prev, type: e.target.value }))}
+                    disabled={addingAsset}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  >
+                    <option value="page">Page</option>
+                    <option value="article">Article</option>
+                    <option value="product">Product</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setAddError('');
+                    setNewAsset({ url: '', type: 'page' });
+                  }}
+                  disabled={addingAsset}
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddAsset}
+                  disabled={!newAsset.url.trim() || addingAsset}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                >
+                  {addingAsset && (
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {addingAsset ? 'Adding...' : 'Add Asset'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Shell>
   );

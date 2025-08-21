@@ -75,6 +75,7 @@ interface JourneyEvent {
   id: number;
   occurred_at: string;
   event_type: string;
+  event_class: string;
   content: {
     id: number;
     url: string;
@@ -83,6 +84,7 @@ interface JourneyEvent {
     slug: string;
     name: string;
   } | null;
+  debug?: string[];
 }
 
 interface Journey {
@@ -1057,6 +1059,22 @@ export default function Journeys() {
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-sm font-medium text-gray-900">
                                   {event.event_type}
+                                </span>
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  event.event_class === 'ai_agent_crawl' ? 'bg-orange-100 text-orange-800' :
+                                  event.event_class === 'human_via_ai' ? 'bg-blue-100 text-blue-800' :
+                                  event.event_class === 'search' ? 'bg-green-100 text-green-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {event.event_class}
+                                  {event.debug && event.debug.length > 0 && (
+                                    <span 
+                                      className="ml-1 text-gray-400 cursor-help" 
+                                      title={`Classification: ${event.debug.join(', ')}`}
+                                    >
+                                      ℹ️
+                                    </span>
+                                  )}
                                 </span>
                                 {event.ai_source && (
                                   <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
