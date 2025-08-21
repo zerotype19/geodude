@@ -18,6 +18,8 @@
     "cf:publish:api": "cd apps/geodude-api && wrangler deploy",
     "cf:publish:ui": "cd apps/geodude && wrangler pages deploy dist",
     "db:reset": "cd apps/geodude-api && wrangler d1 execute optiview_db --remote --file=./migrations/0001_initial_ai_visibility.sql",
+    "db:migrate": "cd apps/geodude-api && wrangler d1 execute optiview_db --remote --file=./run-migration.sql",
+    "db:check": "cd apps/geodude-api && wrangler d1 execute optiview_db --remote --file=./check-schema.sql",
     "seed:fingerprints": "cd apps/geodude-api && tsx scripts/seed-fingerprints.ts",
     "test": "cd apps/geodude-api && vitest run",
     "test:watch": "cd apps/geodude-api && vitest",

@@ -326,7 +326,30 @@ export default function Events() {
       case "human_via_ai": return "bg-blue-100 text-blue-800";
       case "ai_agent_crawl": return "bg-orange-100 text-orange-800";
       case "search": return "bg-green-100 text-green-800";
+      case "unknown": return "bg-gray-100 text-gray-800";
       default: return "bg-gray-100 text-gray-800";
+    }
+  }
+
+  function getTrafficClassLabel(className: string): string {
+    switch (className) {
+      case "direct_human": return "Direct Human";
+      case "human_via_ai": return "Human via AI";
+      case "ai_agent_crawl": return "AI Agent Crawl";
+      case "search": return "Search";
+      case "unknown": return "Unknown";
+      default: return className;
+    }
+  }
+
+  function getTrafficClassDescription(className: string): string {
+    switch (className) {
+      case "direct_human": return "No referrer, direct visits";
+      case "human_via_ai": return "AI assistant referrers (ChatGPT, Claude, etc.)";
+      case "ai_agent_crawl": return "Cloudflare verified bots and crawlers";
+      case "search": return "Search engine referrers (Google, Bing, etc.)";
+      case "unknown": return "Unclassified traffic";
+      default: return "Traffic classification";
     }
   }
 
@@ -577,14 +600,14 @@ export default function Events() {
           </div>
         )}
 
-        {/* Classification System Status */}
+        {/* Hardened Classification System Status */}
         <Card>
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-medium text-gray-900">Traffic Classification System</h3>
+              <h3 className="text-lg font-medium text-gray-900">Hardened AI Detection System</h3>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                  Hardened System Active
+                  ✅ Hardened System Active
                 </span>
                 {summary?.tracking_mode && (
                   <span className={`px-2 py-1 text-xs rounded-full ${
@@ -600,24 +623,35 @@ export default function Events() {
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">🤖</div>
+                <div className="text-2xl font-bold text-orange-600">🤖</div>
                 <div className="text-gray-600">AI Agent Crawl</div>
                 <div className="text-xs text-gray-500">Cloudflare verified bots</div>
+                <div className="text-xs text-gray-400 mt-1">1st Priority</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">🧠</div>
+                <div className="text-2xl font-bold text-blue-600">🧠</div>
                 <div className="text-gray-600">Human via AI</div>
                 <div className="text-xs text-gray-500">AI assistant referrers</div>
+                <div className="text-xs text-gray-400 mt-1">2nd Priority</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">🔍</div>
+                <div className="text-2xl font-bold text-green-600">🔍</div>
                 <div className="text-gray-600">Search</div>
                 <div className="text-xs text-gray-500">Search engine referrers</div>
+                <div className="text-xs text-gray-400 mt-1">3rd Priority</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-600">👤</div>
                 <div className="text-gray-600">Direct Human</div>
                 <div className="text-xs text-gray-500">No referrer, direct visits</div>
+                <div className="text-xs text-gray-400 mt-1">4th Priority</div>
+              </div>
+            </div>
+            
+            <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="text-sm text-gray-700">
+                <strong>Hardened Classification:</strong> Uses Cloudflare bot detection, user agent analysis, and referrer patterns with strict precedence order. 
+                AI sources are automatically managed and mapped for accurate attribution.
               </div>
             </div>
             
@@ -794,8 +828,9 @@ export default function Events() {
                             ? "bg-blue-100 text-blue-800 border-blue-200"
                             : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                           } ${isBaselineClass ? 'opacity-75' : ''}`}
+                        title={getTrafficClassDescription(cls.class)}
                       >
-                        {cls.class} ({formatNumber(cls.count)})
+                        {getTrafficClassLabel(cls.class)} ({formatNumber(cls.count)})
                         {isBaselineClass && summary.ai_lite && (
                           <span className="ml-1 text-xs text-gray-500">ⓘ sampled</span>
                         )}
@@ -930,15 +965,18 @@ export default function Events() {
                             </span>
                           </td>
                           <td className="py-3 pr-4">
-                            <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(item.event_class)}`}>
-                              {item.event_class}
+                            <span 
+                              className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(item.event_class)} cursor-help`}
+                              title={getTrafficClassDescription(item.event_class)}
+                            >
+                              {getTrafficClassLabel(item.event_class)}
                               {['direct_human', 'search'].includes(item.event_class) && summary?.ai_lite && (
                                 <span className="ml-1 text-gray-500">ⓘ sampled</span>
                               )}
                               {item.debug && item.debug.length > 0 && (
                                 <span
                                   className="ml-1 text-gray-400 cursor-help"
-                                  title={`Classification: ${item.debug.join(', ')}`}
+                                  title={`Classification Debug: ${item.debug.join(', ')}`}
                                 >
                                   ℹ️
                                 </span>
@@ -1017,21 +1055,29 @@ export default function Events() {
           </div>
         </Card>
 
-        {/* Classification Debug Information */}
+        {/* Hardened Classification Debug Information */}
         {showDebugInfo && recent && recent.items.length > 0 && (
           <Card>
             <div className="p-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Classification Debug Information</h4>
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Hardened AI Detection System Details</h4>
               <div className="text-xs text-gray-600 space-y-2">
-                <p><strong>Traffic Classification System:</strong> Uses hardened heuristics with Cloudflare data, user agent analysis, and referrer patterns.</p>
+                <p><strong>Hardened Classification System:</strong> Uses Cloudflare bot detection, user agent analysis, and referrer patterns with strict precedence order.</p>
                 <p><strong>Classification Precedence:</strong> 1) Cloudflare verified bots → 2) AI referrers → 3) Search engines → 4) Direct human</p>
+                <p><strong>AI Source Management:</strong> Automatically creates and maps AI sources for accurate attribution and rollup tracking.</p>
                 <p><strong>Debug Trail:</strong> Hover over ℹ️ icons to see classification reasoning for each event.</p>
                 <div className="mt-2 p-2 bg-white border border-gray-200 rounded text-xs">
                   <strong>Example classifications:</strong><br/>
-                  • <code>cf.verifiedBotCategory=Search Engine Crawler</code> → AI Agent Crawl<br/>
-                  • <code>ref:www.google.com</code> → Search<br/>
-                  • <code>ref:chat.openai.com</code> → Human via AI<br/>
-                  • <code>no referrer</code> → Direct Human
+                  • <code>cf.verifiedBotCategory=Search Engine Crawler</code> → AI Agent Crawl (1st priority)<br/>
+                  • <code>ref:chat.openai.com</code> → Human via AI (2nd priority)<br/>
+                  • <code>ref:www.google.com</code> → Search (3rd priority)<br/>
+                  • <code>no referrer</code> → Direct Human (4th priority)
+                </div>
+                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                  <strong>System Features:</strong><br/>
+                  • Cloudflare bot verification with fallback to user agent patterns<br/>
+                  • Preview bot detection (Slack, Discord, Telegram, etc.)<br/>
+                  • Automatic AI source creation and mapping<br/>
+                  • Rollup-based deduplication for crawler events
                 </div>
               </div>
             </div>
