@@ -2929,7 +2929,7 @@ export async function handleApiRoutes(
                     ie.class as event_class,
                     COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
                     COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
-                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug,
+                    COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw,
                     COUNT(*) as referrals_24h
                 FROM interaction_events ie
                 JOIN content_assets ca ON ca.id = ie.content_id
@@ -2941,7 +2941,7 @@ export async function handleApiRoutes(
                 LIMIT ? OFFSET ?
             `).bind(...params, pageSizeNum, offset).all<any>();
 
-                            // Calculate 15m referrals for each item
+                            // Calculate 15m referrals for each item and process debug field
                 const referralsWith15m = await Promise.all(
                     (referrals.results || []).map(async (referral) => {
                         const recent15m = await env.OPTIVIEW_DB.prepare(`
@@ -2955,8 +2955,21 @@ export async function handleApiRoutes(
                               AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                         `).bind(project_id, referral.content_id).first<any>();
 
+                        // Process debug field to ensure it's always an array
+                        let debug = [];
+                        try {
+                            if (referral.debug_raw && referral.debug_raw !== '[]') {
+                                const parsed = JSON.parse(referral.debug_raw);
+                                debug = Array.isArray(parsed) ? parsed : [];
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse debug field:', referral.debug_raw);
+                            debug = [];
+                        }
+
                         return {
                             ...referral,
+                            debug: debug,
                             referrals_15m: recent15m?.count || 0,
                             share_of_ai: 0.5 // Default value for now
                         };
