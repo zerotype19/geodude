@@ -190,13 +190,13 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
     try {
       // Switch to the selected project
       await switchContext(organization!.id, selectedProject.id);
-      
+
       // Persist last project
       localStorage.setItem('ov:lastProjectId', selectedProject.id);
-      
+
       // Navigate to events
       navigate('/events');
-      
+
       setIsOpen(false);
     } catch (error) {
       console.error("Failed to switch project:", error);
@@ -232,7 +232,7 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
   }
 
   return (
-    <div className="relative flex items-center min-w-0 overflow-visible">
+    <div className="relative flex items-center min-w-0 overflow-visible" style={{ zIndex: 1000 }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-l-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 min-w-0"
@@ -243,7 +243,7 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
         </span>
         <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
       </button>
-      
+
       {/* Project Menu Button */}
       <div className="relative">
         <button
@@ -263,7 +263,9 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
             />
 
             {/* Menu */}
-            <div className="absolute left-1/2 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50 transform -translate-x-1/2">
+            <div className="absolute left-1/2 top-full w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-[9999] transform -translate-x-1/2" style={{
+              marginTop: '0.5rem'
+            }}>
               <div className="py-1">
                 <button
                   onClick={handleRenameProject}
@@ -298,7 +300,9 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
           />
 
           {/* Dropdown */}
-          <div className="absolute left-1/2 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50 transform -translate-x-1/2 max-h-[calc(100vh-200px)] overflow-hidden">
+          <div className="absolute left-1/2 top-full w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-[9999] transform -translate-x-1/2 max-h-[calc(100vh-200px)] overflow-hidden" style={{
+            marginTop: '0.5rem'
+          }}>
             <div className="p-4">
               {/* Search */}
               <div className="relative mb-4">
@@ -330,11 +334,10 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
                       <button
                         key={proj.id}
                         onClick={() => handleProjectSelect(proj)}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100 ${
-                          proj.id === project?.id
+                        className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100 ${proj.id === project?.id
                             ? "bg-blue-50 text-blue-700 font-medium"
                             : "text-gray-700"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <span className="truncate">{proj.name}</span>
