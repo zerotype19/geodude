@@ -2918,7 +2918,7 @@ export async function handleApiRoutes(
                 WHERE ${whereConditions.join(' AND ')}
             `).bind(...params).first<any>();
 
-            // Get referrals with pagination
+            // Get referrals with pagination - simplified grouping to fix pagination
             const referrals = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
                     ie.content_id,
@@ -2936,7 +2936,7 @@ export async function handleApiRoutes(
                 JOIN properties p ON p.id = ca.property_id
                 LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                 WHERE ${whereConditions.join(' AND ')}
-                GROUP BY ie.content_id, COALESCE(ie.ai_source_id, 0), ca.url, COALESCE(ais.slug, 'unknown'), COALESCE(ais.name, 'Unknown AI Source'), ie.class
+                GROUP BY ie.content_id, ie.ai_source_id
                 ORDER BY ie.occurred_at DESC
                 LIMIT ? OFFSET ?
             `).bind(...params, pageSizeNum, offset).all<any>();
