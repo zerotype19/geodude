@@ -88,6 +88,7 @@ MAGIC_LINK_RPM_PER_IP = "10"
 MAGIC_LINK_RPD_PER_EMAIL = "50"
 INVITE_EXP_DAYS = "14"
 ADMIN_RPM_PER_IP = "30"
+ADMIN_TOKEN = "geodude-admin-2024"
 
 # Ingest limits (production defaults)
 INGEST_RATE_LIMIT_RPS = "10"

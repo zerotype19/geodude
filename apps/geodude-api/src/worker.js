@@ -3,6 +3,7 @@ import { EmailService } from './email-service.ts';
 import { addCorsHeaders } from './cors';
 import { handleApiRoutes } from './routes/api.ts';
 import { handleHealthRoutes } from './routes/health.ts';
+import { handleAdminRoutes } from './routes/admin.ts';
 import { getOrSetJSON, getProjectVersion, bumpProjectVersion } from './lib/cache.ts';
 import { ipRateLimit } from './lib/ratelimit.ts';
 import { MetricsManager } from './lib/metrics.ts';
@@ -1124,7 +1125,23 @@ export default {
         return addCorsHeaders(response, origin);
       }
 
-      // Try API routes from routes/api.ts first
+      // Try admin routes first (if path starts with /admin)
+      if (url.pathname.startsWith('/admin')) {
+        console.log('🔍 Worker: Attempting to handle admin routes for:', url.pathname);
+        try {
+          const adminResult = await handleAdminRoutes(request, env, url, origin);
+          if (adminResult) {
+            responseStatus = adminResult.status;
+            console.log('✅ Worker: Returning admin response');
+            return adminResult;
+          }
+        } catch (adminError) {
+          console.error('❌ Worker: handleAdminRoutes error:', adminError);
+          // Continue to fallback logic
+        }
+      }
+
+      // Try API routes from routes/api.ts next
       console.log('🔍 Worker: Attempting to handle API routes for:', url.pathname);
       let apiResult = null;
       try {
