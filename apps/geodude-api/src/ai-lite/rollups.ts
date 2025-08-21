@@ -1,10 +1,12 @@
 import { TrafficClass } from './classifier';
+import { BotCategory } from '../classifier/botCategoryMap';
 
 export interface RollupEntry {
   project_id: string;
   property_id: number;
   ts_hour: number;
   class: TrafficClass;
+  bot_category?: string | null;
   events_count: number;
   sampled_count: number;
 }
@@ -20,6 +22,7 @@ export function roundToHour(timestamp: Date): number {
 
 /**
  * Upsert rollup entry for a traffic class with proper instrumentation
+ * For crawler class, bot_category is included in the unique key
  */
 export async function upsertRollup(
   db: any,
@@ -27,32 +30,50 @@ export async function upsertRollup(
   propertyId: number,
   timestamp: Date,
   trafficClass: TrafficClass,
-  isSampled: boolean = false
+  isSampled: boolean = false,
+  botCategory?: string | null
 ): Promise<boolean> {
   const tsHour = roundToHour(timestamp);
 
-
-
   try {
-    // Use INSERT ... ON CONFLICT for proper upsert behavior
-    const result = await db.prepare(`
-      INSERT INTO traffic_rollup_hourly 
-      (project_id, property_id, ts_hour, class, events_count, sampled_count)
-      VALUES (?, ?, ?, ?, 1, ?)
-      ON CONFLICT(project_id, property_id, ts_hour, class) 
-      DO UPDATE SET 
-        events_count = events_count + 1,
-        sampled_count = sampled_count + ?
-    `).bind(
-      projectId, 
-      propertyId, 
-      tsHour, 
-      trafficClass, 
-      isSampled ? 1 : 0,
-      isSampled ? 1 : 0
-    ).run();
-
-
+    // For crawler class, include bot_category in the upsert
+    if (trafficClass === 'crawler' && botCategory) {
+      const result = await db.prepare(`
+        INSERT INTO traffic_rollup_hourly 
+        (project_id, property_id, ts_hour, class, bot_category, events_count, sampled_count)
+        VALUES (?, ?, ?, ?, ?, 1, ?)
+        ON CONFLICT(project_id, property_id, ts_hour, class, COALESCE(bot_category, '')) 
+        DO UPDATE SET 
+          events_count = events_count + 1,
+          sampled_count = sampled_count + ?
+      `).bind(
+        projectId, 
+        propertyId, 
+        tsHour, 
+        trafficClass,
+        botCategory,
+        isSampled ? 1 : 0,
+        isSampled ? 1 : 0
+      ).run();
+    } else {
+      // For non-crawler classes, bot_category is NULL
+      const result = await db.prepare(`
+        INSERT INTO traffic_rollup_hourly 
+        (project_id, property_id, ts_hour, class, bot_category, events_count, sampled_count)
+        VALUES (?, ?, ?, ?, NULL, 1, ?)
+        ON CONFLICT(project_id, property_id, ts_hour, class, COALESCE(bot_category, '')) 
+        DO UPDATE SET 
+          events_count = events_count + 1,
+          sampled_count = sampled_count + ?
+      `).bind(
+        projectId, 
+        propertyId, 
+        tsHour, 
+        trafficClass, 
+        isSampled ? 1 : 0,
+        isSampled ? 1 : 0
+      ).run();
+    }
 
     return true;
   } catch (error) {
@@ -75,12 +96,12 @@ export async function getRollupsInWindow(
 
   try {
     const result = await db.prepare(`
-      SELECT project_id, property_id, ts_hour, class, events_count, sampled_count
+      SELECT project_id, property_id, ts_hour, class, bot_category, events_count, sampled_count
       FROM traffic_rollup_hourly
       WHERE project_id = ?
         AND ts_hour >= ?
         AND ts_hour <= ?
-      ORDER BY ts_hour, class
+      ORDER BY ts_hour, class, bot_category
     `).bind(projectId, startHour, endHour).all();
 
     return result.results || [];
@@ -113,6 +134,44 @@ export async function getRollupTotals(
   }
 
   return totals;
+}
+
+/**
+ * Get crawler rollups grouped by bot category
+ */
+export async function getCrawlerRollupsByCategory(
+  db: any,
+  projectId: string,
+  startTime: Date,
+  endTime: Date
+): Promise<Record<string, number>> {
+  const startHour = roundToHour(startTime);
+  const endHour = roundToHour(endTime);
+
+  try {
+    const result = await db.prepare(`
+      SELECT bot_category, SUM(events_count) as total
+      FROM traffic_rollup_hourly
+      WHERE project_id = ?
+        AND ts_hour >= ?
+        AND ts_hour <= ?
+        AND class = 'crawler'
+        AND bot_category IS NOT NULL
+      GROUP BY bot_category
+      ORDER BY total DESC
+    `).bind(projectId, startHour, endHour).all();
+
+    const categories: Record<string, number> = {};
+
+    for (const row of result.results || []) {
+      categories[row.bot_category] = row.total;
+    }
+
+    return categories;
+  } catch (error) {
+    console.error('Failed to get crawler rollups by category:', error);
+    return {};
+  }
 }
 
 /**

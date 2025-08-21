@@ -1,5 +1,6 @@
 import type { TrafficClassification } from '../ai-lite/classifier';
 import { ensureAiSource } from './ai-sources';
+import { upsertRollup } from '../ai-lite/rollups';
 
 export interface EventInsertData {
   project_id: string;
@@ -18,38 +19,29 @@ export interface RollupData {
   timestamp: Date;
   trafficClass: string;
   isSampled: boolean;
+  botCategory?: string | null;
 }
 
 /**
- * Update rollup data for an event
+ * Update rollup data for an event using the new AI-Lite rollup system
  */
 export async function updateRollup(
   env: any,
   rollupData: RollupData
 ): Promise<boolean> {
   try {
-    const { project_id, property_id, timestamp, trafficClass, isSampled } = rollupData;
+    const { project_id, property_id, timestamp, trafficClass, isSampled, botCategory } = rollupData;
     
-    // Round timestamp to hour (UTC)
-    const tsHour = Math.floor(timestamp.getTime() / 1000 / 3600) * 3600;
-    
-    // Use INSERT ... ON CONFLICT for proper upsert behavior
-    await env.OPTIVIEW_DB.prepare(`
-      INSERT INTO traffic_rollup_hourly 
-      (project_id, property_id, ts_hour, class, events_count, sampled_count)
-      VALUES (?, ?, ?, ?, 1, ?)
-      ON CONFLICT(project_id, property_id, ts_hour, class) 
-      DO UPDATE SET 
-        events_count = events_count + 1,
-        sampled_count = sampled_count + ?
-    `).bind(
-      project_id, 
-      property_id, 
-      tsHour, 
-      trafficClass, 
-      isSampled ? 1 : 0,
-      isSampled ? 1 : 0
-    ).run();
+    // Use the new AI-Lite rollup system
+    await upsertRollup(
+      env.OPTIVIEW_DB,
+      project_id,
+      property_id,
+      timestamp,
+      trafficClass as any, // Cast to TrafficClass for now
+      isSampled,
+      botCategory
+    );
 
     return true;
   } catch (error) {
@@ -102,7 +94,7 @@ export async function processEventClassification(
 
   // Determine category based on classification class
   let category: 'crawler' | 'assistant' | 'unknown' = 'unknown';
-  if (classification.class === 'ai_agent_crawl') {
+  if (classification.class === 'ai_agent_crawl' || classification.class === 'crawler') {
     category = 'crawler';
   } else if (classification.class === 'human_via_ai') {
     category = 'assistant';
@@ -128,7 +120,7 @@ export function shouldInsertEvent(
   samplePct: number
 ): { shouldInsert: boolean; isSampled: boolean } {
   // AI traffic is always inserted
-  if (classification.class === 'ai_agent_crawl' || classification.class === 'human_via_ai') {
+  if (classification.class === 'ai_agent_crawl' || classification.class === 'human_via_ai' || classification.class === 'crawler') {
     return { shouldInsert: true, isSampled: false };
   }
 
@@ -148,5 +140,5 @@ export function shouldInsertEvent(
  */
 export function shouldAttachToSession(classification: TrafficClassification): boolean {
   // Crawlers never attach to sessions
-  return classification.class !== 'ai_agent_crawl';
+  return classification.class !== 'ai_agent_crawl' && classification.class !== 'crawler';
 }

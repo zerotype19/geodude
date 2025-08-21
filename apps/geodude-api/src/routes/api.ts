@@ -2587,16 +2587,38 @@ export async function handleApiRoutes(
                     // Get Cloudflare data for traffic classification
                     const cfData = (req as any).cf;
 
-                    // Classify traffic with hardened system
-                    classification = classifyTraffic(req, cfData, referrer, userAgent);
+                    // Classify traffic with AI Impact v2 system (classifier v3)
+                    const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
+                    
+                    // Get current host for self-referral detection
+                    const currentHost = req.headers.get('host') || '';
+                    
+                    // Extract UTM source if present
+                    const url = new URL(req.url);
+                    const utmSource = url.searchParams.get('utm_source');
+                    
+                    classification = classifyTrafficV3({
+                        cfVerifiedBotCategory: cfData?.verifiedBotCategory,
+                        referrerUrl: referrer,
+                        userAgent,
+                        currentHost,
+                        utmSource,
+                        manifest: STATIC_MANIFEST_V3
+                    });
 
-                    trafficClass = classification.class;
+                    // Map v3 class to v2 class for backward compatibility
+                    if (classification.class === 'crawler') {
+                        trafficClass = 'ai_agent_crawl';
+                    } else {
+                        trafficClass = classification.class;
+                    }
 
                     // Log classification results for debugging
-                    console.log('classification=', {
+                    console.log('classification v3=', {
                         class: classification.class,
                         aiSourceSlug: classification.aiSourceSlug,
-                        reason: classification.reason
+                        reason: classification.reason,
+                        botCategory: classification.evidence.botCategory
                     });
 
                     // Store classification result for session handling
@@ -2614,17 +2636,15 @@ export async function handleApiRoutes(
                     }
 
                     // Build audit metadata and merge with existing metadata
-                    const { buildAuditMeta } = await import('../ai-lite/classifier');
-                    const { getClassifierManifest } = await import('../ai-lite/classifier-manifest');
-
-                    const manifest = await getClassifierManifest(env);
-                    const auditMeta = buildAuditMeta({
+                    const { buildAuditMetaV3 } = await import('../ai-lite/classifier-v3');
+                    const auditMeta = buildAuditMetaV3({
                         referrerUrl: referrer,
                         classification,
                         ua: userAgent,
+                        cfVerifiedBotCategory: cfData?.verifiedBotCategory,
                         versions: {
-                            classifier: 'v2.0.0',
-                            manifest: manifest.manifest_version || 'static'
+                            classifier: 'v3.0.0',
+                            manifest: 'v3'
                         }
                     });
 
@@ -2651,7 +2671,12 @@ export async function handleApiRoutes(
                     }
 
                     // Determine if we should insert a row based on AI-Lite mode and classification
-                    const { shouldInsert, isSampled: shouldSample } = shouldInsertEvent(classification, isAILite, aiLiteConfig.samplePct);
+                    // Map v3 class to v2 class for shouldInsertEvent compatibility
+                    const v2Classification = {
+                        ...classification,
+                        class: trafficClass as any
+                    };
+                    const { shouldInsert, isSampled: shouldSample } = shouldInsertEvent(v2Classification, isAILite, aiLiteConfig.samplePct);
                     shouldInsertRow = shouldInsert;
                     isSampled = shouldSample;
 
@@ -2701,7 +2726,8 @@ export async function handleApiRoutes(
                         property_id,
                         timestamp: new Date(occurred_at || now),
                         trafficClass,
-                        isSampled
+                        isSampled,
+                        botCategory: classification.evidence.botCategory || null
                     });
                 } catch (rollupError) {
                     console.error('Error updating rollup:', rollupError);
