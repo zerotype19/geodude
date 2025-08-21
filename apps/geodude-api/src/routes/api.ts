@@ -1708,8 +1708,21 @@ export async function handleApiRoutes(
                         }
                     }
 
+                    // Debug Cloudflare data
+                    const cfData = (req as any).cf;
+                    console.log('🔍 Cloudflare data:', {
+                        hasCf: !!cfData,
+                        verifiedBotCategory: cfData?.verifiedBotCategory,
+                        userAgent: userAgent,
+                        fromHeader: req.headers.get('from'),
+                        cfKeys: cfData ? Object.keys(cfData) : [],
+                        requestKeys: Object.keys(req),
+                        cfDirect: (req as any).cf,
+                        cfType: typeof (req as any).cf
+                    });
+
                     // Classify traffic with Cloudflare data
-                    const classification = classifyTraffic(referrer, userAgent, req.headers, url, (req as any).cf);
+                    const classification = classifyTraffic(referrer, userAgent, req.headers, url, cfData);
                     trafficClass = classification.class;
 
                     // Determine if we should insert a row based on AI-Lite mode
