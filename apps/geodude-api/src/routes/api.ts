@@ -1711,6 +1711,287 @@ export async function handleApiRoutes(
          }
        }
 
+       // 6.3.6) Admin Classifier Manifest Management
+       if (url.pathname === "/admin/classifier/manifest" && req.method === "POST") {
+         try {
+           // Rate limiting: 5 rpm per IP
+           const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+           const rateLimitKey = `classifier_manifest:${clientIP}`;
+           const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+           
+           if (parseInt(currentCount) >= 5) {
+             const response = new Response(JSON.stringify({
+               error: "Rate limit exceeded",
+               message: "Maximum 5 requests per minute per IP",
+               retry_after: 60
+             }), {
+               status: 429,
+               headers: { "Content-Type": "application/json" }
+             });
+             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           }
+           
+           // Increment rate limit counter
+           await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+           
+           const body = await req.json();
+           
+           // Validate manifest structure (basic validation)
+           if (!body.version || !body.assistants || !body.search_engines || !body.crawlers) {
+             const response = new Response(JSON.stringify({
+               error: "Invalid manifest structure",
+               message: "Manifest must include version, assistants, search_engines, and crawlers"
+             }), {
+               status: 400,
+               headers: { "Content-Type": "application/json" }
+             });
+             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           }
+           
+           // Update KV with new manifest
+           const manifestVersion = `v${Date.now()}`;
+           const updatedManifest = { ...body, version: manifestVersion };
+           
+           await env.RULES.put('classifier_v2', JSON.stringify(updatedManifest));
+           
+           // Bump cache version
+           await env.CACHE.put('classifier_manifest_version', manifestVersion, { expirationTtl: 86400 });
+           
+           const response = new Response(JSON.stringify({
+             message: "Manifest updated successfully",
+             version: manifestVersion,
+             sections: {
+               assistants: Object.keys(body.assistants).length,
+               search_engines: Object.keys(body.search_engines).length,
+               crawlers: Object.keys(body.crawlers).length,
+               preview_bots: Object.keys(body.preview_bots || {}).length,
+               ua_patterns: Object.keys(body.ua_patterns || {}).length
+             },
+             timestamp: new Date().toISOString()
+           }), {
+             headers: { "Content-Type": "application/json" }
+           });
+           
+           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           
+         } catch (error) {
+           console.error("Classifier manifest update error:", error);
+           const response = new Response(JSON.stringify({
+             error: "Internal server error",
+             message: error.message
+           }), {
+             status: 500,
+             headers: { "Content-Type": "application/json" }
+           });
+           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+         }
+       }
+
+       // 6.3.7) Admin AI Backfill Reclassification
+       if (url.pathname === "/admin/ai-backfill/reclassify" && req.method === "GET") {
+         try {
+           // Rate limiting: 5 rpm per IP
+           const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+           const rateLimitKey = `ai_backfill:${clientIP}`;
+           const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+           
+           if (parseInt(currentCount) >= 5) {
+             const response = new Response(JSON.stringify({
+               error: "Rate limit exceeded",
+               message: "Maximum 5 requests per minute per IP",
+               retry_after: 60
+             }), {
+               status: 429,
+               headers: { "Content-Type": "application/json" }
+             });
+             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           }
+           
+           // Increment rate limit counter
+           await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+           
+           const urlObj = new URL(req.url);
+           const hours = parseInt(urlObj.searchParams.get("hours") || "72");
+           
+           // Get recent events for reclassification
+           const cutoffTime = new Date(Date.now() - (hours * 60 * 60 * 1000));
+           const events = await env.OPTIVIEW_DB.prepare(`
+             SELECT id, project_id, property_id, occurred_at, metadata
+             FROM interaction_events 
+             WHERE occurred_at > ? AND (class IS NULL OR class = 'unknown')
+             ORDER BY occurred_at DESC
+             LIMIT 1000
+           `).bind(cutoffTime.toISOString()).all();
+           
+           if (!events.results || events.results.length === 0) {
+             const response = new Response(JSON.stringify({
+               message: "No events found for reclassification",
+               hours,
+               events_count: 0
+             }), {
+               headers: { "Content-Type": "application/json" }
+             });
+             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           }
+           
+           // Reclassify events using Classifier v2
+           let processedCount = 0;
+           let errorCount = 0;
+           const { classifyTraffic } = await import('../ai-lite/classifier');
+           
+           for (const event of events.results) {
+             try {
+               const metadata = JSON.parse(event.metadata || '{}');
+               const referrer = metadata.referrer || metadata.referer || null;
+               const userAgent = metadata.user_agent || null;
+               
+               // Create mock request for classification
+               const mockReq = {
+                 headers: new Headers(),
+                 url: 'https://api.optiview.ai/api/events'
+               } as Request;
+               
+               const classification = classifyTraffic(mockReq, {}, referrer, userAgent);
+               
+               // Update event with new classification
+               await env.OPTIVIEW_DB.prepare(`
+                 UPDATE interaction_events 
+                 SET class = ?, 
+                     metadata = json_set(metadata, '$.classification_reason', ?, '$.classification_confidence', ?)
+                 WHERE id = ?
+               `).bind(
+                 classification.class,
+                 classification.reason,
+                 classification.confidence,
+                 event.id
+               ).run();
+               
+               processedCount++;
+             } catch (error) {
+               console.error(`Error reclassifying event ${event.id}:`, error);
+               errorCount++;
+             }
+           }
+           
+           // Bump cache version
+           await env.CACHE.put('classification_cache_version', String(Date.now()), { expirationTtl: 86400 });
+           
+           const response = new Response(JSON.stringify({
+             message: "Reclassification completed",
+             hours,
+             total_events: events.results.length,
+             processed_count: processedCount,
+             error_count: errorCount,
+             cache_version_bumped: true,
+             timestamp: new Date().toISOString()
+           }), {
+             headers: { "Content-Type": "application/json" }
+           });
+           
+           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           
+         } catch (error) {
+           console.error("AI backfill reclassification error:", error);
+           const response = new Response(JSON.stringify({
+             error: "Internal server error",
+             message: error.message
+           }), {
+             status: 500,
+             headers: { "Content-Type": "application/json" }
+           });
+           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+         }
+       }
+
+       // 6.3.8) Admin Debug Classify (for testing classification)
+       if (url.pathname === "/admin/debug/classify" && req.method === "GET") {
+         try {
+           // Rate limiting: 10 rpm per IP
+           const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+           const rateLimitKey = `debug_classify:${clientIP}`;
+           const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+           
+           if (parseInt(currentCount) >= 10) {
+             const response = new Response(JSON.stringify({
+               error: "Rate limit exceeded",
+               message: "Maximum 10 requests per minute per IP",
+               retry_after: 60
+             }), {
+               status: 429,
+               headers: { "Content-Type": "application/json" }
+             });
+             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           }
+           
+           // Increment rate limit counter
+           await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+           
+           // Get mock data from headers for testing
+           const mockReferrer = req.headers.get("x-mock-referrer");
+           const mockUserAgent = req.headers.get("user-agent") || "Mozilla/5.0 (Test) AppleWebKit/537.36";
+           
+           // Create mock request for classification
+           const mockReq = {
+             headers: new Headers(),
+             url: 'https://api.optiview.ai/api/events'
+           } as Request;
+           
+           // Add any AI client headers for testing
+           const aiClientHeader = req.headers.get("sec-ai-client") || req.headers.get("x-ai-client");
+           if (aiClientHeader) {
+             mockReq.headers.set("sec-ai-client", aiClientHeader);
+           }
+           
+           // Run classification
+           const { classifyTraffic } = await import('../ai-lite/classifier');
+           const classification = classifyTraffic(mockReq, {}, mockReferrer, mockUserAgent);
+           
+           // Get current manifest info
+           const { getClassifierManifest } = await import('../ai-lite/classifier-manifest');
+           const manifest = await getClassifierManifest(env);
+           
+           const response = new Response(JSON.stringify({
+             classification: {
+               class: classification.class,
+               aiSourceSlug: classification.aiSourceSlug,
+               aiSourceName: classification.aiSourceName,
+               reason: classification.reason,
+               confidence: classification.confidence,
+               evidence: classification.evidence
+             },
+             manifest_info: {
+               version: manifest.version,
+               sample_hosts: {
+                 assistants: Object.keys(manifest.assistants).slice(0, 3),
+                 search_engines: Object.keys(manifest.search_engines).slice(0, 3),
+                 crawlers: Object.keys(manifest.crawlers).slice(0, 3)
+               }
+             },
+             test_data: {
+               referrer: mockReferrer,
+               user_agent: mockUserAgent.substring(0, 80),
+               ai_client_header: aiClientHeader || null
+             },
+             timestamp: new Date().toISOString()
+           }), {
+             headers: { "Content-Type": "application/json" }
+           });
+           
+           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+           
+         } catch (error) {
+           console.error("Debug classify error:", error);
+           const response = new Response(JSON.stringify({
+             error: "Internal server error",
+             message: error.message
+           }), {
+             status: 500,
+             headers: { "Content-Type": "application/json" }
+           });
+           return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+         }
+       }
+
        // 6.3.5) Events Ingestion API (with cache invalidation)
     if (url.pathname === "/api/events" && req.method === "POST") {
 
