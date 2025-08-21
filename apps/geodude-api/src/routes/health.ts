@@ -732,12 +732,22 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
     // Calculate referrer visibility (placeholder - would need actual referrer data)
     const referrerVisibility = aiHumanClicks > 0 ? 95 : 0; // Placeholder
     
+    // Get events missing content_id in last 24h
+    const missingContentIdCount = await d1.prepare(`
+      SELECT COUNT(*) as missing_count
+      FROM interaction_events 
+      WHERE occurred_at >= ? AND content_id IS NULL
+    `).bind(last24h.toISOString()).first();
+    
+    const eventsMissingContentId = missingContentIdCount?.missing_count || 0;
+    
     return {
       last_24h: {
         ai_human_clicks: aiHumanClicks,
         crawler_hits: crawlerHits,
         search_vs_ai_split: `${aiPercentage}% AI-influenced`,
-        referrer_visibility: `${referrerVisibility}%`
+        referrer_visibility: `${referrerVisibility}%`,
+        events_missing_content_id: eventsMissingContentId
       },
       trends: {
         ai_human: aiHumanTrend,

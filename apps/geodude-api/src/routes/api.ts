@@ -1918,6 +1918,134 @@ export async function handleApiRoutes(
         }
     }
 
+    // 6.3.4.6) Admin Backfill Content IDs Endpoint
+    if (url.pathname === "/admin/backfill/content-id" && req.method === "POST") {
+        try {
+            // Rate limiting: 5 rpm per IP
+            const clientIP = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+            const rateLimitKey = `backfill_content_id:${clientIP}`;
+            const currentCount = await env.CACHE.get(rateLimitKey) || "0";
+
+            if (parseInt(currentCount) >= 5) {
+                const response = new Response(JSON.stringify({
+                    error: "Rate limit exceeded",
+                    message: "Maximum 5 requests per minute per IP",
+                    retry_after: 60
+                }), {
+                    status: 429,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Increment rate limit counter
+            await env.CACHE.put(rateLimitKey, String(parseInt(currentCount) + 1), { expirationTtl: 60 });
+
+            const body = await req.json();
+            const { project_id, hours_back = 72 } = body;
+
+            if (!project_id) {
+                const response = new Response(JSON.stringify({
+                    error: "Missing project_id parameter"
+                }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get events that need content_id backfill
+            const cutoffTime = new Date(Date.now() - (hours_back * 60 * 60 * 1000));
+            const events = await env.OPTIVIEW_DB.prepare(`
+                SELECT id, project_id, property_id, metadata, occurred_at
+                FROM interaction_events 
+                WHERE project_id = ? AND occurred_at > ? AND content_id IS NULL
+                ORDER BY occurred_at DESC
+                LIMIT 1000
+            `).bind(project_id, cutoffTime.toISOString()).all();
+
+            if (!events.results || events.results.length === 0) {
+                const response = new Response(JSON.stringify({
+                    message: "No events found for content_id backfill",
+                    project_id,
+                    hours_back,
+                    events_count: 0
+                }), {
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Process each event for content_id backfill
+            let processedCount = 0;
+            let errorCount = 0;
+            let fixedCount = 0;
+
+            const { ensureContentAsset } = await import('../lib/content-asset-manager');
+
+            for (const event of events.results) {
+                try {
+                    // Extract URL from metadata
+                    const metadata = JSON.parse(event.metadata || '{}');
+                    const url = metadata.url || metadata.referrer || null;
+
+                    if (url) {
+                        // Ensure content asset exists
+                        const contentId = await ensureContentAsset(
+                            env.OPTIVIEW_DB, 
+                            event.project_id, 
+                            event.property_id, 
+                            url
+                        );
+
+                        if (contentId) {
+                            // Update the event with content_id
+                            await env.OPTIVIEW_DB.prepare(`
+                                UPDATE interaction_events 
+                                SET content_id = ? 
+                                WHERE id = ?
+                            `).bind(contentId, event.id).run();
+
+                            fixedCount++;
+                            console.log(`✅ Fixed content_id for event ${event.id}: ${contentId} (${url})`);
+                        }
+                    }
+
+                    processedCount++;
+                } catch (error) {
+                    console.error(`Error backfilling content_id for event ${event.id}:`, error);
+                    errorCount++;
+                }
+            }
+
+            const response = new Response(JSON.stringify({
+                message: "Content ID backfill completed",
+                project_id,
+                hours_back,
+                total_events: events.results.length,
+                processed_count: processedCount,
+                fixed_count: fixedCount,
+                error_count: errorCount,
+                timestamp: new Date().toISOString()
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("Backfill content_id error:", error);
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: error.message
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
     // 6.3.6) Admin Classifier Manifest Management
     if (url.pathname === "/admin/classifier/manifest" && req.method === "POST") {
         try {
@@ -2426,28 +2554,13 @@ export async function handleApiRoutes(
                 let contentId = null;
                 if (metadata?.url) {
                     try {
-                        // First try to find existing content
-                        let contentResult = await env.OPTIVIEW_DB.prepare(`
-                            SELECT id FROM content_assets WHERE url = ? AND project_id = ? LIMIT 1
-                        `).bind(metadata.url, project_id).first();
-
-                        if (contentResult?.id) {
-                            contentId = contentResult.id;
+                        const { ensureContentAsset } = await import('../lib/content-asset-manager');
+                        contentId = await ensureContentAsset(env.OPTIVIEW_DB, project_id, property_id, metadata.url);
+                        
+                        if (contentId) {
+                            console.log(`🔗 Linked event to content asset: ${contentId} (${metadata.url})`);
                         } else {
-                            // Create new content asset if it doesn't exist
-                            const newContentResult = await env.OPTIVIEW_DB.prepare(`
-                                INSERT INTO content_assets (project_id, property_id, url, type, created_at)
-                                VALUES (?, ?, ?, ?, ?)
-                            `).bind(
-                                project_id,
-                                property_id,
-                                metadata.url,
-                                'page',
-                                now
-                            ).run();
-
-                            // Get the newly created content ID
-                            contentId = newContentResult.meta?.last_row_id || null;
+                            console.warn(`⚠️ Failed to create/link content asset for: ${metadata.url}`);
                         }
                     } catch (e) {
                         console.error('Error handling content asset:', e);
@@ -2493,6 +2606,43 @@ export async function handleApiRoutes(
                             classification.aiSourceName || classification.aiSourceSlug,
                             category
                         );
+                    }
+
+                    // Build audit metadata and merge with existing metadata
+                    const { buildAuditMeta } = await import('../ai-lite/classifier');
+                    const { getClassifierManifest } = await import('../ai-lite/classifier-manifest');
+
+                    const manifest = await getClassifierManifest(env);
+                    const auditMeta = buildAuditMeta({
+                        referrerUrl: referrer,
+                        classification,
+                        ua: userAgent,
+                        versions: {
+                            classifier: 'v2.0.0',
+                            manifest: manifest.manifest_version || 'static'
+                        }
+                    });
+
+                    // Merge audit fields with existing metadata (preserve legacy keys)
+                    const enrichedMetadata = {
+                        ...metadata,
+                        ...auditMeta
+                    };
+
+                    // Truncate metadata if it exceeds 2KB limit
+                    const metadataJson = JSON.stringify(enrichedMetadata);
+                    if (metadataJson.length > 2048) {
+                        console.warn('Metadata exceeds 2KB limit, truncating...');
+                        // Keep essential fields and truncate others
+                        const essential = {
+                            url: enrichedMetadata.url,
+                            title: enrichedMetadata.title,
+                            referrer: enrichedMetadata.referrer,
+                            user_agent: enrichedMetadata.user_agent,
+                            ...auditMeta // Always keep audit fields
+                        };
+                        enrichedMetadata.other = 'Metadata truncated due to size limit';
+                        enrichedMetadata.truncated_at = new Date().toISOString();
                     }
 
                     // Determine if we should insert a row based on AI-Lite mode and classification
@@ -2571,7 +2721,7 @@ export async function handleApiRoutes(
                         contentId,
                         aiSourceId, // Now includes AI source ID when available
                         normalizedEventType,
-                        JSON.stringify(metadata || {}),
+                        JSON.stringify(enrichedMetadata || {}),
                         occurred_at || now,
                         isSampled ? 1 : 0, // Add sampled flag
                         classification.class // Add traffic classification

@@ -416,3 +416,38 @@ function mapSearchReferrer(host: string, referrerUrl: string | null): { slug: st
   
   return { slug: 'search_engine', name: 'Search Engine', isAI: false };
 }
+
+/**
+ * Build normalized audit metadata for events
+ * This ensures consistent audit fields are stored with every event
+ */
+export function buildAuditMeta(input: {
+  referrerUrl?: string | null;
+  classification: ReturnType<typeof classifyTraffic>;
+  ua?: string | null;
+  versions: { classifier: string; manifest: string };
+}) {
+  const u = input.referrerUrl ? safeParseUrl(input.referrerUrl) : null;
+  return {
+    referrer_url: input.referrerUrl ?? null,
+    referrer_host: u?.host ?? null,
+    referrer_path: u?.pathname ?? null,
+    classification_reason: input.classification.reason,
+    confidence: input.classification.confidence ?? null,
+    ai_source_slug: input.classification.aiSourceSlug ?? null,
+    ai_source_name: input.classification.aiSourceName ?? null,
+    classifier_version: input.versions.classifier,
+    kv_manifest_version: input.versions.manifest,
+  };
+}
+
+/**
+ * Safely parse URL without throwing
+ */
+function safeParseUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
