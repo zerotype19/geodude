@@ -3,7 +3,7 @@ import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE, FETCH_OPTS } from '../config';
 import Shell from '../components/Shell';
-import { Info } from 'lucide-react';
+import { Info, ChevronDown, ChevronRight, ExternalLink, Plus, Search, Filter } from 'lucide-react';
 
 interface ContentAsset {
   id: number;
@@ -28,17 +28,19 @@ interface ContentDetail {
     source_name?: string;
     path: string;
     debug?: string[];
+    classification_reason?: string;
+    classification_confidence?: number;
   }>;
 }
 
 // Traffic classification helper functions
 function getTrafficClassColor(className: string): string {
   switch (className) {
-    case "ai_agent_crawl": return "bg-orange-100 text-orange-800";
-    case "human_via_ai": return "bg-blue-100 text-blue-800";
-    case "search": return "bg-green-100 text-green-800";
-    case "direct_human": return "bg-gray-100 text-gray-800";
-    default: return "bg-gray-100 text-gray-800";
+    case "ai_agent_crawl": return "bg-orange-100 text-orange-800 border-orange-200";
+    case "human_via_ai": return "bg-blue-100 text-blue-800 border-blue-200";
+    case "search": return "bg-green-100 text-green-800 border-green-200";
+    case "direct_human": return "bg-gray-100 text-gray-800 border-gray-200";
+    default: return "bg-gray-100 text-gray-800 border-gray-200";
   }
 }
 
@@ -64,10 +66,23 @@ function getTrafficClassDescription(className: string): string {
   }
 }
 
+// Content grouping and collapsing logic
+interface GroupedContent {
+  key: string;
+  title: string;
+  count: number;
+  assets: ContentAsset[];
+  isExpanded: boolean;
+  totalEvents: number;
+  totalAIReferrals: number;
+  topSources: Array<{ slug: string; events: number }>;
+}
+
 const Content: React.FC = () => {
   const { user, project } = useAuth();
   const [assets, setAssets] = useState<ContentAsset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState({
     window: '24h',
@@ -75,7 +90,8 @@ const Content: React.FC = () => {
     type: '',
     aiOnly: false,
     page: 1,
-    pageSize: 50
+    pageSize: 50,
+    groupBy: 'domain' // 'domain', 'type', 'none'
   });
   const [total, setTotal] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -83,8 +99,6 @@ const Content: React.FC = () => {
   const [assetDetails, setAssetDetails] = useState<Record<number, ContentDetail>>({});
   const [addingAsset, setAddingAsset] = useState(false);
   const [addError, setAddError] = useState('');
-
-
 
   // Load window preference from localStorage
   useEffect(() => {
@@ -157,6 +171,16 @@ const Content: React.FC = () => {
     }
   };
 
+  const toggleGroupExpansion = (groupKey: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupKey)) {
+      newExpanded.delete(groupKey);
+    } else {
+      newExpanded.add(groupKey);
+    }
+    setExpandedGroups(newExpanded);
+  };
+
   const toggleRowExpansion = (assetId: number) => {
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(assetId)) {
@@ -166,6 +190,109 @@ const Content: React.FC = () => {
       loadAssetDetail(assetId);
     }
     setExpandedRows(newExpanded);
+  };
+
+  // Group content assets to reduce row count
+  const getGroupedContent = (): GroupedContent[] => {
+    if (filters.groupBy === 'none') {
+      return assets.map(asset => ({
+        key: `asset_${asset.id}`,
+        title: asset.url,
+        count: 1,
+        assets: [asset],
+        isExpanded: expandedGroups.has(`asset_${asset.id}`),
+        totalEvents: asset.events_24h,
+        totalAIReferrals: asset.ai_referrals_24h,
+        topSources: asset.by_source_24h.slice(0, 3)
+      }));
+    }
+
+    if (filters.groupBy === 'domain') {
+      const groups: Record<string, GroupedContent> = {};
+      
+      assets.forEach(asset => {
+        const domain = new URL(asset.url).hostname;
+        const path = new URL(asset.url).pathname;
+        
+        if (!groups[domain]) {
+          groups[domain] = {
+            key: `domain_${domain}`,
+            title: domain,
+            count: 0,
+            assets: [],
+            isExpanded: expandedGroups.has(`domain_${domain}`),
+            totalEvents: 0,
+            totalAIReferrals: 0,
+            topSources: []
+          };
+        }
+        
+        groups[domain].count++;
+        groups[domain].assets.push(asset);
+        groups[domain].totalEvents += asset.events_24h;
+        groups[domain].totalAIReferrals += asset.ai_referrals_24h;
+      });
+
+      // Aggregate top sources across all assets in the group
+      Object.values(groups).forEach(group => {
+        const sourceMap: Record<string, number> = {};
+        group.assets.forEach(asset => {
+          asset.by_source_24h.forEach(source => {
+            sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
+          });
+        });
+        
+        group.topSources = Object.entries(sourceMap)
+          .map(([slug, events]) => ({ slug, events }))
+          .sort((a, b) => b.events - a.events)
+          .slice(0, 3);
+      });
+
+      return Object.values(groups).sort((a, b) => b.totalEvents - a.totalEvents);
+    }
+
+    if (filters.groupBy === 'type') {
+      const groups: Record<string, GroupedContent> = {};
+      
+      assets.forEach(asset => {
+        if (!groups[asset.type]) {
+          groups[asset.type] = {
+            key: `type_${asset.type}`,
+            title: `${asset.type.charAt(0).toUpperCase() + asset.type.slice(1)}s`,
+            count: 0,
+            assets: [],
+            isExpanded: expandedGroups.has(`type_${asset.type}`),
+            totalEvents: 0,
+            totalAIReferrals: 0,
+            topSources: []
+          };
+        }
+        
+        groups[asset.type].count++;
+        groups[asset.type].assets.push(asset);
+        groups[asset.type].totalEvents += asset.events_24h;
+        groups[asset.type].totalAIReferrals += asset.ai_referrals_24h;
+      });
+
+      // Aggregate top sources
+      Object.values(groups).forEach(group => {
+        const sourceMap: Record<string, number> = {};
+        group.assets.forEach(asset => {
+          asset.by_source_24h.forEach(source => {
+            sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
+          });
+        });
+        
+        group.topSources = Object.entries(sourceMap)
+          .map(([slug, events]) => ({ slug, events }))
+          .sort((a, b) => b.events - a.events)
+          .slice(0, 3);
+      });
+
+      return Object.values(groups).sort((a, b) => b.totalEvents - a.totalEvents);
+    }
+
+    return [];
   };
 
   const handleAddAsset = async () => {
@@ -200,279 +327,345 @@ const Content: React.FC = () => {
         loadAssets(); // Refresh the list
       } else {
         const errorData = await response.json();
-        setAddError(errorData.error || 'Failed to add content asset');
+        setAddError(errorData.message || 'Failed to add content asset');
       }
     } catch (error) {
-      console.error('Error creating asset:', error);
-      setAddError('Network error - please try again');
+      setAddError('Network error occurred');
     } finally {
       setAddingAsset(false);
     }
   };
 
-  const getCoverageBadge = (score: number) => {
-    if (score < 34) return { label: 'Low', color: 'bg-red-100 text-red-800' };
-    if (score < 67) return { label: 'Med', color: 'bg-yellow-100 text-yellow-800' };
-    return { label: 'High', color: 'bg-green-100 text-green-800' };
-  };
-
-  const truncateUrl = (url: string) => {
-    if (url.length <= 50) return url;
-    return url.substring(0, 25) + '...' + url.substring(url.length - 20);
-  };
-
-  if (!project?.id) {
-    return (
-      <div className="p-6">
-        <Card title="Content Assets">
-          <div className="p-6 text-center text-gray-500">
-            Please select a project to view content assets.
-          </div>
-        </Card>
-      </div>
-    );
-  }
+  const groupedContent = getGroupedContent();
 
   return (
     <Shell>
-      <div className="p-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Content Assets</h1>
-            <p className="text-gray-600">Track AI visibility and engagement across your content</p>
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Content Assets</h1>
+              <p className="mt-2 text-gray-600">
+                Track performance and AI traffic across all your content
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              {/* Hardened AI Detection System Badge */}
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200">
+                <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                Hardened AI Detection System
+              </div>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Content
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Add Content
-          </button>
         </div>
 
         {/* Filters */}
-        <Card title="Filters">
-          <div className="p-6 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                <input
-                  type="text"
-                  placeholder="Search URLs..."
-                  value={filters.q}
-                  onChange={(e) => setFilters(prev => ({ ...prev, q: e.target.value, page: 1 }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select
-                  value={filters.type}
-                  onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value, page: 1 }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">All Types</option>
-                  <option value="page">Page</option>
-                  <option value="article">Article</option>
-                  <option value="product">Product</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
+        <Card className="mb-6">
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+              {/* Window Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Time Window</label>
                 <select
                   value={filters.window}
                   onChange={(e) => setFilters(prev => ({ ...prev, window: e.target.value, page: 1 }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="15m">Last 15 minutes</option>
                   <option value="24h">Last 24 hours</option>
                   <option value="7d">Last 7 days</option>
                 </select>
               </div>
+
+              {/* Group By Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Group By</label>
+                <select
+                  value={filters.groupBy}
+                  onChange={(e) => setFilters(prev => ({ ...prev, groupBy: e.target.value, page: 1 }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="domain">By Domain</option>
+                  <option value="type">By Type</option>
+                  <option value="none">No Grouping</option>
+                </select>
+              </div>
+
+              {/* Type Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Content Type</label>
+                <select
+                  value={filters.type}
+                  onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value, page: 1 }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">All Types</option>
+                  <option value="page">Pages</option>
+                  <option value="article">Articles</option>
+                  <option value="product">Products</option>
+                </select>
+              </div>
+
+              {/* AI Only Filter */}
               <div className="flex items-end">
                 <label className="flex items-center">
                   <input
                     type="checkbox"
                     checked={filters.aiOnly}
                     onChange={(e) => setFilters(prev => ({ ...prev, aiOnly: e.target.checked, page: 1 }))}
-                    className="mr-2"
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <span className="text-sm text-gray-700">AI activity only</span>
+                  <span className="ml-2 text-sm text-gray-700">AI Traffic Only</span>
                 </label>
+              </div>
+
+              {/* Search */}
+              <div className="lg:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search URLs</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search content URLs..."
+                    value={filters.q}
+                    onChange={(e) => setFilters(prev => ({ ...prev, q: e.target.value, page: 1 }))}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </Card>
 
         {/* Content Table */}
-        <Card title={`Content Assets (${total} total)`}>
-          <div className="overflow-x-auto">
+        <Card>
+          <div className="overflow-hidden">
             {loading ? (
-              <div className="p-6 text-center text-gray-500">Loading...</div>
-            ) : assets.length === 0 ? (
-              <div className="p-6 text-center">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <div className="flex items-center justify-center mb-4">
-                    <svg className="h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-blue-800 mb-2">No manual content assets yet</h3>
-                  <p className="text-blue-700 mb-4">
-                    You can manually add content URLs to track, or view existing AI activity in Referrals.
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <button
-                      onClick={() => setShowAddModal(true)}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Add Content
-                    </button>
-                    <a
-                      href="/referrals"
-                      className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      View AI Activity
-                    </a>
-                  </div>
-                </div>
+              <div className="p-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-gray-600">Loading content assets...</p>
+              </div>
+            ) : groupedContent.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-gray-600">No content assets found matching your criteria.</p>
               </div>
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">15m</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">24h</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Referrals</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Content
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Traffic (24h)
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      AI Referrals
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Top Sources
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Last Activity
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {assets.map((asset) => {
-                    const coverageBadge = getCoverageBadge(asset.coverage_score);
-                    const isExpanded = expandedRows.has(asset.id);
-
-                    return (
-                      <React.Fragment key={asset.id}>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium text-gray-900" title={asset.url}>
-                                {truncateUrl(asset.url)}
-                              </span>
-                              <button
-                                onClick={() => navigator.clipboard.writeText(asset.url)}
-                                className="text-gray-400 hover:text-gray-600"
-                                title="Copy URL"
-                              >
-                                📋
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
-                            {asset.type}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {asset.last_seen ? new Date(asset.last_seen).toLocaleString() : 'Never'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {asset.events_15m}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {asset.events_24h}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {asset.ai_referrals_24h}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${coverageBadge.color}`}>
-                              {coverageBadge.label} ({asset.coverage_score})
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  {groupedContent.map((group) => (
+                    <React.Fragment key={group.key}>
+                      {/* Group Row */}
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
                             <button
-                              onClick={() => toggleRowExpansion(asset.id)}
-                              className="text-blue-600 hover:text-blue-900"
+                              onClick={() => toggleGroupExpansion(group.key)}
+                              className="mr-2 text-gray-400 hover:text-gray-600"
                             >
-                              {isExpanded ? 'Hide' : 'View'} Details
+                              {group.isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
                             </button>
-                          </td>
-                        </tr>
-
-                        {/* Expanded Row */}
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan={8} className="px-6 py-4 bg-gray-50">
-                              <div className="space-y-4">
-                                {/* By Source Breakdown */}
-                                <div>
-                                  <h4 className="font-medium text-gray-900 mb-2">By Source (24h)</h4>
-                                  <div className="flex flex-wrap gap-2">
-                                    {asset.by_source_24h.length > 0 ? (
-                                      asset.by_source_24h.map((source) => (
-                                        <span
-                                          key={source.slug}
-                                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                                        >
-                                          {source.slug}: {source.events}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className="text-gray-500">No AI source activity</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Recent Events */}
-                                {assetDetails[asset.id] && (
-                                  <div>
-                                    <h4 className="font-medium text-gray-900 mb-2">Recent Events</h4>
-                                    <div className="space-y-2">
-                                      {assetDetails[asset.id].recent_events.length > 0 ? (
-                                        assetDetails[asset.id].recent_events.map((event, idx) => (
-                                          <div key={idx} className="flex items-center space-x-4 text-sm text-gray-600">
-                                            <span>{new Date(event.occurred_at).toLocaleString()}</span>
-                                            <span className="capitalize">{event.event_type}</span>
-                                                                                         <div className="flex items-center gap-2">
-                                               <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(event.event_class)}`}>
-                                                 {getTrafficClassLabel(event.event_class)}
-                                               </span>
-                                               {event.event_class !== 'unknown' && (
-                                                 <div className="relative group">
-                                                   <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                                                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                                                     {getTrafficClassDescription(event.event_class)}
-                                                     {event.debug && event.debug.length > 0 && (
-                                                       <div className="mt-1 pt-1 border-t border-gray-700">
-                                                         <strong>Debug:</strong> {event.debug.join(', ')}
-                                                       </div>
-                                                     )}
-                                                   </div>
-                                                 </div>
-                                               )}
-                                             </div>
-                                            <span>via {event.source_name || 'unknown'}</span>
-                                            {event.path && <span>at {event.path}</span>}
-                                          </div>
-                                        ))
-                                      ) : (
-                                        <span className="text-gray-500">No recent events</span>
-                                      )}
-                                    </div>
-                                  </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {group.title}
+                                {group.count > 1 && (
+                                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    {group.count} items
+                                  </span>
                                 )}
                               </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
+                              {group.count === 1 && (
+                                <div className="text-sm text-gray-500 truncate max-w-md">
+                                  {group.assets[0].url}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {group.totalEvents.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {group.totalAIReferrals.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1">
+                            {group.topSources.length > 0 ? (
+                              group.topSources.map((source) => (
+                                <span
+                                  key={source.slug}
+                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                >
+                                  {source.slug}: {source.events}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-gray-500 text-sm">No AI sources</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {group.assets[0].last_seen ? (
+                            new Date(group.assets[0].last_seen).toLocaleDateString()
+                          ) : (
+                            'Never'
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium">
+                          <button
+                            onClick={() => toggleGroupExpansion(group.key)}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            {group.isExpanded ? 'Hide' : 'View'} Details
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* Expanded Group Content */}
+                      {group.isExpanded && (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                            <div className="space-y-4">
+                              {/* Individual Assets */}
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-3">Content Items</h4>
+                                <div className="grid gap-4">
+                                  {group.assets.map((asset) => (
+                                    <div key={asset.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex-1">
+                                          <div className="flex items-center space-x-2">
+                                            <span className="text-sm font-medium text-gray-900">
+                                              {asset.type.charAt(0).toUpperCase() + asset.type.slice(1)}
+                                            </span>
+                                            <a
+                                              href={asset.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-blue-600 hover:text-blue-900 text-sm flex items-center"
+                                            >
+                                              {asset.url}
+                                              <ExternalLink className="h-3 w-3 ml-1" />
+                                            </a>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                                          <span>15m: {asset.events_15m}</span>
+                                          <span>24h: {asset.events_24h}</span>
+                                          <span>AI: {asset.ai_referrals_24h}</span>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* AI Sources Breakdown */}
+                                      {asset.by_source_24h.length > 0 && (
+                                        <div className="mb-3">
+                                          <h5 className="text-xs font-medium text-gray-700 mb-2">AI Sources (24h)</h5>
+                                          <div className="flex flex-wrap gap-2">
+                                            {asset.by_source_24h.map((source) => (
+                                              <span
+                                                key={source.slug}
+                                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                              >
+                                                {source.slug}: {source.events}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Recent Events (if loaded) */}
+                                      {assetDetails[asset.id] && (
+                                        <div>
+                                          <h5 className="text-xs font-medium text-gray-700 mb-2">Recent Events</h5>
+                                          <div className="space-y-2">
+                                            {assetDetails[asset.id].recent_events.slice(0, 5).map((event, idx) => (
+                                              <div key={idx} className="flex items-center space-x-3 text-xs text-gray-600">
+                                                <span>{new Date(event.occurred_at).toLocaleString()}</span>
+                                                <span className="capitalize">{event.event_type}</span>
+                                                <div className="flex items-center gap-2">
+                                                  <span className={`px-2 py-1 rounded-full ${getTrafficClassColor(event.event_class)}`}>
+                                                    {getTrafficClassLabel(event.event_class)}
+                                                  </span>
+                                                  {event.event_class !== 'unknown' && (
+                                                    <div className="relative group">
+                                                      <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                                                        {getTrafficClassDescription(event.event_class)}
+                                                        {event.classification_reason && (
+                                                          <div className="mt-1 pt-1 border-t border-gray-700">
+                                                            <strong>Reason:</strong> {event.classification_reason}
+                                                          </div>
+                                                        )}
+                                                        {event.classification_confidence && (
+                                                          <div className="mt-1 pt-1 border-t border-gray-700">
+                                                            <strong>Confidence:</strong> {(event.classification_confidence * 100).toFixed(0)}%
+                                                          </div>
+                                                        )}
+                                                        {event.debug && event.debug.length > 0 && (
+                                                          <div className="mt-1 pt-1 border-t border-gray-700">
+                                                            <strong>Debug:</strong> {event.debug.join(', ')}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                                <span>via {event.source_name || 'unknown'}</span>
+                                                {event.path && <span>at {event.path}</span>}
+                                              </div>
+                                            ))}
+                                          </div>
+                                          <button
+                                            onClick={() => loadAssetDetail(asset.id)}
+                                            className="mt-2 text-xs text-blue-600 hover:text-blue-900"
+                                          >
+                                            Load more events...
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
                 </tbody>
               </table>
             )}
@@ -506,70 +699,54 @@ const Content: React.FC = () => {
           )}
         </Card>
 
-        {/* Add Asset Modal */}
+        {/* Add Content Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Content Asset</h3>
-
-              {addError && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
-                  <p className="text-sm text-red-700">{addError}</p>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
-                  <input
-                    type="url"
-                    placeholder="https://example.com/page"
-                    value={newAsset.url}
-                    onChange={(e) => setNewAsset(prev => ({ ...prev, url: e.target.value }))}
-                    disabled={addingAsset}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                  <select
-                    value={newAsset.type}
-                    onChange={(e) => setNewAsset(prev => ({ ...prev, type: e.target.value }))}
-                    disabled={addingAsset}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                  >
-                    <option value="page">Page</option>
-                    <option value="article">Article</option>
-                    <option value="product">Product</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setAddError('');
-                    setNewAsset({ url: '', type: 'page' });
-                  }}
-                  disabled={addingAsset}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddAsset}
-                  disabled={!newAsset.url.trim() || addingAsset}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
-                >
-                  {addingAsset && (
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+              <div className="mt-3">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Add Content Asset</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                    <input
+                      type="url"
+                      value={newAsset.url}
+                      onChange={(e) => setNewAsset(prev => ({ ...prev, url: e.target.value }))}
+                      placeholder="https://example.com/page"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      value={newAsset.type}
+                      onChange={(e) => setNewAsset(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="page">Page</option>
+                      <option value="article">Article</option>
+                      <option value="product">Product</option>
+                    </select>
+                  </div>
+                  {addError && (
+                    <div className="text-red-600 text-sm">{addError}</div>
                   )}
-                  {addingAsset ? 'Adding...' : 'Add Asset'}
-                </button>
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={() => setShowAddModal(false)}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAddAsset}
+                      disabled={addingAsset || !newAsset.url.trim()}
+                      className="flex-1 px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {addingAsset ? 'Adding...' : 'Add Asset'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
