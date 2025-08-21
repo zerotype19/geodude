@@ -2824,8 +2824,8 @@ export async function handleApiRoutes(
                         name: row.name,
                         count: row.count
                     })),
-                    by_class: (byClass.results || []).map(row => ({
-                        class: row.class,
+                    by_type: (byClass.results || []).map(row => ({
+                        ref_type: row.class,
                         count: row.count
                     }))
                 };
@@ -2941,28 +2941,27 @@ export async function handleApiRoutes(
                 LIMIT ? OFFSET ?
             `).bind(...params, pageSizeNum, offset).all<any>();
 
-            // Calculate 15m referrals for each item
-            const referralsWith15m = await Promise.all(
-                (referrals.results || []).map(async (referral) => {
-                    const recent15m = await env.OPTIVIEW_DB.prepare(`
-                        SELECT COUNT(*) as count
-                        FROM interaction_events ie
-                        JOIN content_assets ca ON ca.id = ie.content_id
-                        JOIN properties p ON p.id = ca.property_id
-                        WHERE p.project_id = ? 
-                          AND ie.content_id = ?
-                          AND ie.ai_source_id = ?
-                          AND ie.occurred_at >= datetime('now', '-15 minutes')
-                          AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                    `).bind(project_id, referral.content_id, referral.ai_source_id).first<any>();
+                            // Calculate 15m referrals for each item
+                const referralsWith15m = await Promise.all(
+                    (referrals.results || []).map(async (referral) => {
+                        const recent15m = await env.OPTIVIEW_DB.prepare(`
+                            SELECT COUNT(*) as count
+                            FROM interaction_events ie
+                            JOIN content_assets ca ON ca.id = ie.content_id
+                            JOIN properties p ON p.id = ca.property_id
+                            WHERE p.project_id = ? 
+                              AND ie.content_id = ?
+                              AND ie.occurred_at >= datetime('now', '-15 minutes')
+                              AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                        `).bind(project_id, referral.content_id).first<any>();
 
-                    return {
-                        ...referral,
-                        referrals_15m: recent15m?.count || 0,
-                        share_of_ai: 0.5 // Default value for now
-                    };
-                })
-            );
+                        return {
+                            ...referral,
+                            referrals_15m: recent15m?.count || 0,
+                            share_of_ai: 0.5 // Default value for now
+                        };
+                    })
+                );
 
             const response = new Response(JSON.stringify({
                 items: referralsWith15m,
