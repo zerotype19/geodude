@@ -48,8 +48,7 @@ export async function qProjectsCreated5m(db: D1Database, orgId: string) {
     SELECT COUNT(*) AS c
     FROM project
     WHERE org_id = ?
-      AND COALESCE(created_at, datetime(created_ts/1000, 'unixepoch'))
-          >= datetime('now','-5 minutes')
+      AND datetime(created_ts/1000, 'unixepoch') >= datetime('now','-5 minutes')
   `;
   const r = await db.prepare(sql).bind(orgId).first<{ c: number }>();
   return r?.c || 0;
