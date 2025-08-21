@@ -80,12 +80,13 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         }
       };
 
-      return new Response(JSON.stringify(payload), {
+      const response = new Response(JSON.stringify(payload), {
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "no-store, no-cache, must-revalidate",
         },
       });
+      return addCorsHeaders(response, origin);
     } catch (error) {
       console.error("Admin health error:", error);
       const response = new Response(JSON.stringify({
