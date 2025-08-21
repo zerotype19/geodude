@@ -2936,7 +2936,7 @@ export async function handleApiRoutes(
                 JOIN properties p ON p.id = ca.property_id
                 LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                 WHERE ${whereConditions.join(' AND ')}
-                GROUP BY ie.content_id, ie.ai_source_id, ca.url, ais.slug, ais.name, ie.class
+                GROUP BY ie.content_id, COALESCE(ie.ai_source_id, 0), ca.url, COALESCE(ais.slug, 'unknown'), COALESCE(ais.name, 'Unknown AI Source'), ie.class
                 ORDER BY ie.occurred_at DESC
                 LIMIT ? OFFSET ?
             `).bind(...params, pageSizeNum, offset).all<any>();
@@ -2982,7 +2982,13 @@ export async function handleApiRoutes(
                 items: referralsWith15m,
                 total: totalResult?.total || 0,
                 page: pageNum,
-                pageSize: pageSizeNum
+                pageSize: pageSizeNum,
+                debug: {
+                    whereConditions: whereConditions,
+                    params: params,
+                    offset: offset,
+                    actualCount: referrals.results?.length || 0
+                }
             }), {
                 headers: {
                     "Content-Type": "application/json",
