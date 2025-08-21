@@ -1,3 +1,5 @@
+import { getClassifierManifest, STATIC_MANIFEST, type ClassifierManifest } from './classifier-manifest';
+
 export type TrafficClass = 'ai_agent_crawl' | 'human_via_ai' | 'search' | 'direct_human';
 
 export interface TrafficClassification {
@@ -8,9 +10,12 @@ export interface TrafficClassification {
   reason: string;            // concise, human-readable
   evidence: {                // small, safe subset
     cfVerifiedBot?: string;
-    referrerHost?: string;
     uaHit?: string;
+    headerHit?: string;
+    refHost?: string;
+    refPath?: string;
   };
+  confidence: number;        // 0.0 to 1.0
 }
 
 /**
@@ -47,7 +52,8 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
         aiSourceSlug: slug,
         aiSourceName: name,
         reason: `cf.verifiedBotCategory=${category} → ai_agent_crawl (${name})`,
-        evidence
+        evidence,
+        confidence: 1.0
       };
     }
   }
@@ -61,7 +67,8 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
       aiSourceSlug: slug,
       aiSourceName: name,
       reason: `UA matches known crawler → ai_agent_crawl (${name})`,
-      evidence
+      evidence,
+      confidence: 0.95
     };
   }
 
@@ -74,42 +81,73 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
       aiSourceSlug: slug,
       aiSourceName: name,
       reason: `Preview bot detected → ai_agent_crawl (${name})`,
-      evidence
+      evidence,
+      confidence: 0.95
+    };
+  }
+
+  // AI client header detection (sec-ai-client, x-ai-client)
+  const aiClientHeader = req.headers.get('sec-ai-client') || req.headers.get('x-ai-client');
+  if (aiClientHeader) {
+    evidence.headerHit = `${aiClientHeader.substring(0, 50)}...`; // Mask for privacy
+    return {
+      class: 'ai_agent_crawl',
+      aiSourceSlug: 'ai_client',
+      aiSourceName: 'AI Client',
+      reason: `AI client header detected → ai_agent_crawl`,
+      evidence,
+      confidence: 0.95
     };
   }
 
   // From header check (supporting signal, never solely decisive)
   const fromHeader = req.headers.get('from') || '';
   if (fromHeader && (fromHeader.includes('googlebot.com') || fromHeader.includes('bing.com'))) {
-    evidence.uaHit = fromHeader;
+    evidence.headerHit = fromHeader;
     const { slug, name } = mapCrawlerSource(uaLower, fromHeader);
     return {
       class: 'ai_agent_crawl',
       aiSourceSlug: slug,
       aiSourceName: name,
       reason: `From header indicates crawler → ai_agent_crawl (${name})`,
-      evidence
+      evidence,
+      confidence: 0.9
     };
   }
 
   // 2) AI assistant referrers → human_via_ai
   if (referrerHost && isAIReferrer(referrerHost)) {
-    evidence.referrerHost = referrerHost;
+    evidence.refHost = referrerHost;
+    evidence.refPath = new URL(referrer).pathname.substring(0, 256);
     const { slug, name } = mapAIReferrer(referrerHost);
     return {
       class: 'human_via_ai',
       aiSourceSlug: slug,
       aiSourceName: name,
       reason: `referrer host matched '${referrerHost}' → human_via_ai (${name})`,
-      evidence
+      evidence,
+      confidence: 0.95
+    };
+  }
+
+    // Self-referral check (same property domain)
+  if (referrerHost && req.headers.get('host') && referrerHost === req.headers.get('host')?.toLowerCase().replace(/^www\./, '')) {
+    evidence.refHost = referrerHost;
+    evidence.refPath = new URL(referrer).pathname.substring(0, 256);
+    return {
+      class: 'direct_human',
+      reason: `self-referral from '${referrerHost}' → direct_human`,
+      evidence,
+      confidence: 0.9
     };
   }
 
   // 3) Search engines → search (with AI detection)
   if (referrerHost && isSearchReferrer(referrerHost)) {
-    evidence.referrerHost = referrerHost;
+    evidence.refHost = referrerHost;
+    evidence.refPath = new URL(referrer).pathname.substring(0, 256);
     const searchInfo = mapSearchReferrer(referrerHost, referrerUrl);
-
+    
     // If this search engine has AI features, classify as human_via_ai
     if (searchInfo.isAI) {
       return {
@@ -117,15 +155,17 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
         aiSourceSlug: searchInfo.slug,
         aiSourceName: searchInfo.name,
         reason: `AI-enhanced search '${referrerHost}' → human_via_ai (${searchInfo.name})`,
-        evidence
+        evidence,
+        confidence: 0.9
       };
     }
-
+    
     // Regular search engine
     return {
       class: 'search',
       reason: `search referrer '${referrerHost}' → search (${searchInfo.name})`,
-      evidence
+      evidence,
+      confidence: 0.95
     };
   }
 
@@ -134,13 +174,15 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
     return {
       class: 'direct_human',
       reason: 'no referrer → direct_human',
-      evidence
+      evidence,
+      confidence: 0.8
     };
   } else {
     return {
       class: 'direct_human',
       reason: `referrer '${referrerHost}' (unmatched) → direct_human`,
-      evidence
+      evidence,
+      confidence: 0.7
     };
   }
 }
@@ -339,17 +381,19 @@ function mapSearchReferrer(host: string, referrerUrl: string | null): { slug: st
     if (referrerUrl && (referrerUrl.includes('/chat') || referrerUrl.includes('/copilot'))) {
       return { slug: 'microsoft_copilot', name: 'Microsoft Copilot', isAI: true };
     }
+    // Default to search for all other Bing paths (including root, /search, /maps, etc.)
     return { slug: 'microsoft_bing', name: 'Microsoft Bing', isAI: false };
   }
-
+  
   if (host.includes('google.com')) {
     // Check if this is Google Gemini or regular Google search
     if (referrerUrl && (referrerUrl.includes('/gemini') || referrerUrl.includes('/bard'))) {
       return { slug: 'google_gemini', name: 'Google Gemini', isAI: true };
     }
+    // Default to search for all other Google paths (including root, /search, /maps, etc.)
     return { slug: 'google', name: 'Google', isAI: false };
   }
-
+  
   // Default search engines
   if (host.includes('duckduckgo.com')) {
     return { slug: 'duckduckgo', name: 'DuckDuckGo', isAI: false };
@@ -357,9 +401,18 @@ function mapSearchReferrer(host: string, referrerUrl: string | null): { slug: st
   if (host.includes('search.brave.com')) {
     return { slug: 'brave', name: 'Brave Search', isAI: false };
   }
+  if (host.includes('kagi.com')) {
+    return { slug: 'kagi', name: 'Kagi', isAI: false };
+  }
   if (host.includes('yahoo.com')) {
     return { slug: 'yahoo', name: 'Yahoo', isAI: false };
   }
-
+  if (host.includes('ecosia.org')) {
+    return { slug: 'ecosia', name: 'Ecosia', isAI: false };
+  }
+  if (host.includes('baidu.com')) {
+    return { slug: 'baidu', name: 'Baidu', isAI: false };
+  }
+  
   return { slug: 'search_engine', name: 'Search Engine', isAI: false };
 }

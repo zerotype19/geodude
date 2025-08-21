@@ -145,6 +145,42 @@ const testCases = [
     expectedClass: "human_via_ai",
     expectedSlug: "microsoft_copilot"
   },
+  {
+    name: "chatgpt.com referrer",
+    cf: {},
+    headers: {},
+    referrer: "https://chatgpt.com/c/abc123",
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "human_via_ai",
+    expectedSlug: "openai_chatgpt"
+  },
+  {
+    name: "Bing Copilot copilot path",
+    cf: {},
+    headers: {},
+    referrer: "https://bing.com/copilot?q=test",
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "human_via_ai",
+    expectedSlug: "microsoft_copilot"
+  },
+  {
+    name: "copilot.microsoft.com direct",
+    cf: {},
+    headers: {},
+    referrer: "https://copilot.microsoft.com/chat",
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "human_via_ai",
+    expectedSlug: "microsoft_copilot"
+  },
+  {
+    name: "Perplexity pplx.ai",
+    cf: {},
+    headers: {},
+    referrer: "https://pplx.ai/chat",
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "human_via_ai",
+    expectedSlug: "perplexity"
+  },
   
   // 6. Search engines → search
   {
@@ -163,7 +199,25 @@ const testCases = [
     referrer: "https://www.bing.com/search?q=test",
     userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
     expectedClass: "search",
-    expectedSlug: undefined
+    expectedSlug: "microsoft_bing"
+  },
+  {
+    name: "Bing root (no path)",
+    cf: {},
+    headers: {},
+    referrer: "https://bing.com",
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "search",
+    expectedSlug: "microsoft_bing"
+  },
+  {
+    name: "Google maps referrer",
+    cf: {},
+    headers: {},
+    referrer: "https://www.google.com/maps?q=test",
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "search",
+    expectedSlug: "google"
   },
   {
     name: "DuckDuckGo search referrer",
@@ -218,6 +272,35 @@ const edgeCases = [
     userAgent: "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
     expectedClass: "ai_agent_crawl", // Preview bot should win over search referrer
     expectedSlug: "slack"
+  },
+  
+  // Classifier v2 edge cases
+  {
+    name: "Self-referral (same property domain)",
+    cf: {},
+    headers: { "host": "example.com" },
+    referrer: "https://example.com/page",
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "direct_human",
+    expectedSlug: undefined
+  },
+  {
+    name: "AI client header (sec-ai-client)",
+    cf: {},
+    headers: { "sec-ai-client": "1" },
+    referrer: null,
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "ai_agent_crawl",
+    expectedSlug: "ai_client"
+  },
+  {
+    name: "AI client header (x-ai-client)",
+    cf: {},
+    headers: { "x-ai-client": "true" },
+    referrer: null,
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    expectedClass: "ai_agent_crawl",
+    expectedSlug: "ai_client"
   }
 ];
 

@@ -1,0 +1,109 @@
+/**
+ * Static Classifier Manifest Fallback
+ * 
+ * This manifest is used when the KV rules:classifier_v2 is unavailable.
+ * It provides the same structure and ensures classification never fails.
+ */
+
+export interface ClassifierManifest {
+  version: string;
+  assistants: Record<string, { slug: string; name: string; category: 'assistant' }>;
+  search_engines: Record<string, { slug: string; name: string; category: 'search' }>;
+  crawlers: Record<string, { slug: string; name: string; category: 'crawler' }>;
+  preview_bots: Record<string, { slug: string; name: string; category: 'preview_bot' }>;
+  ua_patterns: Record<string, { slug: string; name: string; category: 'crawler' }>;
+}
+
+export const STATIC_MANIFEST: ClassifierManifest = {
+  version: "v2.0.0-static",
+  
+  // AI Assistants (direct domains)
+  assistants: {
+    "chat.openai.com": { slug: "openai_chatgpt", name: "OpenAI/ChatGPT", category: "assistant" },
+    "chatgpt.com": { slug: "openai_chatgpt", name: "OpenAI/ChatGPT", category: "assistant" },
+    "claude.ai": { slug: "anthropic_claude", name: "Anthropic/Claude", category: "assistant" },
+    "perplexity.ai": { slug: "perplexity", name: "Perplexity", category: "assistant" },
+    "www.perplexity.ai": { slug: "perplexity", name: "Perplexity", category: "assistant" },
+    "pplx.ai": { slug: "perplexity", name: "Perplexity", category: "assistant" },
+    "gemini.google.com": { slug: "google_gemini", name: "Google Gemini", category: "assistant" },
+    "copilot.microsoft.com": { slug: "microsoft_copilot", name: "Microsoft Copilot", category: "assistant" },
+    "poe.com": { slug: "poe", name: "Poe", category: "assistant" },
+    "phind.com": { slug: "phind", name: "Phind", category: "assistant" },
+    "you.com": { slug: "you", name: "You.com", category: "assistant" },
+    "metaphor.systems": { slug: "metaphor", name: "Metaphor", category: "assistant" }
+  },
+  
+  // Search Engines (path-disambiguated)
+  search_engines: {
+    "google.com": { slug: "google", name: "Google", category: "search" },
+    "www.google.com": { slug: "google", name: "Google", category: "search" },
+    "bing.com": { slug: "microsoft_bing", name: "Microsoft Bing", category: "search" },
+    "www.bing.com": { slug: "microsoft_bing", name: "Microsoft Bing", category: "search" },
+    "duckduckgo.com": { slug: "duckduckgo", name: "DuckDuckGo", category: "search" },
+    "search.brave.com": { slug: "brave", name: "Brave Search", category: "search" },
+    "kagi.com": { slug: "kagi", name: "Kagi", category: "search" },
+    "yahoo.com": { slug: "yahoo", name: "Yahoo", category: "search" },
+    "search.yahoo.com": { slug: "yahoo", name: "Yahoo", category: "search" },
+    "ecosia.org": { slug: "ecosia", name: "Ecosia", category: "search" },
+    "baidu.com": { slug: "baidu", name: "Baidu", category: "search" },
+    "ask.com": { slug: "ask", name: "Ask", category: "search" }
+  },
+  
+  // Crawlers (verified bots)
+  crawlers: {
+    "googlebot.com": { slug: "google", name: "Google", category: "crawler" },
+    "bing.com": { slug: "microsoft_bing", name: "Microsoft/Bing", category: "crawler" }
+  },
+  
+  // Preview/Unfurl Bots
+  preview_bots: {
+    "slack.com": { slug: "slack", name: "Slack", category: "preview_bot" },
+    "hooks.slack.com": { slug: "slack", name: "Slack", category: "preview_bot" },
+    "l.facebook.com": { slug: "meta", name: "Meta", category: "preview_bot" },
+    "facebookexternalhit.com": { slug: "meta", name: "Meta", category: "preview_bot" },
+    "t.co": { slug: "twitter", name: "Twitter", category: "preview_bot" },
+    "twitter.com": { slug: "twitter", name: "Twitter", category: "preview_bot" },
+    "discord.com": { slug: "discord", name: "Discord", category: "preview_bot" },
+    "linkedin.com": { slug: "linkedin", name: "LinkedIn", category: "preview_bot" },
+    "lnkd.in": { slug: "linkedin", name: "LinkedIn", category: "preview_bot" },
+    "wa.me": { slug: "whatsapp", name: "WhatsApp", category: "preview_bot" },
+    "web.whatsapp.com": { slug: "whatsapp", name: "WhatsApp", category: "preview_bot" },
+    "telegram.org": { slug: "telegram", name: "Telegram", category: "preview_bot" }
+  },
+  
+  // User Agent Patterns
+  ua_patterns: {
+    "googlebot": { slug: "google", name: "Google", category: "crawler" },
+    "bingbot": { slug: "microsoft_bing", name: "Microsoft/Bing", category: "crawler" },
+    "duckduckbot": { slug: "duckduckgo", name: "DuckDuckGo", category: "crawler" },
+    "applebot": { slug: "apple", name: "Apple", category: "crawler" },
+    "yandexbot": { slug: "yandex", name: "Yandex", category: "crawler" },
+    "facebot": { slug: "meta", name: "Meta", category: "crawler" },
+    "twitterbot": { slug: "twitter", name: "Twitter", category: "crawler" },
+    "slackbot": { slug: "slack", name: "Slack", category: "crawler" },
+    "discordbot": { slug: "discord", name: "Discord", category: "crawler" },
+    "linkedinbot": { slug: "linkedin", name: "LinkedIn", category: "crawler" },
+    "gptbot": { slug: "openai", name: "OpenAI", category: "crawler" },
+    "anthropic": { slug: "anthropic", name: "Anthropic", category: "crawler" },
+    "claude": { slug: "anthropic", name: "Anthropic", category: "crawler" },
+    "chatgpt": { slug: "openai", name: "OpenAI", category: "crawler" },
+    "ai-client": { slug: "ai_client", name: "AI Client", category: "crawler" },
+    "ai-bot": { slug: "ai_bot", name: "AI Bot", category: "crawler" }
+  }
+};
+
+/**
+ * Get manifest with fallback to static version
+ */
+export async function getClassifierManifest(env: any): Promise<ClassifierManifest> {
+  try {
+    const kvManifest = await env.RULES?.get('classifier_v2', { type: 'json' });
+    if (kvManifest && kvManifest.version) {
+      return kvManifest;
+    }
+  } catch (error) {
+    console.warn('⚠️ KV manifest unavailable, using static fallback');
+  }
+  
+  return STATIC_MANIFEST;
+}
