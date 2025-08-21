@@ -20,7 +20,7 @@ export interface TrafficClassification {
 export function classifyTraffic(req: Request, cf: any, referrerUrl: string | null, userAgent: string | null): TrafficClassification {
   const referrer = referrerUrl || '';
   const ua = userAgent || '';
-  
+
   // Normalize referrer host to lowercase, strip www
   let referrerHost: string | undefined;
   try {
@@ -39,7 +39,7 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
   if (cf?.verifiedBotCategory) {
     const category = cf.verifiedBotCategory;
     evidence.cfVerifiedBot = category;
-    
+
     if (category === 'Search Engine Crawler' || category === 'AI Chatbot Crawler') {
       const { slug, name } = mapCrawlerSource(uaLower, req.headers.get('from') || '');
       return {
@@ -105,12 +105,26 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
     };
   }
 
-  // 3) Search engines → search
+  // 3) Search engines → search (with AI detection)
   if (referrerHost && isSearchReferrer(referrerHost)) {
     evidence.referrerHost = referrerHost;
+    const searchInfo = mapSearchReferrer(referrerHost, referrerUrl);
+
+    // If this search engine has AI features, classify as human_via_ai
+    if (searchInfo.isAI) {
+      return {
+        class: 'human_via_ai',
+        aiSourceSlug: searchInfo.slug,
+        aiSourceName: searchInfo.name,
+        reason: `AI-enhanced search '${referrerHost}' → human_via_ai (${searchInfo.name})`,
+        evidence
+      };
+    }
+
+    // Regular search engine
     return {
       class: 'search',
-      reason: `search referrer '${referrerHost}' → search`,
+      reason: `search referrer '${referrerHost}' → search (${searchInfo.name})`,
       evidence
     };
   }
@@ -142,7 +156,7 @@ function isKnownCrawlerUA(ua: string): boolean {
     'gptbot', 'anthropic', 'google-extended', 'claude', 'chatgpt', 'ai-client', 'ai-bot',
     'bytespider', 'mj12bot', 'sogou', 'facebot', 'ia_archiver', 'ccbot', 'petalbot'
   ];
-  
+
   return crawlerPatterns.some(pattern => ua.includes(pattern.toLowerCase()));
 }
 
@@ -153,7 +167,7 @@ function isPreviewBot(ua: string): boolean {
   const previewPatterns = [
     'slackbot', 'facebookexternalhit', 'discordbot', 'linkedinbot', 'whatsapp', 'telegrambot'
   ];
-  
+
   return previewPatterns.some(pattern => ua.includes(pattern.toLowerCase()));
 }
 
@@ -218,7 +232,7 @@ function mapCrawlerSource(ua: string, fromHeader: string): { slug: string; name:
   if (/google-extended/i.test(ua)) {
     return { slug: 'google_extended', name: 'Google Extended' };
   }
-  
+
   return { slug: 'generic_crawler', name: 'Generic Crawler' };
 }
 
@@ -244,7 +258,7 @@ function mapPreviewBot(ua: string): { slug: string; name: string } {
   if (/telegrambot/i.test(ua)) {
     return { slug: 'telegram', name: 'Telegram' };
   }
-  
+
   return { slug: 'preview_bot', name: 'Preview Bot' };
 }
 
@@ -254,10 +268,15 @@ function mapPreviewBot(ua: string): { slug: string; name: string } {
 function isAIReferrer(host: string): boolean {
   const aiHosts = [
     'chat.openai.com', 'chatgpt.com', 'claude.ai', 'perplexity.ai', 'poe.com', 'you.com',
-    'copilot.microsoft.com', 'bing.com', 'gemini.google.com', 'bard.google.com', 'arc.net',
+    'copilot.microsoft.com', 'gemini.google.com', 'bard.google.com', 'arc.net',
     'phind.com', 'metaphor.systems'
   ];
-  
+
+  // Special handling for Bing - only AI paths are AI referrers
+  if (host.includes('bing.com')) {
+    return false; // Let search referrer logic handle this
+  }
+
   return aiHosts.some(aiHost => host === aiHost || host.endsWith('.' + aiHost));
 }
 
@@ -280,9 +299,6 @@ function mapAIReferrer(host: string): { slug: string; name: string } {
   if (host.includes('copilot.microsoft.com')) {
     return { slug: 'microsoft_copilot', name: 'Microsoft Copilot' };
   }
-  if (host.includes('bing.com')) {
-    return { slug: 'microsoft_copilot', name: 'Microsoft Copilot' };
-  }
   if (host.includes('poe.com')) {
     return { slug: 'poe', name: 'Poe' };
   }
@@ -298,7 +314,7 @@ function mapAIReferrer(host: string): { slug: string; name: string } {
   if (host.includes('metaphor.systems')) {
     return { slug: 'metaphor', name: 'Metaphor' };
   }
-  
+
   return { slug: 'ai_referrer', name: 'AI Assistant' };
 }
 
@@ -310,6 +326,40 @@ function isSearchReferrer(host: string): boolean {
     'google.com', 'bing.com', 'duckduckgo.com', 'search.brave.com', 'yahoo.com',
     'yandex.com', 'ecosia.org', 'baidu.com', 'ask.com'
   ];
-  
+
   return searchHosts.some(searchHost => host === searchHost || host.endsWith('.' + searchHost));
+}
+
+/**
+ * Map search referrers to determine if they're AI-enhanced
+ */
+function mapSearchReferrer(host: string, referrerUrl: string | null): { slug: string; name: string; isAI: boolean } {
+  if (host.includes('bing.com')) {
+    // Check if this is Bing Copilot (AI) or regular Bing search
+    if (referrerUrl && (referrerUrl.includes('/chat') || referrerUrl.includes('/copilot'))) {
+      return { slug: 'microsoft_copilot', name: 'Microsoft Copilot', isAI: true };
+    }
+    return { slug: 'microsoft_bing', name: 'Microsoft Bing', isAI: false };
+  }
+
+  if (host.includes('google.com')) {
+    // Check if this is Google Gemini or regular Google search
+    if (referrerUrl && (referrerUrl.includes('/gemini') || referrerUrl.includes('/bard'))) {
+      return { slug: 'google_gemini', name: 'Google Gemini', isAI: true };
+    }
+    return { slug: 'google', name: 'Google', isAI: false };
+  }
+
+  // Default search engines
+  if (host.includes('duckduckgo.com')) {
+    return { slug: 'duckduckgo', name: 'DuckDuckGo', isAI: false };
+  }
+  if (host.includes('search.brave.com')) {
+    return { slug: 'brave', name: 'Brave Search', isAI: false };
+  }
+  if (host.includes('yahoo.com')) {
+    return { slug: 'yahoo', name: 'Yahoo', isAI: false };
+  }
+
+  return { slug: 'search_engine', name: 'Search Engine', isAI: false };
 }
