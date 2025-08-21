@@ -1469,9 +1469,7 @@ export async function handleApiRoutes(
 
     // 6.3.5) Events Ingestion API (with cache invalidation)
     if (url.pathname === "/api/events" && req.method === "POST") {
-        console.log('🔍 Events API: POST /api/events called');
-        console.log('🔍 Events API: env keys available:', Object.keys(env || {}));
-        console.log('🔍 Events API: env.OPTIVIEW_DB available:', !!env.OPTIVIEW_DB);
+
 
         try {
             // Check Content-Type
@@ -1614,13 +1612,7 @@ export async function handleApiRoutes(
             const aiLiteConfig = await getProjectAILiteConfig(env.OPTIVIEW_DB, project_id, env);
             const isAILite = aiLiteConfig.enforceAI || aiLiteConfig.trackingMode === 'ai-lite';
 
-            console.log('🔍 AI-Lite config:', {
-                projectId: project_id,
-                trackingMode: aiLiteConfig.trackingMode,
-                enforceAI: aiLiteConfig.enforceAI,
-                samplePct: aiLiteConfig.samplePct,
-                isAILite
-            });
+
 
             // Process each event in the batch
             const now = new Date().toISOString();
@@ -1708,18 +1700,8 @@ export async function handleApiRoutes(
                         }
                     }
 
-                    // Debug Cloudflare data
+                    // Get Cloudflare data for traffic classification
                     const cfData = (req as any).cf;
-                    console.log('🔍 Cloudflare data:', {
-                        hasCf: !!cfData,
-                        verifiedBotCategory: cfData?.verifiedBotCategory,
-                        userAgent: userAgent,
-                        fromHeader: req.headers.get('from'),
-                        cfKeys: cfData ? Object.keys(cfData) : [],
-                        requestKeys: Object.keys(req),
-                        cfDirect: (req as any).cf,
-                        cfType: typeof (req as any).cf
-                    });
 
                     // Classify traffic with Cloudflare data
                     const classification = classifyTraffic(referrer, userAgent, req.headers, url, cfData);
@@ -1756,17 +1738,7 @@ export async function handleApiRoutes(
                         }
                     }
 
-                    console.log('🔍 Traffic classification:', {
-                        class: trafficClass,
-                        isAI: classification.isAI,
-                        shouldSample: classification.shouldSample,
-                        shouldInsertRow,
-                        isSampled,
-                        samplePct: aiLiteConfig.samplePct,
-                        aiSourceSlug: classification.aiSourceSlug,
-                        aiSourceName: classification.aiSourceName,
-                        aiSourceId
-                    });
+
 
                 } catch (classificationError) {
                     console.error('Error in traffic classification:', classificationError);
@@ -1815,7 +1787,7 @@ export async function handleApiRoutes(
                         trafficClass,
                         isSampled
                     );
-                    console.log('✅ Rollup updated for class:', trafficClass);
+    
                 } catch (rollupError) {
                     console.error('Error updating rollup:', rollupError);
                     // Don't fail the request, just log the error
@@ -1844,16 +1816,7 @@ export async function handleApiRoutes(
                         isSampled ? 1 : 0 // Add sampled flag
                     ];
 
-                    console.log('🔍 Events API Debug - Insert values:', {
-                        project_id,
-                        property_id,
-                        contentId,
-                        ai_source_id: null,
-                        event_type: normalizedEventType,
-                        metadata: JSON.stringify(metadata || {}),
-                        occurred_at: occurred_at || now,
-                        rawValues: insertValues
-                    });
+
 
                     // Validate all values are defined before insertion
                     if (insertValues.some(val => val === undefined)) {

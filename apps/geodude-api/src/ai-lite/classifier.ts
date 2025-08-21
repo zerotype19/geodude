@@ -45,17 +45,8 @@ export function classifyTraffic(
     };
   }
 
-  // Debug Cloudflare data in classifier
-  console.log('🔍 Classifier Cloudflare check:', {
-    hasCf: !!cf,
-    verifiedBotCategory: cf?.verifiedBotCategory,
-    userAgent: userAgentLower,
-    fromHeader: headers.get('from')
-  });
-
   // 1) Cloudflare verified bots (authoritative)
   if (cf?.verifiedBotCategory) {
-    console.log('✅ Cloudflare verified bot detected:', cf.verifiedBotCategory);
     const { slug, name } = mapCrawlerSource(userAgentLower, headers.get('from') || '');
     return {
       class: 'ai_agent_crawl',
@@ -71,7 +62,6 @@ export function classifyTraffic(
   if (isKnownCrawlerUA(userAgentLower) || 
       headers.get('from')?.toLowerCase().includes('googlebot.com') || 
       headers.get('from')?.toLowerCase().includes('bing.com')) {
-    console.log('✅ Strong bot signal detected via headers/UA');
     const { slug, name } = mapCrawlerSource(userAgentLower, headers.get('from') || '');
     return {
       class: 'ai_agent_crawl',

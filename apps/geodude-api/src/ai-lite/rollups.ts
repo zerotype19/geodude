@@ -31,14 +31,7 @@ export async function upsertRollup(
 ): Promise<boolean> {
   const tsHour = roundToHour(timestamp);
 
-  console.log('ROLLUP_DEBUG: pre', {
-    projectId,
-    propertyId,
-    trafficClass,
-    timestamp: timestamp.toISOString(),
-    tsHour,
-    isSampled
-  });
+
 
   try {
     // Use INSERT ... ON CONFLICT for proper upsert behavior
@@ -59,21 +52,11 @@ export async function upsertRollup(
       isSampled ? 1 : 0
     ).run();
 
-    console.log('ROLLUP_DEBUG: post', { 
-      success: true, 
-      changes: result.changes,
-      trafficClass,
-      tsHour 
-    });
+
 
     return true;
   } catch (error) {
-    console.error('ROLLUP_DEBUG: failed', { 
-      error: error.message, 
-      trafficClass,
-      projectId,
-      tsHour 
-    });
+    console.error('Rollup upsert failed:', error);
     throw error;
   }
 }
