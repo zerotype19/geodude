@@ -2577,6 +2577,7 @@ export async function handleApiRoutes(
                 let isSampled = false;
                 let aiSourceId = null;
                 let classification: any = null;
+                let enrichedMetadata: any = metadata; // Default to original metadata
 
                 try {
                     // Extract referrer and user agent from metadata

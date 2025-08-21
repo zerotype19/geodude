@@ -38,25 +38,14 @@ export async function ensureContentAsset(
 
     // First try to find existing content asset
     const existingAsset = await db.prepare(`
-      SELECT id, url, type, updated_at
+      SELECT id, url, type, created_at
       FROM content_assets 
       WHERE project_id = ? AND property_id = ? AND url = ?
       LIMIT 1
     `).bind(project_id, property_id, normalizedUrl).first();
 
     if (existingAsset?.id) {
-      // Asset exists, update timestamp if needed
-      const now = new Date().toISOString();
-      if (!existingAsset.updated_at || 
-          (new Date(now).getTime() - new Date(existingAsset.updated_at).getTime()) > 24 * 60 * 60 * 1000) {
-        // Update if more than 24 hours old
-        await db.prepare(`
-          UPDATE content_assets 
-          SET updated_at = ? 
-          WHERE id = ?
-        `).bind(now, existingAsset.id).run();
-      }
-      
+      // Asset exists, return it (no need to update timestamp)
       return existingAsset.id;
     }
 
@@ -65,9 +54,9 @@ export async function ensureContentAsset(
     const now = new Date().toISOString();
     
     const result = await db.prepare(`
-      INSERT INTO content_assets (project_id, property_id, url, type, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(project_id, property_id, normalizedUrl, contentType, now, now).run();
+      INSERT INTO content_assets (project_id, property_id, url, type, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(project_id, property_id, normalizedUrl, contentType, now).run();
 
     const newAssetId = result.meta?.last_row_id;
     if (newAssetId) {
@@ -126,7 +115,7 @@ export async function getContentAsset(
 ): Promise<ContentAsset | null> {
   try {
     const asset = await db.prepare(`
-      SELECT id, project_id, property_id, url, type, created_at, updated_at
+      SELECT id, project_id, property_id, url, type, created_at
       FROM content_assets 
       WHERE id = ?
     `).bind(content_id).first();
