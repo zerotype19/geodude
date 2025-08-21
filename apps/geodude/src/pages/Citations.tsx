@@ -130,13 +130,7 @@ export default function Citations() {
       if (sourceFilter) params.append('source', sourceFilter);
       if (searchQuery.trim()) params.append('q', searchQuery.trim());
 
-      console.log('🔍 Citations API call:', {
-        sourceFilter,
-        searchQuery,
-        params: params.toString(),
-        url: `${API_BASE}/api/citations?${params}`,
-        summary: summary?.totals?.by_source
-      });
+
 
       const response = await fetch(`${API_BASE}/api/citations?${params}`, FETCH_OPTS);
 
@@ -268,13 +262,12 @@ export default function Citations() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => {
-                  console.log('🔍 Clicked "All" filter');
                   setSourceFilter("");
                   setPage(1);
                 }}
                 className={`px-3 py-1 rounded-full text-sm ${sourceFilter === ""
-                    ? "bg-blue-100 text-blue-800 border-blue-200"
-                    : "bg-gray-100 text-gray-700 border-gray-200"
+                  ? "bg-blue-100 text-blue-800 border-blue-200"
+                  : "bg-gray-100 text-gray-700 border-gray-200"
                   } border hover:bg-blue-50`}
               >
                 All ({summary.totals.citations})
@@ -283,16 +276,15 @@ export default function Citations() {
                 <button
                   key={source.slug}
                   onClick={() => {
-                    console.log('🔍 Clicked source filter:', source.slug, source.name);
                     setSourceFilter(source.slug);
                     setPage(1);
                   }}
                   className={`px-3 py-1 rounded-full text-sm ${sourceFilter === source.slug
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : "bg-gray-200"
+                    ? "bg-blue-100 text-blue-800 border-blue-200"
+                    : "bg-gray-200"
                     } border hover:bg-blue-50`}
                 >
-                  {source.name} ({source.slug}) ({source.count})
+                  {source.name} ({source.count})
                 </button>
               ))}
             </div>
@@ -340,7 +332,7 @@ export default function Citations() {
           </div>
           {(sourceFilter || searchQuery.trim()) && (
             <div className="mt-3 text-sm text-gray-600">
-              Active filters: 
+              Active filters:
               {sourceFilter && <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">{sourceFilter}</span>}
               {searchQuery.trim() && <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">"{searchQuery.trim()}"</span>}
             </div>
@@ -365,9 +357,9 @@ export default function Citations() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Content URL
                   </th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Classification
-                      </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Classification
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Ref URL
                   </th>

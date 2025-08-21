@@ -1058,7 +1058,14 @@ export async function handleApiRoutes(
             `).bind(project_id, Math.floor(fromTs / 1000)).all();
 
             const summary = {
-                totals: { citations: totalResult?.citations || 0, by_source: bySourceResult.results || [] },
+                totals: { 
+                    citations: totalResult?.citations || 0, 
+                    by_source: (bySourceResult.results || []).map(row => ({
+                        slug: row.source_slug,
+                        name: row.source_name,
+                        count: row.count
+                    }))
+                },
                 top_content: (topContentResult.results || []).map(row => ({
                     content_id: row.content_id,
                     url: row.url,
