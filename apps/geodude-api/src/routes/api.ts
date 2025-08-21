@@ -2908,40 +2908,35 @@ export async function handleApiRoutes(
             const pageSizeNum = Math.min(parseInt(pageSize), 100);
             const offset = (pageNum - 1) * pageSizeNum;
 
-            // Get total count of grouped results (matching the main query grouping)
+            // Get total count of individual events (matching the main query)
             const totalResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT COUNT(*) AS total
-                FROM (
-                    SELECT ie.content_id, ie.ai_source_id
-                    FROM interaction_events ie
-                    JOIN content_assets ca ON ca.id = ie.content_id
-                    JOIN properties p ON p.id = ca.property_id
-                    LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                    WHERE ${whereConditions.join(' AND ')}
-                    GROUP BY ie.content_id, ie.ai_source_id
-                ) grouped_results
+                FROM interaction_events ie
+                JOIN content_assets ca ON ca.id = ie.content_id
+                JOIN properties p ON p.id = ca.property_id
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                WHERE ${whereConditions.join(' AND ')}
             `).bind(...params).first<any>();
 
-            // Get referrals with pagination - simple approach
+            // Get referrals with pagination - no grouping to fix pagination issues
             const referrals = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
                     ie.content_id,
                     ca.url,
                     COALESCE(ais.slug, 'unknown') as source_slug,
                     COALESCE(ais.name, 'Unknown AI Source') as source_name,
-                    MAX(ie.occurred_at) as last_seen,
+                    ie.occurred_at as last_seen,
                     ie.class as event_class,
                     COALESCE(json_extract(ie.metadata, '$.classification_reason'), '') as classification_reason,
                     COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
                     COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw,
-                    COUNT(*) as referrals_24h
+                    1 as referrals_24h
                 FROM interaction_events ie
                 JOIN content_assets ca ON ca.id = ie.content_id
                 JOIN properties p ON p.id = ca.property_id
                 LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                 WHERE ${whereConditions.join(' AND ')}
-                GROUP BY ie.content_id, ie.ai_source_id, ca.url, ie.class
-                ORDER BY MAX(ie.occurred_at) DESC
+                ORDER BY ie.occurred_at DESC
                 LIMIT ? OFFSET ?
             `).bind(...params, pageSizeNum, offset).all<any>();
 
