@@ -784,16 +784,48 @@ export async function handleApiRoutes(
                 LIMIT ? OFFSET ?
             `).bind(...bindParams, pageSizeNum, offset).all<any>();
 
-            const items = (content.results || []).map(row => ({
-                id: row.id,
-                url: row.url,
-                type: row.type,
-                last_seen: row.last_seen,
-                events_15m: row.events_15m || 0,
-                events_24h: row.events_24h || 0,
-                ai_referrals_24h: 0,
-                by_source_24h: [],
-                coverage_score: row.events_24h > 0 ? 50 : 0
+            // Get AI referrals data for each content asset
+            const items = await Promise.all((content.results || []).map(async (row) => {
+                // Get AI referrals count for last 24h
+                const aiReferralsResult = await env.OPTIVIEW_DB.prepare(`
+                    SELECT COUNT(*) as ai_count
+                    FROM interaction_events ie
+                    WHERE ie.project_id = ? AND ie.content_id = ? 
+                      AND ie.occurred_at >= datetime('now','-1 day')
+                      AND ie.class IN ('human_via_ai', 'ai_agent_crawl')
+                `).bind(project_id, row.id).first<any>();
+
+                // Get AI referrals breakdown by source for last 24h
+                const bySourceResult = await env.OPTIVIEW_DB.prepare(`
+                    SELECT 
+                        s.slug,
+                        s.name,
+                        COUNT(*) as count
+                    FROM interaction_events ie
+                    JOIN ai_sources s ON s.id = ie.ai_source_id
+                    WHERE ie.project_id = ? AND ie.content_id = ? 
+                      AND ie.occurred_at >= datetime('now','-1 day')
+                      AND ie.class IN ('human_via_ai', 'ai_agent_crawl')
+                      AND ie.ai_source_id IS NOT NULL
+                    GROUP BY ie.ai_source_id, s.slug, s.name
+                    ORDER BY count DESC
+                    LIMIT 5
+                `).bind(project_id, row.id).all<any>();
+
+                return {
+                    id: row.id,
+                    url: row.url,
+                    type: row.type,
+                    last_seen: row.last_seen,
+                    events_15m: row.events_15m || 0,
+                    events_24h: row.events_24h || 0,
+                    ai_referrals_24h: aiReferralsResult?.ai_count || 0,
+                    by_source_24h: (bySourceResult.results || []).map(source => ({
+                        slug: source.slug,
+                        events: source.count
+                    })),
+                    coverage_score: row.events_24h > 0 ? 50 : 0
+                };
             }));
 
             const response = new Response(JSON.stringify({
@@ -1907,6 +1939,10 @@ export async function handleApiRoutes(
                             SELECT id FROM content_assets WHERE url = ? AND project_id = ? LIMIT 1
                         `).bind(metadata.url, project_id).first().then(r => r?.id || null);
 
+                        // Determine if this session should be AI-influenced based on classification
+                        const isAIInfluenced = classification.class === 'human_via_ai' || classification.class === 'ai_agent_crawl';
+                        const primaryAiSourceId = classification.aiSourceId || null;
+
                         // Handle the unique constraint by using INSERT OR IGNORE
                         const newSessionResult = await env.OPTIVIEW_DB.prepare(`
                             INSERT OR IGNORE INTO session_v1 (
@@ -1914,7 +1950,10 @@ export async function handleApiRoutes(
                                 ai_influenced, primary_ai_source_id, entry_content_id, entry_url
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         `).bind(
-                            project_id, visitorIdInt, eventTime, null, 1, 0, null, contentId, metadata.url || ''
+                            project_id, visitorIdInt, eventTime, null, 1,
+                            isAIInfluenced ? 1 : 0,
+                            primaryAiSourceId,
+                            contentId, metadata.url || ''
                         ).run();
 
                         // If insert failed due to unique constraint, get the existing session
@@ -1945,13 +1984,17 @@ export async function handleApiRoutes(
 
                     // 6) Update aggregates on the session
                     if (currentSessionId) {
+                        // Determine if this event should mark the session as AI-influenced
+                        const isAIInfluenced = classification.class === 'human_via_ai' || classification.class === 'ai_agent_crawl';
+                        const primaryAiSourceId = classification.aiSourceId || null;
+
                         await env.OPTIVIEW_DB.prepare(`
                             UPDATE session_v1
                             SET events_count = events_count + 1,
-                                ai_influenced = CASE WHEN ? IS NOT NULL THEN 1 ELSE ai_influenced END,
+                                ai_influenced = CASE WHEN ? = 1 THEN 1 ELSE ai_influenced END,
                                 primary_ai_source_id = COALESCE(primary_ai_source_id, ?)
                             WHERE id = ?
-                        `).bind(null, null, currentSessionId).run();
+                        `).bind(isAIInfluenced ? 1 : 0, primaryAiSourceId, currentSessionId).run();
                     }
                 }
             } catch (sessionError) {
