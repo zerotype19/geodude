@@ -356,5 +356,195 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
     }
   }
 
+  // Admin rollup debug endpoint
+  if (url.pathname === "/admin/rollup/peek") {
+    try {
+      const projectId = url.searchParams.get('project_id') || 'prj_UHoetismrowc';
+      const window = url.searchParams.get('window') || '1h';
+      const trafficClass = url.searchParams.get('class') || 'ai_agent_crawl';
+      
+      // Get window duration in hours
+      const hours = window.endsWith('h') ? parseInt(window.slice(0, -1)) : 1;
+      const hoursAgo = new Date(Date.now() - hours * 60 * 60 * 1000);
+      
+      // Get recent events for this class
+      const recentEvents = await d1.prepare(`
+        SELECT 
+          ie.id,
+          ie.event_type,
+          ie.occurred_at,
+          ie.content_id,
+          ie.ai_source_id,
+          ai.name as ai_source_name,
+          ai.category as ai_source_category
+        FROM interaction_events ie
+        LEFT JOIN ai_sources ai ON ai.id = ie.ai_source_id
+        WHERE ie.project_id = ?
+          AND ie.occurred_at >= ?
+          AND ai.category = 'crawler'
+        ORDER BY ie.occurred_at DESC
+        LIMIT 10
+      `).bind(projectId, hoursAgo.toISOString()).all();
+
+      // Get rollup data for this window
+      const rollupData = await d1.prepare(`
+        SELECT 
+          ts_hour,
+          class,
+          events_count,
+          sampled_count
+        FROM traffic_rollup_hourly
+        WHERE project_id = ?
+          AND ts_hour >= ?
+          AND class = ?
+        ORDER BY ts_hour DESC
+      `).bind(projectId, Math.floor(hoursAgo.getTime() / 1000 / 3600) * 3600, trafficClass).all();
+
+      // Calculate expected vs actual counts
+      const eventCount = recentEvents.results?.length || 0;
+      const rollupCount = rollupData.results?.reduce((sum, r) => sum + r.events_count, 0) || 0;
+
+      const response = new Response(JSON.stringify({
+        window,
+        traffic_class: trafficClass,
+        project_id: projectId,
+        counts: {
+          events_in_db: eventCount,
+          rollup_total: rollupCount,
+          drift: rollupCount - eventCount
+        },
+        recent_events: recentEvents.results || [],
+        rollup_entries: rollupData.results || [],
+        debug_info: {
+          hours_ago: hoursAgo.toISOString(),
+          ts_hour_threshold: Math.floor(hoursAgo.getTime() / 1000 / 3600) * 3600
+        }
+      }, null, 2), {
+        headers: { 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate"
+        }
+      });
+
+      return addCorsHeaders(response, origin);
+    } catch (error) {
+      console.error('Rollup debug endpoint error:', error);
+      const response = new Response(JSON.stringify({
+        error: "Failed to fetch rollup debug data",
+        details: error.message
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+      return addCorsHeaders(response, origin);
+    }
+  }
+
+  // Admin backfill endpoint for crawler rollups
+  if (url.pathname === "/admin/rollup/backfill-crawlers") {
+    try {
+      const projectId = url.searchParams.get('project_id') || 'prj_UHoetismrowc';
+      const hours = parseInt(url.searchParams.get('hours') || '6');
+      const hoursAgo = new Date(Date.now() - hours * 60 * 60 * 1000);
+      
+      // Get all crawler events from the last N hours
+      const crawlerEvents = await d1.prepare(`
+        SELECT 
+          ie.project_id,
+          ie.property_id,
+          ie.occurred_at,
+          ie.ai_source_id,
+          ai.category
+        FROM interaction_events ie
+        JOIN ai_sources ai ON ai.id = ie.ai_source_id
+        WHERE ie.project_id = ?
+          AND ie.occurred_at >= ?
+          AND ai.category = 'crawler'
+        ORDER BY ie.occurred_at
+      `).bind(projectId, hoursAgo.toISOString()).all();
+
+      const events = crawlerEvents.results || [];
+      let backfilled = 0;
+      let errors = 0;
+      
+      // Group events by hour and property
+      const hourlyGroups: Record<string, { propertyId: number; count: number }> = {};
+      
+      for (const event of events) {
+        const eventTime = new Date(event.occurred_at);
+        const hourBucket = Math.floor(eventTime.getTime() / 1000 / 3600) * 3600;
+        const key = `${hourBucket}-${event.property_id}`;
+        
+        if (!hourlyGroups[key]) {
+          hourlyGroups[key] = { propertyId: event.property_id, count: 0 };
+        }
+        hourlyGroups[key].count++;
+      }
+      
+      // Backfill rollups for each hour/property group
+      for (const [key, group] of Object.entries(hourlyGroups)) {
+        const [hourBucket, propertyId] = key.split('-');
+        
+        try {
+          await d1.prepare(`
+            INSERT INTO traffic_rollup_hourly 
+            (project_id, property_id, ts_hour, class, events_count, sampled_count)
+            VALUES (?, ?, ?, 'ai_agent_crawl', ?, 0)
+            ON CONFLICT(project_id, property_id, ts_hour, class) 
+            DO UPDATE SET events_count = events_count + ?
+          `).bind(
+            projectId,
+            parseInt(propertyId),
+            parseInt(hourBucket),
+            group.count,
+            group.count
+          ).run();
+          
+          backfilled += group.count;
+        } catch (error) {
+          console.error('Backfill error for', key, error);
+          errors++;
+        }
+      }
+
+      const response = new Response(JSON.stringify({
+        success: true,
+        backfill_summary: {
+          project_id: projectId,
+          hours_processed: hours,
+          events_found: events.length,
+          events_backfilled: backfilled,
+          hour_groups: Object.keys(hourlyGroups).length,
+          errors
+        },
+        hourly_breakdown: Object.entries(hourlyGroups).map(([key, group]) => {
+          const [hourBucket, propertyId] = key.split('-');
+          return {
+            hour_bucket: parseInt(hourBucket),
+            property_id: parseInt(propertyId),
+            events_count: group.count
+          };
+        })
+      }, null, 2), {
+        headers: { 
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate"
+        }
+      });
+
+      return addCorsHeaders(response, origin);
+    } catch (error) {
+      console.error('Backfill endpoint error:', error);
+      const response = new Response(JSON.stringify({
+        error: "Failed to backfill crawler rollups",
+        details: error.message
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+      return addCorsHeaders(response, origin);
+    }
+  }
+
   return null; // Not handled by this router
 }

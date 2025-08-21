@@ -1,5 +1,7 @@
+export type TrafficClass = 'human_via_ai' | 'ai_agent_crawl' | 'search' | 'direct_human' | 'citation';
+
 export interface TrafficClassification {
-  class: string;
+  class: TrafficClass;
   isAI: boolean;
   shouldSample: boolean;
   sampled: boolean;

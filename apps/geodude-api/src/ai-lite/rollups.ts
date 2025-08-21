@@ -1,8 +1,10 @@
+import { TrafficClass } from './classifier';
+
 export interface RollupEntry {
   project_id: string;
   property_id: number;
   ts_hour: number;
-  class: string;
+  class: TrafficClass;
   events_count: number;
   sampled_count: number;
 }
@@ -17,40 +19,61 @@ export function roundToHour(timestamp: Date): number {
 }
 
 /**
- * Upsert rollup entry for a traffic class
+ * Upsert rollup entry for a traffic class with proper instrumentation
  */
 export async function upsertRollup(
   db: any,
   projectId: string,
   propertyId: number,
   timestamp: Date,
-  trafficClass: string,
+  trafficClass: TrafficClass,
   isSampled: boolean = false
-): Promise<void> {
+): Promise<boolean> {
   const tsHour = roundToHour(timestamp);
 
-  try {
-    // Try to update existing rollup
-    const updateResult = await db.prepare(`
-      UPDATE traffic_rollup_hourly 
-      SET events_count = events_count + 1,
-          sampled_count = sampled_count + ?
-      WHERE project_id = ? 
-        AND property_id = ? 
-        AND ts_hour = ? 
-        AND class = ?
-    `).bind(isSampled ? 1 : 0, projectId, propertyId, tsHour, trafficClass).run();
+  console.log('ROLLUP_DEBUG: pre', {
+    projectId,
+    propertyId,
+    trafficClass,
+    timestamp: timestamp.toISOString(),
+    tsHour,
+    isSampled
+  });
 
-    // If no rows were updated, insert new rollup
-    if (updateResult.changes === 0) {
-      await db.prepare(`
-        INSERT INTO traffic_rollup_hourly 
-        (project_id, property_id, ts_hour, class, events_count, sampled_count)
-        VALUES (?, ?, ?, ?, 1, ?)
-      `).bind(projectId, propertyId, tsHour, trafficClass, isSampled ? 1 : 0).run();
-    }
+  try {
+    // Use INSERT ... ON CONFLICT for proper upsert behavior
+    const result = await db.prepare(`
+      INSERT INTO traffic_rollup_hourly 
+      (project_id, property_id, ts_hour, class, events_count, sampled_count)
+      VALUES (?, ?, ?, ?, 1, ?)
+      ON CONFLICT(project_id, property_id, ts_hour, class) 
+      DO UPDATE SET 
+        events_count = events_count + 1,
+        sampled_count = sampled_count + ?
+    `).bind(
+      projectId, 
+      propertyId, 
+      tsHour, 
+      trafficClass, 
+      isSampled ? 1 : 0,
+      isSampled ? 1 : 0
+    ).run();
+
+    console.log('ROLLUP_DEBUG: post', { 
+      success: true, 
+      changes: result.changes,
+      trafficClass,
+      tsHour 
+    });
+
+    return true;
   } catch (error) {
-    console.error('Rollup upsert failed:', error);
+    console.error('ROLLUP_DEBUG: failed', { 
+      error: error.message, 
+      trafficClass,
+      projectId,
+      tsHour 
+    });
     throw error;
   }
 }
