@@ -207,33 +207,33 @@ const Content: React.FC = () => {
       }));
     }
 
-         if (filters.groupBy === 'page') {
-       const groups: Record<string, GroupedContent> = {};
-       
-       assets.forEach(asset => {
-         const url = new URL(asset.url);
-         const canonicalUrl = asset.url;
-         const displayTitle = url.pathname === '/' ? url.hostname : url.pathname;
-         
-         if (!groups[canonicalUrl]) {
-           groups[canonicalUrl] = {
-             key: `page_${canonicalUrl}`,
-             title: displayTitle,
-             count: 1,
-             assets: [asset],
-             isExpanded: expandedGroups.has(`page_${canonicalUrl}`),
-             totalEvents: asset.events_24h,
-             totalAIReferrals: asset.ai_referrals_24h,
-             topSources: asset.by_source_24h.slice(0, 3)
-           };
-         } else {
-           // This shouldn't happen with page grouping, but just in case
-           groups[canonicalUrl].count++;
-           groups[canonicalUrl].assets.push(asset);
-           groups[canonicalUrl].totalEvents += asset.events_24h;
-           groups[canonicalUrl].totalAIReferrals += asset.ai_referrals_24h;
-         }
-       });
+    if (filters.groupBy === 'page') {
+      const groups: Record<string, GroupedContent> = {};
+
+      assets.forEach(asset => {
+        const url = new URL(asset.url);
+        const canonicalUrl = asset.url;
+        const displayTitle = url.pathname === '/' ? url.hostname : url.pathname;
+
+        if (!groups[canonicalUrl]) {
+          groups[canonicalUrl] = {
+            key: `page_${canonicalUrl}`,
+            title: displayTitle,
+            count: 1,
+            assets: [asset],
+            isExpanded: expandedGroups.has(`page_${canonicalUrl}`),
+            totalEvents: asset.events_24h,
+            totalAIReferrals: asset.ai_referrals_24h,
+            topSources: asset.by_source_24h.slice(0, 3)
+          };
+        } else {
+          // This shouldn't happen with page grouping, but just in case
+          groups[canonicalUrl].count++;
+          groups[canonicalUrl].assets.push(asset);
+          groups[canonicalUrl].totalEvents += asset.events_24h;
+          groups[canonicalUrl].totalAIReferrals += asset.ai_referrals_24h;
+        }
+      });
 
       // Aggregate top sources across all assets in the group
       Object.values(groups).forEach(group => {
@@ -243,7 +243,7 @@ const Content: React.FC = () => {
             sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
           });
         });
-        
+
         group.topSources = Object.entries(sourceMap)
           .map(([slug, events]) => ({ slug, events }))
           .sort((a, b) => b.events - a.events)
@@ -255,11 +255,11 @@ const Content: React.FC = () => {
 
     if (filters.groupBy === 'domain') {
       const groups: Record<string, GroupedContent> = {};
-      
+
       assets.forEach(asset => {
         const domain = new URL(asset.url).hostname;
         const path = new URL(asset.url).pathname;
-        
+
         if (!groups[domain]) {
           groups[domain] = {
             key: `domain_${domain}`,
@@ -272,7 +272,7 @@ const Content: React.FC = () => {
             topSources: []
           };
         }
-        
+
         groups[domain].count++;
         groups[domain].assets.push(asset);
         groups[domain].totalEvents += asset.events_24h;
@@ -287,7 +287,7 @@ const Content: React.FC = () => {
             sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
           });
         });
-        
+
         group.topSources = Object.entries(sourceMap)
           .map(([slug, events]) => ({ slug, events }))
           .sort((a, b) => b.events - a.events)
@@ -299,7 +299,7 @@ const Content: React.FC = () => {
 
     if (filters.groupBy === 'type') {
       const groups: Record<string, GroupedContent> = {};
-      
+
       assets.forEach(asset => {
         if (!groups[asset.type]) {
           groups[asset.type] = {
@@ -313,7 +313,7 @@ const Content: React.FC = () => {
             topSources: []
           };
         }
-        
+
         groups[asset.type].count++;
         groups[asset.type].assets.push(asset);
         groups[asset.type].totalEvents += asset.events_24h;
@@ -328,7 +328,7 @@ const Content: React.FC = () => {
             sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
           });
         });
-        
+
         group.topSources = Object.entries(sourceMap)
           .map(([slug, events]) => ({ slug, events }))
           .sort((a, b) => b.events - a.events)
@@ -438,7 +438,7 @@ const Content: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               {/* Window Filter */}
               <div>
@@ -502,26 +502,25 @@ const Content: React.FC = () => {
               <div className="flex items-end">
                 <button
                   onClick={() => setFilters(prev => ({ ...prev, aiOnly: !prev.aiOnly, page: 1 }))}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
-                    filters.aiOnly
-                      ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700 border border-blue-600'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-blue-300 hover:text-blue-700'
-                  }`}
+                  className={`px-3 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${filters.aiOnly
+                      ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700 border border-blue-600'
+                      : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 hover:border-gray-300'
+                    }`}
                 >
                   <div className="relative">
                     <input
                       type="checkbox"
                       checked={filters.aiOnly}
-                      onChange={() => {}} // Handled by button click
+                      onChange={() => { }} // Handled by button click
                       className="sr-only" // Hide the checkbox visually but keep it accessible
                     />
                     {filters.aiOnly && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full animate-pulse"></div>
                     )}
                   </div>
                   <span>AI Traffic Only</span>
                   {filters.aiOnly && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       Active
                     </span>
                   )}
@@ -628,25 +627,25 @@ const Content: React.FC = () => {
                                 <ChevronRight className="h-4 w-4" />
                               )}
                             </button>
-                                                         <div>
-                               <div className="text-sm font-medium text-gray-900">
-                                 {group.title}
-                                 {group.count > 1 && (
-                                   <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                     {group.count} items
-                                   </span>
-                                 )}
-                               </div>
-                               {filters.groupBy === 'page' ? (
-                                 <div className="text-sm text-gray-500 truncate max-w-md">
-                                   {group.assets[0].url}
-                                 </div>
-                               ) : group.count === 1 && (
-                                 <div className="text-sm text-gray-500 truncate max-w-md">
-                                   {group.assets[0].url}
-                                 </div>
-                               )}
-                             </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {group.title}
+                                {group.count > 1 && (
+                                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    {group.count} items
+                                  </span>
+                                )}
+                              </div>
+                              {filters.groupBy === 'page' ? (
+                                <div className="text-sm text-gray-500 truncate max-w-md">
+                                  {group.assets[0].url}
+                                </div>
+                              ) : group.count === 1 && (
+                                <div className="text-sm text-gray-500 truncate max-w-md">
+                                  {group.assets[0].url}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
@@ -661,7 +660,7 @@ const Content: React.FC = () => {
                               group.topSources.map((source) => (
                                 <span
                                   key={source.slug}
-                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                  className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
                                 >
                                   {source.slug}: {source.events}
                                 </span>
@@ -722,23 +721,23 @@ const Content: React.FC = () => {
                                           <span>AI: {asset.ai_referrals_24h}</span>
                                         </div>
                                       </div>
-                                      
-                                      {/* AI Sources Breakdown */}
-                                      {asset.by_source_24h.length > 0 && (
-                                        <div className="mb-3">
-                                          <h5 className="text-xs font-medium text-gray-700 mb-2">AI Sources (24h)</h5>
-                                          <div className="flex flex-wrap gap-2">
-                                            {asset.by_source_24h.map((source) => (
-                                              <span
-                                                key={source.slug}
-                                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                                              >
-                                                {source.slug}: {source.events}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
+
+                                                                             {/* AI Sources Breakdown */}
+                                       {asset.by_source_24h.length > 0 && (
+                                         <div className="mb-3">
+                                           <h5 className="text-xs font-medium text-gray-700 mb-2">AI Sources (24h)</h5>
+                                           <div className="flex flex-wrap gap-2">
+                                             {asset.by_source_24h.map((source) => (
+                                               <span
+                                                 key={source.slug}
+                                                 className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
+                                               >
+                                                 {source.slug}: {source.events}
+                                               </span>
+                                             ))}
+                                           </div>
+                                         </div>
+                                       )}
 
                                       {/* Recent Events (if loaded) */}
                                       {assetDetails[asset.id] && (
