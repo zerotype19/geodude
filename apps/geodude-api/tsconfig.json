@@ -14,10 +14,31 @@
     ]
   },
   "include": [
-    "scripts/**/*.ts"
+    "src/worker.js",
+    "src/config.ts",
+    "src/cors.ts",
+    "src/schema-validator.ts",
+    "src/auth-middleware.ts",
+    "src/email-service.ts",
+    "src/metrics.ts",
+    "src/rate-limiter.ts",
+    "src/security-headers.ts",
+    "src/auth.ts",
+    "src/metadata-sanitizer.ts",
+    "src/alerts.ts",
+    "src/utils.ts",
+    "src/logging.ts",
+    "src/lib/**/*.ts",
+    "src/ai-lite/**/*.ts",
+    "src/metrics/**/*.ts",
+    "src/routes/**/*.ts"
   ],
   "exclude": [
-    "src/**/*",
-    "tests/**/*"
+    "scripts/**/*",
+    "tests/**/*",
+    "src/worker-*.ts",
+    "src/worker-new.ts",
+    "src/worker-simple.ts",
+    "src/classifier.ts"
   ]
 }
