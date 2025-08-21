@@ -8,7 +8,7 @@ export interface CorsConfig {
 export function addCorsHeaders(response: Response, origin?: string): Response {
   // Always allow preflight requests
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-optiview-key-id, x-optiview-signature, x-optiview-timestamp');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-optiview-key-id, x-optiview-signature, x-optiview-timestamp, cache-control, pragma');
   response.headers.set('Access-Control-Allow-Credentials', 'true');
   
   // Set origin based on request, default to frontend origin
