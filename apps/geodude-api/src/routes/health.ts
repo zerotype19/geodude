@@ -99,11 +99,12 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         },
         projects_5m: { created },
         ai_lite: aiLiteMetrics, // AI-Lite specific metrics
-        
+
         // Hardened Classification System Health Tiles
         hardened_classification: await getHardenedClassificationHealth(d1, orgId),
         citations: await getCitationsHealth(d1, orgId),
-        
+        classifier_info: await getClassifierInfo(env),
+
         // Legacy fields for backward compatibility
         kv_ok: kvOk,
         d1_ok: dbOk,
@@ -674,7 +675,7 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
+
     // Get last 24h metrics from rollups
     const last24hRollups = await d1.prepare(`
       SELECT class, SUM(events_count) as total_events
@@ -682,7 +683,7 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
       WHERE ts_hour >= ? 
       GROUP BY class
     `).bind(Math.floor(last24h.getTime() / 1000)).all();
-    
+
     // Get previous 24h for comparison
     const prev24h = new Date(last24h.getTime() - 24 * 60 * 60 * 1000);
     const prev24hRollups = await d1.prepare(`
@@ -691,7 +692,7 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
       WHERE ts_hour >= ? AND ts_hour < ?
       GROUP BY class
     `).bind(Math.floor(prev24h.getTime() / 1000), Math.floor(last24h.getTime() / 1000)).all();
-    
+
     // Get 7-day median for baseline
     const weekRollups = await d1.prepare(`
       SELECT class, AVG(daily_total) as median_daily
@@ -703,58 +704,80 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
       ) daily_totals
       GROUP BY class
     `).bind(Math.floor(last7d.getTime() / 1000)).all();
-    
+
     // Process current 24h data
     const currentData = new Map();
     (last24hRollups.results || []).forEach(row => {
       currentData.set(row.class, row.total_events);
     });
-    
+
     // Process previous 24h data
     const previousData = new Map();
     (prev24hRollups.results || []).forEach(row => {
       previousData.set(row.class, row.total_events);
     });
-    
+
     // Process 7-day median data
     const medianData = new Map();
     (weekRollups.results || []).forEach(row => {
       medianData.set(row.class, row.median_daily);
     });
-    
+
     // Calculate metrics
     const aiHumanClicks = currentData.get('human_via_ai') || 0;
     const crawlerHits = currentData.get('ai_agent_crawl') || 0;
     const searchClicks = currentData.get('search') || 0;
     const directHuman = currentData.get('direct_human') || 0;
-    
+
     // Calculate trends (vs previous 24h)
     const aiHumanTrend = getTrend(aiHumanClicks, previousData.get('human_via_ai') || 0);
     const crawlerTrend = getTrend(crawlerHits, previousData.get('ai_agent_crawl') || 0);
-    
+
     // Calculate search vs AI split
     const totalHumanTraffic = aiHumanClicks + searchClicks;
     const aiPercentage = totalHumanTraffic > 0 ? Math.round((aiHumanClicks / totalHumanTraffic) * 100) : 0;
-    
+
     // Calculate referrer visibility (placeholder - would need actual referrer data)
     const referrerVisibility = aiHumanClicks > 0 ? 95 : 0; // Placeholder
-    
+
     // Get events missing content_id in last 24h
     const missingContentIdCount = await d1.prepare(`
       SELECT COUNT(*) as missing_count
       FROM interaction_events 
       WHERE occurred_at >= ? AND content_id IS NULL
     `).bind(last24h.toISOString()).first();
-    
+
     const eventsMissingContentId = missingContentIdCount?.missing_count || 0;
-    
+
+    // Get audit coverage metrics
+    const totalEvents24h = await d1.prepare(`
+      SELECT COUNT(*) as total_count
+      FROM interaction_events 
+      WHERE occurred_at >= ?
+    `).bind(last24h.toISOString()).first();
+
+    const eventsWithAuditFields = await d1.prepare(`
+      SELECT COUNT(*) as audit_count
+      FROM interaction_events 
+      WHERE occurred_at >= ? 
+        AND json_extract(metadata, '$.classification_reason') IS NOT NULL
+        AND json_extract(metadata, '$.confidence') IS NOT NULL
+    `).bind(last24h.toISOString()).first();
+
+    const totalEvents = totalEvents24h?.total_count || 0;
+    const auditEvents = eventsWithAuditFields?.audit_count || 0;
+    const auditCoverage = totalEvents > 0 ? Math.round((auditEvents / totalEvents) * 100) : 0;
+
     return {
       last_24h: {
         ai_human_clicks: aiHumanClicks,
         crawler_hits: crawlerHits,
         search_vs_ai_split: `${aiPercentage}% AI-influenced`,
         referrer_visibility: `${referrerVisibility}%`,
-        events_missing_content_id: eventsMissingContentId
+        events_missing_content_id: eventsMissingContentId,
+        audit_coverage_percent: auditCoverage,
+        total_events: totalEvents,
+        events_with_audit_fields: auditEvents
       },
       trends: {
         ai_human: aiHumanTrend,
@@ -766,7 +789,7 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
       },
       status: aiHumanClicks > 0 || crawlerHits > 0 ? "healthy" : "no_data"
     };
-    
+
   } catch (error) {
     console.error('Error getting hardened classification health:', error);
     return {
@@ -783,7 +806,7 @@ async function getCitationsHealth(d1: any, orgId: string) {
   try {
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
+
     // Get citations ingested in last 24h
     const ingestedCount = await d1.prepare(`
       SELECT COUNT(*) as total
@@ -792,7 +815,7 @@ async function getCitationsHealth(d1: any, orgId: string) {
       JOIN projects pr ON pr.id = p.project_id
       WHERE pr.org_id = ? AND ace.created_at >= ?
     `).bind(orgId, last24h.toISOString()).first();
-    
+
     // Get distinct sources citing in last 24h
     const sourcesCount = await d1.prepare(`
       SELECT COUNT(DISTINCT ace.surface) as total
@@ -801,7 +824,7 @@ async function getCitationsHealth(d1: any, orgId: string) {
       JOIN projects pr ON pr.id = p.project_id
       WHERE pr.org_id = ? AND ace.created_at >= ?
     `).bind(orgId, last24h.toISOString()).first();
-    
+
     // Get evidence type breakdown
     const evidenceTypes = await d1.prepare(`
       SELECT 
@@ -814,21 +837,53 @@ async function getCitationsHealth(d1: any, orgId: string) {
       GROUP BY ace.evidence_type
       ORDER BY count DESC
     `).bind(orgId, last24h.toISOString()).all();
-    
+
     const evidenceTypeMap = {};
     (evidenceTypes.results || []).forEach(row => {
       evidenceTypeMap[row.evidence_type] = row.count;
     });
-    
+
     return {
       ingested_24h: ingestedCount?.total || 0,
       sources_citing_24h: sourcesCount?.total || 0,
       evidence_types: evidenceTypeMap,
       status: ingestedCount?.total > 0 ? "active" : "no_citations"
     };
-    
+
   } catch (error) {
     console.error('Error getting citations health:', error);
+    return {
+      error: error.message,
+      status: "error"
+    };
+  }
+}
+
+/**
+ * Get classifier information and version details
+ */
+async function getClassifierInfo(env: any) {
+  try {
+    // Get current classifier manifest version
+    const { getClassifierManifest } = await import('./ai-lite/classifier-manifest');
+    const manifest = await getClassifierManifest(env);
+    
+    // Get KV fallback counter (incremented when static manifest is used)
+    const fallbackCount = await env.CACHE.get('classifier_kv_fallback_count') || '0';
+    
+    // Get last 24h fallback count
+    const last24hFallback = await env.CACHE.get('classifier_kv_fallback_24h') || '0';
+    
+    return {
+      classifier_version: 'v2.0.0',
+      kv_manifest_version: manifest.manifest_version || 'static',
+      kv_fallback_total: parseInt(fallbackCount),
+      kv_fallback_24h: parseInt(last24hFallback),
+      status: manifest.manifest_version ? 'kv_manifest' : 'static_fallback'
+    };
+    
+  } catch (error) {
+    console.error('Error getting classifier info:', error);
     return {
       error: error.message,
       status: "error"
@@ -843,7 +898,7 @@ function getTrend(current: number, previous: number): string {
   if (current === 0 && previous === 0) return "→";
   if (current === 0) return "↓";
   if (previous === 0) return "↑";
-  
+
   const change = ((current - previous) / previous) * 100;
   if (change > 10) return "↑";
   if (change < -10) return "↓";
