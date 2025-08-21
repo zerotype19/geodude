@@ -623,19 +623,8 @@ export async function handleApiRoutes(
             ];
             let params: any[] = [project_id, sinceISO];
 
-            // Add traffic class filter
-            if (trafficClass) {
-                whereConditions.push(`(
-                    CASE 
-                        WHEN e.ai_source_id IS NOT NULL THEN 'human_via_ai'
-                        WHEN json_extract(e.metadata,'$.traffic_class') IS NOT NULL THEN json_extract(e.metadata,'$.traffic_class')
-                        WHEN json_extract(e.metadata,'$.referrer') LIKE '%google.com%' OR json_extract(e.metadata,'$.referrer') LIKE '%bing.com%' THEN 'search'
-                        WHEN json_extract(e.metadata,'$.user_agent') LIKE '%bot%' OR json_extract(e.metadata,'$.referrer') LIKE '%crawler%' THEN 'ai_agent_crawl'
-                        ELSE 'direct_human'
-                    END
-                ) = ?`);
-                params.push(trafficClass);
-            }
+            // Add traffic class filter - we'll filter in application code after classification
+            // since the new hardened classifier needs access to Cloudflare data and heuristics
 
             // Add source filter
             if (source) {
@@ -665,15 +654,10 @@ export async function handleApiRoutes(
             const dataQuery = `
                 SELECT 
                     e.id, e.occurred_at, e.event_type,
-                    CASE 
-                        WHEN e.ai_source_id IS NOT NULL THEN 'human_via_ai'
-                        WHEN json_extract(e.metadata,'$.traffic_class') IS NOT NULL THEN json_extract(e.metadata,'$.traffic_class')
-                        WHEN json_extract(e.metadata,'$.referrer') LIKE '%google.com%' OR json_extract(e.metadata,'$.referrer') LIKE '%bing.com%' THEN 'search'
-                        WHEN json_extract(e.metadata,'$.user_agent') LIKE '%bot%' OR json_extract(e.metadata,'$.referrer') LIKE '%crawler%' THEN 'ai_agent_crawl'
-                        ELSE 'direct_human'
-                    END AS class,
                     e.content_id, e.property_id,
                     json_extract(e.metadata,'$.url') AS url,
+                    json_extract(e.metadata,'$.referrer') AS referrer,
+                    json_extract(e.metadata,'$.user_agent') AS user_agent,
                     e.ai_source_id, s.slug, s.name,
                     json_object(
                         'p', json_extract(e.metadata,'$.pathname'),
@@ -688,25 +672,56 @@ export async function handleApiRoutes(
             `;
             const eventsResult = await env.OPTIVIEW_DB.prepare(dataQuery).bind(...params, pageSizeNum, offset).all<any>();
 
-            const result = {
-                items: (eventsResult.results || []).map(row => ({
+            // Load heuristics for classification
+            const { classifyTraffic } = await import('../lib/classifier');
+            const { loadHeuristics } = await import('../lib/kv-rules');
+            const heuristics = await loadHeuristics(env);
+            
+            // Classify each event using the hardened classifier
+            const classifiedItems = await Promise.all((eventsResult.results || []).map(async (row) => {
+                // Classify the event
+                const classification = classifyTraffic({
+                    cf: undefined, // No Cloudflare data in GET requests
+                    headers: new Headers(), // No headers in GET requests
+                    url: row.url || '',
+                    referrer: row.referrer || '',
+                    userAgent: row.user_agent || '',
+                    heuristics
+                });
+
+                // Check if we should include this event based on traffic class filter
+                if (trafficClass && classification.class !== trafficClass) {
+                    return null; // Filter out events that don't match the requested class
+                }
+
+                // Check if we should include this event based on source filter
+                if (source && classification.aiSourceSlug !== source) {
+                    return null; // Filter out events that don't match the requested source
+                }
+
+                return {
                     id: row.id,
                     occurred_at: row.occurred_at,
                     event_type: row.event_type,
-                    class: row.class || 'direct_human',
-                    source: row.ai_source_id ? {
-                        id: row.ai_source_id,
-                        slug: row.slug,
-                        name: row.name
-                    } : null,
+                    event_class: classification.class,
+                    source_name: classification.aiSourceName || row.name,
                     url: row.url,
                     content_id: row.content_id,
                     property_id: row.property_id,
-                    metadata_preview: row.metadata_preview
-                })),
+                    metadata_preview: row.metadata_preview,
+                    ...(url.searchParams.get('debug') === '1' && { debug: classification.reason })
+                };
+            }));
+
+            // Filter out null items and update total count
+            const filteredItems = classifiedItems.filter(item => item !== null);
+            const filteredTotal = filteredItems.length;
+
+            const result = {
+                items: filteredItems,
                 page: pageNum,
                 pageSize: pageSizeNum,
-                total: totalResult?.total || 0
+                total: filteredTotal
             };
 
             const response = new Response(JSON.stringify(result), {
@@ -1607,7 +1622,9 @@ export async function handleApiRoutes(
             }
 
             // Get AI-Lite configuration for this project
-            const { getProjectAILiteConfig, classifyTraffic, shouldSampleTraffic, upsertRollup } = await import('../ai-lite');
+            const { getProjectAILiteConfig } = await import('../ai-lite');
+            const { classifyTraffic, loadHeuristics } = await import('../lib/classifier');
+            const { updateRollup, insertEvent, processEventClassification, shouldInsertEvent, shouldAttachToSession } = await import('../lib/events-utils');
 
             const aiLiteConfig = await getProjectAILiteConfig(env.OPTIVIEW_DB, project_id, env);
             const isAILite = aiLiteConfig.enforceAI || aiLiteConfig.trackingMode === 'ai-lite';
@@ -1663,11 +1680,12 @@ export async function handleApiRoutes(
                     }
                 }
 
-                // AI-Lite: Classify traffic and determine sampling
+                // Hardened traffic classification
                 let trafficClass = 'direct_human'; // Default fallback
                 let shouldInsertRow = true;
                 let isSampled = false;
                 let aiSourceId = null;
+                let classification: any = null;
 
                 try {
                     // Extract referrer and user agent from metadata
@@ -1675,68 +1693,39 @@ export async function handleApiRoutes(
                     const userAgent = metadata?.user_agent || null;
                     const url = metadata?.url || null;
 
-                    // Helper function to get or create AI source
-                    async function getOrCreateAISource(db: any, slug: string, name: string): Promise<number | null> {
-                        try {
-                            // First try to find existing source
-                            const existing = await db.prepare(`
-                                SELECT id FROM ai_sources WHERE slug = ?
-                            `).bind(slug).first();
-
-                            if (existing) {
-                                return existing.id;
-                            }
-
-                            // Create new source if it doesn't exist
-                            const result = await db.prepare(`
-                                INSERT INTO ai_sources (slug, name, category, created_at)
-                                VALUES (?, ?, ?, ?)
-                            `).bind(slug, name, 'crawler', new Date().toISOString()).run();
-
-                            return result.meta.last_row_id;
-                        } catch (error) {
-                            console.error('Error getting/creating AI source:', error);
-                            return null;
-                        }
-                    }
+                    // Load heuristics for classification
+                    const heuristics = await loadHeuristics(env);
 
                     // Get Cloudflare data for traffic classification
                     const cfData = (req as any).cf;
 
-                    // Classify traffic with Cloudflare data
-                    const classification = classifyTraffic(referrer, userAgent, req.headers, url, cfData);
+                    // Classify traffic with hardened system
+                    classification = classifyTraffic({
+                        cf: cfData,
+                        headers: req.headers,
+                        url: url || '',
+                        referrer: referrer || '',
+                        userAgent: userAgent || '',
+                        heuristics
+                    });
+                    
                     trafficClass = classification.class;
+                    
+                    // Log classification results for debugging
+                    console.log('classification=', {
+                        class: classification.class,
+                        aiSourceSlug: classification.aiSourceSlug,
+                        reason: classification.reason
+                    });
 
-                    // Determine if we should insert a row based on AI-Lite mode
-                    if (isAILite) {
-                        if (classification.isAI) {
-                            // AI traffic: always insert row
-                            shouldInsertRow = true;
-                            isSampled = false;
+                    // Process classification and determine insertion behavior
+                    const { aiSourceId: processedAiSourceId } = await processEventClassification(env, classification);
+                    aiSourceId = processedAiSourceId;
 
-                            // Set ai_source_id for AI traffic
-                            if (classification.aiSourceSlug) {
-                                // Look up or create AI source
-                                aiSourceId = await getOrCreateAISource(env.OPTIVIEW_DB, classification.aiSourceSlug, classification.aiSourceName);
-                            }
-                        } else {
-                            // Baseline traffic: apply sampling
-                            isSampled = shouldSampleTraffic(classification, {
-                                samplePct: aiLiteConfig.samplePct,
-                                enforceAI: aiLiteConfig.enforceAI
-                            });
-                            shouldInsertRow = isSampled;
-                        }
-                    } else {
-                        // Full mode: always insert row
-                        shouldInsertRow = true;
-                        isSampled = false;
-
-                        // Set ai_source_id for AI traffic even in full mode
-                        if (classification.aiSourceSlug) {
-                            aiSourceId = await getOrCreateAISource(env.OPTIVIEW_DB, classification.aiSourceSlug, classification.aiSourceName);
-                        }
-                    }
+                    // Determine if we should insert a row based on AI-Lite mode and classification
+                    const { shouldInsert, isSampled: shouldSample } = shouldInsertEvent(classification, isAILite, aiLiteConfig.samplePct);
+                    shouldInsertRow = shouldInsert;
+                    isSampled = shouldSample;
 
 
 
@@ -1777,17 +1766,15 @@ export async function handleApiRoutes(
                     }
                 }
 
-                // AI-Lite: Always update rollups (counts every event)
+                // Always update rollups (counts every event)
                 try {
-                    await upsertRollup(
-                        env.OPTIVIEW_DB,
+                    await updateRollup(env, {
                         project_id,
                         property_id,
-                        new Date(occurred_at || now),
+                        timestamp: new Date(occurred_at || now),
                         trafficClass,
                         isSampled
-                    );
-    
+                    });
                 } catch (rollupError) {
                     console.error('Error updating rollup:', rollupError);
                     // Don't fail the request, just log the error
@@ -1857,6 +1844,12 @@ export async function handleApiRoutes(
                     if (!eventId) {
                         // This event was skipped due to AI-Lite sampling or deduplication
                         console.log('⏭️ Skipping session handling for skipped event index:', i);
+                        continue;
+                    }
+
+                    // Skip session handling for crawler events
+                    if (classification && !shouldAttachToSession(classification)) {
+                        console.log('⏭️ Skipping session handling for crawler event');
                         continue;
                     }
 
