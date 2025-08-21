@@ -1501,6 +1501,20 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
+            // Get AI-Lite configuration for this project
+            const { getProjectAILiteConfig, classifyTraffic, shouldSampleTraffic, upsertRollup } = await import('../ai-lite');
+            
+            const aiLiteConfig = await getProjectAILiteConfig(env.OPTIVIEW_DB, project_id, env);
+            const isAILite = aiLiteConfig.enforceAI || aiLiteConfig.trackingMode === 'ai-lite';
+            
+            console.log('🔍 AI-Lite config:', { 
+                projectId: project_id, 
+                trackingMode: aiLiteConfig.trackingMode, 
+                enforceAI: aiLiteConfig.enforceAI,
+                samplePct: aiLiteConfig.samplePct,
+                isAILite 
+            });
+
             // Process each event in the batch
             const now = new Date().toISOString();
             const insertResults = [];
@@ -1550,17 +1564,133 @@ export async function handleApiRoutes(
                     }
                 }
 
-                // Store event in interaction_events table
+                // AI-Lite: Classify traffic and determine sampling
+                let trafficClass = 'direct_human'; // Default fallback
+                let shouldInsertRow = true;
+                let isSampled = false;
+                let aiSourceId = null;
+
+                try {
+                    // Extract referrer and user agent from metadata
+                    const referrer = metadata?.referrer || metadata?.referer || null;
+                    const userAgent = metadata?.user_agent || null;
+                    const url = metadata?.url || null;
+                    
+                    // Classify traffic
+                    const classification = classifyTraffic(referrer, userAgent, req.headers, url);
+                    trafficClass = classification.class;
+                    
+                    // Determine if we should insert a row based on AI-Lite mode
+                    if (isAILite) {
+                        if (classification.isAI) {
+                            // AI traffic: always insert row
+                            shouldInsertRow = true;
+                            isSampled = false;
+                            
+                            // Set ai_source_id for AI traffic
+                            if (trafficClass === 'human_via_ai') {
+                                // TODO: Look up or create AI source based on referrer/headers
+                                aiSourceId = null; // Will be enhanced later
+                            }
+                        } else {
+                            // Baseline traffic: apply sampling
+                            isSampled = shouldSampleTraffic(classification, {
+                                samplePct: aiLiteConfig.samplePct,
+                                enforceAI: aiLiteConfig.enforceAI
+                            });
+                            shouldInsertRow = isSampled;
+                        }
+                    } else {
+                        // Full mode: always insert row
+                        shouldInsertRow = true;
+                        isSampled = false;
+                    }
+                    
+                    console.log('🔍 Traffic classification:', {
+                        class: trafficClass,
+                        isAI: classification.isAI,
+                        shouldSample: classification.shouldSample,
+                        shouldInsertRow,
+                        isSampled,
+                        samplePct: aiLiteConfig.samplePct
+                    });
+                    
+                } catch (classificationError) {
+                    console.error('Error in traffic classification:', classificationError);
+                    // Fall back to default behavior
+                    shouldInsertRow = true;
+                    isSampled = false;
+                }
+
+                // AI-Lite: Check for crawl deduplication (within 10 minutes)
+                let shouldSkipDueToDedupe = false;
+                if (trafficClass === 'ai_agent_crawl' && isAILite) {
+                    try {
+                        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+                        const existingCrawl = await env.OPTIVIEW_DB.prepare(`
+                            SELECT id FROM interaction_events
+                            WHERE project_id = ? 
+                              AND property_id = ? 
+                              AND ai_source_id = ? 
+                              AND metadata LIKE ?
+                              AND occurred_at > ?
+                              AND event_type = ?
+                            LIMIT 1
+                        `).bind(
+                            project_id, 
+                            property_id, 
+                            aiSourceId, 
+                            `%${metadata?.url || ''}%`,
+                            tenMinutesAgo.toISOString(),
+                            normalizedEventType
+                        ).first();
+                        
+                        if (existingCrawl) {
+                            shouldSkipDueToDedupe = true;
+                            console.log('🔄 Skipping duplicate AI crawl within 10 minutes');
+                        }
+                    } catch (dedupeError) {
+                        console.error('Error checking crawl deduplication:', dedupeError);
+                    }
+                }
+
+                // AI-Lite: Always update rollups (counts every event)
+                try {
+                    await upsertRollup(
+                        env.OPTIVIEW_DB,
+                        project_id,
+                        property_id,
+                        new Date(occurred_at || now),
+                        trafficClass,
+                        isSampled
+                    );
+                    console.log('✅ Rollup updated for class:', trafficClass);
+                } catch (rollupError) {
+                    console.error('Error updating rollup:', rollupError);
+                    // Don't fail the request, just log the error
+                }
+
+                // Store event in interaction_events table (only if we should)
+                if (!shouldInsertRow || shouldSkipDueToDedupe) {
+                    const skipReason = !shouldInsertRow ? 'baseline traffic (AI-Lite mode)' : 'duplicate AI crawl';
+                    console.log(`⏭️ Skipping row insert: ${skipReason}`);
+                    insertResults.push({ meta: { last_row_id: null } }); // Placeholder for indexing
+                    continue;
+                }
+
+
+
                 try {
                     // Debug logging to identify undefined values
                     const insertValues = [
                         project_id,
                         property_id,
                         contentId,
-                        null, // ai_source_id (can be enhanced later)
+                        aiSourceId, // Now includes AI source ID when available
                         normalizedEventType,
                         JSON.stringify(metadata || {}),
-                        occurred_at || now
+                        occurred_at || now,
+                        isSampled ? 1 : 0 // Add sampled flag
                     ];
 
                     console.log('🔍 Events API Debug - Insert values:', {
@@ -1590,8 +1720,8 @@ export async function handleApiRoutes(
                     const result = await env.OPTIVIEW_DB.prepare(`
                         INSERT INTO interaction_events (
                             project_id, property_id, content_id, ai_source_id, 
-                            event_type, metadata, occurred_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                            event_type, metadata, occurred_at, sampled
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     `).bind(...insertValues).run();
 
                     insertResults.push(result);
@@ -1611,8 +1741,9 @@ export async function handleApiRoutes(
                     // Get the corresponding event ID from insertResults
                     const eventId = insertResults[i]?.meta?.last_row_id;
                     if (!eventId) {
-                        console.error('No event ID found for event index:', i);
-                        continue; // Skip this event if we can't get the ID
+                        // This event was skipped due to AI-Lite sampling or deduplication
+                        console.log('⏭️ Skipping session handling for skipped event index:', i);
+                        continue;
                     }
 
                     // Extract session and visitor info from metadata
@@ -1750,14 +1881,50 @@ export async function handleApiRoutes(
                 UPDATE api_key SET last_used_ts = unixepoch() WHERE id = ?
             `).bind(apiKey.id).run();
 
+            // AI-Lite: Log sampling statistics
+            if (isAILite) {
+                const actualInserted = insertResults.filter(r => r.meta?.last_row_id).length;
+                const skipped = events.length - actualInserted;
+                const samplingRate = ((actualInserted / events.length) * 100).toFixed(1);
+                
+                console.log('📊 AI-Lite sampling stats:', {
+                    total: events.length,
+                    inserted: actualInserted,
+                    skipped,
+                    samplingRate: `${samplingRate}%`,
+                    samplePct: aiLiteConfig.samplePct
+                });
+                
+                // Store sampling metrics in KV for monitoring
+                if (env.METRICS) {
+                    try {
+                        const metricsKey = `ai_lite:${project_id}:${new Date().toISOString().split('T')[0]}`;
+                        const currentMetrics = await env.METRICS.get(metricsKey, 'json') || { total: 0, inserted: 0, skipped: 0 };
+                        
+                        currentMetrics.total += events.length;
+                        currentMetrics.inserted += actualInserted;
+                        currentMetrics.skipped += skipped;
+                        
+                        await env.METRICS.put(metricsKey, JSON.stringify(currentMetrics), { expirationTtl: 7 * 24 * 3600 });
+                    } catch (metricsError) {
+                        console.error('Failed to store AI-Lite metrics:', metricsError);
+                    }
+                }
+            }
+
             // Invalidate cache for this project
             const { bumpProjectVersion } = await import('../lib/cache');
             await bumpProjectVersion(env.CACHE, project_id);
 
             const response = new Response(JSON.stringify({
                 success: true,
-                processed: insertResults.length,
-                total: events.length
+                processed: insertResults.filter(r => r.meta?.last_row_id).length,
+                total: events.length,
+                ai_lite: isAILite ? {
+                    mode: aiLiteConfig.trackingMode,
+                    sample_pct: aiLiteConfig.samplePct,
+                    sampling_applied: isAILite
+                } : undefined
             }), {
                 status: 201,
                 headers: { "Content-Type": "application/json" }
