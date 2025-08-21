@@ -1119,23 +1119,33 @@ export async function handleApiRoutes(
             const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
 
             // Get citations data from interaction_events table
-            const countResult = await env.OPTIVIEW_DB.prepare(`
+            let countQuery = `
                 SELECT COUNT(*) as total
                 FROM interaction_events ie
                 JOIN projects p ON p.id = ie.project_id
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                LEFT JOIN content_assets ca ON ca.id = ie.content_id
                 WHERE p.project_id = ? 
                   AND ie.occurred_at >= datetime(?, 'unixepoch')
                   AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                  ${sourceFilter ? 'AND COALESCE(ais.slug, "unknown") = ?' : ''}
-                  ${searchQuery.trim() ? 'AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)' : ''}
-            `).bind(
-                project_id, 
-                Math.floor(fromTs / 1000),
-                ...(sourceFilter ? [sourceFilter] : []),
-                ...(searchQuery.trim() ? [`%${searchQuery.trim()}%`, `%${searchQuery.trim()}%`] : [])
-            ).first();
+            `;
+            
+            let countParams = [project_id, Math.floor(fromTs / 1000)];
+            
+            if (sourceFilter) {
+                countQuery += ' AND COALESCE(ais.slug, "unknown") = ?';
+                countParams.push(sourceFilter);
+            }
+            
+            if (searchQuery.trim()) {
+                countQuery += ' AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)';
+                countParams.push(`%${searchQuery.trim()}%`);
+                countParams.push(`%${searchQuery.trim()}%`);
+            }
 
-            const itemsResult = await env.OPTIVIEW_DB.prepare(`
+            const countResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...countParams).first();
+
+            let itemsQuery = `
                 SELECT 
                     ie.id,
                     ie.occurred_at as detected_at,
@@ -1155,18 +1165,25 @@ export async function handleApiRoutes(
                 WHERE p.project_id = ? 
                   AND ie.occurred_at >= datetime(?, 'unixepoch')
                   AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
-                  ${sourceFilter ? 'AND COALESCE(ais.slug, "unknown") = ?' : ''}
-                  ${searchQuery.trim() ? 'AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)' : ''}
-                ORDER BY ie.occurred_at DESC
-                LIMIT ? OFFSET ?
-            `).bind(
-                project_id, 
-                Math.floor(fromTs / 1000),
-                ...(sourceFilter ? [sourceFilter] : []),
-                ...(searchQuery.trim() ? [`%${searchQuery.trim()}%`, `%${searchQuery.trim()}%`] : []),
-                pageSizeNum,
-                (pageNum - 1) * pageSizeNum
-            ).all();
+            `;
+            
+            let itemsParams = [project_id, Math.floor(fromTs / 1000)];
+            
+            if (sourceFilter) {
+                itemsQuery += ' AND COALESCE(ais.slug, "unknown") = ?';
+                itemsParams.push(sourceFilter);
+            }
+            
+            if (searchQuery.trim()) {
+                itemsQuery += ' AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)';
+                itemsParams.push(`%${searchQuery.trim()}%`);
+                itemsParams.push(`%${searchQuery.trim()}%`);
+            }
+            
+            itemsQuery += ' ORDER BY ie.occurred_at DESC LIMIT ? OFFSET ?';
+            itemsParams.push(pageSizeNum, (pageNum - 1) * pageSizeNum);
+
+            const itemsResult = await env.OPTIVIEW_DB.prepare(itemsQuery).bind(...itemsParams).all();
 
             const result = {
                 items: (itemsResult.results || []).map(row => ({
