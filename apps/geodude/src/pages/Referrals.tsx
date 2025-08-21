@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Shell from '../components/Shell';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE, FETCH_OPTS } from '../config';
 import { Info } from 'lucide-react';
+import { getReferralsTab, setReferralsTab } from '../lib/prefs';
 
 interface ReferralSummary {
   totals: {
@@ -44,6 +46,7 @@ interface ReferralItem {
 
 const Referrals: React.FC = () => {
   const { project, loading: authLoading } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [summary, setSummary] = useState<ReferralSummary | null>(null);
   const [referrals, setReferrals] = useState<ReferralItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +59,9 @@ const Referrals: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [total, setTotal] = useState(0);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'assistants' | 'search' | 'crawlers'>('assistants');
 
   // Load window preference from localStorage
   useEffect(() => {
@@ -68,13 +74,43 @@ const Referrals: React.FC = () => {
     }
   }, [project?.id]);
 
+  // Load tab from URL params and localStorage
+  useEffect(() => {
+    if (project?.id) {
+      const tabFromURL = searchParams.get('tab') as 'assistants' | 'search' | 'crawlers';
+      if (tabFromURL && ['assistants', 'search', 'crawlers'].includes(tabFromURL)) {
+        setActiveTab(tabFromURL);
+        setReferralsTab(project.id, tabFromURL);
+      } else {
+        const savedTab = getReferralsTab(project.id);
+        setActiveTab(savedTab);
+      }
+    }
+  }, [project?.id, searchParams]);
+
   // Save window preference to localStorage
   useEffect(() => {
     if (project?.id) {
-      const storageKey = `referrals_window_${project.id}`;
+      const storageKey = `referrals_window_${window}`;
       localStorage.setItem(storageKey, window);
     }
   }, [project?.id, window]);
+
+  // Handle tab change
+  const handleTabChange = (tab: 'assistants' | 'search' | 'crawlers') => {
+    setActiveTab(tab);
+    if (project?.id) {
+      setReferralsTab(project.id, tab);
+    }
+    
+    // Update URL params
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('tab', tab);
+    setSearchParams(newParams);
+    
+    // Reset page when changing tabs
+    setPage(1);
+  };
 
   const fetchSummary = async () => {
     if (!project?.id) return;
@@ -285,6 +321,42 @@ const Referrals: React.FC = () => {
             </Card>
           </div>
         )}
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => handleTabChange('assistants')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'assistants'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              AI Assistants
+            </button>
+            <button
+              onClick={() => handleTabChange('search')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'search'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Search Engines
+            </button>
+            <button
+              onClick={() => handleTabChange('crawlers')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'crawlers'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Crawlers
+            </button>
+          </nav>
+        </div>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">

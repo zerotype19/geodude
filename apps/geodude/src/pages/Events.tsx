@@ -62,6 +62,7 @@ import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../contexts/AuthContext";
 import { API_BASE, FETCH_OPTS } from '../config';
+import { getIncludeTraining, setIncludeTraining as setIncludeTrainingPref, getIncludeTrainingFromURL, syncIncludeTrainingFromURL } from '../lib/prefs';
 
 interface EventItem {
   id: number;
@@ -124,6 +125,7 @@ export default function Events() {
   // AI-Lite state
   const [includeBaseline, setIncludeBaseline] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [includeTraining, setIncludeTraining] = useState(false);
 
   // URL params and filters
   const window = searchParams.get("window") || getStoredWindow() || "24h";
@@ -132,9 +134,25 @@ export default function Events() {
   const searchQuery = searchParams.get("q") || "";
   const page = parseInt(searchParams.get("page") || "1");
 
+  // Check for include_training URL param
+  const includeTrainingFromURL = getIncludeTrainingFromURL(searchParams);
+
   // Refs for auto-refresh
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
   const refreshCount = useRef(0);
+
+  // Initialize includeTraining from localStorage and URL params
+  useEffect(() => {
+    if (project?.id) {
+      // Check URL param first, then localStorage
+      if (includeTrainingFromURL) {
+        setIncludeTraining(true);
+        syncIncludeTrainingFromURL(project.id, searchParams);
+      } else {
+        setIncludeTraining(getIncludeTraining(project.id));
+      }
+    }
+  }, [project?.id, includeTrainingFromURL, searchParams]);
 
   // Local storage for window preference
   function getStoredWindow(): string | null {
@@ -158,6 +176,14 @@ export default function Events() {
       }
     });
     setSearchParams(newParams);
+  }
+
+  // Handle include training toggle
+  function handleIncludeTrainingToggle(checked: boolean) {
+    setIncludeTraining(checked);
+    if (project?.id) {
+      setIncludeTrainingPref(project.id, checked);
+    }
   }
 
   // API calls
@@ -557,8 +583,8 @@ export default function Events() {
                   key={w}
                   onClick={() => handleWindowChange(w)}
                   className={`px-3 py-1 text-sm font-medium ${window === w
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50"
                     } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
                 >
                   {w}
@@ -612,17 +638,16 @@ export default function Events() {
                   ✅ Hardened System Active
                 </span>
                 {summary?.tracking_mode && (
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    summary.tracking_mode === 'ai-lite' 
-                      ? 'bg-blue-100 text-blue-800' 
+                  <span className={`px-2 py-1 text-xs rounded-full ${summary.tracking_mode === 'ai-lite'
+                      ? 'bg-blue-100 text-blue-800'
                       : 'bg-purple-100 text-purple-800'
-                  }`}>
+                    }`}>
                     {summary.tracking_mode === 'ai-lite' ? 'AI-Lite Mode' : 'Full Tracking'}
                   </span>
                 )}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">🤖</div>
@@ -649,24 +674,24 @@ export default function Events() {
                 <div className="text-xs text-gray-400 mt-1">4th Priority</div>
               </div>
             </div>
-            
+
             <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
               <div className="text-sm text-gray-700">
-                <strong>Hardened Classification:</strong> Uses Cloudflare bot detection, user agent analysis, and referrer patterns with strict precedence order. 
+                <strong>Hardened Classification:</strong> Uses Cloudflare bot detection, user agent analysis, and referrer patterns with strict precedence order.
                 AI sources are automatically managed and mapped for accurate attribution.
               </div>
               <div className="mt-2 flex items-center justify-between text-xs">
                 <span className="text-gray-600">
-                  <strong>System Status:</strong> 
+                  <strong>System Status:</strong>
                   <span className="ml-1 text-green-600">✅ Operational</span>
                 </span>
                 <span className="text-gray-600">
-                  <strong>Classification Confidence:</strong> 
+                  <strong>Classification Confidence:</strong>
                   <span className="ml-1 text-blue-600">High (95%+)</span>
                 </span>
               </div>
             </div>
-            
+
             {summary?.ai_lite && (
               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="text-sm text-blue-800">
@@ -696,13 +721,46 @@ export default function Events() {
 
             <Card>
               <div className="p-4">
-                <div className="flex items-center">
-                  <Bot className="h-5 w-5 text-blue-400" />
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500">AI-Influenced</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {formatNumber(summary.totals.ai_influenced)}
-                    </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Bot className="h-5 w-5 text-blue-400" />
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">AI-Influenced</p>
+                      <p className="text-2xl font-semibold text-gray-900">
+                        {formatNumber(summary.totals.ai_influenced)}
+                        {includeTraining && (
+                          <span className="ml-2 text-sm text-blue-600 font-normal">
+                            + AI training
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Include AI Training Crawlers Toggle */}
+                  <div className="flex items-center space-x-2">
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeTraining}
+                        onChange={(e) => handleIncludeTrainingToggle(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${includeTraining ? 'bg-blue-600' : 'bg-gray-200'
+                        }`}>
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${includeTraining ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                      </div>
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">Include AI training</span>
+                      <div className="group relative">
+                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                          Include AI training crawlers (GPTBot, CCBot, etc.) in AI totals
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -714,9 +772,14 @@ export default function Events() {
                   <Zap className="h-5 w-5 text-green-400" />
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-500">% AI-Influenced</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {formatPercentage(summary.totals.ai_influenced, summary.totals.events)}
-                    </p>
+                                          <p className="text-2xl font-semibold text-gray-900">
+                        {formatPercentage(summary.totals.ai_influenced, summary.totals.events)}
+                        {includeTraining && (
+                          <span className="ml-2 text-sm text-blue-600 font-normal">
+                            + AI training
+                          </span>
+                        )}
+                      </p>
                   </div>
                 </div>
               </div>
@@ -819,8 +882,8 @@ export default function Events() {
                   <button
                     onClick={() => handleClassFilter("")}
                     className={`px-3 py-1 rounded-full text-sm border ${!classFilter
-                        ? "bg-blue-100 text-blue-800 border-blue-200"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                       }`}
                   >
                     All ({formatNumber(summary.totals.events)})
@@ -837,8 +900,8 @@ export default function Events() {
                         key={cls.class}
                         onClick={() => handleClassFilter(cls.class)}
                         className={`px-3 py-1 rounded-full text-sm border ${classFilter === cls.class
-                            ? "bg-blue-100 text-blue-800 border-blue-200"
-                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                          ? "bg-blue-100 text-blue-800 border-blue-200"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                           } ${isBaselineClass ? 'opacity-75' : ''}`}
                         title={getTrafficClassDescription(cls.class)}
                       >
@@ -860,7 +923,7 @@ export default function Events() {
                     </span>
                   </div>
                 )}
-                
+
                 {/* Classification Debug Toggle */}
                 <div className="mt-2 flex items-center gap-2">
                   <button
@@ -887,8 +950,8 @@ export default function Events() {
                   <button
                     onClick={() => handleSourceFilter("")}
                     className={`px-3 py-1 rounded-full text-sm border ${!sourceFilter
-                        ? "bg-blue-100 text-blue-800 border-blue-200"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                       }`}
                   >
                     All sources
@@ -898,8 +961,8 @@ export default function Events() {
                       key={source.slug}
                       onClick={() => handleSourceFilter(source.slug)}
                       className={`px-3 py-1 rounded-full text-sm border ${sourceFilter === source.slug
-                          ? "bg-blue-100 text-blue-800 border-blue-200"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                        ? "bg-blue-100 text-blue-800 border-blue-200"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                         }`}
                     >
                       {source.name} ({formatNumber(source.count)})
@@ -1092,17 +1155,17 @@ export default function Events() {
                 <p><strong>AI Source Management:</strong> Automatically creates and maps AI sources for accurate attribution and rollup tracking.</p>
                 <p><strong>Debug Trail:</strong> Hover over ℹ️ icons to see classification reasoning for each event.</p>
                 <div className="mt-2 p-2 bg-white border border-gray-200 rounded text-xs">
-                  <strong>Example classifications:</strong><br/>
-                  • <code>cf.verifiedBotCategory=Search Engine Crawler</code> → AI Agent Crawl (1st priority)<br/>
-                  • <code>ref:chat.openai.com</code> → Human via AI (2nd priority)<br/>
-                  • <code>ref:www.google.com</code> → Search (3rd priority)<br/>
+                  <strong>Example classifications:</strong><br />
+                  • <code>cf.verifiedBotCategory=Search Engine Crawler</code> → AI Agent Crawl (1st priority)<br />
+                  • <code>ref:chat.openai.com</code> → Human via AI (2nd priority)<br />
+                  • <code>ref:www.google.com</code> → Search (3rd priority)<br />
                   • <code>no referrer</code> → Direct Human (4th priority)
                 </div>
                 <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                  <strong>System Features:</strong><br/>
-                  • Cloudflare bot verification with fallback to user agent patterns<br/>
-                  • Preview bot detection (Slack, Discord, Telegram, etc.)<br/>
-                  • Automatic AI source creation and mapping<br/>
+                  <strong>System Features:</strong><br />
+                  • Cloudflare bot verification with fallback to user agent patterns<br />
+                  • Preview bot detection (Slack, Discord, Telegram, etc.)<br />
+                  • Automatic AI source creation and mapping<br />
                   • Rollup-based deduplication for crawler events
                 </div>
               </div>
