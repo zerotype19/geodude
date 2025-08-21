@@ -3,6 +3,7 @@ import Shell from '../components/Shell';
 import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE, FETCH_OPTS } from '../config';
+import { Info } from 'lucide-react';
 
 interface ReferralSummary {
   totals: {
@@ -35,6 +36,10 @@ interface ReferralItem {
   referrals_15m: number;
   referrals_24h: number;
   share_of_ai: number;
+  event_class?: string;
+  classification_reason?: string;
+  classification_confidence?: number;
+  debug?: string[];
 }
 
 const Referrals: React.FC = () => {
@@ -174,6 +179,40 @@ const Referrals: React.FC = () => {
     }
   };
 
+  // Traffic classification helper functions (consistent with other pages)
+  const getTrafficClassColor = (eventClass: string) => {
+    switch (eventClass) {
+      case 'ai_agent_crawl': return 'bg-orange-100 text-orange-800';
+      case 'human_via_ai': return 'bg-blue-100 text-blue-800';
+      case 'search': return 'bg-green-100 text-green-800';
+      case 'direct_human': return 'bg-gray-100 text-gray-800';
+      case 'unknown': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getTrafficClassLabel = (eventClass: string) => {
+    switch (eventClass) {
+      case 'ai_agent_crawl': return 'AI Agent';
+      case 'human_via_ai': return 'Human via AI';
+      case 'search': return 'Search';
+      case 'direct_human': return 'Direct';
+      case 'unknown': return 'Unknown';
+      default: return eventClass || 'Unknown';
+    }
+  };
+
+  const getTrafficClassDescription = (eventClass: string) => {
+    switch (eventClass) {
+      case 'ai_agent_crawl': return 'Cloudflare-verified AI bots and crawlers (1st priority)';
+      case 'human_via_ai': return 'Human traffic from AI assistant referrers (2nd priority)';
+      case 'search': return 'Traditional search engine referrers (3rd priority)';
+      case 'direct_human': return 'Direct visits or unknown referrers (4th priority)';
+      case 'unknown': return 'Classification pending or unavailable';
+      default: return 'Traffic classification information';
+    }
+  };
+
   if (error) {
     return (
       <Shell>
@@ -192,6 +231,14 @@ const Referrals: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">AI Referrals</h1>
             <p className="text-gray-600">Track how AI platforms refer traffic to your content</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                ✅ Hardened AI Detection System
+              </span>
+              <span className="text-xs text-gray-500">
+                Enterprise-grade traffic classification and source attribution
+              </span>
+            </div>
           </div>
           <a
             href="/docs"
@@ -303,6 +350,9 @@ const Referrals: React.FC = () => {
                     URL
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Classification
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Last Seen
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -319,13 +369,13 @@ const Referrals: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                       Loading...
                     </td>
                   </tr>
                 ) : referrals.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
                       No AI referrals found in the selected window.
                     </td>
                   </tr>
@@ -341,6 +391,40 @@ const Referrals: React.FC = () => {
                         <div className="max-w-xs truncate" title={referral.url}>
                           {formatUrl(referral.url)}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {referral.event_class ? (
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(referral.event_class)}`}>
+                              {getTrafficClassLabel(referral.event_class)}
+                            </span>
+                            {referral.event_class !== 'unknown' && (
+                              <div className="relative group">
+                                <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                                  {getTrafficClassDescription(referral.event_class)}
+                                  {referral.classification_reason && (
+                                    <div className="mt-1 pt-1 border-t border-gray-700">
+                                      <strong>Reason:</strong> {referral.classification_reason}
+                                    </div>
+                                  )}
+                                  {referral.classification_confidence && (
+                                    <div className="mt-1">
+                                      <strong>Confidence:</strong> {(referral.classification_confidence * 100).toFixed(0)}%
+                                    </div>
+                                  )}
+                                  {referral.debug && referral.debug.length > 0 && (
+                                    <div className="mt-1 pt-1 border-t border-gray-700">
+                                      <strong>Debug:</strong> {referral.debug.join(', ')}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">Legacy Data</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatLastSeen(referral.last_seen)}
