@@ -1752,7 +1752,7 @@ export async function handleApiRoutes(
            const manifestVersion = `v${Date.now()}`;
            const updatedManifest = { ...body, version: manifestVersion };
            
-           await env.RULES.put('classifier_v2', JSON.stringify(updatedManifest));
+           await env.AI_FINGERPRINTS.put('classifier_v2', JSON.stringify(updatedManifest));
            
            // Bump cache version
            await env.CACHE.put('classifier_manifest_version', manifestVersion, { expirationTtl: 86400 });

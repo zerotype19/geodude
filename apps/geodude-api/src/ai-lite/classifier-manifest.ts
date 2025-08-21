@@ -16,7 +16,7 @@ export interface ClassifierManifest {
 
 export const STATIC_MANIFEST: ClassifierManifest = {
   version: "v2.0.0-static",
-  
+
   // AI Assistants (direct domains)
   assistants: {
     "chat.openai.com": { slug: "openai_chatgpt", name: "OpenAI/ChatGPT", category: "assistant" },
@@ -32,7 +32,7 @@ export const STATIC_MANIFEST: ClassifierManifest = {
     "you.com": { slug: "you", name: "You.com", category: "assistant" },
     "metaphor.systems": { slug: "metaphor", name: "Metaphor", category: "assistant" }
   },
-  
+
   // Search Engines (path-disambiguated)
   search_engines: {
     "google.com": { slug: "google", name: "Google", category: "search" },
@@ -48,13 +48,13 @@ export const STATIC_MANIFEST: ClassifierManifest = {
     "baidu.com": { slug: "baidu", name: "Baidu", category: "search" },
     "ask.com": { slug: "ask", name: "Ask", category: "search" }
   },
-  
+
   // Crawlers (verified bots)
   crawlers: {
     "googlebot.com": { slug: "google", name: "Google", category: "crawler" },
     "bing.com": { slug: "microsoft_bing", name: "Microsoft/Bing", category: "crawler" }
   },
-  
+
   // Preview/Unfurl Bots
   preview_bots: {
     "slack.com": { slug: "slack", name: "Slack", category: "preview_bot" },
@@ -70,7 +70,7 @@ export const STATIC_MANIFEST: ClassifierManifest = {
     "web.whatsapp.com": { slug: "whatsapp", name: "WhatsApp", category: "preview_bot" },
     "telegram.org": { slug: "telegram", name: "Telegram", category: "preview_bot" }
   },
-  
+
   // User Agent Patterns
   ua_patterns: {
     "googlebot": { slug: "google", name: "Google", category: "crawler" },
@@ -97,13 +97,13 @@ export const STATIC_MANIFEST: ClassifierManifest = {
  */
 export async function getClassifierManifest(env: any): Promise<ClassifierManifest> {
   try {
-    const kvManifest = await env.RULES?.get('classifier_v2', { type: 'json' });
+    const kvManifest = await env.AI_FINGERPRINTS?.get('classifier_v2', { type: 'json' });
     if (kvManifest && kvManifest.version) {
       return kvManifest;
     }
   } catch (error) {
     console.warn('⚠️ KV manifest unavailable, using static fallback');
   }
-  
+
   return STATIC_MANIFEST;
 }
