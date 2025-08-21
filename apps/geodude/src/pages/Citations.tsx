@@ -259,7 +259,10 @@ export default function Citations() {
             <h3 className="text-sm font-medium text-gray-700 mb-3">Sources breakdown</h3>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setSourceFilter("")}
+                onClick={() => {
+                  setSourceFilter("");
+                  setPage(1);
+                }}
                 className={`px-3 py-1 rounded-full text-sm ${sourceFilter === ""
                     ? "bg-blue-100 text-blue-800 border-blue-200"
                     : "bg-gray-100 text-gray-700 border-gray-200"
@@ -270,7 +273,10 @@ export default function Citations() {
               {summary.totals.by_source.map((source) => (
                 <button
                   key={source.slug}
-                  onClick={() => setSourceFilter(source.slug)}
+                  onClick={() => {
+                    setSourceFilter(source.slug);
+                    setPage(1);
+                  }}
                   className={`px-3 py-1 rounded-full text-sm ${sourceFilter === source.slug
                       ? "bg-blue-100 text-blue-800 border-blue-200"
                       : "bg-gray-100 text-gray-700 border-gray-200"
@@ -285,7 +291,7 @@ export default function Citations() {
 
         {/* Filters */}
         <div className="bg-white p-4 rounded-lg border">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1">
               <div className="relative">
                 <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -309,7 +315,26 @@ export default function Citations() {
                 <option value="7d">Last 7 days</option>
               </select>
             </div>
+            {(sourceFilter || searchQuery.trim()) && (
+              <button
+                onClick={() => {
+                  setSourceFilter("");
+                  setSearchQuery("");
+                  setPage(1);
+                }}
+                className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
+          {(sourceFilter || searchQuery.trim()) && (
+            <div className="mt-3 text-sm text-gray-600">
+              Active filters: 
+              {sourceFilter && <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">{sourceFilter}</span>}
+              {searchQuery.trim() && <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">"{searchQuery.trim()}"</span>}
+            </div>
+          )}
         </div>
 
         {/* Citations Table */}
