@@ -1002,8 +1002,8 @@ export async function handleApiRoutes(
             const totalResult = await env.OPTIVIEW_DB.prepare(`
                 SELECT COUNT(*) as citations
                 FROM interaction_events ie
-                JOIN projects p ON p.id = ie.project_id
-                WHERE p.project_id = ? 
+                JOIN project p ON p.id = ie.project_id
+                WHERE p.id = ? 
                   AND ie.occurred_at >= datetime(?, 'unixepoch')
                   AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
             `).bind(project_id, Math.floor(fromTs / 1000)).first();
@@ -1015,9 +1015,9 @@ export async function handleApiRoutes(
                     COALESCE(ais.name, 'Unknown AI Source') as source_name,
                     COUNT(*) as count
                 FROM interaction_events ie
-                JOIN projects p ON p.id = ie.project_id
+                JOIN project p ON p.id = ie.project_id
                 LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
-                WHERE p.project_id = ? 
+                WHERE p.id = ?
                   AND ie.occurred_at >= datetime(?, 'unixepoch')
                   AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                 GROUP BY ie.ai_source_id, ais.slug, ais.name
@@ -1032,9 +1032,9 @@ export async function handleApiRoutes(
                     ca.url,
                     COUNT(*) as count
                 FROM interaction_events ie
-                JOIN projects p ON p.id = ie.project_id
+                JOIN project p ON p.id = ie.project_id
                 LEFT JOIN content_assets ca ON ca.id = ie.content_id
-                WHERE p.project_id = ? 
+                WHERE p.id = ?
                   AND ie.occurred_at >= datetime(?, 'unixepoch')
                   AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                   AND ie.content_id IS NOT NULL
@@ -1049,8 +1049,8 @@ export async function handleApiRoutes(
                     strftime('%Y-%m-%d', ie.occurred_at) as day,
                     COUNT(*) as count
                 FROM interaction_events ie
-                JOIN projects p ON p.id = ie.project_id
-                WHERE p.project_id = ? 
+                JOIN project p ON p.id = ie.project_id
+                WHERE p.id = ?
                   AND ie.occurred_at >= datetime(?, 'unixepoch')
                   AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                 GROUP BY strftime('%Y-%m-%d', ie.occurred_at)
@@ -1122,25 +1122,25 @@ export async function handleApiRoutes(
             let countQuery = `
                 SELECT COUNT(*) as total
                 FROM interaction_events ie
-                JOIN projects p ON p.id = ie.project_id
+                JOIN project p ON p.id = ie.project_id
                 LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                 LEFT JOIN content_assets ca ON ca.id = ie.content_id
-                WHERE p.project_id = ? 
+                WHERE p.id = ? 
                   AND ie.occurred_at >= datetime(?, 'unixepoch')
                   AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
             `;
-            
+
             let countParams = [project_id, Math.floor(fromTs / 1000)];
-            
-            if (sourceFilter) {
+
+            if (source) {
                 countQuery += ' AND COALESCE(ais.slug, "unknown") = ?';
-                countParams.push(sourceFilter);
+                countParams.push(source);
             }
-            
-            if (searchQuery.trim()) {
+
+            if (q.trim()) {
                 countQuery += ' AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)';
-                countParams.push(`%${searchQuery.trim()}%`);
-                countParams.push(`%${searchQuery.trim()}%`);
+                countParams.push(`%${q.trim()}%`);
+                countParams.push(`%${q.trim()}%`);
             }
 
             const countResult = await env.OPTIVIEW_DB.prepare(countQuery).bind(...countParams).first();
@@ -1159,27 +1159,27 @@ export async function handleApiRoutes(
                     COALESCE(json_extract(ie.metadata, '$.classification_confidence'), 0.0) as classification_confidence,
                     COALESCE(json_extract(ie.metadata, '$.debug'), '[]') as debug_raw
                 FROM interaction_events ie
-                JOIN projects p ON p.id = ie.project_id
+                JOIN project p ON p.id = ie.project_id
                 LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                 LEFT JOIN content_assets ca ON ca.id = ie.content_id
-                WHERE p.project_id = ? 
+                WHERE p.id = ? 
                   AND ie.occurred_at >= datetime(?, 'unixepoch')
                   AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
             `;
-            
+
             let itemsParams = [project_id, Math.floor(fromTs / 1000)];
-            
-            if (sourceFilter) {
+
+            if (source) {
                 itemsQuery += ' AND COALESCE(ais.slug, "unknown") = ?';
-                itemsParams.push(sourceFilter);
+                itemsParams.push(source);
             }
-            
-            if (searchQuery.trim()) {
+
+            if (q.trim()) {
                 itemsQuery += ' AND (ca.url LIKE ? OR json_extract(ie.metadata, "$.referrer_url") LIKE ?)';
-                itemsParams.push(`%${searchQuery.trim()}%`);
-                itemsParams.push(`%${searchQuery.trim()}%`);
+                itemsParams.push(`%${q.trim()}%`);
+                itemsParams.push(`%${q.trim()}%`);
             }
-            
+
             itemsQuery += ' ORDER BY ie.occurred_at DESC LIMIT ? OFFSET ?';
             itemsParams.push(pageSizeNum, (pageNum - 1) * pageSizeNum);
 
