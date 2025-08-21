@@ -623,10 +623,13 @@ export async function handleApiRoutes(
             ];
             let params: any[] = [project_id, sinceISO];
 
-            // Add traffic class filter - we'll filter in application code after classification
-            // since the new hardened classifier needs access to Cloudflare data and heuristics
+            // Add traffic class filter using stored class column
+            if (trafficClass) {
+                whereConditions.push("e.class = ?");
+                params.push(trafficClass);
+            }
 
-            // Add source filter
+            // Add source filter using stored ai_source_id
             if (source) {
                 whereConditions.push("s.slug = ?");
                 params.push(source);
@@ -653,7 +656,7 @@ export async function handleApiRoutes(
             // Get paginated results
             const dataQuery = `
                 SELECT 
-                    e.id, e.occurred_at, e.event_type,
+                    e.id, e.occurred_at, e.event_type, e.class,
                     e.content_id, e.property_id,
                     json_extract(e.metadata,'$.url') AS url,
                     json_extract(e.metadata,'$.referrer') AS referrer,
@@ -672,30 +675,18 @@ export async function handleApiRoutes(
             `;
             const eventsResult = await env.OPTIVIEW_DB.prepare(dataQuery).bind(...params, pageSizeNum, offset).all<any>();
 
-            // Load heuristics for classification
-            const { classifyTraffic } = await import('../lib/classifier');
-            const { loadHeuristics } = await import('../lib/kv-rules');
-            const heuristics = await loadHeuristics(env);
-
-            // Classify each event using the hardened classifier
+            // Use stored classification from database instead of re-classifying
             const classifiedItems = await Promise.all((eventsResult.results || []).map(async (row) => {
-                // Classify the event
-                const classification = classifyTraffic({
-                    cf: undefined, // No Cloudflare data in GET requests
-                    headers: new Headers(), // No headers in GET requests
-                    url: row.url || '',
-                    referrer: row.referrer || '',
-                    userAgent: row.user_agent || '',
-                    heuristics
-                });
+                // Use the stored class from the database
+                const storedClass = row.class || 'unknown';
 
                 // Check if we should include this event based on traffic class filter
-                if (trafficClass && classification.class !== trafficClass) {
+                if (trafficClass && storedClass !== trafficClass) {
                     return null; // Filter out events that don't match the requested class
                 }
 
                 // Check if we should include this event based on source filter
-                if (source && classification.aiSourceSlug !== source) {
+                if (source && row.slug !== source) {
                     return null; // Filter out events that don't match the requested source
                 }
 
@@ -703,13 +694,12 @@ export async function handleApiRoutes(
                     id: row.id,
                     occurred_at: row.occurred_at,
                     event_type: row.event_type,
-                    event_class: classification.class,
-                    source_name: classification.aiSourceName || row.name,
+                    event_class: storedClass,
+                    source_name: row.name,
                     url: row.url,
                     content_id: row.content_id,
                     property_id: row.property_id,
-                    metadata_preview: row.metadata_preview,
-                    ...(url.searchParams.get('debug') === '1' && { debug: classification.reason })
+                    metadata_preview: row.metadata_preview
                 };
             }));
 
@@ -1805,7 +1795,8 @@ export async function handleApiRoutes(
                         normalizedEventType,
                         JSON.stringify(metadata || {}),
                         occurred_at || now,
-                        isSampled ? 1 : 0 // Add sampled flag
+                        isSampled ? 1 : 0, // Add sampled flag
+                        classification.class // Add traffic classification
                     ];
 
 
@@ -1826,8 +1817,8 @@ export async function handleApiRoutes(
                     const result = await env.OPTIVIEW_DB.prepare(`
                         INSERT INTO interaction_events (
                             project_id, property_id, content_id, ai_source_id, 
-                            event_type, metadata, occurred_at, sampled
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            event_type, metadata, occurred_at, sampled, class
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `).bind(...insertValues).run();
 
                     insertResults.push(result);
@@ -3249,6 +3240,140 @@ export async function handleApiRoutes(
             return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
         } catch (e: any) {
             console.error("content_delete_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.13.1) Admin Backfill Event Classification API
+    if (url.pathname === "/admin/backfill-classification" && req.method === "POST") {
+        try {
+            // Check authentication (admin only)
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Check if user is admin
+            const userData = await env.OPTIVIEW_DB.prepare(`
+                SELECT is_admin FROM users WHERE id = ?
+            `).bind(sessionData.user_id).first<{ is_admin: number }>();
+
+            if (!userData || !userData.is_admin) {
+                const response = new Response(JSON.stringify({ error: "Admin access required" }), {
+                    status: 403,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse body
+            const bodyText = await req.text();
+            const body = JSON.parse(bodyText);
+            const { project_id, limit = "1000" } = body;
+
+            if (!project_id) {
+                const response = new Response(JSON.stringify({ error: "Missing project_id" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get events without classification
+            const eventsToUpdate = await env.OPTIVIEW_DB.prepare(`
+                SELECT id, metadata, ai_source_id FROM interaction_events 
+                WHERE project_id = ? AND (class IS NULL OR class = 'unknown')
+                ORDER BY occurred_at DESC LIMIT ?
+            `).bind(project_id, parseInt(limit)).all<any>();
+
+            if (!eventsToUpdate.results || eventsToUpdate.results.length === 0) {
+                const response = new Response(JSON.stringify({
+                    message: "No events need classification backfill",
+                    updated: 0
+                }), {
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Load classification logic
+            const { classifyTraffic } = await import('../lib/classifier');
+            const { loadHeuristics } = await import('../lib/kv-rules');
+            const heuristics = await loadHeuristics(env);
+
+            let updatedCount = 0;
+            for (const event of eventsToUpdate.results) {
+                try {
+                    const metadata = JSON.parse(event.metadata || '{}');
+                    const referrer = metadata.referrer || metadata.referer || '';
+                    const userAgent = metadata.user_agent || '';
+                    const url = metadata.url || '';
+
+                    // Classify the event
+                    const classification = classifyTraffic({
+                        cf: undefined, // No Cloudflare data for historical events
+                        headers: new Headers(),
+                        url,
+                        referrer,
+                        userAgent,
+                        heuristics
+                    });
+
+                    // Update the event with classification
+                    await env.OPTIVIEW_DB.prepare(`
+                        UPDATE interaction_events 
+                        SET class = ? 
+                        WHERE id = ?
+                    `).bind(classification.class, event.id).run();
+
+                    updatedCount++;
+                } catch (error) {
+                    console.error('Error updating event classification:', error);
+                    // Continue with other events
+                }
+            }
+
+            const response = new Response(JSON.stringify({
+                message: "Classification backfill completed",
+                updated: updatedCount,
+                total: eventsToUpdate.results.length
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (e: any) {
+            console.error("admin_backfill_classification_error", { error: e.message, stack: e.stack });
             const response = new Response(JSON.stringify({
                 error: "Internal server error",
                 message: e.message
