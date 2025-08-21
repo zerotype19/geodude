@@ -295,6 +295,18 @@ const Content: React.FC = () => {
     return [];
   };
 
+  // Get paginated grouped content
+  const getPaginatedGroupedContent = (): GroupedContent[] => {
+    const allGroups = getGroupedContent();
+    const startIndex = (filters.page - 1) * filters.pageSize;
+    const endIndex = startIndex + filters.pageSize;
+    return allGroups.slice(startIndex, endIndex);
+  };
+
+  const groupedContent = getPaginatedGroupedContent();
+  const allGroupedContent = getGroupedContent();
+  const totalGroups = allGroupedContent.length;
+
   const handleAddAsset = async () => {
     if (!project?.id || !newAsset.url.trim()) return;
 
@@ -335,8 +347,6 @@ const Content: React.FC = () => {
       setAddingAsset(false);
     }
   };
-
-  const groupedContent = getGroupedContent();
 
   return (
     <Shell>
@@ -396,6 +406,20 @@ const Content: React.FC = () => {
                   <option value="domain">By Domain</option>
                   <option value="type">By Type</option>
                   <option value="none">No Grouping</option>
+                </select>
+              </div>
+
+              {/* Page Size Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Page Size</label>
+                <select
+                  value={filters.pageSize}
+                  onChange={(e) => setFilters(prev => ({ ...prev, pageSize: parseInt(e.target.value), page: 1 }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value={25}>25 groups</option>
+                  <option value={50}>50 groups</option>
+                  <option value={100}>100 groups</option>
                 </select>
               </div>
 
@@ -672,11 +696,12 @@ const Content: React.FC = () => {
           </div>
 
           {/* Pagination */}
-          {total > filters.pageSize && (
+          {totalGroups > filters.pageSize && (
             <div className="px-6 py-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-700">
-                  Showing {((filters.page - 1) * filters.pageSize) + 1} to {Math.min(filters.page * filters.pageSize, total)} of {total}
+                  Showing {((filters.page - 1) * filters.pageSize) + 1} to {Math.min(filters.page * filters.pageSize, totalGroups)} of {totalGroups} groups
+                  <span className="text-gray-500 ml-2">({total} total content assets)</span>
                 </div>
                 <div className="flex space-x-2">
                   <button
@@ -688,7 +713,7 @@ const Content: React.FC = () => {
                   </button>
                   <button
                     onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
-                    disabled={filters.page * filters.pageSize >= total}
+                    disabled={filters.page * filters.pageSize >= totalGroups}
                     className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
