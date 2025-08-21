@@ -1503,11 +1503,27 @@ export async function handleApiRoutes(
 
 
         try {
-            // Check Content-Type
+            // Check Content-Type - accept both application/json and text/plain
             const contentType = req.headers.get("content-type");
-            if (!contentType || !contentType.includes("application/json")) {
-                const response = new Response("Content-Type must be application/json", { status: 415 });
+            const isJsonContent = contentType && contentType.includes("application/json");
+            const isTextContent = contentType && contentType.includes("text/plain");
+            
+            if (!isJsonContent && !isTextContent) {
+                const response = new Response(JSON.stringify({
+                    error: "Unsupported Content-Type",
+                    message: "Content-Type must be application/json or text/plain",
+                    received: contentType || "none",
+                    supported: ["application/json", "text/plain"]
+                }), { 
+                    status: 415,
+                    headers: { "Content-Type": "application/json" }
+                });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+            
+            // Log content type for debugging
+            if (isTextContent) {
+                console.log(`📝 Accepting text/plain content from ${req.headers.get("cf-connecting-ip") || "unknown IP"}`);
             }
 
             // IP rate limiting (120 rpm per IP, 60s window) - temporarily disabled for debugging
