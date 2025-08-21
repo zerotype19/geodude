@@ -500,31 +500,32 @@ const Content: React.FC = () => {
 
               {/* AI Only Filter */}
               <div className="flex items-end">
-                <label className="flex items-center cursor-pointer group">
+                <button
+                  onClick={() => setFilters(prev => ({ ...prev, aiOnly: !prev.aiOnly, page: 1 }))}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${
+                    filters.aiOnly
+                      ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700 border border-blue-600'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-blue-300 hover:text-blue-700'
+                  }`}
+                >
                   <div className="relative">
                     <input
                       type="checkbox"
                       checked={filters.aiOnly}
-                      onChange={(e) => setFilters(prev => ({ ...prev, aiOnly: e.target.checked, page: 1 }))}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded transition-colors"
+                      onChange={() => {}} // Handled by button click
+                      className="sr-only" // Hide the checkbox visually but keep it accessible
                     />
                     {filters.aiOnly && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-pulse"></div>
                     )}
                   </div>
-                  <span className={`ml-2 text-sm font-medium transition-colors ${
-                    filters.aiOnly 
-                      ? 'text-blue-700' 
-                      : 'text-gray-700 group-hover:text-blue-600'
-                  }`}>
-                    AI Traffic Only
-                  </span>
+                  <span>AI Traffic Only</span>
                   {filters.aiOnly && (
-                    <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       Active
                     </span>
                   )}
-                </label>
+                </button>
               </div>
 
               {/* Search */}
