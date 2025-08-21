@@ -676,7 +676,7 @@ export async function handleApiRoutes(
             const { classifyTraffic } = await import('../lib/classifier');
             const { loadHeuristics } = await import('../lib/kv-rules');
             const heuristics = await loadHeuristics(env);
-            
+
             // Classify each event using the hardened classifier
             const classifiedItems = await Promise.all((eventsResult.results || []).map(async (row) => {
                 // Classify the event
@@ -1623,7 +1623,8 @@ export async function handleApiRoutes(
 
             // Get AI-Lite configuration for this project
             const { getProjectAILiteConfig } = await import('../ai-lite');
-            const { classifyTraffic, loadHeuristics } = await import('../lib/classifier');
+            const { classifyTraffic } = await import('../lib/classifier');
+            const { loadHeuristics } = await import('../lib/kv-rules');
             const { updateRollup, insertEvent, processEventClassification, shouldInsertEvent, shouldAttachToSession } = await import('../lib/events-utils');
 
             const aiLiteConfig = await getProjectAILiteConfig(env.OPTIVIEW_DB, project_id, env);
@@ -1634,6 +1635,7 @@ export async function handleApiRoutes(
             // Process each event in the batch
             const now = new Date().toISOString();
             const insertResults = [];
+            const classificationResults: any[] = [];
 
             for (const event of events) {
                 const { event_type, metadata, occurred_at } = event;
@@ -1708,15 +1710,18 @@ export async function handleApiRoutes(
                         userAgent: userAgent || '',
                         heuristics
                     });
-                    
+
                     trafficClass = classification.class;
-                    
+
                     // Log classification results for debugging
                     console.log('classification=', {
                         class: classification.class,
                         aiSourceSlug: classification.aiSourceSlug,
                         reason: classification.reason
                     });
+
+                    // Store classification result for session handling
+                    classificationResults.push(classification);
 
                     // Process classification and determine insertion behavior
                     const { aiSourceId: processedAiSourceId } = await processEventClassification(env, classification);
@@ -1848,7 +1853,8 @@ export async function handleApiRoutes(
                     }
 
                     // Skip session handling for crawler events
-                    if (classification && !shouldAttachToSession(classification)) {
+                    const eventClassification = classificationResults[i];
+                    if (eventClassification && !shouldAttachToSession(eventClassification)) {
                         console.log('⏭️ Skipping session handling for crawler event');
                         continue;
                     }
