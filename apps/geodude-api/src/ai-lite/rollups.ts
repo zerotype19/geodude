@@ -28,7 +28,7 @@ export async function upsertRollup(
   isSampled: boolean = false
 ): Promise<void> {
   const tsHour = roundToHour(timestamp);
-  
+
   try {
     // Try to update existing rollup
     const updateResult = await db.prepare(`
@@ -94,18 +94,18 @@ export async function getRollupTotals(
   endTime: Date
 ): Promise<Record<string, { total: number; sampled: number }>> {
   const rollups = await getRollupsInWindow(db, projectId, startTime, endTime);
-  
+
   const totals: Record<string, { total: number; sampled: number }> = {};
-  
+
   for (const rollup of rollups) {
     if (!totals[rollup.class]) {
       totals[rollup.class] = { total: 0, sampled: 0 };
     }
-    
+
     totals[rollup.class].total += rollup.events_count;
     totals[rollup.class].sampled += rollup.sampled_count;
   }
-  
+
   return totals;
 }
 
@@ -117,23 +117,23 @@ export async function getLast5MinuteRollups(
   projectId: string
 ): Promise<Record<string, number>> {
   const now = new Date();
-  const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-  
+  const currentHour = roundToHour(now);
+
   try {
     const result = await db.prepare(`
       SELECT class, SUM(events_count) as total
       FROM traffic_rollup_hourly
       WHERE project_id = ?
-        AND ts_hour >= ?
+        AND ts_hour = ?
       GROUP BY class
-    `).bind(projectId, roundToHour(fiveMinutesAgo)).all();
+    `).bind(projectId, currentHour).all();
 
     const rollups: Record<string, number> = {};
-    
+
     for (const row of result.results || []) {
       rollups[row.class] = row.total;
     }
-    
+
     return rollups;
   } catch (error) {
     console.error('Failed to get last 5-minute rollups:', error);

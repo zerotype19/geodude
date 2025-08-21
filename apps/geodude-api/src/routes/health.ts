@@ -50,11 +50,10 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
       try {
         const { getLast5MinuteRollups } = await import('../ai-lite/rollups');
         
-        // For now, we'll get metrics for a default project
-        // TODO: Get actual project ID from session or query
-        const defaultProjectId = "prj_default"; // Placeholder
+        // Get metrics for the actual project (prj_UHoetismrowc)
+        const projectId = "prj_UHoetismrowc";
         
-        const rollupMetrics = await getLast5MinuteRollups(d1, defaultProjectId);
+        const rollupMetrics = await getLast5MinuteRollups(d1, projectId);
         
         aiLiteMetrics = {
           ai_events_5m: rollupMetrics['human_via_ai'] || 0,
