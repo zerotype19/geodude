@@ -81,11 +81,18 @@ export function setTimeRange(projectId: string, timeRange: string): void {
  * @param projectId - The project ID
  * @returns The preferred referrals tab (assistants, search, crawlers)
  */
-export function getReferralsTab(projectId: string): string {
+export function getReferralsTab(projectId: string): 'assistants' | 'search' | 'crawlers' {
     if (typeof window === 'undefined') return 'assistants';
 
     const key = `${PREF_PREFIX}referrals_tab:${projectId}`;
-    return localStorage.getItem(key) || 'assistants';
+    const savedTab = localStorage.getItem(key);
+    
+    // Ensure we return a valid tab type
+    if (savedTab && ['assistants', 'search', 'crawlers'].includes(savedTab)) {
+        return savedTab as 'assistants' | 'search' | 'crawlers';
+    }
+    
+    return 'assistants'; // Default fallback
 }
 
 /**
@@ -93,7 +100,7 @@ export function getReferralsTab(projectId: string): string {
  * @param projectId - The project ID
  * @param tab - The preferred tab (assistants, search, crawlers)
  */
-export function setReferralsTab(projectId: string, tab: string): void {
+export function setReferralsTab(projectId: string, tab: 'assistants' | 'search' | 'crawlers'): void {
     if (typeof window === 'undefined') return;
 
     const key = `${PREF_PREFIX}referrals_tab:${projectId}`;
