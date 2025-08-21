@@ -45,6 +45,40 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         qLastCron(env as any),
       ]);
 
+      // AI-Lite: Get rollup-based metrics for last 5 minutes
+      let aiLiteMetrics = null;
+      try {
+        const { getLast5MinuteRollups } = await import('../ai-lite/rollups');
+        
+        // For now, we'll get metrics for a default project
+        // TODO: Get actual project ID from session or query
+        const defaultProjectId = "prj_default"; // Placeholder
+        
+        const rollupMetrics = await getLast5MinuteRollups(d1, defaultProjectId);
+        
+        aiLiteMetrics = {
+          ai_events_5m: rollupMetrics['human_via_ai'] || 0,
+          ai_crawls_5m: rollupMetrics['ai_agent_crawl'] || 0,
+          citations_5m: rollupMetrics['citation'] || 0,
+          baseline_sampled_rows_5m: (rollupMetrics['direct_human'] || 0) + (rollupMetrics['search'] || 0),
+          sample_pct: parseInt(env.AI_LITE_SAMPLE_PCT || '2'),
+          tracking_mode: env.ENFORCE_AI_LITE === 'true' ? 'ai-lite (enforced)' : 'configurable',
+          rollups_available: Object.keys(rollupMetrics).length > 0
+        };
+      } catch (error) {
+        console.error('Failed to get AI-Lite metrics:', error);
+        aiLiteMetrics = {
+          ai_events_5m: 0,
+          ai_crawls_5m: 0,
+          citations_5m: 0,
+          baseline_sampled_rows_5m: 0,
+          sample_pct: parseInt(env.AI_LITE_SAMPLE_PCT || '2'),
+          tracking_mode: 'unknown',
+          rollups_available: false,
+          error: error.message
+        };
+      }
+
       const errorRate = totalReq > 0 ? +((totalErr / totalReq) * 100).toFixed(2) : 0;
 
       const payload = {
@@ -65,6 +99,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
           status: opened > 0 && attached > 0 ? "healthy" : (opened === 0 && attached === 0 ? "watch" : "degraded") 
         },
         projects_5m: { created },
+        ai_lite: aiLiteMetrics, // AI-Lite specific metrics
         // Legacy fields for backward compatibility
         kv_ok: kvOk,
         d1_ok: dbOk,
@@ -99,7 +134,17 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
         cron: { last: null },
         requests_5m: { total: 0, error_rate_pct: 0, p50_ms: 0, p95_ms: 0, status_breakdown: [] },
         sessions_5m: { opened: 0, closed: 0, attached: 0, status: "degraded" },
-        projects_5m: { created: 0 }
+        projects_5m: { created: 0 },
+        ai_lite: {
+          ai_events_5m: 0,
+          ai_crawls_5m: 0,
+          citations_5m: 0,
+          baseline_sampled_rows_5m: 0,
+          sample_pct: parseInt(env.AI_LITE_SAMPLE_PCT || '2'),
+          tracking_mode: 'unknown',
+          rollups_available: false,
+          error: 'Health check failed'
+        }
       }), {
         status: 200, // Return 200 with degraded status for monitoring
         headers: { 
