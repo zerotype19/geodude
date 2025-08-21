@@ -2738,56 +2738,85 @@ export async function handleApiRoutes(
             const fromSql = fromTs / 1000;
             const toSql = toTs / 1000;
 
-            // Generate referrals summary with caching
+            // Generate referrals summary with caching using new interaction_events table
             const generateReferralsSummary = async () => {
-                // Get total referrals
+                // Get total referrals from interaction_events (AI traffic only)
                 const totalResult = await env.OPTIVIEW_DB.prepare(`
                     SELECT COUNT(*) AS total
-                    FROM ai_referrals ar
-                    JOIN content_assets ca ON ca.id = ar.content_id
+                    FROM interaction_events ie
+                    JOIN content_assets ca ON ca.id = ie.content_id
                     JOIN properties p ON p.id = ca.property_id
                     WHERE p.project_id = ? 
-                      AND ar.detected_at >= datetime(?, 'unixepoch')
-                      AND ar.detected_at <= datetime(?, 'unixepoch')
+                      AND ie.occurred_at >= datetime(?, 'unixepoch')
+                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
                 `).bind(project_id, fromSql, toSql).first<any>();
 
-                // Get referrals by AI source
+                // Get referrals by AI source from interaction_events
                 const bySource = await env.OPTIVIEW_DB.prepare(`
                     SELECT 
-                        ar.ai_source_id,
-                        ais.slug,
-                        ais.name,
+                        ie.ai_source_id,
+                        COALESCE(ais.slug, 'unknown') as slug,
+                        COALESCE(ais.name, 'Unknown AI Source') as name,
                         COUNT(*) AS count
-                    FROM ai_referrals ar
-                    JOIN content_assets ca ON ca.id = ar.content_id
+                    FROM interaction_events ie
+                    JOIN content_assets ca ON ca.id = ie.content_id
                     JOIN properties p ON p.id = ca.property_id
-                    JOIN ai_sources ais ON ais.id = ar.ai_source_id
+                    LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                     WHERE p.project_id = ? 
-                      AND ar.detected_at >= datetime(?, 'unixepoch')
-                      AND ar.detected_at <= datetime(?, 'unixepoch')
-                    GROUP BY ar.ai_source_id, ais.slug, ais.name
+                      AND ie.occurred_at >= datetime(?, 'unixepoch')
+                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                    GROUP BY ie.ai_source_id, ais.slug, ais.name
                     ORDER BY count DESC
                     LIMIT 10
                 `).bind(project_id, fromSql, toSql).all<any>();
 
-                // Get referrals by type
-                const byType = await env.OPTIVIEW_DB.prepare(`
+                // Get referrals by traffic class
+                const byClass = await env.OPTIVIEW_DB.prepare(`
                     SELECT 
-                        ar.ref_type,
+                        ie.class,
                         COUNT(*) AS count
-                    FROM ai_referrals ar
-                    JOIN content_assets ca ON ca.id = ar.content_id
+                    FROM interaction_events ie
+                    JOIN content_assets ca ON ca.id = ie.content_id
                     JOIN properties p ON p.id = ca.property_id
                     WHERE p.project_id = ? 
-                      AND ar.detected_at >= datetime(?, 'unixepoch')
-                      AND ar.detected_at <= datetime(?, 'unixepoch')
-                    GROUP BY ar.ref_type
+                      AND ie.occurred_at >= datetime(?, 'unixepoch')
+                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                    GROUP BY ie.class
                     ORDER BY count DESC
                 `).bind(project_id, fromSql, toSql).all<any>();
 
+                // Get total contents and sources for additional metrics
+                const contentsResult = await env.OPTIVIEW_DB.prepare(`
+                    SELECT COUNT(DISTINCT ie.content_id) AS total_contents
+                    FROM interaction_events ie
+                    JOIN content_assets ca ON ca.id = ie.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    WHERE p.project_id = ? 
+                      AND ie.occurred_at >= datetime(?, 'unixepoch')
+                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                `).bind(project_id, fromSql, toSql).first<any>();
+
+                const sourcesResult = await env.OPTIVIEW_DB.prepare(`
+                    SELECT COUNT(DISTINCT ie.ai_source_id) AS total_sources
+                    FROM interaction_events ie
+                    JOIN content_assets ca ON ca.id = ie.content_id
+                    JOIN properties p ON p.id = ca.property_id
+                    WHERE p.project_id = ? 
+                      AND ie.occurred_at >= datetime(?, 'unixepoch')
+                      AND ie.occurred_at <= datetime(?, 'unixepoch')
+                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                      AND ie.ai_source_id IS NOT NULL
+                `).bind(project_id, fromSql, toSql).first<any>();
+
                 return {
                     totals: {
-                        referrals: totalResult?.total || 0
+                        referrals: totalResult?.total || 0,
+                        contents: contentsResult?.total_contents || 0,
+                        sources: sourcesResult?.total_sources || 0
                     },
                     by_source: (bySource.results || []).map(row => ({
                         ai_source_id: row.ai_source_id,
@@ -2795,8 +2824,8 @@ export async function handleApiRoutes(
                         name: row.name,
                         count: row.count
                     })),
-                    by_type: (byType.results || []).map(row => ({
-                        ref_type: row.ref_type,
+                    by_class: (byClass.results || []).map(row => ({
+                        class: row.class,
                         count: row.count
                     }))
                 };
@@ -2832,7 +2861,132 @@ export async function handleApiRoutes(
         }
     }
 
-    // 6.6) Top Referrals API
+    // 6.6) Referrals List API (using new interaction_events table)
+    if (url.pathname === "/api/referrals" && req.method === "GET") {
+        try {
+            const { project_id, window = "24h", from, to, source, q, page = "1", pageSize = "50" } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response("missing project_id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Calculate time bounds from window or from/to override
+            let fromTs: number, toTs: number;
+            if (from && to) {
+                fromTs = new Date(from).getTime();
+                toTs = new Date(to).getTime();
+            } else {
+                const now = Date.now();
+                switch (window) {
+                    case "15m": fromTs = now - 15 * 60 * 1000; break;
+                    case "24h": fromTs = now - 24 * 60 * 60 * 1000; break;
+                    case "7d": fromTs = now - 7 * 24 * 60 * 60 * 1000; break;
+                    default: fromTs = now - 24 * 60 * 60 * 1000; break;
+                }
+                toTs = now;
+            }
+
+            // Convert to SQL-compatible format (milliseconds -> seconds)
+            const fromSql = fromTs / 1000;
+            const toSql = toTs / 1000;
+
+            // Build WHERE clause
+            let whereConditions = [`p.project_id = ?`, `ie.occurred_at >= datetime(?, 'unixepoch')`, `ie.occurred_at <= datetime(?, 'unixepoch')`, `ie.class IN ('ai_agent_crawl', 'human_via_ai')`];
+            let params = [project_id, fromSql, toSql];
+
+            if (source) {
+                whereConditions.push(`ais.slug = ?`);
+                params.push(source);
+            }
+
+            if (q) {
+                whereConditions.push(`ca.url LIKE ?`);
+                params.push(`%${q}%`);
+            }
+
+            const pageNum = parseInt(page);
+            const pageSizeNum = Math.min(parseInt(pageSize), 100);
+            const offset = (pageNum - 1) * pageSizeNum;
+
+            // Get total count
+            const totalResult = await env.OPTIVIEW_DB.prepare(`
+                SELECT COUNT(*) AS total
+                FROM interaction_events ie
+                JOIN content_assets ca ON ca.id = ie.content_id
+                JOIN properties p ON p.id = ca.property_id
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                WHERE ${whereConditions.join(' AND ')}
+            `).bind(...params).first<any>();
+
+            // Get referrals with pagination
+            const referrals = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.content_id,
+                    ca.url,
+                    COALESCE(ais.slug, 'unknown') as source_slug,
+                    COALESCE(ais.name, 'Unknown AI Source') as source_name,
+                    ie.occurred_at as last_seen,
+                    ie.class as event_class,
+                    json_extract(ie.metadata, '$.classification_reason') as classification_reason,
+                    json_extract(ie.metadata, '$.classification_confidence') as classification_confidence,
+                    json_extract(ie.metadata, '$.debug') as debug,
+                    COUNT(*) as referrals_24h
+                FROM interaction_events ie
+                JOIN content_assets ca ON ca.id = ie.content_id
+                JOIN properties p ON p.id = ca.property_id
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                WHERE ${whereConditions.join(' AND ')}
+                GROUP BY ie.content_id, ie.ai_source_id, ca.url, ais.slug, ais.name, ie.class, ie.metadata
+                ORDER BY ie.occurred_at DESC
+                LIMIT ? OFFSET ?
+            `).bind(...params, pageSizeNum, offset).all<any>();
+
+            // Calculate 15m referrals for each item
+            const referralsWith15m = await Promise.all(
+                (referrals.results || []).map(async (referral) => {
+                    const recent15m = await env.OPTIVIEW_DB.prepare(`
+                        SELECT COUNT(*) as count
+                        FROM interaction_events ie
+                        JOIN content_assets ca ON ca.id = ie.content_id
+                        JOIN properties p ON p.id = ca.property_id
+                        WHERE p.project_id = ? 
+                          AND ie.content_id = ?
+                          AND ie.ai_source_id = ?
+                          AND ie.occurred_at >= datetime('now', '-15 minutes')
+                          AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                    `).bind(project_id, referral.content_id, referral.ai_source_id).first<any>();
+
+                    return {
+                        ...referral,
+                        referrals_15m: recent15m?.count || 0,
+                        share_of_ai: 0.5 // Default value for now
+                    };
+                })
+            );
+
+            const response = new Response(JSON.stringify({
+                items: referralsWith15m,
+                total: totalResult?.total || 0,
+                page: pageNum,
+                pageSize: pageSizeNum
+            }), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=60"
+                }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("referrals_list_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 6.7) Top Referrals API
     if (url.pathname === "/api/referrals/top" && req.method === "GET") {
         try {
             const { project_id, limit = "10" } = Object.fromEntries(url.searchParams);
@@ -2843,16 +2997,18 @@ export async function handleApiRoutes(
 
             const referrals = await env.OPTIVIEW_DB.prepare(`
                 SELECT 
-                    ar.id, ar.ref_type, ar.detected_at,
-                    ais.name as ai_source_name, ais.category,
+                    ie.content_id, ie.class as ref_type, ie.occurred_at as detected_at,
+                    COALESCE(ais.name, 'Unknown AI Source') as ai_source_name, 
+                    COALESCE(ais.category, 'unknown') as category,
                     ca.url as content_url,
                     COUNT(*) as referral_count
-                FROM ai_referrals ar
-                JOIN ai_sources ais ON ar.ai_source_id = ais.id
-                LEFT JOIN content_assets ca ON ar.content_id = ca.id
+                FROM interaction_events ie
+                LEFT JOIN ai_sources ais ON ie.ai_source_id = ais.id
+                LEFT JOIN content_assets ca ON ie.content_id = ca.id
                 LEFT JOIN properties p ON ca.property_id = p.id
-                WHERE p.project_id = ? OR (p.project_id IS NULL AND ? IS NULL)
-                GROUP BY ar.content_id, ais.id
+                WHERE (p.project_id = ? OR (p.project_id IS NULL AND ? IS NULL))
+                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                GROUP BY ie.content_id, ie.ai_source_id, ie.class, ie.occurred_at, ais.name, ais.category, ca.url
                 ORDER BY referral_count DESC
                 LIMIT ?
             `).bind(project_id, project_id, parseInt(limit)).all<any>();
