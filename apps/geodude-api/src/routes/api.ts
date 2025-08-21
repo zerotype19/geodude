@@ -131,12 +131,12 @@ export async function handleApiRoutes(
                     CREATE INDEX IF NOT EXISTS idx_ie_project_time 
                     ON interaction_events(project_id, occurred_at)
                 `).run();
-                
+
                 await env.OPTIVIEW_DB.prepare(`
                     CREATE INDEX IF NOT EXISTS idx_ie_project_source_time 
                     ON interaction_events(project_id, ai_source_id, occurred_at)
                 `).run();
-                
+
                 await env.OPTIVIEW_DB.prepare(`
                     CREATE INDEX IF NOT EXISTS idx_ie_project_content_time 
                     ON interaction_events(project_id, content_id, occurred_at)
@@ -317,52 +317,52 @@ export async function handleApiRoutes(
                 const { getProjectAILiteConfig, getRollupTotals } = await import('../ai-lite');
                 const aiLiteConfig = await getProjectAILiteConfig(env.OPTIVIEW_DB, project_id, env);
                 const isAILite = aiLiteConfig.enforceAI || aiLiteConfig.trackingMode === 'ai-lite';
-                
+
                 let totals: any;
                 let byClass: any[];
                 let baseline: any;
-                
+
                 if (isAILite) {
                     // AI-Lite mode: Use rollups for totals and baseline estimation
                     const startTime = new Date(sinceISO);
                     const endTime = new Date();
-                    
+
                     const rollupTotals = await getRollupTotals(env.OPTIVIEW_DB, project_id, startTime, endTime);
-                    
+
                     // Calculate totals from rollups
-                    const aiEvents = (rollupTotals['human_via_ai']?.total || 0) + 
-                                   (rollupTotals['ai_agent_crawl']?.total || 0) +
-                                   (rollupTotals['citation']?.total || 0);
-                    
+                    const aiEvents = (rollupTotals['human_via_ai']?.total || 0) +
+                        (rollupTotals['ai_agent_crawl']?.total || 0) +
+                        (rollupTotals['citation']?.total || 0);
+
                     const directEstimated = rollupTotals['direct_human']?.total || 0;
                     const searchEstimated = rollupTotals['search']?.total || 0;
-                    
+
                     const totalEvents = aiEvents + directEstimated + searchEstimated;
-                    
+
                     totals = {
                         events: totalEvents,
                         ai_influenced: aiEvents,
                         ai_pct: totalEvents > 0 ? (aiEvents / totalEvents) : 0
                     };
-                    
+
                     // Build class breakdown from rollups
                     byClass = Object.entries(rollupTotals).map(([class_name, data]: [string, any]) => ({
                         class: class_name,
                         count: data.total,
                         estimated: class_name === 'direct_human' || class_name === 'search'
                     }));
-                    
+
                     // Add baseline information
                     const sampledDirect = rollupTotals['direct_human']?.sampled || 0;
                     const sampledSearch = rollupTotals['search']?.sampled || 0;
-                    
+
                     baseline = {
                         direct_events: directEstimated,
                         search_events: searchEstimated,
                         sampled_rows_retained: sampledDirect + sampledSearch,
                         sample_pct: aiLiteConfig.samplePct
                     };
-                    
+
                 } else {
                     // Full mode: Use existing logic with row counts
                     const totalResult = await env.OPTIVIEW_DB.prepare(`
@@ -377,13 +377,13 @@ export async function handleApiRoutes(
                         WHERE project_id = ? AND occurred_at >= ?
                           AND (ai_source_id IS NOT NULL OR json_extract(metadata,'$.traffic_class') IN ('human_via_ai','ai_agent_crawl'))
                     `).bind(project_id, sinceISO).first<any>();
-                    
+
                     totals = {
                         events: totalResult?.events || 0,
                         ai_influenced: aiInfluencedResult?.ai_influenced || 0,
                         ai_pct: (totalResult?.events || 0) > 0 ? ((aiInfluencedResult?.ai_influenced || 0) / (totalResult?.events || 0)) : 0
                     };
-                    
+
                     // Get breakdown by class with traffic classification
                     const classBreakdown = await env.OPTIVIEW_DB.prepare(`
                         SELECT 
@@ -400,13 +400,13 @@ export async function handleApiRoutes(
                         GROUP BY class
                         ORDER BY count DESC
                     `).bind(project_id, sinceISO).all<any>();
-                    
+
                     byClass = (classBreakdown.results || []).map(row => ({
                         class: row.class || 'direct_human',
                         count: row.count,
                         estimated: false
                     }));
-                    
+
                     baseline = undefined; // No baseline in full mode
                 }
 
@@ -437,7 +437,7 @@ export async function handleApiRoutes(
                     // AI-Lite mode: Use rollups for timeseries (hourly buckets)
                     const startTime = new Date(sinceISO);
                     const endTime = new Date();
-                    
+
                     // For AI-Lite, we'll use hourly rollups for timeseries
                     // This gives us accurate counts for all traffic classes
                     const rollupTimeseries = await env.OPTIVIEW_DB.prepare(`
@@ -451,11 +451,11 @@ export async function handleApiRoutes(
                         GROUP BY ts_hour
                         ORDER BY ts_hour ASC
                     `).bind(
-                        project_id, 
-                        Math.floor(startTime.getTime() / 1000), 
+                        project_id,
+                        Math.floor(startTime.getTime() / 1000),
                         Math.floor(endTime.getTime() / 1000)
                     ).all<any>();
-                    
+
                     timeseries = rollupTimeseries;
                 } else {
                     // Full mode: Use existing row-based timeseries
@@ -474,8 +474,8 @@ export async function handleApiRoutes(
                     // AI-Lite mode: Process rollup-based timeseries
                     processedTimeseries = (timeseries.results || []).map(row => {
                         const ts = new Date(row.ts_hour * 1000).toISOString();
-                        return { 
-                            ts, 
+                        return {
+                            ts,
                             count: row.total_count,
                             ai_count: row.ai_count,
                             baseline_count: row.baseline_count,
@@ -513,8 +513,8 @@ export async function handleApiRoutes(
             };
 
             // Get cached or generate summary (respect nocache=1)
-            const summary = nocache === "1" ? 
-                await generateSummary() : 
+            const summary = nocache === "1" ?
+                await generateSummary() :
                 await getOrSetJSON(env.CACHE, cacheKey, 30, generateSummary, {
                     CACHE_OFF: env.CACHE_OFF
                 });
@@ -1610,16 +1610,16 @@ export async function handleApiRoutes(
 
             // Get AI-Lite configuration for this project
             const { getProjectAILiteConfig, classifyTraffic, shouldSampleTraffic, upsertRollup } = await import('../ai-lite');
-            
+
             const aiLiteConfig = await getProjectAILiteConfig(env.OPTIVIEW_DB, project_id, env);
             const isAILite = aiLiteConfig.enforceAI || aiLiteConfig.trackingMode === 'ai-lite';
-            
-            console.log('🔍 AI-Lite config:', { 
-                projectId: project_id, 
-                trackingMode: aiLiteConfig.trackingMode, 
+
+            console.log('🔍 AI-Lite config:', {
+                projectId: project_id,
+                trackingMode: aiLiteConfig.trackingMode,
                 enforceAI: aiLiteConfig.enforceAI,
                 samplePct: aiLiteConfig.samplePct,
-                isAILite 
+                isAILite
             });
 
             // Process each event in the batch
@@ -1682,22 +1682,47 @@ export async function handleApiRoutes(
                     const referrer = metadata?.referrer || metadata?.referer || null;
                     const userAgent = metadata?.user_agent || null;
                     const url = metadata?.url || null;
-                    
-                    // Classify traffic
-                    const classification = classifyTraffic(referrer, userAgent, req.headers, url);
+
+                    // Helper function to get or create AI source
+                    async function getOrCreateAISource(db: any, slug: string, name: string): Promise<number | null> {
+                        try {
+                            // First try to find existing source
+                            const existing = await db.prepare(`
+                                SELECT id FROM ai_sources WHERE slug = ?
+                            `).bind(slug).first();
+
+                            if (existing) {
+                                return existing.id;
+                            }
+
+                            // Create new source if it doesn't exist
+                            const result = await db.prepare(`
+                                INSERT INTO ai_sources (slug, name, category, created_at)
+                                VALUES (?, ?, ?, ?)
+                            `).bind(slug, name, 'crawler', new Date().toISOString()).run();
+
+                            return result.meta.last_row_id;
+                        } catch (error) {
+                            console.error('Error getting/creating AI source:', error);
+                            return null;
+                        }
+                    }
+
+                    // Classify traffic with Cloudflare data
+                    const classification = classifyTraffic(referrer, userAgent, req.headers, url, (req as any).cf);
                     trafficClass = classification.class;
-                    
+
                     // Determine if we should insert a row based on AI-Lite mode
                     if (isAILite) {
                         if (classification.isAI) {
                             // AI traffic: always insert row
                             shouldInsertRow = true;
                             isSampled = false;
-                            
+
                             // Set ai_source_id for AI traffic
-                            if (trafficClass === 'human_via_ai') {
-                                // TODO: Look up or create AI source based on referrer/headers
-                                aiSourceId = null; // Will be enhanced later
+                            if (classification.aiSourceSlug) {
+                                // Look up or create AI source
+                                aiSourceId = await getOrCreateAISource(env.OPTIVIEW_DB, classification.aiSourceSlug, classification.aiSourceName);
                             }
                         } else {
                             // Baseline traffic: apply sampling
@@ -1711,17 +1736,25 @@ export async function handleApiRoutes(
                         // Full mode: always insert row
                         shouldInsertRow = true;
                         isSampled = false;
+
+                        // Set ai_source_id for AI traffic even in full mode
+                        if (classification.aiSourceSlug) {
+                            aiSourceId = await getOrCreateAISource(env.OPTIVIEW_DB, classification.aiSourceSlug, classification.aiSourceName);
+                        }
                     }
-                    
+
                     console.log('🔍 Traffic classification:', {
                         class: trafficClass,
                         isAI: classification.isAI,
                         shouldSample: classification.shouldSample,
                         shouldInsertRow,
                         isSampled,
-                        samplePct: aiLiteConfig.samplePct
+                        samplePct: aiLiteConfig.samplePct,
+                        aiSourceSlug: classification.aiSourceSlug,
+                        aiSourceName: classification.aiSourceName,
+                        aiSourceId
                     });
-                    
+
                 } catch (classificationError) {
                     console.error('Error in traffic classification:', classificationError);
                     // Fall back to default behavior
@@ -1739,19 +1772,17 @@ export async function handleApiRoutes(
                             WHERE project_id = ? 
                               AND property_id = ? 
                               AND ai_source_id = ? 
-                              AND metadata LIKE ?
+                              AND content_id = ?
                               AND occurred_at > ?
-                              AND event_type = ?
                             LIMIT 1
                         `).bind(
-                            project_id, 
-                            property_id, 
-                            aiSourceId, 
-                            `%${metadata?.url || ''}%`,
-                            tenMinutesAgo.toISOString(),
-                            normalizedEventType
+                            project_id,
+                            property_id,
+                            aiSourceId,
+                            contentId,
+                            tenMinutesAgo.toISOString()
                         ).first();
-                        
+
                         if (existingCrawl) {
                             shouldSkipDueToDedupe = true;
                             console.log('🔄 Skipping duplicate AI crawl within 10 minutes');
@@ -1844,7 +1875,7 @@ export async function handleApiRoutes(
                     const event = events[i];
                     const { metadata, occurred_at } = event;
                     const eventTime = occurred_at || now;
-                    
+
                     // Get the corresponding event ID from insertResults
                     const eventId = insertResults[i]?.meta?.last_row_id;
                     if (!eventId) {
@@ -1993,7 +2024,7 @@ export async function handleApiRoutes(
                 const actualInserted = insertResults.filter(r => r.meta?.last_row_id).length;
                 const skipped = events.length - actualInserted;
                 const samplingRate = ((actualInserted / events.length) * 100).toFixed(1);
-                
+
                 console.log('📊 AI-Lite sampling stats:', {
                     total: events.length,
                     inserted: actualInserted,
@@ -2001,17 +2032,17 @@ export async function handleApiRoutes(
                     samplingRate: `${samplingRate}%`,
                     samplePct: aiLiteConfig.samplePct
                 });
-                
+
                 // Store sampling metrics in KV for monitoring
                 if (env.METRICS) {
                     try {
                         const metricsKey = `ai_lite:${project_id}:${new Date().toISOString().split('T')[0]}`;
                         const currentMetrics = await env.METRICS.get(metricsKey, 'json') || { total: 0, inserted: 0, skipped: 0 };
-                        
+
                         currentMetrics.total += events.length;
                         currentMetrics.inserted += actualInserted;
                         currentMetrics.skipped += skipped;
-                        
+
                         await env.METRICS.put(metricsKey, JSON.stringify(currentMetrics), { expirationTtl: 7 * 24 * 3600 });
                     } catch (metricsError) {
                         console.error('Failed to store AI-Lite metrics:', metricsError);
