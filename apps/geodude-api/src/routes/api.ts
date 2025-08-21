@@ -313,37 +313,104 @@ export async function handleApiRoutes(
 
             // Generate summary data
             const generateSummary = async () => {
-                // Get total events
-                const totalResult = await env.OPTIVIEW_DB.prepare(`
-                    SELECT COUNT(*) AS events
-                    FROM interaction_events
-                    WHERE project_id = ? AND occurred_at >= ?
-                `).bind(project_id, sinceISO).first<any>();
+                // Get AI-Lite configuration for this project
+                const { getProjectAILiteConfig, getRollupTotals } = await import('../ai-lite');
+                const aiLiteConfig = await getProjectAILiteConfig(env.OPTIVIEW_DB, project_id, env);
+                const isAILite = aiLiteConfig.enforceAI || aiLiteConfig.trackingMode === 'ai-lite';
+                
+                let totals: any;
+                let byClass: any[];
+                let baseline: any;
+                
+                if (isAILite) {
+                    // AI-Lite mode: Use rollups for totals and baseline estimation
+                    const startTime = new Date(sinceISO);
+                    const endTime = new Date();
+                    
+                    const rollupTotals = await getRollupTotals(env.OPTIVIEW_DB, project_id, startTime, endTime);
+                    
+                    // Calculate totals from rollups
+                    const aiEvents = (rollupTotals['human_via_ai']?.total || 0) + 
+                                   (rollupTotals['ai_agent_crawl']?.total || 0) +
+                                   (rollupTotals['citation']?.total || 0);
+                    
+                    const directEstimated = rollupTotals['direct_human']?.total || 0;
+                    const searchEstimated = rollupTotals['search']?.total || 0;
+                    
+                    const totalEvents = aiEvents + directEstimated + searchEstimated;
+                    
+                    totals = {
+                        events: totalEvents,
+                        ai_influenced: aiEvents,
+                        ai_pct: totalEvents > 0 ? (aiEvents / totalEvents) : 0
+                    };
+                    
+                    // Build class breakdown from rollups
+                    byClass = Object.entries(rollupTotals).map(([class_name, data]: [string, any]) => ({
+                        class: class_name,
+                        count: data.total,
+                        estimated: class_name === 'direct_human' || class_name === 'search'
+                    }));
+                    
+                    // Add baseline information
+                    const sampledDirect = rollupTotals['direct_human']?.sampled || 0;
+                    const sampledSearch = rollupTotals['search']?.sampled || 0;
+                    
+                    baseline = {
+                        direct_events: directEstimated,
+                        search_events: searchEstimated,
+                        sampled_rows_retained: sampledDirect + sampledSearch,
+                        sample_pct: aiLiteConfig.samplePct
+                    };
+                    
+                } else {
+                    // Full mode: Use existing logic with row counts
+                    const totalResult = await env.OPTIVIEW_DB.prepare(`
+                        SELECT COUNT(*) AS events
+                        FROM interaction_events
+                        WHERE project_id = ? AND occurred_at >= ?
+                    `).bind(project_id, sinceISO).first<any>();
 
-                // Get AI-influenced count
-                const aiInfluencedResult = await env.OPTIVIEW_DB.prepare(`
-                    SELECT COUNT(*) AS ai_influenced
-                    FROM interaction_events
-                    WHERE project_id = ? AND occurred_at >= ?
-                      AND (ai_source_id IS NOT NULL OR json_extract(metadata,'$.traffic_class') IN ('human_via_ai','ai_agent_crawl'))
-                `).bind(project_id, sinceISO).first<any>();
+                    const aiInfluencedResult = await env.OPTIVIEW_DB.prepare(`
+                        SELECT COUNT(*) AS ai_influenced
+                        FROM interaction_events
+                        WHERE project_id = ? AND occurred_at >= ?
+                          AND (ai_source_id IS NOT NULL OR json_extract(metadata,'$.traffic_class') IN ('human_via_ai','ai_agent_crawl'))
+                    `).bind(project_id, sinceISO).first<any>();
+                    
+                    totals = {
+                        events: totalResult?.events || 0,
+                        ai_influenced: aiInfluencedResult?.ai_influenced || 0,
+                        ai_pct: (totalResult?.events || 0) > 0 ? ((aiInfluencedResult?.ai_influenced || 0) / (totalResult?.events || 0)) : 0
+                    };
+                    
+                    // Get breakdown by class with traffic classification
+                    const classBreakdown = await env.OPTIVIEW_DB.prepare(`
+                        SELECT 
+                            CASE 
+                                WHEN ai_source_id IS NOT NULL THEN 'human_via_ai'
+                                WHEN json_extract(metadata,'$.traffic_class') IS NOT NULL THEN json_extract(metadata,'$.traffic_class')
+                                WHEN json_extract(metadata,'$.referrer') LIKE '%google.com%' OR json_extract(metadata,'$.referrer') LIKE '%bing.com%' THEN 'search'
+                                WHEN json_extract(metadata,'$.user_agent') LIKE '%bot%' OR json_extract(metadata,'$.user_agent') LIKE '%crawler%' THEN 'ai_agent_crawl'
+                                ELSE 'direct_human'
+                            END AS class,
+                            COUNT(*) AS count
+                        FROM interaction_events
+                        WHERE project_id = ? AND occurred_at >= ?
+                        GROUP BY class
+                        ORDER BY count DESC
+                    `).bind(project_id, sinceISO).all<any>();
+                    
+                    byClass = (classBreakdown.results || []).map(row => ({
+                        class: row.class || 'direct_human',
+                        count: row.count,
+                        estimated: false
+                    }));
+                    
+                    baseline = undefined; // No baseline in full mode
+                }
 
-                // Get breakdown by class with traffic classification
-                const classBreakdown = await env.OPTIVIEW_DB.prepare(`
-                    SELECT 
-                        CASE 
-                            WHEN ai_source_id IS NOT NULL THEN 'human_via_ai'
-                            WHEN json_extract(metadata,'$.traffic_class') IS NOT NULL THEN json_extract(metadata,'$.traffic_class')
-                            WHEN json_extract(metadata,'$.referrer') LIKE '%google.com%' OR json_extract(metadata,'$.referrer') LIKE '%bing.com%' THEN 'search'
-                            WHEN json_extract(metadata,'$.user_agent') LIKE '%bot%' OR json_extract(metadata,'$.user_agent') LIKE '%crawler%' THEN 'ai_agent_crawl'
-                            ELSE 'direct_human'
-                        END AS class,
-                        COUNT(*) AS count
-                    FROM interaction_events
-                    WHERE project_id = ? AND occurred_at >= ?
-                    GROUP BY class
-                    ORDER BY count DESC
-                `).bind(project_id, sinceISO).all<any>();
+
 
                 // Get top AI sources
                 const topSources = await env.OPTIVIEW_DB.prepare(`
@@ -365,43 +432,83 @@ export async function handleApiRoutes(
                     default: bucketFormat = "substr(occurred_at,1,13)"; break;
                 }
 
-                const timeseries = await env.OPTIVIEW_DB.prepare(`
-                    SELECT ${bucketFormat} AS bucket, COUNT(*) AS count
-                    FROM interaction_events
-                    WHERE project_id = ? AND occurred_at >= ?
-                    GROUP BY ${bucketFormat}
-                    ORDER BY bucket ASC
-                `).bind(project_id, sinceISO).all<any>();
+                let timeseries: any;
+                if (isAILite) {
+                    // AI-Lite mode: Use rollups for timeseries (hourly buckets)
+                    const startTime = new Date(sinceISO);
+                    const endTime = new Date();
+                    
+                    // For AI-Lite, we'll use hourly rollups for timeseries
+                    // This gives us accurate counts for all traffic classes
+                    const rollupTimeseries = await env.OPTIVIEW_DB.prepare(`
+                        SELECT 
+                            ts_hour,
+                            SUM(events_count) as total_count,
+                            SUM(CASE WHEN class IN ('human_via_ai', 'ai_agent_crawl', 'citation') THEN events_count ELSE 0 END) as ai_count,
+                            SUM(CASE WHEN class IN ('direct_human', 'search') THEN events_count ELSE 0 END) as baseline_count
+                        FROM traffic_rollup_hourly
+                        WHERE project_id = ? AND ts_hour >= ? AND ts_hour <= ?
+                        GROUP BY ts_hour
+                        ORDER BY ts_hour ASC
+                    `).bind(
+                        project_id, 
+                        Math.floor(startTime.getTime() / 1000), 
+                        Math.floor(endTime.getTime() / 1000)
+                    ).all<any>();
+                    
+                    timeseries = rollupTimeseries;
+                } else {
+                    // Full mode: Use existing row-based timeseries
+                    timeseries = await env.OPTIVIEW_DB.prepare(`
+                        SELECT ${bucketFormat} AS bucket, COUNT(*) AS count
+                        FROM interaction_events
+                        WHERE project_id = ? AND occurred_at >= ?
+                        GROUP BY ${bucketFormat}
+                        ORDER BY bucket ASC
+                    `).bind(project_id, sinceISO).all<any>();
+                }
 
                 // Process timeseries buckets
-                const processedTimeseries = (timeseries.results || []).map(row => {
-                    let ts: string;
-                    switch (window) {
-                        case "15m": ts = row.bucket + ":00Z"; break;
-                        case "24h": ts = row.bucket + ":00:00Z"; break;
-                        case "7d": ts = row.bucket + "T00:00:00Z"; break;
-                        default: ts = row.bucket + ":00:00Z"; break;
-                    }
-                    return { ts, count: row.count };
-                });
+                let processedTimeseries: any[];
+                if (isAILite) {
+                    // AI-Lite mode: Process rollup-based timeseries
+                    processedTimeseries = (timeseries.results || []).map(row => {
+                        const ts = new Date(row.ts_hour * 1000).toISOString();
+                        return { 
+                            ts, 
+                            count: row.total_count,
+                            ai_count: row.ai_count,
+                            baseline_count: row.baseline_count,
+                            estimated: true // Mark as estimated since it's from rollups
+                        };
+                    });
+                } else {
+                    // Full mode: Process row-based timeseries
+                    processedTimeseries = (timeseries.results || []).map(row => {
+                        let ts: string;
+                        switch (window) {
+                            case "15m": ts = row.bucket + ":00Z"; break;
+                            case "24h": ts = row.bucket + ":00:00Z"; break;
+                            case "7d": ts = row.bucket + "T00:00:00Z"; break;
+                            default: ts = row.bucket + ":00:00Z"; break;
+                        }
+                        return { ts, count: row.count, estimated: false };
+                    });
+                }
 
                 return {
-                    totals: {
-                        events: totalResult?.events || 0,
-                        ai_influenced: aiInfluencedResult?.ai_influenced || 0,
-                        active_sources: (topSources.results || []).length
-                    },
-                    by_class: (classBreakdown.results || []).map(row => ({
-                        class: row.class || 'direct_human',
-                        count: row.count
-                    })),
+                    totals,
+                    by_class: byClass,
                     by_source_top: (topSources.results || []).map(row => ({
                         ai_source_id: row.ai_source_id,
                         slug: row.slug,
                         name: row.name,
                         count: row.count
                     })),
-                    timeseries: processedTimeseries
+                    timeseries: processedTimeseries,
+                    baseline, // Include baseline info for AI-Lite mode
+                    tracking_mode: aiLiteConfig.trackingMode,
+                    ai_lite: isAILite
                 };
             };
 
