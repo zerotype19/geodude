@@ -2957,14 +2957,16 @@ export async function handleApiRoutes(
 
                         // Process debug field to ensure it's always an array
                         let debug = [];
-                        try {
-                            if (referral.debug_raw && referral.debug_raw !== '[]') {
-                                const parsed = JSON.parse(referral.debug_raw);
-                                debug = Array.isArray(parsed) ? parsed : [];
+                        if (referral.debug_raw && referral.debug_raw !== 'null') {
+                            try {
+                                if (referral.debug_raw !== '[]') {
+                                    const parsed = JSON.parse(referral.debug_raw);
+                                    debug = Array.isArray(parsed) ? parsed : [];
+                                }
+                            } catch (e) {
+                                console.warn('Failed to parse debug field:', referral.debug_raw);
+                                debug = [];
                             }
-                        } catch (e) {
-                            console.warn('Failed to parse debug field:', referral.debug_raw);
-                            debug = [];
                         }
 
                         return {
