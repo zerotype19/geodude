@@ -3,6 +3,7 @@ import { Card } from '../components/ui/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE, FETCH_OPTS } from '../config';
 import Shell from '../components/Shell';
+import { Info } from 'lucide-react';
 
 interface ContentAsset {
   id: number;
@@ -28,6 +29,39 @@ interface ContentDetail {
     path: string;
     debug?: string[];
   }>;
+}
+
+// Traffic classification helper functions
+function getTrafficClassColor(className: string): string {
+  switch (className) {
+    case "ai_agent_crawl": return "bg-orange-100 text-orange-800";
+    case "human_via_ai": return "bg-blue-100 text-blue-800";
+    case "search": return "bg-green-100 text-green-800";
+    case "direct_human": return "bg-gray-100 text-gray-800";
+    default: return "bg-gray-100 text-gray-800";
+  }
+}
+
+function getTrafficClassLabel(className: string): string {
+  switch (className) {
+    case "direct_human": return "Direct Human";
+    case "human_via_ai": return "Human via AI";
+    case "ai_agent_crawl": return "AI Agent Crawl";
+    case "search": return "Search";
+    case "unknown": return "Unknown";
+    default: return className;
+  }
+}
+
+function getTrafficClassDescription(className: string): string {
+  switch (className) {
+    case "direct_human": return "No referrer, direct visits";
+    case "human_via_ai": return "AI assistant referrers (ChatGPT, Claude, etc.)";
+    case "ai_agent_crawl": return "Cloudflare verified bots and crawlers";
+    case "search": return "Search engine referrers (Google, Bing, etc.)";
+    case "unknown": return "Unclassified traffic";
+    default: return "Traffic classification";
+  }
 }
 
 const Content: React.FC = () => {
@@ -404,21 +438,24 @@ const Content: React.FC = () => {
                                           <div key={idx} className="flex items-center space-x-4 text-sm text-gray-600">
                                             <span>{new Date(event.occurred_at).toLocaleString()}</span>
                                             <span className="capitalize">{event.event_type}</span>
-                                            <span className={`px-2 py-1 text-xs rounded-full ${event.event_class === 'ai_agent_crawl' ? 'bg-orange-100 text-orange-800' :
-                                                event.event_class === 'human_via_ai' ? 'bg-blue-100 text-blue-800' :
-                                                  event.event_class === 'search' ? 'bg-green-100 text-green-800' :
-                                                    'bg-gray-100 text-gray-800'
-                                              }`}>
-                                              {event.event_class}
-                                              {event.debug && event.debug.length > 0 && (
-                                                <span
-                                                  className="ml-1 text-gray-400 cursor-help"
-                                                  title={`Classification: ${event.debug.join(', ')}`}
-                                                >
-                                                  ℹ️
-                                                </span>
-                                              )}
-                                            </span>
+                                                                                         <div className="flex items-center gap-2">
+                                               <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(event.event_class)}`}>
+                                                 {getTrafficClassLabel(event.event_class)}
+                                               </span>
+                                               {event.event_class !== 'unknown' && (
+                                                 <div className="relative group">
+                                                   <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                                                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                                                     {getTrafficClassDescription(event.event_class)}
+                                                     {event.debug && event.debug.length > 0 && (
+                                                       <div className="mt-1 pt-1 border-t border-gray-700">
+                                                         <strong>Debug:</strong> {event.debug.join(', ')}
+                                                       </div>
+                                                     )}
+                                                   </div>
+                                                 </div>
+                                               )}
+                                             </div>
                                             <span>via {event.source_name || 'unknown'}</span>
                                             {event.path && <span>at {event.path}</span>}
                                           </div>
