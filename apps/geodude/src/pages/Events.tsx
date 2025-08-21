@@ -11,7 +11,8 @@ import {
   Zap,
   MoreVertical,
   Copy,
-  AlertCircle
+  AlertCircle,
+  Info
 } from "lucide-react";
 // Simple SVG chart component instead of recharts
 function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: string) => string }) {
@@ -79,6 +80,15 @@ interface EventsSummary {
   by_class: Array<{ class: string; count: number }>;
   by_source_top: Array<{ ai_source_id: number; slug: string; name: string; count: number }>;
   timeseries: Array<{ ts: string; count: number }>;
+  // AI-Lite fields
+  baseline?: {
+    direct_events: number;
+    search_events: number;
+    sampled_rows_retained: number;
+    sample_pct: number;
+  };
+  tracking_mode?: string;
+  ai_lite?: boolean;
 }
 
 interface EventsRecent {
@@ -107,6 +117,9 @@ export default function Events() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [autoRefreshCount, setAutoRefreshCount] = useState(0);
   const [metadataPopover, setMetadataPopover] = useState<{ id: number; metadata: any } | null>(null);
+  
+  // AI-Lite state
+  const [includeBaseline, setIncludeBaseline] = useState(false);
 
   // URL params and filters
   const window = searchParams.get("window") || getStoredWindow() || "24h";
@@ -267,6 +280,21 @@ export default function Events() {
       setStoredWindow(window);
     }
   }, [window, project?.id]);
+
+  // Set default AI-only filter for AI-Lite mode
+  useEffect(() => {
+    if (summary?.ai_lite && !classFilter) {
+      // Default to AI-only view in AI-Lite mode
+      const aiClasses = ['human_via_ai', 'ai_agent_crawl', 'citation'];
+      if (summary.by_class.some(cls => aiClasses.includes(cls.class))) {
+        // Set a default AI filter if available
+        const firstAIClass = summary.by_class.find(cls => aiClasses.includes(cls.class));
+        if (firstAIClass) {
+          handleClassFilter(firstAIClass.class);
+        }
+      }
+    }
+  }, [summary, classFilter]);
 
   // Handlers
   function handleWindowChange(newWindow: string) {
@@ -456,9 +484,45 @@ export default function Events() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Events</h1>
             <p className="text-gray-600">Monitor AI traffic and user interactions</p>
+            {summary?.tracking_mode && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">
+                  {summary.tracking_mode === 'ai-lite' ? 'AI-Lite Mode' : 'Full Tracking Mode'}
+                </span>
+                {summary.ai_lite && (
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Info className="h-3 w-3" />
+                    <span>Baseline traffic sampled at {summary.baseline?.sample_pct || 2}%</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-4">
+            {/* AI-Lite Baseline Toggle */}
+            {summary?.ai_lite && (
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={includeBaseline}
+                    onChange={(e) => setIncludeBaseline(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Include baseline
+                </label>
+                <div className="relative group">
+                  <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                  <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                    Baseline (rollup)
+                    <br />
+                    Totals include all direct/search activity via hourly rollups. For performance, only a small sampled subset of baseline events is retained for detail view (sample: {summary.baseline?.sample_pct || 2}%). AI activity retains full detail.
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Window Selector */}
             <div className="flex rounded-lg border border-gray-300">
               {["15m", "24h", "7d"].map((w) => (
@@ -573,11 +637,62 @@ export default function Events() {
           </div>
         )}
 
+        {/* Baseline Information (AI-Lite Mode) */}
+        {summary?.ai_lite && summary.baseline && (
+          <Card>
+            <div className="p-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Baseline Traffic (Rollup Data)</h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-500">Direct Traffic</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {formatNumber(summary.baseline.direct_events)}
+                  </p>
+                  <p className="text-xs text-gray-500">estimated from rollups</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-500">Search Traffic</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {formatNumber(summary.baseline.search_events)}
+                  </p>
+                  <p className="text-xs text-gray-500">estimated from rollups</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-500">Sampled Rows</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {formatNumber(summary.baseline.sampled_rows_retained)}
+                  </p>
+                  <p className="text-xs text-gray-500">retained for detail view</p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Timeseries Chart */}
         {summary && (
           <Card>
             <div className="p-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Events Over Time</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Events Over Time</h3>
+                {summary.ai_lite && summary.baseline && (
+                  <div className="text-xs text-gray-500">
+                    {includeBaseline ? (
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        AI traffic (full detail)
+                        <span className="w-2 h-2 bg-gray-400 rounded-full ml-2"></span>
+                        Baseline (estimated from rollups)
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        AI traffic only
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               {summary.timeseries.length > 0 ? (
                 <SimpleLineChart 
                   data={summary.timeseries} 
@@ -610,20 +725,41 @@ export default function Events() {
                   >
                     All ({formatNumber(summary.totals.events)})
                   </button>
-                  {summary.by_class.map((cls) => (
-                    <button
-                      key={cls.class}
-                      onClick={() => handleClassFilter(cls.class)}
-                      className={`px-3 py-1 rounded-full text-sm border ${
-                        classFilter === cls.class
-                          ? "bg-blue-100 text-blue-800 border-blue-200"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      {cls.class} ({formatNumber(cls.count)})
-                    </button>
-                  ))}
+                  {summary.by_class.map((cls) => {
+                    const isAIClass = ['human_via_ai', 'ai_agent_crawl', 'citation'].includes(cls.class);
+                    const isBaselineClass = ['direct_human', 'search'].includes(cls.class);
+                    const showClass = !summary.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
+                    
+                    if (!showClass) return null;
+                    
+                    return (
+                      <button
+                        key={cls.class}
+                        onClick={() => handleClassFilter(cls.class)}
+                        className={`px-3 py-1 rounded-full text-sm border ${
+                          classFilter === cls.class
+                            ? "bg-blue-100 text-blue-800 border-blue-200"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                        } ${isBaselineClass ? 'opacity-75' : ''}`}
+                      >
+                        {cls.class} ({formatNumber(cls.count)})
+                        {isBaselineClass && summary.ai_lite && (
+                          <span className="ml-1 text-xs text-gray-500">ⓘ sampled</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
+                
+                {/* AI-Lite Mode Note */}
+                {summary.ai_lite && (
+                  <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    <span>
+                      AI-Lite mode: AI traffic shown in full detail, baseline traffic sampled at {summary.baseline?.sample_pct || 2}%
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -729,6 +865,9 @@ export default function Events() {
                           <td className="py-3 pr-4">
                             <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(item.class)}`}>
                               {item.class}
+                              {['direct_human', 'search'].includes(item.class) && summary?.ai_lite && (
+                                <span className="ml-1 text-gray-500">ⓘ sampled</span>
+                              )}
                             </span>
                           </td>
                           <td className="py-3 pr-4">
@@ -802,6 +941,24 @@ export default function Events() {
             )}
           </div>
         </Card>
+
+        {/* AI-Lite Baseline Note */}
+        {summary?.ai_lite && (
+          <Card>
+            <div className="p-4">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-gray-600">
+                  <p className="font-medium mb-1">AI-Lite Mode Active</p>
+                  <p>
+                    Non-AI events (direct human, search) are sampled at {summary.baseline?.sample_pct || 2}% for performance. 
+                    Only sampled baseline events appear in the table above. For complete baseline counts, see the rollup data above.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Auto-refresh status */}
         {autoRefreshCount > 0 && autoRefreshCount < 12 && (

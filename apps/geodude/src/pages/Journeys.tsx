@@ -11,7 +11,8 @@ import {
   ArrowRight,
   MoreVertical,
   X,
-  AlertCircle
+  AlertCircle,
+  Info
 } from "lucide-react";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
@@ -37,6 +38,9 @@ interface SessionSummary {
     ts: string;
     count: number;
   }>;
+  // AI-Lite fields
+  tracking_mode?: string;
+  ai_lite?: boolean;
 }
 
 interface SessionItem {
@@ -372,6 +376,14 @@ export default function Journeys() {
     }
   }, [window, project?.id]);
 
+  // Set default AI-only filter for AI-Lite mode
+  useEffect(() => {
+    if (summary?.ai_lite && aiFilter === "all") {
+      // Default to AI-only view in AI-Lite mode
+      handleAIFilter("only");
+    }
+  }, [summary, aiFilter]);
+
   // Handlers
   function handleWindowChange(newWindow: string) {
     updateParams({ window: newWindow, page: null });
@@ -524,6 +536,19 @@ export default function Journeys() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Journeys</h1>
             <p className="text-gray-600">Monitor visitor sessions and user journeys</p>
+            {summary?.tracking_mode && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">
+                  {summary.tracking_mode === 'ai-lite' ? 'AI-Lite Mode' : 'Full Tracking Mode'}
+                </span>
+                {summary.ai_lite && (
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Info className="h-3 w-3" />
+                    <span>Non-AI sessions not retained in detail view</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -680,6 +705,16 @@ export default function Journeys() {
                     </button>
                   ))}
                 </div>
+                
+                {/* AI-Lite Mode Note */}
+                {summary?.ai_lite && (
+                  <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    <span>
+                      AI-Lite mode: Non-AI sessions are not retained as detailed journeys. Baseline counts are available on Events page.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Search Input */}
@@ -878,6 +913,25 @@ export default function Journeys() {
             )}
           </div>
         </div>
+
+        {/* AI-Lite Mode Note */}
+        {summary?.ai_lite && (
+          <Card>
+            <div className="p-4">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-gray-600">
+                  <p className="font-medium mb-1">AI-Lite Mode Active</p>
+                  <p>
+                    Non-AI sessions are not retained as detailed journeys in AI-Lite mode. 
+                    Only AI-influenced sessions appear in the table above. For baseline traffic counts, 
+                    see the Events page which shows rollup data for direct human and search traffic.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Auto-refresh status */}
         {autoRefreshCount > 0 && autoRefreshCount < 12 && (
