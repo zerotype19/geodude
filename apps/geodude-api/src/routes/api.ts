@@ -1940,8 +1940,8 @@ export async function handleApiRoutes(
                         `).bind(metadata.url, project_id).first().then(r => r?.id || null);
 
                         // Determine if this session should be AI-influenced based on classification
-                        const isAIInfluenced = classification.class === 'human_via_ai' || classification.class === 'ai_agent_crawl';
-                        const primaryAiSourceId = classification.aiSourceId || null;
+                        const isAIInfluenced = eventClassification.class === 'human_via_ai' || eventClassification.class === 'ai_agent_crawl';
+                        const primaryAiSourceId = eventClassification.aiSourceId || null;
 
                         // Handle the unique constraint by using INSERT OR IGNORE
                         const newSessionResult = await env.OPTIVIEW_DB.prepare(`
@@ -1985,8 +1985,8 @@ export async function handleApiRoutes(
                     // 6) Update aggregates on the session
                     if (currentSessionId) {
                         // Determine if this event should mark the session as AI-influenced
-                        const isAIInfluenced = classification.class === 'human_via_ai' || classification.class === 'ai_agent_crawl';
-                        const primaryAiSourceId = classification.aiSourceId || null;
+                        const isAIInfluenced = eventClassification.class === 'human_via_ai' || eventClassification.class === 'ai_agent_crawl';
+                        const primaryAiSourceId = eventClassification.aiSourceId || null;
 
                         await env.OPTIVIEW_DB.prepare(`
                             UPDATE session_v1
