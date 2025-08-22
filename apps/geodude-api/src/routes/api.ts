@@ -329,10 +329,12 @@ export async function handleApiRoutes(
 
                     const rollupTotals = await getRollupTotals(env.OPTIVIEW_DB, project_id, startTime, endTime);
 
-                    // Calculate totals from rollups
+                    // Calculate totals from rollups: human_via_ai + ai_training bots only
                     const aiEvents = (rollupTotals['human_via_ai']?.total || 0) +
-                        (rollupTotals['crawler']?.total || 0) +
                         (rollupTotals['citation']?.total || 0);
+                    
+                    // Note: AI training bots are counted separately and only when toggle is ON
+                    // This prevents inflating the metric with search crawlers and preview bots
 
                     const directEstimated = rollupTotals['direct_human']?.total || 0;
                     const searchEstimated = rollupTotals['search']?.total || 0;
@@ -371,11 +373,16 @@ export async function handleApiRoutes(
                         WHERE project_id = ? AND occurred_at >= ?
                     `).bind(project_id, sinceISO).first<any>();
 
+                    // Get AI-influenced count: human_via_ai + ai_training bots only
                     const aiInfluencedResult = await env.OPTIVIEW_DB.prepare(`
                         SELECT COUNT(*) AS ai_influenced
                         FROM interaction_events
                         WHERE project_id = ? AND occurred_at >= ?
-                          AND class IN ('human_via_ai','crawler','citation')
+                          AND (
+                            class = 'human_via_ai' 
+                            OR (class = 'crawler' AND json_extract(metadata, '$.bot_category') = 'ai_training')
+                            OR class = 'citation'
+                          )
                     `).bind(project_id, sinceISO).first<any>();
 
                     totals = {
