@@ -17,6 +17,29 @@ interface ContentAsset {
   coverage_score: number;
 }
 
+interface ContentSummary {
+  totals: {
+    content_assets: number;
+    total_events: number;
+    ai_referrals: number;
+    ai_influenced: number;
+  };
+  by_class: Array<{
+    class: string;
+    count: number;
+  }>;
+  by_source: Array<{
+    slug: string;
+    name: string;
+    count: number;
+  }>;
+  timeseries: Array<{
+    ts: string;
+    events: number;
+    ai_referrals: number;
+  }>;
+}
+
 interface ContentDetail {
   asset: { id: number; url: string; type: string };
   by_source: Array<{ slug: string; events: number }>;
@@ -81,6 +104,7 @@ interface GroupedContent {
 const Content: React.FC = () => {
   const { user, project } = useAuth();
   const [assets, setAssets] = useState<ContentAsset[]>([]);
+  const [summary, setSummary] = useState<ContentSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -91,7 +115,10 @@ const Content: React.FC = () => {
     aiOnly: false,
     page: 1,
     pageSize: 50,
-    groupBy: 'page' // 'page', 'domain', 'type', 'none'
+    groupBy: 'page', // 'page', 'domain', 'type', 'none'
+    class: '', // traffic class filter
+    source: '', // AI source filter
+    botCategory: '' // bot category filter
   });
   const [total, setTotal] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -121,9 +148,31 @@ const Content: React.FC = () => {
 
   useEffect(() => {
     if (project?.id) {
-      loadAssets();
+      Promise.all([fetchSummary(), loadAssets()]);
     }
-  }, [project?.id, filters]);
+  }, [project?.id, filters.window, filters.q, filters.type, filters.aiOnly, filters.page, filters.pageSize, filters.groupBy, filters.class, filters.source, filters.botCategory]);
+
+  const fetchSummary = async () => {
+    if (!project?.id) return;
+
+    try {
+      const params = new URLSearchParams({
+        project_id: project.id,
+        window: filters.window
+      });
+
+      const response = await fetch(`${API_BASE}/api/events/summary?${params}`, FETCH_OPTS);
+
+      if (response.ok) {
+        const data = await response.json();
+        setSummary(data);
+      } else {
+        throw new Error(`Summary API failed: ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Failed to fetch summary:', err);
+    }
+  };
 
   const loadAssets = async () => {
     if (!project?.id) return;
@@ -139,6 +188,11 @@ const Content: React.FC = () => {
         page: filters.page.toString(),
         pageSize: filters.pageSize.toString()
       });
+
+      // Add new AI detection filters
+      if (filters.class) params.append("class", filters.class);
+      if (filters.source) params.append("source", filters.source);
+      if (filters.botCategory) params.append("botCategory", filters.botCategory);
 
       const response = await fetch(`${API_BASE}/api/content?${params}`, FETCH_OPTS);
 
@@ -190,6 +244,31 @@ const Content: React.FC = () => {
       loadAssetDetail(assetId);
     }
     setExpandedRows(newExpanded);
+  };
+
+  // Filter handlers
+  const handleClassFilter = (className: string) => {
+    setFilters(prev => ({
+      ...prev,
+      class: className === filters.class ? '' : className,
+      page: 1
+    }));
+  };
+
+  const handleSourceFilter = (slug: string) => {
+    setFilters(prev => ({
+      ...prev,
+      source: slug === filters.source ? '' : slug,
+      page: 1
+    }));
+  };
+
+  const handleBotCategoryFilter = (category: string) => {
+    setFilters(prev => ({
+      ...prev,
+      botCategory: category === filters.botCategory ? '' : category,
+      page: 1
+    }));
   };
 
   // Group content assets to reduce row count
@@ -439,7 +518,8 @@ const Content: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            {/* Basic Filters Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
               {/* Window Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Time Window</label>
@@ -542,6 +622,115 @@ const Content: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Advanced AI Detection Filters */}
+            {summary && (
+              <>
+                {/* Traffic Classes */}
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Traffic Classes</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleClassFilter('')}
+                      className={`px-3 py-1 rounded-full text-sm border ${!filters.class
+                        ? "bg-blue-100 text-blue-800 border-blue-200"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                        }`}
+                    >
+                      All ({summary.totals.content_assets})
+                    </button>
+                    {summary.by_class.map((cls) => (
+                      <button
+                        key={cls.class}
+                        onClick={() => handleClassFilter(cls.class)}
+                        className={`px-3 py-1 rounded-full text-sm border ${filters.class === cls.class
+                          ? "bg-blue-100 text-blue-800 border-blue-200"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                          }`}
+                        title={getTrafficClassDescription(cls.class)}
+                      >
+                        {getTrafficClassLabel(cls.class)} ({cls.count})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* AI Sources */}
+                {summary.by_source.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">AI Sources</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleSourceFilter('')}
+                        className={`px-3 py-1 rounded-full text-sm border ${!filters.source
+                          ? "bg-blue-100 text-blue-800 border-blue-200"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                          }`}
+                      >
+                        All sources
+                      </button>
+                      {summary.by_source.map((source) => (
+                        <button
+                          key={source.slug}
+                          onClick={() => handleSourceFilter(source.slug)}
+                          className={`px-3 py-1 rounded-full text-sm border ${filters.source === source.slug
+                            ? "bg-blue-100 text-blue-800 border-blue-200"
+                            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                            }`}
+                        >
+                          {source.name} ({source.count})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bot Categories (if crawler class exists) */}
+                {summary.by_class.some(cls => cls.class === 'crawler') && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Bot Categories</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleBotCategoryFilter('')}
+                        className={`px-3 py-1 rounded-full text-sm border ${!filters.botCategory
+                          ? "bg-blue-100 text-blue-800 border-blue-200"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                          }`}
+                      >
+                        All bot types
+                      </button>
+                      <button
+                        onClick={() => handleBotCategoryFilter("ai_training")}
+                        className={`px-3 py-1 rounded-full text-sm border ${filters.botCategory === "ai_training"
+                          ? "bg-purple-100 text-purple-800 border-purple-200"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                          }`}
+                      >
+                        AI Training
+                      </button>
+                      <button
+                        onClick={() => handleBotCategoryFilter("search_crawler")}
+                        className={`px-3 py-1 rounded-full text-sm border ${filters.botCategory === "search_crawler"
+                          ? "bg-blue-100 text-blue-800 border-blue-200"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                          }`}
+                      >
+                        Search Crawler
+                      </button>
+                      <button
+                        onClick={() => handleBotCategoryFilter("preview_bot")}
+                        className={`px-3 py-1 rounded-full text-sm border ${filters.botCategory === "preview_bot"
+                          ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                          }`}
+                      >
+                        Preview Bot
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </Card>
 

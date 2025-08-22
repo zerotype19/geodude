@@ -743,6 +743,9 @@ export async function handleApiRoutes(
                 q = "",
                 type = "",
                 aiOnly = "false",
+                class: trafficClass = "",
+                source = "",
+                botCategory = "",
                 page = "1",
                 pageSize = "50"
             } = params;
@@ -768,6 +771,40 @@ export async function handleApiRoutes(
             if (type.trim()) {
                 whereConditions.push("ca.type = ?");
                 bindParams.push(type.trim());
+            }
+
+            // Add traffic class filter
+            if (trafficClass.trim()) {
+                whereConditions.push(`EXISTS (
+                    SELECT 1 FROM interaction_events ie 
+                    WHERE ie.project_id = ca.project_id 
+                    AND ie.content_id = ca.id 
+                    AND ie.class = ?
+                )`);
+                bindParams.push(trafficClass);
+            }
+
+            // Add AI source filter
+            if (source.trim()) {
+                whereConditions.push(`EXISTS (
+                    SELECT 1 FROM interaction_events ie 
+                    JOIN ai_sources s ON s.id = ie.ai_source_id 
+                    WHERE ie.project_id = ca.project_id 
+                    AND ie.content_id = ca.id 
+                    AND s.slug = ?
+                )`);
+                bindParams.push(source);
+            }
+
+            // Add bot category filter
+            if (botCategory.trim()) {
+                whereConditions.push(`EXISTS (
+                    SELECT 1 FROM interaction_events ie 
+                    WHERE ie.project_id = ca.project_id 
+                    AND ie.content_id = ca.id 
+                    AND ie.bot_category = ?
+                )`);
+                bindParams.push(botCategory);
             }
 
             const whereClause = whereConditions.join(" AND ");
