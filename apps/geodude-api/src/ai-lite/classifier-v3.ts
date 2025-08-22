@@ -1,10 +1,21 @@
 import { normalizeCfCategory, BotCategory } from '../classifier/botCategoryMap';
 
+/**
+ * Normalize hostname by removing www./m. prefixes and converting to lowercase
+ */
+export const normalizeHost = (h: string): string =>
+  h.replace(/^www\./, '').replace(/^m\./, '').toLowerCase();
+
+/**
+ * Extract and normalize base host from URL
+ */
+export const baseHost = (u?: string | null): string | null =>
+  u ? normalizeHost(new URL(u).hostname) : null;
+
 export interface TrafficClassificationV3 {
-  class: 'human_via_ai' | 'search' | 'direct_human' | 'crawler';
-  aiSourceId?: number;
-  aiSourceSlug?: string;
-  aiSourceName?: string;
+  class: 'human_via_ai' | 'crawler' | 'search' | 'direct_human';
+  aiSourceSlug?: string | null;
+  aiSourceName?: string | null;
   reason: string;
   confidence: number;
   evidence: {
@@ -15,6 +26,12 @@ export interface TrafficClassificationV3 {
     userAgent?: string;
     utmSource?: string;
     isSelfReferral?: boolean;
+    referralChain?: string;
+    aiRef?: string;
+  };
+  debug: {
+    matchedRule: string;
+    signals: string[];
   };
 }
 
@@ -31,6 +48,7 @@ export interface ClassifierManifestV3 {
   searchEngines: {
     [host: string]: {
       name: string;
+      slug: string;
       paths?: string[];
       excludePaths?: string[];
     };
@@ -41,41 +59,42 @@ export interface ClassifierManifestV3 {
       category: BotCategory;
     };
   };
+  socialShareHosts: string[];
+  utmSourceAliases: { [source: string]: string };
+  aiRefAliases: { [ref: string]: string };
 }
 
 // Static fallback manifest
 export const STATIC_MANIFEST_V3: ClassifierManifestV3 = {
   version: 'v3',
+
+  // Direct AI assistant referrers (maps to smoke test: "ChatGPT web → site", "Perplexity web → site", "Gemini web → site")
   assistants: {
     'chatgpt.com': { name: 'ChatGPT', slug: 'chatgpt' },
     'chat.openai.com': { name: 'ChatGPT', slug: 'chatgpt' },
     'perplexity.ai': { name: 'Perplexity', slug: 'perplexity' },
     'pplx.ai': { name: 'Perplexity', slug: 'perplexity' },
-    'bing.com': { 
-      name: 'Microsoft Copilot', 
+    'gemini.google.com': { name: 'Google Gemini', slug: 'google_gemini' },
+    'bard.google.com': { name: 'Google Gemini', slug: 'google_gemini' },
+    'bing.com': {
+      name: 'Microsoft Copilot',
       slug: 'microsoft_copilot',
       paths: ['/chat', '/copilot'],
       utmHints: ['copilot']
     },
-    'copilot.microsoft.com': { name: 'Microsoft Copilot', slug: 'microsoft_copilot' },
-    'google.com': { 
-      name: 'Google Gemini', 
-      slug: 'google_gemini',
-      paths: ['/gemini'],
-      utmHints: ['gemini']
-    },
-    'gemini.google.com': { name: 'Google Gemini', slug: 'google_gemini' },
-    'bard.google.com': { name: 'Google Gemini', slug: 'google_gemini' }
+    'copilot.microsoft.com': { name: 'Microsoft Copilot', slug: 'microsoft_copilot' }
   },
+
+  // Search engines (maps to smoke test: "Google Search → site", "Bing Search → site")
   searchEngines: {
-    'google.com': { 
-      name: 'Google', 
+    'google.com': {
+      name: 'Google',
       slug: 'google',
       paths: ['/search', '/images', '/maps'],
       excludePaths: ['/gemini']
     },
-    'bing.com': { 
-      name: 'Microsoft Bing', 
+    'bing.com': {
+      name: 'Microsoft Bing',
       slug: 'microsoft_bing',
       paths: ['/search', '/images', '/maps'],
       excludePaths: ['/chat', '/copilot']
@@ -87,6 +106,37 @@ export const STATIC_MANIFEST_V3: ClassifierManifestV3 = {
     'ecosia.org': { name: 'Ecosia', slug: 'ecosia' },
     'yandex.ru': { name: 'Yandex', slug: 'yandex' }
   },
+
+  // Social sharing hosts (maps to smoke test: "Slack share", "Discord share")
+  socialShareHosts: ['slack.com', 'app.slack.com', 'discord.com'],
+
+  // UTM source aliases (maps to smoke test: "ChatGPT app open (utm_source=chatgpt.com)")
+  utmSourceAliases: {
+    'chatgpt.com': 'chatgpt',
+    'openai.com': 'chatgpt',
+    'perplexity.ai': 'perplexity',
+    'pplx.ai': 'perplexity',
+    'gemini.google.com': 'google_gemini',
+    'bard.google.com': 'google_gemini',
+    'bing.com': 'microsoft_copilot',
+    'copilot.microsoft.com': 'microsoft_copilot'
+  },
+
+  // AI reference aliases (maps to smoke test: "Gemini masked (ai_ref=google_gemini)")
+  aiRefAliases: {
+    'chatgpt': 'chatgpt',
+    'openai': 'chatgpt',
+    'perplexity': 'perplexity',
+    'pplx': 'perplexity',
+    'google_gemini': 'google_gemini',
+    'gemini': 'google_gemini',
+    'bard': 'google_gemini',
+    'microsoft_copilot': 'microsoft_copilot',
+    'copilot': 'microsoft_copilot',
+    'bing': 'microsoft_copilot'
+  },
+
+  // User-Agent patterns (maps to smoke test: "GPTBot crawl", "PerplexityBot crawl", etc.)
   crawlers: {
     'Googlebot': { name: 'Googlebot', category: 'search_crawler' },
     'Bingbot': { name: 'Bingbot', category: 'search_crawler' },
@@ -131,7 +181,7 @@ export function classifyTrafficV3(input: {
   manifest: ClassifierManifestV3;
 }): TrafficClassificationV3 {
   const { cfVerifiedBotCategory, referrerUrl, userAgent, currentHost, utmSource, aiRef, manifest } = input;
-  
+
   // 1. Cloudflare verified bot → crawler (highest precedence)
   if (cfVerifiedBotCategory) {
     const botCategory = normalizeCfCategory(cfVerifiedBotCategory);
@@ -143,16 +193,20 @@ export function classifyTrafficV3(input: {
         cfVerifiedCategory: cfVerifiedBotCategory,
         botCategory,
         userAgent: userAgent || undefined
+      },
+      debug: {
+        matchedRule: 'Cloudflare verified bot',
+        signals: [`cf_verified_category: ${cfVerifiedBotCategory}`]
       }
     };
   }
-  
+
   // 2. AI assistant referrer → human_via_ai
   if (referrerUrl) {
     const referrer = new URL(referrerUrl);
-    const referrerHost = referrer.hostname.toLowerCase().replace(/^www\./, '');
+    const referrerHost = normalizeHost(referrer.hostname);
     const referrerPath = referrer.pathname;
-    
+
     // Check for self-referral (same domain)
     if (referrerHost === currentHost.toLowerCase()) {
       return {
@@ -163,17 +217,21 @@ export function classifyTrafficV3(input: {
           referrerHost,
           referrerPath,
           isSelfReferral: true
+        },
+        debug: {
+          matchedRule: 'Self-referral (same domain)',
+          signals: [`referrer_host: ${referrerHost}`]
         }
       };
     }
-    
+
     // Check if referrer is a known AI assistant
     const assistant = manifest.assistants[referrerHost];
     if (assistant) {
       // Check path restrictions
       if (assistant.paths && assistant.paths.length > 0) {
-        const isAssistantPath = assistant.paths.some(path => 
-          referrerPath.startsWith(path)
+        const isAssistantPath = assistant.paths.some(path =>
+          referrerPath.indexOf(path) === 0
         );
         if (!isAssistantPath) {
           // Not an AI path, treat as search if it's a search engine
@@ -181,18 +239,24 @@ export function classifyTrafficV3(input: {
           if (searchEngine) {
             return {
               class: 'search',
+              aiSourceSlug: searchEngine.slug,
+              aiSourceName: searchEngine.name,
               reason: `Search engine: ${searchEngine.name}`,
               confidence: 0.9,
               evidence: {
                 referrerHost,
                 referrerPath,
                 utmSource
+              },
+              debug: {
+                matchedRule: 'Search engine (path restriction)',
+                signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
               }
             };
           }
         }
       }
-      
+
       // Valid AI assistant path
       return {
         class: 'human_via_ai',
@@ -204,16 +268,64 @@ export function classifyTrafficV3(input: {
           referrerHost,
           referrerPath,
           utmSource
+        },
+        debug: {
+          matchedRule: 'AI assistant (path restriction)',
+          signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
         }
       };
     }
-    
-    // 3. Search referrer → search
+
+    // 3. Search referrer → search (normalized host detection)
+    if (referrerHost === 'google.com' || referrerHost === 'bing.com') {
+      // Special handling for major search engines
+      if (referrerHost === 'bing.com' && referrerPath.indexOf('/chat') === 0) {
+        // Bing chat is AI assistant
+        return {
+          class: 'human_via_ai',
+          aiSourceSlug: 'microsoft_copilot',
+          aiSourceName: 'Microsoft Copilot',
+          reason: 'AI assistant on search domain: Microsoft Copilot',
+          confidence: 0.9,
+          evidence: {
+            referrerHost,
+            referrerPath,
+            utmSource
+          },
+          debug: {
+            matchedRule: 'AI assistant on search domain (Bing chat)',
+            signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
+          }
+        };
+      } else {
+        // Regular search traffic
+        const searchName = referrerHost === 'google.com' ? 'Google' : 'Microsoft Bing';
+        const searchSlug = referrerHost === 'google.com' ? 'google' : 'microsoft_bing';
+        return {
+          class: 'search',
+          aiSourceSlug: searchSlug,
+          aiSourceName: searchName,
+          reason: `Search engine: ${searchName}`,
+          confidence: 0.9,
+          evidence: {
+            referrerHost,
+            referrerPath,
+            utmSource
+          },
+          debug: {
+            matchedRule: 'Search engine (host detection)',
+            signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
+          }
+        };
+      }
+    }
+
+    // Fallback to manifest-based search detection
     const searchEngine = manifest.searchEngines[referrerHost];
     if (searchEngine) {
       // Check if path is excluded (AI paths)
-      if (searchEngine.excludePaths && searchEngine.excludePaths.some(path => 
-        referrerPath.startsWith(path)
+      if (searchEngine.excludePaths && searchEngine.excludePaths.some(path =>
+        referrerPath.indexOf(path) === 0
       )) {
         // This is an AI path on a search domain, treat as AI
         const assistant = manifest.assistants[referrerHost];
@@ -228,30 +340,139 @@ export function classifyTrafficV3(input: {
               referrerHost,
               referrerPath,
               utmSource
+            },
+            debug: {
+              matchedRule: 'AI assistant on search domain (manifest exclusion)',
+              signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
             }
           };
         }
       }
-      
+
       return {
         class: 'search',
+        aiSourceSlug: searchEngine.slug,
+        aiSourceName: searchEngine.name,
         reason: `Search engine: ${searchEngine.name}`,
         confidence: 0.9,
         evidence: {
           referrerHost,
           referrerPath,
           utmSource
+        },
+        debug: {
+          matchedRule: 'Search engine (manifest)',
+          signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
         }
       };
     }
   }
-  
-  // 4. AI reference detection (when no referrer)
+
+  // 4. Social sharing with AI attribution (Slack/Discord)
+  if (referrerUrl) {
+    const referrer = new URL(referrerUrl);
+    const referrerHost = normalizeHost(referrer.hostname);
+
+    if (manifest.socialShareHosts.includes(referrerHost)) {
+      // Extract AI source from query parameters
+      let aiSlug: string | undefined;
+      let referralChain: string | undefined;
+
+      if (utmSource) {
+        // Check UTM source aliases first
+        const aliasSlug = manifest.utmSourceAliases[utmSource];
+        if (aliasSlug) {
+          aiSlug = aliasSlug;
+          referralChain = referrerHost === 'discord.com' ? 'discord' : 'slack';
+        } else {
+          // Fallback: check if UTM source contains AI assistant domain
+          for (const host of Object.keys(manifest.assistants)) {
+            const assistant = manifest.assistants[host];
+            if (utmSource.indexOf(host.replace(/^www\./, '')) !== -1) {
+              aiSlug = assistant.slug;
+              referralChain = referrerHost === 'discord.com' ? 'discord' : 'slack';
+              break;
+            }
+          }
+        }
+      }
+
+      if (aiRef) {
+        // Check AI reference aliases first
+        const aliasSlug = manifest.aiRefAliases[aiRef.toLowerCase()];
+        if (aliasSlug) {
+          aiSlug = aliasSlug;
+          referralChain = referrerHost === 'discord.com' ? 'discord' : 'slack';
+        } else {
+          // Fallback: check if AI ref matches an AI assistant
+          for (const host of Object.keys(manifest.assistants)) {
+            const assistant = manifest.assistants[host];
+            if (aiRef.toLowerCase() === assistant.slug.toLowerCase() ||
+              aiRef.toLowerCase() === assistant.name.toLowerCase().replace(/\s+/g, '').toLowerCase()) {
+              aiSlug = assistant.slug;
+              referralChain = referrerHost === 'discord.com' ? 'discord' : 'slack';
+              break;
+            }
+          }
+        }
+      }
+
+      if (aiSlug) {
+        let assistant = null;
+        for (const host of Object.keys(manifest.assistants)) {
+          if (manifest.assistants[host].slug === aiSlug) {
+            assistant = manifest.assistants[host];
+            break;
+          }
+        }
+        return {
+          class: 'human_via_ai',
+          aiSourceSlug: aiSlug,
+          aiSourceName: assistant?.name || aiSlug,
+          reason: `AI assistant via social share: ${assistant?.name || aiSlug}`,
+          confidence: 0.9,
+          evidence: {
+            referrerHost,
+            referralChain,
+            utmSource,
+            aiRef
+          },
+          debug: {
+            matchedRule: 'AI assistant via social share',
+            signals: [`referrer_host: ${referrerHost}`, `utm_source: ${utmSource}`]
+          }
+        };
+      }
+    }
+  }
+
+  // 5. AI reference detection (when no referrer)
   if (aiRef && !referrerUrl) {
-    // Check if AI ref matches an AI assistant slug or name
-    for (const [host, assistant] of Object.entries(manifest.assistants)) {
-      if (aiRef.toLowerCase() === assistant.slug.toLowerCase() || 
-          aiRef.toLowerCase() === assistant.name.toLowerCase().replace(/\s+/g, '').toLowerCase()) {
+    // Check AI reference aliases first
+    const aliasSlug = manifest.aiRefAliases[aiRef.toLowerCase()];
+    if (aliasSlug) {
+      const assistant = Object.keys(manifest.assistants).map(host => manifest.assistants[host]).find(a => a.slug === aliasSlug);
+      return {
+        class: 'human_via_ai',
+        aiSourceSlug: aliasSlug,
+        aiSourceName: assistant?.name || aliasSlug,
+        reason: `AI assistant via reference alias: ${assistant?.name || aliasSlug}`,
+        confidence: 0.9,
+        evidence: {
+          aiRef
+        },
+        debug: {
+          matchedRule: 'AI assistant via reference alias',
+          signals: [`ai_ref: ${aiRef}`]
+        }
+      };
+    }
+
+    // Fallback: check if AI ref matches an AI assistant slug or name
+    for (const host of Object.keys(manifest.assistants)) {
+      const assistant = manifest.assistants[host];
+      if (aiRef.toLowerCase() === assistant.slug.toLowerCase() ||
+        aiRef.toLowerCase() === assistant.name.toLowerCase().replace(/\s+/g, '').toLowerCase()) {
         return {
           class: 'human_via_ai',
           aiSourceSlug: assistant.slug,
@@ -260,17 +481,42 @@ export function classifyTrafficV3(input: {
           confidence: 0.9,
           evidence: {
             aiRef
+          },
+          debug: {
+            matchedRule: 'AI assistant via reference',
+            signals: [`ai_ref: ${aiRef}`]
           }
         };
       }
     }
   }
-  
+
   // 5. UTM source and AI reference detection (when no referrer)
   if (utmSource && !referrerUrl) {
-    // Check if UTM source matches an AI assistant domain
-    for (const [host, assistant] of Object.entries(manifest.assistants)) {
-      if (utmSource.includes(host.replace(/^www\./, ''))) {
+    // Check UTM source aliases first
+    const aliasSlug = manifest.utmSourceAliases[utmSource];
+    if (aliasSlug) {
+      const assistant = Object.keys(manifest.assistants).map(host => manifest.assistants[host]).find(a => a.slug === aliasSlug);
+      return {
+        class: 'human_via_ai',
+        aiSourceSlug: aliasSlug,
+        aiSourceName: assistant?.name || aliasSlug,
+        reason: `AI assistant via UTM alias: ${assistant?.name || aliasSlug}`,
+        confidence: 0.9,
+        evidence: {
+          utmSource
+        },
+        debug: {
+          matchedRule: 'AI assistant via UTM alias',
+          signals: [`utm_source: ${utmSource}`]
+        }
+      };
+    }
+
+    // Fallback: check if UTM source contains AI assistant domain
+    for (const host of Object.keys(manifest.assistants)) {
+      const assistant = manifest.assistants[host];
+      if (utmSource.indexOf(host.replace(/^www\./, '')) !== -1) {
         return {
           class: 'human_via_ai',
           aiSourceSlug: assistant.slug,
@@ -279,14 +525,19 @@ export function classifyTrafficV3(input: {
           confidence: 0.85,
           evidence: {
             utmSource
+          },
+          debug: {
+            matchedRule: 'AI assistant via UTM',
+            signals: [`utm_source: ${utmSource}`]
           }
         };
       }
     }
-    
+
     // Check for specific UTM hints
-    for (const [host, assistant] of Object.entries(manifest.assistants)) {
-      if (assistant.utmHints && assistant.utmHints.some(hint => utmSource.includes(hint))) {
+    for (const host of Object.keys(manifest.assistants)) {
+      const assistant = manifest.assistants[host];
+      if (assistant.utmHints && assistant.utmHints.some(hint => utmSource.indexOf(hint) !== -1)) {
         return {
           class: 'human_via_ai',
           aiSourceSlug: assistant.slug,
@@ -295,11 +546,15 @@ export function classifyTrafficV3(input: {
           confidence: 0.85,
           evidence: {
             utmSource
+          },
+          debug: {
+            matchedRule: 'AI assistant via UTM hint',
+            signals: [`utm_source: ${utmSource}`]
           }
         };
       }
     }
-    
+
     // No AI match found
     return {
       class: 'direct_human',
@@ -307,14 +562,19 @@ export function classifyTrafficV3(input: {
       confidence: 0.8,
       evidence: {
         utmSource
+      },
+      debug: {
+        matchedRule: 'UTM source without referrer',
+        signals: [`utm_source: ${utmSource}`]
       }
     };
   }
-  
-  // 5. User-Agent pattern matching for crawlers (without Cloudflare verification)
+
+  // 6. User-Agent pattern matching for crawlers (without Cloudflare verification)
   if (userAgent) {
-    for (const [pattern, crawler] of Object.entries(manifest.crawlers)) {
-      if (userAgent.includes(pattern)) {
+    for (const pattern of Object.keys(manifest.crawlers)) {
+      const crawler = manifest.crawlers[pattern];
+      if (userAgent.indexOf(pattern) !== -1) {
         return {
           class: 'crawler',
           reason: `Crawler detected: ${crawler.name}`,
@@ -322,13 +582,17 @@ export function classifyTrafficV3(input: {
           evidence: {
             botCategory: crawler.category,
             userAgent
+          },
+          debug: {
+            matchedRule: 'Crawler (UA pattern)',
+            signals: [`user_agent: ${userAgent}`]
           }
         };
       }
     }
   }
-  
-  // 6. Default → direct_human
+
+  // 7. Default → direct_human
   return {
     class: 'direct_human',
     reason: 'No referrer or unknown source',
@@ -336,6 +600,10 @@ export function classifyTrafficV3(input: {
     evidence: {
       referrerHost: referrerUrl ? new URL(referrerUrl).hostname : undefined,
       utmSource
+    },
+    debug: {
+      matchedRule: 'No referrer or unknown source',
+      signals: []
     }
   };
 }
@@ -363,7 +631,7 @@ export function buildAuditMetaV3(input: {
   bot_category: string | null;
 } {
   const u = input.referrerUrl ? new URL(input.referrerUrl) : null;
-  
+
   return {
     referrer_url: input.referrerUrl ?? null,
     referrer_host: u?.hostname ?? null,

@@ -76,17 +76,22 @@ do_call () {
 
   # Expected fields
   local want_tc want_src want_bot want_chain
-  want_tc=$(echo "$expected_json"   | jq -r '.traffic_class')
-  want_src=$(echo "$expected_json"  | jq -r '.ai_source_id // "__UNSET__"')
-  want_bot=$(echo "$expected_json"  | jq -r '.bot_category // "__UNSET__"')
-  want_chain=$(echo "$expected_json"| jq -r '.referral_chain // "__UNSET__"')
+  want_tc=$(echo "$expected_json"   | jq -r '.class')
+  want_src=$(echo "$expected_json"  | jq -r '.aiSourceSlug // "__UNSET__"')
+  want_bot=$(echo "$expected_json"  | jq -r '.botCategory // "__UNSET__"')
+  want_chain=$(echo "$expected_json"| jq -r '.referralChain // "__UNSET__"')
 
   # Got fields
   local got_tc got_src got_bot got_chain
   got_tc=$(echo "$resp"   | jq -r '.classification.class // ""')
   got_src=$(echo "$resp"  | jq -r '.classification.aiSourceSlug // "__UNSET__"')
   got_bot=$(echo "$resp"  | jq -r '.classification.evidence.botCategory // "__UNSET__"')
-  got_chain=$(echo "$resp"| jq -r '.classification.evidence.referral_chain // "__UNSET__"')
+  got_chain=$(echo "$resp"| jq -r '.classification.evidence.referralChain // "__UNSET__"')
+  
+  # Debug info for troubleshooting
+  local matched_rule signals
+  matched_rule=$(echo "$resp" | jq -r '.classification.debug.matchedRule // ""')
+  signals=$(echo "$resp" | jq -r '.classification.debug.signals // []' | jq -r 'join(", ")')
 
   local ok=1
   [[ "$got_tc" == "$want_tc" ]] || ok=0
@@ -99,8 +104,10 @@ do_call () {
     return 0
   else
     echo "❌ $name"
-    echo "    Expected: $(echo "$expected_json" | jq -c '{traffic_class,ai_source_id,bot_category,referral_chain}')"
-    echo "    Got:      $(echo "$resp" | jq -c '{traffic_class,ai_source_id,bot_category,referral_chain,debug:.debug}')"
+    echo "    Expected: $(echo "$expected_json" | jq -c '{class,aiSourceSlug,botCategory,referralChain}')"
+    echo "    Got:      $(echo "$resp" | jq -c '{class:.classification.class,aiSourceSlug:.classification.aiSourceSlug,botCategory:.classification.evidence.botCategory,referralChain:.classification.evidence.referralChain}')"
+    echo "    Rule:     $matched_rule"
+    echo "    Signals:  $signals"
     return 1
   fi
 }
@@ -108,26 +115,26 @@ do_call () {
 # ---------- Test Matrix (no comments; valid JSON) ----------
 read -r -d '' CASES_JSON <<'JSON'
 [
-  {"name":"ChatGPT web → site (referrer present)","referrer":"https://chat.openai.com/","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"traffic_class":"human_via_ai","ai_source_id":"chatgpt"}},
-  {"name":"Perplexity web → site (referrer present)","referrer":"https://www.perplexity.ai/","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"traffic_class":"human_via_ai","ai_source_id":"perplexity"}},
-  {"name":"Gemini web → site (referrer present)","referrer":"https://gemini.google.com/","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:11.0) like Gecko","query":null,"headers":null,"expected":{"traffic_class":"human_via_ai","ai_source_id":"google_gemini"}},
-  {"name":"Bing Copilot (web chat) → site","referrer":"https://www.bing.com/chat","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0","query":null,"headers":null,"expected":{"traffic_class":"human_via_ai","ai_source_id":"microsoft_copilot"}},
+  {"name":"ChatGPT web → site (referrer present)","referrer":"https://chat.openai.com/","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"class":"human_via_ai","aiSourceSlug":"chatgpt"}},
+  {"name":"Perplexity web → site (referrer present)","referrer":"https://www.perplexity.ai/","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"class":"human_via_ai","aiSourceSlug":"perplexity"}},
+  {"name":"Gemini web → site (referrer present)","referrer":"https://gemini.google.com/","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:11.0) like Gecko","query":null,"headers":null,"expected":{"class":"human_via_ai","aiSourceSlug":"google_gemini"}},
+  {"name":"Bing Copilot (web chat) → site","referrer":"https://www.bing.com/chat","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0","query":null,"headers":null,"expected":{"class":"human_via_ai","aiSourceSlug":"microsoft_copilot"}},
 
-  {"name":"ChatGPT app open (no referrer, utm_source=chatgpt.com)","referrer":null,"user_agent":"Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1","query":{"utm_source":"chatgpt.com"},"headers":null,"expected":{"traffic_class":"human_via_ai","ai_source_id":"chatgpt"}},
-  {"name":"Perplexity iOS app open (no referrer, Perplexity UA)","referrer":null,"user_agent":"Perplexity/2.3.1 (iOS; iPhone16,2) CFNetwork/1410.0.3 Darwin/22.6.0","query":null,"headers":null,"expected":{"traffic_class":"direct_human","ai_source_id":null}},
-  {"name":"Gemini masked (no ref, ai_ref=google_gemini)","referrer":null,"user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15","query":{"ai_ref":"google_gemini"},"headers":null,"expected":{"traffic_class":"human_via_ai","ai_source_id":"google_gemini"}},
+  {"name":"ChatGPT app open (no referrer, utm_source=chatgpt.com)","referrer":null,"user_agent":"Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1","query":{"utm_source":"chatgpt.com"},"headers":null,"expected":{"class":"human_via_ai","aiSourceSlug":"chatgpt"}},
+  {"name":"Perplexity iOS app open (no referrer, Perplexity UA)","referrer":null,"user_agent":"Perplexity/2.3.1 (iOS; iPhone16,2) CFNetwork/1410.0.3 Darwin/22.6.0","query":null,"headers":null,"expected":{"class":"direct_human","aiSourceSlug":null}},
+  {"name":"Gemini masked (no ref, ai_ref=google_gemini)","referrer":null,"user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Safari/605.1.15","query":{"ai_ref":"google_gemini"},"headers":null,"expected":{"class":"human_via_ai","aiSourceSlug":"google_gemini"}},
 
-  {"name":"GPTBot crawl","referrer":null,"user_agent":"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) GPTBot/1.0","query":null,"headers":null,"expected":{"traffic_class":"crawler","bot_category":"ai_training"}},
-  {"name":"PerplexityBot crawl","referrer":null,"user_agent":"PerplexityBot/1.0 (+https://www.perplexity.ai/bot)","query":null,"headers":{"from":"bot@perplexity.ai"},"expected":{"traffic_class":"crawler","bot_category":"ai_training"}},
-  {"name":"ClaudeBot crawl","referrer":null,"user_agent":"ClaudeBot/1.0","query":null,"headers":null,"expected":{"traffic_class":"crawler","bot_category":"ai_training"}},
-  {"name":"GoogleOther (Gemini fetcher) crawl","referrer":null,"user_agent":"Mozilla/5.0 (compatible; GoogleOther)","query":null,"headers":null,"expected":{"traffic_class":"crawler","bot_category":"ai_training"}},
+  {"name":"GPTBot crawl","referrer":null,"user_agent":"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) GPTBot/1.0","query":null,"headers":null,"expected":{"class":"crawler","botCategory":"ai_training"}},
+  {"name":"PerplexityBot crawl","referrer":null,"user_agent":"PerplexityBot/1.0 (+https://www.perplexity.ai/bot)","query":null,"headers":{"from":"bot@perplexity.ai"},"expected":{"class":"crawler","botCategory":"ai_training"}},
+  {"name":"ClaudeBot crawl","referrer":null,"user_agent":"ClaudeBot/1.0","query":null,"headers":null,"expected":{"class":"crawler","botCategory":"ai_training"}},
+  {"name":"GoogleOther (Gemini fetcher) crawl","referrer":null,"user_agent":"Mozilla/5.0 (compatible; GoogleOther)","query":null,"headers":null,"expected":{"class":"crawler","botCategory":"ai_training"}},
 
-  {"name":"Direct type-in (no referrer)","referrer":null,"user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"traffic_class":"direct_human","ai_source_id":null}},
-  {"name":"Google Search → site (non-AI)","referrer":"https://www.google.com/","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"traffic_class":"search","ai_source_id":"google"}},
-  {"name":"Bing Search → site (non-Copilot)","referrer":"https://www.bing.com/","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; Trident/7.0; rv:11.0) like Gecko","query":null,"headers":null,"expected":{"traffic_class":"search","ai_source_id":"microsoft_bing"}},
+  {"name":"Direct type-in (no referrer)","referrer":null,"user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"class":"direct_human","aiSourceSlug":null}},
+  {"name":"Google Search → site (non-AI)","referrer":"https://www.google.com/","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"class":"search","aiSourceSlug":"google"}},
+  {"name":"Bing Search → site (non-Copilot)","referrer":"https://www.bing.com/","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; Trident/7.0; rv:11.0) like Gecko","query":null,"headers":null,"expected":{"class":"search","aiSourceSlug":"microsoft_bing"}},
 
-  {"name":"Slack share of ChatGPT answer (slack referrer + utm_source=chatgpt.com)","referrer":"https://app.slack.com/client/T123/C456","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36","query":{"utm_source":"chatgpt.com"},"headers":null,"expected":{"traffic_class":"human_via_ai","ai_source_id":"chatgpt","referral_chain":"slack"}},
-  {"name":"Discord share of Perplexity answer (discord referrer + ai_ref=perplexity)","referrer":"https://discord.com/channels/123/456","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36","query":{"ai_ref":"perplexity"},"headers":null,"expected":{"traffic_class":"human_via_ai","ai_source_id":"perplexity","referral_chain":"discord"}}
+  {"name":"Slack share of ChatGPT answer (slack referrer + utm_source=chatgpt.com)","referrer":"https://app.slack.com/client/T123/C456","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36","query":{"utm_source":"chatgpt.com"},"headers":null,"expected":{"class":"human_via_ai","aiSourceSlug":"chatgpt","referralChain":"slack"}},
+  {"name":"Discord share of Perplexity answer (discord referrer + ai_ref=perplexity)","referrer":"https://discord.com/channels/123/456","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36","query":{"ai_ref":"perplexity"},"headers":null,"expected":{"class":"human_via_ai","aiSourceSlug":"perplexity","referralChain":"discord"}}
 ]
 JSON
 
