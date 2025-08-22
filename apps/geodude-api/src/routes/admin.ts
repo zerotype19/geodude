@@ -186,6 +186,46 @@ export async function handleAdminRoutes(
       }
     }
 
+    // Historic data reclassification endpoint
+    if (pathname === '/admin/reclassify-historic-data' && request.method === 'POST') {
+      try {
+        // Check authentication
+        if (!checkAdminAuth(request)) {
+          return new Response(JSON.stringify({ error: "Admin access required" }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log('🔄 Starting historic data reclassification...');
+
+        // Import the reclassification functions
+        const { reclassifyHistoricData, verifyReclassification } = await import('../scripts/reclassify-historic-data.js');
+
+        // Run the reclassification
+        const result = await reclassifyHistoricData(env.OPTIVIEW_DB);
+
+        // Verify the results
+        await verifyReclassification(env.OPTIVIEW_DB);
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Historic data reclassification completed',
+          result
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+
+      } catch (error) {
+        console.error('Historic data reclassification failed:', error);
+        return new Response(JSON.stringify({
+          error: "Reclassification failed",
+          message: error.message
+        }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     // List unknown Cloudflare categories endpoint
     if (pathname === '/admin/cf-cats' && request.method === 'GET') {
       if (!checkAdminAuth(request)) {

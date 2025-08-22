@@ -216,25 +216,25 @@ const Referrals: React.FC = () => {
   };
 
   // Traffic classification helper functions (consistent with other pages)
-  const getTrafficClassColor = (eventClass: string) => {
+  const getTrafficClassLabel = (eventClass: string) => {
     switch (eventClass) {
-      case 'ai_agent_crawl': return 'bg-orange-100 text-orange-800';
-      case 'human_via_ai': return 'bg-blue-100 text-blue-800';
-      case 'search': return 'bg-green-100 text-green-800';
-      case 'direct_human': return 'bg-gray-100 text-gray-800';
-      case 'unknown': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "direct_human": return "Direct Human";
+      case "human_via_ai": return "Human via AI";
+      case "crawler": return "Crawler";
+      case "search": return "Search";
+      case "unknown": return "Unknown";
+      default: return eventClass;
     }
   };
 
-  const getTrafficClassLabel = (eventClass: string) => {
+  const getTrafficClassColor = (eventClass: string) => {
     switch (eventClass) {
-      case 'ai_agent_crawl': return 'AI Agent';
-      case 'human_via_ai': return 'Human via AI';
-      case 'search': return 'Search';
-      case 'direct_human': return 'Direct';
-      case 'unknown': return 'Unknown';
-      default: return eventClass || 'Unknown';
+      case "direct_human": return "bg-gray-100 text-gray-800";
+      case "human_via_ai": return "bg-blue-100 text-blue-800";
+      case "crawler": return "bg-orange-100 text-orange-800";
+      case "search": return "bg-green-100 text-green-800";
+      case "unknown": return "bg-gray-100 text-gray-800";
+      default: return "bg-gray-100 text-gray-800";
     }
   };
 

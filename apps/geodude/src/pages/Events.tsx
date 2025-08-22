@@ -68,7 +68,7 @@ interface EventItem {
   id: number;
   occurred_at: string;
   event_type: "pageview" | "click" | "custom";
-  event_class: "direct_human" | "human_via_ai" | "ai_agent_crawl" | "search" | "unknown";
+  event_class: "direct_human" | "human_via_ai" | "crawler" | "search" | "unknown";
   source_name?: string | null;
   url?: string;
   content_id?: number;
@@ -77,6 +77,7 @@ interface EventItem {
   debug?: string[]; // Classification debug trail
   classification_reason?: string; // New audit field
   classification_confidence?: number; // New audit field
+  bot_category?: string | null; // New bot category field
 }
 
 interface EventsSummary {
@@ -131,6 +132,7 @@ export default function Events() {
   const window = searchParams.get("window") || getStoredWindow() || "24h";
   const classFilter = searchParams.get("class") || "";
   const sourceFilter = searchParams.get("source") || "";
+  const botCategoryFilter = searchParams.get("bot_category") || "";
   const searchQuery = searchParams.get("q") || "";
   const page = parseInt(searchParams.get("page") || "1");
 
@@ -224,6 +226,7 @@ export default function Events() {
 
       if (classFilter) params.append("trafficClass", classFilter);
       if (sourceFilter) params.append("source", sourceFilter);
+      if (botCategoryFilter) params.append("botCategory", botCategoryFilter);
       if (searchQuery) params.append("q", searchQuery);
 
       const response = await fetch(`${API_BASE}/api/events/recent?${params}`, FETCH_OPTS);
@@ -315,7 +318,7 @@ export default function Events() {
   useEffect(() => {
     if (summary?.ai_lite && !classFilter) {
       // Default to AI-only view in AI-Lite mode
-      const aiClasses = ['human_via_ai', 'ai_agent_crawl', 'citation'];
+      const aiClasses = ['human_via_ai', 'crawler', 'citation'];
       if (summary.by_class.some(cls => aiClasses.includes(cls.class))) {
         // Set a default AI filter if available
         const firstAIClass = summary.by_class.find(cls => aiClasses.includes(cls.class));
@@ -352,7 +355,7 @@ export default function Events() {
     switch (className) {
       case "direct_human": return "bg-gray-100 text-gray-800";
       case "human_via_ai": return "bg-blue-100 text-blue-800";
-      case "ai_agent_crawl": return "bg-orange-100 text-orange-800";
+      case "crawler": return "bg-orange-100 text-orange-800";
       case "search": return "bg-green-100 text-green-800";
       case "unknown": return "bg-gray-100 text-gray-800";
       default: return "bg-gray-100 text-gray-800";
@@ -363,7 +366,7 @@ export default function Events() {
     switch (className) {
       case "direct_human": return "Direct Human";
       case "human_via_ai": return "Human via AI";
-      case "ai_agent_crawl": return "AI Agent Crawl";
+      case "crawler": return "AI Agent Crawl";
       case "search": return "Search";
       case "unknown": return "Unknown";
       default: return className;
@@ -374,10 +377,44 @@ export default function Events() {
     switch (className) {
       case "direct_human": return "No referrer, direct visits";
       case "human_via_ai": return "AI assistant referrers (ChatGPT, Claude, etc.)";
-      case "ai_agent_crawl": return "Cloudflare verified bots and crawlers";
+      case "crawler": return "Cloudflare verified bots and crawlers";
       case "search": return "Search engine referrers (Google, Bing, etc.)";
       case "unknown": return "Unclassified traffic";
       default: return "Traffic classification";
+    }
+  }
+
+  function getBotCategoryLabel(category: string): string {
+    switch (category) {
+      case "ai_training": return "AI Training";
+      case "search_crawler": return "Search Crawler";
+      case "preview_bot": return "Preview Bot";
+      case "uptime_monitor": return "Uptime Monitor";
+      case "seo_tool": return "SEO Tool";
+      case "archiver": return "Archiver";
+      case "security": return "Security";
+      case "marketing": return "Marketing";
+      case "accessibility": return "Accessibility";
+      case "research": return "Research";
+      case "other": return "Other";
+      default: return category;
+    }
+  }
+
+  function getBotCategoryColor(category: string): string {
+    switch (category) {
+      case "ai_training": return "bg-purple-100 text-purple-800 border-purple-200";
+      case "search_crawler": return "bg-blue-100 text-blue-800 border-blue-200";
+      case "preview_bot": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "uptime_monitor": return "bg-green-100 text-green-800 border-green-200";
+      case "seo_tool": return "bg-indigo-100 text-indigo-800 border-indigo-200";
+      case "archiver": return "bg-gray-100 text-gray-800 border-gray-200";
+      case "security": return "bg-red-100 text-red-800 border-red-200";
+      case "marketing": return "bg-pink-100 text-pink-800 border-pink-200";
+      case "accessibility": return "bg-teal-100 text-teal-800 border-teal-200";
+      case "research": return "bg-cyan-100 text-cyan-800 border-cyan-200";
+      case "other": return "bg-gray-100 text-gray-800 border-gray-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   }
 
@@ -639,8 +676,8 @@ export default function Events() {
                 </span>
                 {summary?.tracking_mode && (
                   <span className={`px-2 py-1 text-xs rounded-full ${summary.tracking_mode === 'ai-lite'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-purple-100 text-purple-800'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-purple-100 text-purple-800'
                     }`}>
                     {summary.tracking_mode === 'ai-lite' ? 'AI-Lite Mode' : 'Full Tracking'}
                   </span>
@@ -772,14 +809,14 @@ export default function Events() {
                   <Zap className="h-5 w-5 text-green-400" />
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-500">% AI-Influenced</p>
-                                          <p className="text-2xl font-semibold text-gray-900">
-                        {formatPercentage(summary.totals.ai_influenced, summary.totals.events)}
-                        {includeTraining && (
-                          <span className="ml-2 text-sm text-blue-600 font-normal">
-                            + AI training
-                          </span>
-                        )}
-                      </p>
+                    <p className="text-2xl font-semibold text-gray-900">
+                      {formatPercentage(summary.totals.ai_influenced, summary.totals.events)}
+                      {includeTraining && (
+                        <span className="ml-2 text-sm text-blue-600 font-normal">
+                          + AI training
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -889,7 +926,7 @@ export default function Events() {
                     All ({formatNumber(summary.totals.events)})
                   </button>
                   {summary.by_class.map((cls) => {
-                    const isAIClass = ['human_via_ai', 'ai_agent_crawl', 'citation'].includes(cls.class);
+                    const isAIClass = ['human_via_ai', 'crawler', 'citation'].includes(cls.class);
                     const isBaselineClass = ['direct_human', 'search'].includes(cls.class);
                     const showClass = !summary.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
 
@@ -972,6 +1009,52 @@ export default function Events() {
               </div>
             )}
 
+            {/* Bot Category Chips */}
+            {summary.by_class.some(cls => cls.class === 'crawler') && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Bot Categories</h4>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => updateParams({ bot_category: null })}
+                    className={`px-3 py-1 rounded-full text-sm border ${!botCategoryFilter
+                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    All bot types
+                  </button>
+                  {/* We'll populate this dynamically based on available bot categories */}
+                  <button
+                    onClick={() => updateParams({ bot_category: "ai_training" })}
+                    className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "ai_training"
+                      ? "bg-purple-100 text-purple-800 border-purple-200"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    AI Training
+                  </button>
+                  <button
+                    onClick={() => updateParams({ bot_category: "search_crawler" })}
+                    className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "search_crawler"
+                      ? "bg-blue-100 text-blue-800 border-blue-200"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    Search Crawler
+                  </button>
+                  <button
+                    onClick={() => updateParams({ bot_category: "preview_bot" })}
+                    className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "preview_bot"
+                      ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                  >
+                    Preview Bot
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Search Input */}
             <div className="flex items-center gap-4">
               <div className="relative flex-1 max-w-md">
@@ -1047,11 +1130,21 @@ export default function Events() {
                                   <span className="ml-1 text-gray-500">ⓘ sampled</span>
                                 )}
                               </span>
+                              {item.bot_category && item.event_class === 'crawler' && (
+                                <span className={`px-2 py-1 text-xs rounded-full border ${getBotCategoryColor(item.bot_category)}`}>
+                                  {getBotCategoryLabel(item.bot_category)}
+                                </span>
+                              )}
                               {item.event_class !== 'unknown' && (
                                 <div className="relative group">
                                   <Info className="h-3 w-3 text-gray-400 cursor-help" />
                                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
                                     {getTrafficClassDescription(item.event_class)}
+                                    {item.bot_category && item.event_class === 'crawler' && (
+                                      <div className="mt-1 pt-1 border-t border-gray-700">
+                                        <strong>Bot Category:</strong> {getBotCategoryLabel(item.bot_category)}
+                                      </div>
+                                    )}
                                     {item.classification_reason && (
                                       <div className="mt-1 pt-1 border-t border-gray-700">
                                         <strong>Reason:</strong> {item.classification_reason}

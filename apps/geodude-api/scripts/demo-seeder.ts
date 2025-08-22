@@ -206,22 +206,22 @@ async function generateSyntheticEvents(db: D1Database) {
     for (let i = 0; i < eventCount; i++) {
       // Random timestamp within last 24 hours
       const timestamp = now - Math.floor(Math.random() * oneDayMs);
-      
+
       // Random content
       const contentId = contentIds[Math.floor(Math.random() * contentIds.length)];
-      
+
       // Random AI source (or null for direct human)
       const hasAiSource = Math.random() < 0.6; // 60% chance of AI source
       const aiSourceId = hasAiSource ? aiSourceIds[Math.floor(Math.random() * aiSourceIds.length)] : null;
-      
+
       // Traffic class based on AI source
       let trafficClass = "direct_human";
       let confidence = 1.0;
-      
+
       if (aiSourceId) {
         const aiSource = aiSources.results.find(s => s.id === aiSourceId);
         if (aiSource?.name.includes("Bot") || aiSource?.name.includes("Chat")) {
-          trafficClass = "ai_agent_crawl";
+          trafficClass = "crawler";
           confidence = 0.9;
         } else {
           trafficClass = "human_via_ai";
@@ -257,7 +257,7 @@ async function generateSyntheticEvents(db: D1Database) {
 
     // Generate some referrals
     const referralCount = Math.floor(Math.random() * 21) + 10; // 10-30
-    
+
     for (let i = 0; i < referralCount; i++) {
       const timestamp = now - Math.floor(Math.random() * oneDayMs);
       const contentId = contentIds[Math.floor(Math.random() * contentIds.length)];

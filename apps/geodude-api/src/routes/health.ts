@@ -377,7 +377,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
     try {
       const projectId = url.searchParams.get('project_id') || 'prj_UHoetismrowc';
       const window = url.searchParams.get('window') || '1h';
-      const trafficClass = url.searchParams.get('class') || 'ai_agent_crawl';
+      const trafficClass = url.searchParams.get('class') || 'crawler';
 
       // Get window duration in hours
       const hours = window.endsWith('h') ? parseInt(window.slice(0, -1)) : 1;

@@ -1,6 +1,6 @@
 import { getClassifierManifest, STATIC_MANIFEST, type ClassifierManifest } from './classifier-manifest';
 
-export type TrafficClass = 'ai_agent_crawl' | 'human_via_ai' | 'search' | 'direct_human';
+export type TrafficClass = 'crawler' | 'human_via_ai' | 'search' | 'direct_human';
 
 export interface TrafficClassification {
   class: TrafficClass;
@@ -48,10 +48,10 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
     if (category === 'Search Engine Crawler' || category === 'AI Chatbot Crawler') {
       const { slug, name } = mapCrawlerSource(uaLower, req.headers.get('from') || '');
       return {
-        class: 'ai_agent_crawl',
+        class: 'crawler',
         aiSourceSlug: slug,
         aiSourceName: name,
-        reason: `cf.verifiedBotCategory=${category} → ai_agent_crawl (${name})`,
+        reason: `cf.verifiedBotCategory=${category} → crawler (${name})`,
         evidence,
         confidence: 1.0
       };
@@ -63,10 +63,10 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
     evidence.uaHit = uaLower;
     const { slug, name } = mapCrawlerSource(uaLower, req.headers.get('from') || '');
     return {
-      class: 'ai_agent_crawl',
+      class: 'crawler',
       aiSourceSlug: slug,
       aiSourceName: name,
-      reason: `UA matches known crawler → ai_agent_crawl (${name})`,
+      reason: `UA matches known crawler → crawler (${name})`,
       evidence,
       confidence: 0.95
     };
@@ -77,10 +77,10 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
     evidence.uaHit = uaLower;
     const { slug, name } = mapPreviewBot(uaLower);
     return {
-      class: 'ai_agent_crawl',
+      class: 'crawler',
       aiSourceSlug: slug,
       aiSourceName: name,
-      reason: `Preview bot detected → ai_agent_crawl (${name})`,
+      reason: `Preview bot detected → crawler (${name})`,
       evidence,
       confidence: 0.95
     };
@@ -91,10 +91,10 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
   if (aiClientHeader) {
     evidence.headerHit = `${aiClientHeader.substring(0, 50)}...`; // Mask for privacy
     return {
-      class: 'ai_agent_crawl',
+      class: 'crawler',
       aiSourceSlug: 'ai_client',
       aiSourceName: 'AI Client',
-      reason: `AI client header detected → ai_agent_crawl`,
+      reason: `AI client header detected → crawler`,
       evidence,
       confidence: 0.95
     };
@@ -106,10 +106,10 @@ export function classifyTraffic(req: Request, cf: any, referrerUrl: string | nul
     evidence.headerHit = fromHeader;
     const { slug, name } = mapCrawlerSource(uaLower, fromHeader);
     return {
-      class: 'ai_agent_crawl',
+      class: 'crawler',
       aiSourceSlug: slug,
       aiSourceName: name,
-      reason: `From header indicates crawler → ai_agent_crawl (${name})`,
+      reason: `From header indicates crawler → crawler (${name})`,
       evidence,
       confidence: 0.9
     };

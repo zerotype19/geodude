@@ -48,7 +48,7 @@ function getTrafficClassLabel(className: string): string {
   switch (className) {
     case "direct_human": return "Direct Human";
     case "human_via_ai": return "Human via AI";
-    case "ai_agent_crawl": return "AI Agent Crawl";
+    case "crawler": return "Crawler";
     case "search": return "Search";
     case "unknown": return "Unknown";
     default: return className;

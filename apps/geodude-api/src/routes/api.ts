@@ -331,7 +331,7 @@ export async function handleApiRoutes(
 
                     // Calculate totals from rollups
                     const aiEvents = (rollupTotals['human_via_ai']?.total || 0) +
-                        (rollupTotals['ai_agent_crawl']?.total || 0) +
+                        (rollupTotals['crawler']?.total || 0) +
                         (rollupTotals['citation']?.total || 0);
 
                     const directEstimated = rollupTotals['direct_human']?.total || 0;
@@ -375,7 +375,7 @@ export async function handleApiRoutes(
                         SELECT COUNT(*) AS ai_influenced
                         FROM interaction_events
                         WHERE project_id = ? AND occurred_at >= ?
-                          AND class IN ('human_via_ai','ai_agent_crawl','citation')
+                          AND class IN ('human_via_ai','crawler','citation')
                     `).bind(project_id, sinceISO).first<any>();
 
                     totals = {
@@ -586,6 +586,7 @@ export async function handleApiRoutes(
                 window = "24h",
                 class: trafficClass,
                 source,
+                botCategory,
                 q,
                 page = "1",
                 pageSize = "50"
@@ -623,6 +624,12 @@ export async function handleApiRoutes(
                 params.push(trafficClass);
             }
 
+            // Add bot category filter
+            if (botCategory) {
+                whereConditions.push("e.bot_category = ?");
+                params.push(botCategory);
+            }
+
             // Add source filter using stored ai_source_id
             if (source) {
                 whereConditions.push("s.slug = ?");
@@ -651,7 +658,7 @@ export async function handleApiRoutes(
             const dataQuery = `
                 SELECT 
                     e.id, e.occurred_at, e.event_type, e.class,
-                    e.content_id, e.property_id,
+                    e.content_id, e.property_id, e.bot_category,
                     json_extract(e.metadata,'$.url') AS url,
                     json_extract(e.metadata,'$.referrer') AS referrer,
                     json_extract(e.metadata,'$.user_agent') AS user_agent,
@@ -693,6 +700,7 @@ export async function handleApiRoutes(
                     url: row.url,
                     content_id: row.content_id,
                     property_id: row.property_id,
+                    bot_category: row.bot_category,
                     metadata_preview: row.metadata_preview
                 };
             }));
@@ -2589,14 +2597,14 @@ export async function handleApiRoutes(
 
                     // Classify traffic with AI Impact v2 system (classifier v3)
                     const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
-                    
+
                     // Get current host for self-referral detection
                     const currentHost = req.headers.get('host') || '';
-                    
+
                     // Extract UTM source if present
                     const url = new URL(req.url);
                     const utmSource = url.searchParams.get('utm_source');
-                    
+
                     classification = classifyTrafficV3({
                         cfVerifiedBotCategory: cfData?.verifiedBotCategory,
                         referrerUrl: referrer,
@@ -2606,12 +2614,8 @@ export async function handleApiRoutes(
                         manifest: STATIC_MANIFEST_V3
                     });
 
-                    // Map v3 class to v2 class for backward compatibility
-                    if (classification.class === 'crawler') {
-                        trafficClass = 'ai_agent_crawl';
-                    } else {
-                        trafficClass = classification.class;
-                    }
+                    // Use v3 class names directly
+                    trafficClass = classification.class;
 
                     // Log classification results for debugging
                     console.log('classification v3=', {
@@ -2626,7 +2630,7 @@ export async function handleApiRoutes(
 
                     // Ensure AI source exists and get ID
                     if (classification.aiSourceSlug) {
-                        const category = trafficClass === 'ai_agent_crawl' ? 'crawler' : 'assistant';
+                        const category = trafficClass === 'crawler' ? 'crawler' : 'assistant';
                         aiSourceId = await ensureAISourceWithMapping(
                             env,
                             classification.aiSourceSlug,
@@ -2691,7 +2695,7 @@ export async function handleApiRoutes(
 
                 // AI-Lite: Check for crawl deduplication (within 10 minutes)
                 let shouldSkipDueToDedupe = false;
-                if (trafficClass === 'ai_agent_crawl' && isAILite) {
+                if (trafficClass === 'crawler' && isAILite) {
                     try {
                         const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
                         const existingCrawl = await env.OPTIVIEW_DB.prepare(`
@@ -2755,7 +2759,8 @@ export async function handleApiRoutes(
                         JSON.stringify(enrichedMetadata || {}),
                         occurred_at || now,
                         isSampled ? 1 : 0, // Add sampled flag
-                        classification.class // Add traffic classification
+                        classification.class, // Add traffic classification
+                        classification.evidence.botCategory || null // Add bot category
                     ];
 
 
@@ -2776,8 +2781,8 @@ export async function handleApiRoutes(
                     const result = await env.OPTIVIEW_DB.prepare(`
                         INSERT INTO interaction_events (
                             project_id, property_id, content_id, ai_source_id, 
-                            event_type, metadata, occurred_at, sampled, class
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            event_type, metadata, occurred_at, sampled, class, bot_category
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `).bind(...insertValues).run();
 
                     insertResults.push(result);
