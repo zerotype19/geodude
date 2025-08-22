@@ -64,6 +64,7 @@ export const STATIC_MANIFEST_V3: ClassifierManifestV3 = {
       paths: ['/gemini'],
       utmHints: ['gemini']
     },
+    'gemini.google.com': { name: 'Google Gemini', slug: 'google_gemini' },
     'bard.google.com': { name: 'Google Gemini', slug: 'google_gemini' }
   },
   searchEngines: {
@@ -93,7 +94,9 @@ export const STATIC_MANIFEST_V3: ClassifierManifestV3 = {
     'Applebot': { name: 'Applebot', category: 'search_crawler' },
     'GPTBot': { name: 'GPTBot', category: 'ai_training' },
     'CCBot': { name: 'CCBot', category: 'ai_training' },
+    'ClaudeBot': { name: 'ClaudeBot', category: 'ai_training' },
     'Google-Extended': { name: 'Google-Extended', category: 'ai_training' },
+    'GoogleOther': { name: 'GoogleOther', category: 'ai_training' },
     'PerplexityBot': { name: 'PerplexityBot', category: 'ai_training' },
     'facebookexternalhit': { name: 'Facebook', category: 'preview_bot' },
     'Twitterbot': { name: 'Twitter', category: 'preview_bot' },
@@ -124,9 +127,10 @@ export function classifyTrafficV3(input: {
   userAgent?: string | null;
   currentHost: string;
   utmSource?: string;
+  aiRef?: string;
   manifest: ClassifierManifestV3;
 }): TrafficClassificationV3 {
-  const { cfVerifiedBotCategory, referrerUrl, userAgent, currentHost, utmSource, manifest } = input;
+  const { cfVerifiedBotCategory, referrerUrl, userAgent, currentHost, utmSource, aiRef, manifest } = input;
   
   // 1. Cloudflare verified bot → crawler (highest precedence)
   if (cfVerifiedBotCategory) {
@@ -242,7 +246,72 @@ export function classifyTrafficV3(input: {
     }
   }
   
-  // 4. User-Agent pattern matching for crawlers (without Cloudflare verification)
+  // 4. AI reference detection (when no referrer)
+  if (aiRef && !referrerUrl) {
+    // Check if AI ref matches an AI assistant slug or name
+    for (const [host, assistant] of Object.entries(manifest.assistants)) {
+      if (aiRef.toLowerCase() === assistant.slug.toLowerCase() || 
+          aiRef.toLowerCase() === assistant.name.toLowerCase().replace(/\s+/g, '').toLowerCase()) {
+        return {
+          class: 'human_via_ai',
+          aiSourceSlug: assistant.slug,
+          aiSourceName: assistant.name,
+          reason: `AI assistant via reference: ${assistant.name}`,
+          confidence: 0.9,
+          evidence: {
+            aiRef
+          }
+        };
+      }
+    }
+  }
+  
+  // 5. UTM source and AI reference detection (when no referrer)
+  if (utmSource && !referrerUrl) {
+    // Check if UTM source matches an AI assistant domain
+    for (const [host, assistant] of Object.entries(manifest.assistants)) {
+      if (utmSource.includes(host.replace(/^www\./, ''))) {
+        return {
+          class: 'human_via_ai',
+          aiSourceSlug: assistant.slug,
+          aiSourceName: assistant.name,
+          reason: `AI assistant via UTM: ${assistant.name}`,
+          confidence: 0.85,
+          evidence: {
+            utmSource
+          }
+        };
+      }
+    }
+    
+    // Check for specific UTM hints
+    for (const [host, assistant] of Object.entries(manifest.assistants)) {
+      if (assistant.utmHints && assistant.utmHints.some(hint => utmSource.includes(hint))) {
+        return {
+          class: 'human_via_ai',
+          aiSourceSlug: assistant.slug,
+          aiSourceName: assistant.name,
+          reason: `AI assistant via UTM hint: ${assistant.name}`,
+          confidence: 0.85,
+          evidence: {
+            utmSource
+          }
+        };
+      }
+    }
+    
+    // No AI match found
+    return {
+      class: 'direct_human',
+      reason: 'UTM source without referrer (not counted as AI)',
+      confidence: 0.8,
+      evidence: {
+        utmSource
+      }
+    };
+  }
+  
+  // 5. User-Agent pattern matching for crawlers (without Cloudflare verification)
   if (userAgent) {
     for (const [pattern, crawler] of Object.entries(manifest.crawlers)) {
       if (userAgent.includes(pattern)) {
@@ -257,18 +326,6 @@ export function classifyTrafficV3(input: {
         };
       }
     }
-  }
-  
-  // 5. UTM-only without referrer → direct_human (never upgrade to human_via_ai)
-  if (utmSource && !referrerUrl) {
-    return {
-      class: 'direct_human',
-      reason: 'UTM source without referrer (not counted as AI)',
-      confidence: 0.8,
-      evidence: {
-        utmSource
-      }
-    };
   }
   
   // 6. Default → direct_human

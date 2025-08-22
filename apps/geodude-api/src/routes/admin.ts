@@ -334,6 +334,8 @@ export async function handleAdminRoutes(
       const urlParams = new URLSearchParams(url.search);
       const referrer = urlParams.get('referrer');
       const userAgent = urlParams.get('ua') || 'Mozilla/5.0 (Test)';
+      const utmSource = urlParams.get('utm_source');
+      const aiRef = urlParams.get('ai_ref');
 
       // Note: referrer is optional - some tests (like crawler detection) only use User-Agent
 
@@ -345,6 +347,8 @@ export async function handleAdminRoutes(
           referrerUrl: referrer || null,
           userAgent,
           currentHost: 'test.example.com',
+          utmSource,
+          aiRef,
           manifest: STATIC_MANIFEST_V3
         });
 
