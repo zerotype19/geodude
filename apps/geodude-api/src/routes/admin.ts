@@ -335,19 +335,14 @@ export async function handleAdminRoutes(
       const referrer = urlParams.get('referrer');
       const userAgent = urlParams.get('ua') || 'Mozilla/5.0 (Test)';
 
-      if (!referrer) {
-        return new Response(JSON.stringify({ error: 'referrer parameter required' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+      // Note: referrer is optional - some tests (like crawler detection) only use User-Agent
 
       try {
         // Import classifier v3
         const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3.js');
 
         const classification = classifyTrafficV3({
-          referrerUrl: referrer,
+          referrerUrl: referrer || null,
           userAgent,
           currentHost: 'test.example.com',
           manifest: STATIC_MANIFEST_V3

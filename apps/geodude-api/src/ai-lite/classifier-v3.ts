@@ -146,7 +146,7 @@ export function classifyTrafficV3(input: {
   // 2. AI assistant referrer → human_via_ai
   if (referrerUrl) {
     const referrer = new URL(referrerUrl);
-    const referrerHost = referrer.hostname.toLowerCase();
+    const referrerHost = referrer.hostname.toLowerCase().replace(/^www\./, '');
     const referrerPath = referrer.pathname;
     
     // Check for self-referral (same domain)
@@ -242,7 +242,24 @@ export function classifyTrafficV3(input: {
     }
   }
   
-  // 4. UTM-only without referrer → direct_human (never upgrade to human_via_ai)
+  // 4. User-Agent pattern matching for crawlers (without Cloudflare verification)
+  if (userAgent) {
+    for (const [pattern, crawler] of Object.entries(manifest.crawlers)) {
+      if (userAgent.includes(pattern)) {
+        return {
+          class: 'crawler',
+          reason: `Crawler detected: ${crawler.name}`,
+          confidence: 0.9,
+          evidence: {
+            botCategory: crawler.category,
+            userAgent
+          }
+        };
+      }
+    }
+  }
+  
+  // 5. UTM-only without referrer → direct_human (never upgrade to human_via_ai)
   if (utmSource && !referrerUrl) {
     return {
       class: 'direct_human',
@@ -254,7 +271,7 @@ export function classifyTrafficV3(input: {
     };
   }
   
-  // 5. Default → direct_human
+  // 6. Default → direct_human
   return {
     class: 'direct_human',
     reason: 'No referrer or unknown source',
