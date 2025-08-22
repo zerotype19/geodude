@@ -74,6 +74,83 @@ export async function handleAdminRoutes(
       return token === env.ADMIN_TOKEN;
     };
 
+    // Debug reclassify endpoint - re-run classifier using stored inputs
+    if (pathname === '/admin/debug/reclassify' && request.method === 'GET') {
+      if (!checkAdminAuth(request)) {
+        return new Response(JSON.stringify({ error: 'Admin authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const { searchParams } = url;
+      const id = searchParams.get('id');
+      if (!id) {
+        return new Response(JSON.stringify({ error: 'missing id' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      try {
+        // Get the event with stored inputs
+        const row = await env.OPTIVIEW_DB.prepare(`
+          SELECT id, 
+                 json_extract(metadata, '$.url') as url,
+                 json_extract(metadata, '$.referrer') as referrer,
+                 json_extract(metadata, '$.user_agent') as user_agent,
+                 metadata
+          FROM interaction_events WHERE id = ?
+        `).bind(id).first<any>();
+
+        if (!row) {
+          return new Response(JSON.stringify({ error: 'not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Parse metadata for headers if available
+        let headers = {};
+        try {
+          if (row.metadata) {
+            const metadata = JSON.parse(row.metadata);
+            headers = metadata.headers || {};
+          }
+        } catch (e) {
+          console.warn('Failed to parse metadata headers:', e);
+        }
+
+        // Re-run classification using stored inputs
+        // Note: This would call the actual classifier function
+        // For now, return the inputs and current classification for debugging
+        const currentClassification = await env.OPTIVIEW_DB.prepare(`
+          SELECT class, bot_category, json_extract(metadata, '$.classification_reason') as matched_rule
+          FROM interaction_events WHERE id = ?
+        `).bind(id).first<any>();
+
+        return new Response(JSON.stringify({
+          id: parseInt(id),
+          inputs: {
+            url: row.url,
+            referrer: row.referrer,
+            user_agent: row.user_agent,
+            headers
+          },
+          current_classification: currentClassification,
+          note: "Classifier function call would go here - this shows current stored classification"
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e: any) {
+        console.error("debug_reclassify_error", { error: e.message, stack: e.stack });
+        return new Response(JSON.stringify({
+          error: "Internal server error",
+          message: e.message
+        }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     // Backfill bot categories endpoint
     if (pathname === '/admin/backfill-bot-categories' && request.method === 'POST') {
       const clientIP = request.headers.get('cf-connecting-ip') || 'unknown';
@@ -222,6 +299,79 @@ export async function handleAdminRoutes(
         return new Response(JSON.stringify({
           error: "Reclassification failed",
           message: error.message
+        }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // Reclassify false bot classifications endpoint
+    if (pathname === '/admin/tools/reclassify-false-bots' && request.method === 'POST') {
+      if (!checkAdminAuth(request)) {
+        return new Response(JSON.stringify({ error: 'Admin authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      try {
+        const BATCH = 1000;
+        
+        // Get events that are classified as crawler + ai_training but shouldn't be
+        const rows = await env.OPTIVIEW_DB.prepare(`
+          SELECT id, 
+                 json_extract(metadata, '$.referrer') as referrer,
+                 json_extract(metadata, '$.user_agent') as user_agent
+          FROM interaction_events
+          WHERE class = 'crawler'
+            AND bot_category = 'ai_training'
+            AND (json_extract(metadata, '$.cf_verified_category') IS NULL 
+                 OR json_extract(metadata, '$.cf_verified_category') = '')
+          LIMIT ?
+        `).bind(BATCH).all<any>();
+
+        let fixed = 0;
+        const results = [];
+
+        for (const row of rows.results || []) {
+          // Check if this is actually a known bot pattern
+          const isKnownBot = getBotCategoryFromUA(row.user_agent);
+          
+          if (isKnownBot === 'other') {
+            // Derive fallback class by referrer
+            const referrer = row.referrer || '';
+            const host = referrer ? new URL(referrer).hostname : null;
+            const isSearchHost = host && (host.includes('google.com') || host.includes('bing.com'));
+            const newClass = isSearchHost ? 'search' : 'direct_human';
+            
+            await env.OPTIVIEW_DB.prepare(`
+              UPDATE interaction_events
+              SET class = ?, bot_category = NULL, 
+                  metadata = json_set(metadata, '$.classification_reason', 'admin.backfill.false-bot')
+              WHERE id = ?
+            `).bind(newClass, row.id).run();
+            
+            fixed++;
+            results.push({
+              id: row.id,
+              old_class: 'crawler',
+              old_bot_category: 'ai_training',
+              new_class: newClass,
+              reason: 'Not a known bot pattern'
+            });
+          }
+        }
+
+        return new Response(JSON.stringify({
+          scanned: (rows.results || []).length,
+          fixed,
+          results: results.slice(0, 10) // Show first 10 for verification
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (e: any) {
+        console.error("reclassify_false_bots_error", { error: e.message, stack: e.stack });
+        return new Response(JSON.stringify({
+          error: "Internal server error",
+          message: e.message
         }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }

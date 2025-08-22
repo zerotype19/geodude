@@ -328,6 +328,22 @@ export default function Events() {
                         <Copy size={12} className="inline mr-1" />
                         Copy
                       </button>
+                      <button
+                        onClick={() => {
+                          const params = new URLSearchParams({
+                            ua: detail.user_agent || '',
+                            referrer: detail.referrer || '',
+                            url: detail.url || ''
+                          });
+                          const cURL = `curl -H "Authorization: Bearer $ADMIN_TOKEN" "https://api.optiview.ai/admin/debug/classify?${params.toString()}"`;
+                          navigator.clipboard.writeText(cURL);
+                        }}
+                        className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 rounded border"
+                        title="Copy cURL command to reproduce classification"
+                      >
+                        <Copy size={12} className="inline mr-1" />
+                        Copy cURL
+                      </button>
                     </div>
                     <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
                       {JSON.stringify(detail, null, 2)}
