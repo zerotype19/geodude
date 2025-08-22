@@ -2906,7 +2906,7 @@ export async function handleApiRoutes(
                         `).bind(metadata.url, project_id).first().then(r => r?.id || null);
 
                         // Determine if this session should be AI-influenced based on classification
-                        const isAIInfluenced = eventClassification.class === 'human_via_ai' || eventClassification.class === 'ai_agent_crawl';
+                        const isAIInfluenced = eventClassification.class === 'human_via_ai' || eventClassification.class === 'crawler';
                         const primaryAiSourceId = eventClassification.aiSourceId || null;
 
                         // Handle the unique constraint by using INSERT OR IGNORE
@@ -2951,7 +2951,7 @@ export async function handleApiRoutes(
                     // 6) Update aggregates on the session
                     if (currentSessionId) {
                         // Determine if this event should mark the session as AI-influenced
-                        const isAIInfluenced = eventClassification.class === 'human_via_ai' || eventClassification.class === 'ai_agent_crawl';
+                        const isAIInfluenced = eventClassification.class === 'human_via_ai' || eventClassification.class === 'crawler';
                         const primaryAiSourceId = eventClassification.aiSourceId || null;
 
                         await env.OPTIVIEW_DB.prepare(`
@@ -3170,7 +3170,7 @@ export async function handleApiRoutes(
                     WHERE p.project_id = ? 
                       AND ie.occurred_at >= ?
                       AND ie.occurred_at <= ?
-                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                      AND ie.class IN ('crawler', 'human_via_ai')
                 `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).first<any>();
 
                 // Get referrals by AI source from interaction_events
@@ -3187,7 +3187,7 @@ export async function handleApiRoutes(
                     WHERE p.project_id = ? 
                       AND ie.occurred_at >= ?
                       AND ie.occurred_at <= ?
-                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                      AND ie.class IN ('crawler', 'human_via_ai')
                     GROUP BY ie.ai_source_id, ais.slug, ais.name
                     ORDER BY count DESC
                     LIMIT 10
@@ -3204,7 +3204,7 @@ export async function handleApiRoutes(
                     WHERE p.project_id = ? 
                       AND ie.occurred_at >= ?
                       AND ie.occurred_at <= ?
-                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                      AND ie.class IN ('crawler', 'human_via_ai')
                     GROUP BY ie.class
                     ORDER BY count DESC
                 `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).all<any>();
@@ -3218,7 +3218,7 @@ export async function handleApiRoutes(
                     WHERE p.project_id = ? 
                       AND ie.occurred_at >= ?
                       AND ie.occurred_at <= ?
-                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                      AND ie.class IN ('crawler', 'human_via_ai')
                 `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).first<any>();
 
                 const sourcesResult = await env.OPTIVIEW_DB.prepare(`
@@ -3229,7 +3229,7 @@ export async function handleApiRoutes(
                     WHERE p.project_id = ? 
                       AND ie.occurred_at >= ?
                       AND ie.occurred_at <= ?
-                      AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                      AND ie.class IN ('crawler', 'human_via_ai')
                       AND ie.ai_source_id IS NOT NULL
                 `).bind(project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()).first<any>();
 
@@ -3312,7 +3312,7 @@ export async function handleApiRoutes(
             const toSql = toTs / 1000;
 
             // Build WHERE clause
-            let whereConditions = [`p.project_id = ?`, `ie.occurred_at >= ?`, `ie.occurred_at <= ?`, `ie.class IN ('ai_agent_crawl', 'human_via_ai')`];
+            let whereConditions = [`p.project_id = ?`, `ie.occurred_at >= ?`, `ie.occurred_at <= ?`, `ie.class IN ('crawler', 'human_via_ai')`];
             let params = [project_id, new Date(fromTs).toISOString(), new Date(toTs).toISOString()];
 
             if (source) {
@@ -3372,7 +3372,7 @@ export async function handleApiRoutes(
                             WHERE p.project_id = ? 
                               AND ie.content_id = ?
                               AND ie.occurred_at >= datetime('now', '-15 minutes')
-                              AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                              AND ie.class IN ('crawler', 'human_via_ai')
                         `).bind(project_id, referral.content_id).first<any>();
 
                     // Process debug field to ensure it's always an array
@@ -3447,7 +3447,7 @@ export async function handleApiRoutes(
                 LEFT JOIN content_assets ca ON ie.content_id = ca.id
                 LEFT JOIN properties p ON ca.property_id = p.id
                 WHERE (p.project_id = ? OR (p.project_id IS NULL AND ? IS NULL))
-                  AND ie.class IN ('ai_agent_crawl', 'human_via_ai')
+                  AND ie.class IN ('crawler', 'human_via_ai')
                 GROUP BY ie.content_id, ie.ai_source_id, ie.class, ie.occurred_at, ais.name, ais.category, ca.url
                 ORDER BY referral_count DESC
                 LIMIT ?

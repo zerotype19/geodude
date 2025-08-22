@@ -94,7 +94,7 @@ export async function processEventClassification(
 
   // Determine category based on classification class
   let category: 'crawler' | 'assistant' | 'unknown' = 'unknown';
-  if (classification.class === 'ai_agent_crawl' || classification.class === 'crawler') {
+  if (classification.class === 'crawler') {
     category = 'crawler';
   } else if (classification.class === 'human_via_ai') {
     category = 'assistant';
@@ -120,7 +120,7 @@ export function shouldInsertEvent(
   samplePct: number
 ): { shouldInsert: boolean; isSampled: boolean } {
   // AI traffic is always inserted
-  if (classification.class === 'ai_agent_crawl' || classification.class === 'human_via_ai' || classification.class === 'crawler') {
+  if (classification.class === 'human_via_ai' || classification.class === 'crawler') {
     return { shouldInsert: true, isSampled: false };
   }
 
@@ -140,5 +140,5 @@ export function shouldInsertEvent(
  */
 export function shouldAttachToSession(classification: TrafficClassification): boolean {
   // Crawlers never attach to sessions
-  return classification.class !== 'ai_agent_crawl' && classification.class !== 'crawler';
+  return classification.class !== 'crawler';
 }

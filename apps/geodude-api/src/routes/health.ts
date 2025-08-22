@@ -57,7 +57,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
 
         aiLiteMetrics = {
           ai_events_5m: rollupMetrics['human_via_ai'] || 0,
-          ai_crawls_5m: rollupMetrics['ai_agent_crawl'] || 0,
+          ai_crawls_5m: rollupMetrics['crawler'] || 0,
           citations_5m: rollupMetrics['citation'] || 0,
           baseline_sampled_rows_5m: (rollupMetrics['direct_human'] || 0) + (rollupMetrics['search'] || 0),
           sample_pct: parseInt(env.AI_LITE_SAMPLE_PCT || '2'),
@@ -505,7 +505,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
           await d1.prepare(`
             INSERT INTO traffic_rollup_hourly 
             (project_id, property_id, ts_hour, class, events_count, sampled_count)
-            VALUES (?, ?, ?, 'ai_agent_crawl', ?, 0)
+            VALUES (?, ?, ?, 'crawler', ?, 0)
             ON CONFLICT(project_id, property_id, ts_hour, class) 
             DO UPDATE SET events_count = events_count + ?
           `).bind(
@@ -610,7 +610,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
             WHERE project_id = ? 
               AND occurred_at >= ? 
               AND occurred_at <= COALESCE(?, datetime('now'))
-              AND class IN ('human_via_ai', 'ai_agent_crawl')
+              AND class IN ('human_via_ai', 'crawler')
           `).bind(
             project_id,
             session.started_at,
@@ -664,41 +664,41 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
     }
   }
 
-     // Filter parity health check endpoint (optional monitoring, not CI-enforced)
-   if (url.pathname === "/api/health/filter-parity" && request.method === "GET") {
-      try {
-          const { project_id, window = "24h" } = Object.fromEntries(url.searchParams);
-          if (!project_id) {
-              const response = new Response("Missing project_id", { status: 400 });
-              return addCorsHeaders(response, origin);
-          }
+  // Filter parity health check endpoint (optional monitoring, not CI-enforced)
+  if (url.pathname === "/api/health/filter-parity" && request.method === "GET") {
+    try {
+      const { project_id, window = "24h" } = Object.fromEntries(url.searchParams);
+      if (!project_id) {
+        const response = new Response("Missing project_id", { status: 400 });
+        return addCorsHeaders(response, origin);
+      }
 
-          // Test basic filter parity
-          const testCases = [
-              {
-                  name: "All traffic",
-                  events_params: `project_id=${project_id}&window=${window}`,
-                  content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50`
-              },
-              {
-                  name: "Human via AI",
-                  events_params: `project_id=${project_id}&window=${window}&traffic_class=human_via_ai`,
-                  content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50&class=human_via_ai`
-              },
-              {
-                  name: "Crawler",
-                  events_params: `project_id=${project_id}&window=${window}&traffic_class=crawler`,
-                  content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50&class=crawler`
-              }
-          ];
+      // Test basic filter parity
+      const testCases = [
+        {
+          name: "All traffic",
+          events_params: `project_id=${project_id}&window=${window}`,
+          content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50`
+        },
+        {
+          name: "Human via AI",
+          events_params: `project_id=${project_id}&window=${window}&traffic_class=human_via_ai`,
+          content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50&class=human_via_ai`
+        },
+        {
+          name: "Crawler",
+          events_params: `project_id=${project_id}&window=${window}&traffic_class=crawler`,
+          content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50&class=crawler`
+        }
+      ];
 
-          const results = [];
-          let totalDelta = 0;
-          let testCount = 0;
+      const results = [];
+      let totalDelta = 0;
+      let testCount = 0;
 
-          for (const testCase of testCases) {
-              // Get Events summary
-              const eventsResult = await d1.prepare(`
+      for (const testCase of testCases) {
+        // Get Events summary
+        const eventsResult = await d1.prepare(`
                   SELECT COUNT(*) as total
                   FROM interaction_events ie
                   WHERE ie.project_id = ? AND ie.occurred_at >= datetime('now', '-1 day')
@@ -706,8 +706,8 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
                   ${testCase.events_params.includes('traffic_class=crawler') ? "AND ie.class = 'crawler'" : ""}
               `).bind(project_id).first<any>();
 
-              // Get Content total
-              const contentResult = await d1.prepare(`
+        // Get Content total
+        const contentResult = await d1.prepare(`
                   SELECT COUNT(DISTINCT ie.content_id) as total
                   FROM interaction_events ie
                   WHERE ie.project_id = ? AND ie.occurred_at >= datetime('now', '-1 day')
@@ -715,61 +715,61 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
                   ${testCase.content_params.includes('class=crawler') ? "AND ie.class = 'crawler'" : ""}
               `).bind(project_id).first<any>();
 
-              const eventsTotal = eventsResult?.total || 0;
-              const contentTotal = contentResult?.total || 0;
-              
-              let delta = 0;
-              if (eventsTotal > 0) {
-                  delta = Math.abs((contentTotal - eventsTotal) / eventsTotal) * 100;
-              }
-              
-              totalDelta += delta;
-              testCount++;
-              
-              results.push({
-                  test: testCase.name,
-                  events_total: eventsTotal,
-                  content_total: contentTotal,
-                  delta_percent: Math.round(delta * 100) / 100,
-                  status: delta <= 1.0 ? "pass" : "fail"
-              });
-          }
+        const eventsTotal = eventsResult?.total || 0;
+        const contentTotal = contentResult?.total || 0;
 
-          const averageDelta = totalDelta / testCount;
-          const overallStatus = averageDelta <= 1.0 ? "healthy" : "degraded";
+        let delta = 0;
+        if (eventsTotal > 0) {
+          delta = Math.abs((contentTotal - eventsTotal) / eventsTotal) * 100;
+        }
 
-          const response = new Response(JSON.stringify({
-              status: overallStatus,
-              timestamp: new Date().toISOString(),
-              project_id,
-              window,
-              average_delta_percent: Math.round(averageDelta * 100) / 100,
-              test_results: results,
-              thresholds: {
-                  healthy: "≤ 1.0%",
-                  degraded: "> 1.0%",
-                  critical: "> 5.0%"
-              }
-          }), {
-              headers: {
-                  "Content-Type": "application/json",
-                  "Cache-Control": "public, max-age=300"
-              }
-          });
+        totalDelta += delta;
+        testCount++;
 
-          return addCorsHeaders(response, origin);
-      } catch (e: any) {
-          console.error("filter_parity_health_error", { error: e.message, stack: e.stack });
-          const response = new Response(JSON.stringify({
-              status: "error",
-              error: e.message,
-              timestamp: new Date().toISOString()
-          }), { 
-              status: 500, 
-              headers: { "Content-Type": "application/json" } 
-          });
-          return addCorsHeaders(response, origin);
+        results.push({
+          test: testCase.name,
+          events_total: eventsTotal,
+          content_total: contentTotal,
+          delta_percent: Math.round(delta * 100) / 100,
+          status: delta <= 1.0 ? "pass" : "fail"
+        });
       }
+
+      const averageDelta = totalDelta / testCount;
+      const overallStatus = averageDelta <= 1.0 ? "healthy" : "degraded";
+
+      const response = new Response(JSON.stringify({
+        status: overallStatus,
+        timestamp: new Date().toISOString(),
+        project_id,
+        window,
+        average_delta_percent: Math.round(averageDelta * 100) / 100,
+        test_results: results,
+        thresholds: {
+          healthy: "≤ 1.0%",
+          degraded: "> 1.0%",
+          critical: "> 5.0%"
+        }
+      }), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=300"
+        }
+      });
+
+      return addCorsHeaders(response, origin);
+    } catch (e: any) {
+      console.error("filter_parity_health_error", { error: e.message, stack: e.stack });
+      const response = new Response(JSON.stringify({
+        status: "error",
+        error: e.message,
+        timestamp: new Date().toISOString()
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+      return addCorsHeaders(response, origin);
+    }
   }
 
   return null; // Not handled by this router
@@ -833,13 +833,13 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
 
     // Calculate metrics
     const aiHumanClicks = currentData.get('human_via_ai') || 0;
-    const crawlerHits = currentData.get('ai_agent_crawl') || 0;
+    const crawlerHits = currentData.get('crawler') || 0;
     const searchClicks = currentData.get('search') || 0;
     const directHuman = currentData.get('direct_human') || 0;
 
     // Calculate trends (vs previous 24h)
     const aiHumanTrend = getTrend(aiHumanClicks, previousData.get('human_via_ai') || 0);
-    const crawlerTrend = getTrend(crawlerHits, previousData.get('ai_agent_crawl') || 0);
+    const crawlerTrend = getTrend(crawlerHits, previousData.get('crawler') || 0);
 
     // Calculate search vs AI split
     const totalHumanTraffic = aiHumanClicks + searchClicks;
@@ -893,7 +893,7 @@ async function getHardenedClassificationHealth(d1: any, orgId: string) {
       },
       baseline: {
         ai_human_median: Math.round(medianData.get('human_via_ai') || 0),
-        crawler_median: Math.round(medianData.get('ai_agent_crawl') || 0)
+        crawler_median: Math.round(medianData.get('crawler') || 0)
       },
       status: aiHumanClicks > 0 || crawlerHits > 0 ? "healthy" : "no_data"
     };
