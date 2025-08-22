@@ -592,7 +592,7 @@ export async function handleApiRoutes(
                 SELECT 
                     ie.id, 
                     ie.occurred_at, 
-                    ie.url, 
+                    json_extract(ie.metadata, '$.url') as url,
                     ie.event_type,
                     ie.class as traffic_class,
                     ie.ai_source_id,
