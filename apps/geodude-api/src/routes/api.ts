@@ -320,6 +320,7 @@ export async function handleApiRoutes(
 
                 let totals: any;
                 let byClass: any[];
+                let byBotCategory: any[];
                 let baseline: any;
 
                 if (isAILite) {
@@ -332,7 +333,7 @@ export async function handleApiRoutes(
                     // Calculate totals from rollups: human_via_ai + ai_training bots only
                     const aiEvents = (rollupTotals['human_via_ai']?.total || 0) +
                         (rollupTotals['citation']?.total || 0);
-                    
+
                     // Note: AI training bots are counted separately and only when toggle is ON
                     // This prevents inflating the metric with search crawlers and preview bots
 
@@ -352,6 +353,22 @@ export async function handleApiRoutes(
                         class: class_name,
                         count: data.total,
                         estimated: class_name === 'direct_human' || class_name === 'search'
+                    }));
+
+                    // Get bot category breakdown for AI-Lite mode
+                    const botCategoryBreakdown = await env.OPTIVIEW_DB.prepare(`
+                        SELECT 
+                            COALESCE(json_extract(metadata, '$.bot_category'), 'none') AS category,
+                            COUNT(*) AS count
+                        FROM interaction_events
+                        WHERE project_id = ? AND occurred_at >= ? AND class = 'crawler'
+                        GROUP BY json_extract(metadata, '$.bot_category')
+                        ORDER BY count DESC
+                    `).bind(project_id, sinceISO).all<any>();
+
+                    const byBotCategory = (botCategoryBreakdown.results || []).map(row => ({
+                        category: row.category === 'none' ? 'unknown' : row.category,
+                        count: row.count
                     }));
 
                     // Add baseline information
@@ -406,6 +423,22 @@ export async function handleApiRoutes(
                         class: row.class || 'direct_human',
                         count: row.count,
                         estimated: false
+                    }));
+
+                    // Get breakdown by bot category for accurate AI training bot counting
+                    const botCategoryBreakdown = await env.OPTIVIEW_DB.prepare(`
+                        SELECT 
+                            COALESCE(json_extract(metadata, '$.bot_category'), 'none') AS category,
+                            COUNT(*) AS count
+                        FROM interaction_events
+                        WHERE project_id = ? AND occurred_at >= ? AND class = 'crawler'
+                        GROUP BY json_extract(metadata, '$.bot_category')
+                        ORDER BY count DESC
+                    `).bind(project_id, sinceISO).all<any>();
+
+                    const byBotCategory = (botCategoryBreakdown.results || []).map(row => ({
+                        category: row.category === 'none' ? 'unknown' : row.category,
+                        count: row.count
                     }));
 
                     baseline = undefined; // No baseline in full mode
@@ -500,6 +533,7 @@ export async function handleApiRoutes(
                 return {
                     totals,
                     by_class: byClass,
+                    by_bot_category: byBotCategory || [],
                     by_source_top: (topSources.results || []).map(row => ({
                         ai_source_id: row.ai_source_id,
                         slug: row.slug,

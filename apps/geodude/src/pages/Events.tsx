@@ -444,7 +444,12 @@ export default function Events() {
     if (!summary) return { percent: 0, humanViaAI: 0, aiTrainingBots: 0 };
     
     const humanViaAI = summary.by_class.find(c => c.class === 'human_via_ai')?.count || 0;
-    const aiTrainingBots = includeTraining ? (summary.by_class.find(c => c.class === 'crawler')?.count || 0) : 0;
+    
+    // Only count AI training bots, not all crawlers (search crawlers, preview bots, etc.)
+    let aiTrainingBots = 0;
+    if (includeTraining && summary.by_bot_category) {
+      aiTrainingBots = summary.by_bot_category.find(c => c.category === 'ai_training')?.count || 0;
+    }
     
     const numerator = humanViaAI + aiTrainingBots;
     const denominator = Math.max(1, summary.totals.events);
