@@ -9,12 +9,18 @@ interface ContentAsset {
   id: number;
   url: string;
   type: string;
-  last_seen: string | null;
-  events_15m: number;
-  events_24h: number;
-  ai_referrals_24h: number;
-  by_source_24h: Array<{ slug: string; events: number }>;
-  coverage_score: number;
+  // New API response structure
+  traffic_count: number;
+  ai_referrals: number;
+  last_activity: string;
+  top_sources: Array<{ slug: string; name: string; count: number }>;
+  // Legacy fields for backward compatibility
+  last_seen?: string | null;
+  events_15m?: number;
+  events_24h?: number;
+  ai_referrals_24h?: number;
+  by_source_24h?: Array<{ slug: string; events: number }>;
+  coverage_score?: number;
 }
 
 interface ContentSummary {
@@ -95,6 +101,12 @@ interface GroupedContent {
   count: number;
   assets: ContentAsset[];
   isExpanded: boolean;
+  // New API response structure
+  traffic_count?: number;
+  ai_referrals?: number;
+  last_activity?: string;
+  top_sources?: Array<{ slug: string; name: string; count: number }>;
+  // Legacy fields for backward compatibility
   totalEvents: number;
   totalAIReferrals: number;
   topSources: Array<{ slug: string; events: number }>;
@@ -272,151 +284,24 @@ const Content: React.FC = () => {
 
   // Group content assets to reduce row count
   const getGroupedContent = (): GroupedContent[] => {
-    if (filters.groupBy === 'none') {
-      return assets.map(asset => ({
-        key: `asset_${asset.id}`,
-        title: asset.url,
-        count: 1,
-        assets: [asset],
-        isExpanded: expandedGroups.has(`asset_${asset.id}`),
-        totalEvents: asset.events_24h,
-        totalAIReferrals: asset.ai_referrals_24h,
-        topSources: asset.by_source_24h.slice(0, 3)
-      }));
-    }
-
-    if (filters.groupBy === 'page') {
-      const groups: Record<string, GroupedContent> = {};
-
-      assets.forEach(asset => {
-        const url = new URL(asset.url);
-        const canonicalUrl = asset.url;
-        const displayTitle = url.pathname === '/' ? url.hostname : url.pathname;
-
-        if (!groups[canonicalUrl]) {
-          groups[canonicalUrl] = {
-            key: `page_${canonicalUrl}`,
-            title: displayTitle,
-            count: 1,
-            assets: [asset],
-            isExpanded: expandedGroups.has(`page_${canonicalUrl}`),
-            totalEvents: asset.events_24h,
-            totalAIReferrals: asset.ai_referrals_24h,
-            topSources: asset.by_source_24h.slice(0, 3)
-          };
-        } else {
-          // This shouldn't happen with page grouping, but just in case
-          groups[canonicalUrl].count++;
-          groups[canonicalUrl].assets.push(asset);
-          groups[canonicalUrl].totalEvents += asset.events_24h;
-          groups[canonicalUrl].totalAIReferrals += asset.ai_referrals_24h;
-        }
-      });
-
-      // Aggregate top sources across all assets in the group
-      Object.values(groups).forEach(group => {
-        const sourceMap: Record<string, number> = {};
-        group.assets.forEach(asset => {
-          asset.by_source_24h.forEach(source => {
-            sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
-          });
-        });
-
-        group.topSources = Object.entries(sourceMap)
-          .map(([slug, events]) => ({ slug, events }))
-          .sort((a, b) => b.events - a.events)
-          .slice(0, 3);
-      });
-
-      return Object.values(groups).sort((a, b) => b.totalEvents - a.totalEvents);
-    }
-
-    if (filters.groupBy === 'domain') {
-      const groups: Record<string, GroupedContent> = {};
-
-      assets.forEach(asset => {
-        const domain = new URL(asset.url).hostname;
-        const path = new URL(asset.url).pathname;
-
-        if (!groups[domain]) {
-          groups[domain] = {
-            key: `domain_${domain}`,
-            title: domain,
-            count: 0,
-            assets: [],
-            isExpanded: expandedGroups.has(`domain_${domain}`),
-            totalEvents: 0,
-            totalAIReferrals: 0,
-            topSources: []
-          };
-        }
-
-        groups[domain].count++;
-        groups[domain].assets.push(asset);
-        groups[domain].totalEvents += asset.events_24h;
-        groups[domain].totalAIReferrals += asset.ai_referrals_24h;
-      });
-
-      // Aggregate top sources across all assets in the group
-      Object.values(groups).forEach(group => {
-        const sourceMap: Record<string, number> = {};
-        group.assets.forEach(asset => {
-          asset.by_source_24h.forEach(source => {
-            sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
-          });
-        });
-
-        group.topSources = Object.entries(sourceMap)
-          .map(([slug, events]) => ({ slug, events }))
-          .sort((a, b) => b.events - a.events)
-          .slice(0, 3);
-      });
-
-      return Object.values(groups).sort((a, b) => b.totalEvents - a.totalEvents);
-    }
-
-    if (filters.groupBy === 'type') {
-      const groups: Record<string, GroupedContent> = {};
-
-      assets.forEach(asset => {
-        if (!groups[asset.type]) {
-          groups[asset.type] = {
-            key: `type_${asset.type}`,
-            title: `${asset.type.charAt(0).toUpperCase() + asset.type.slice(1)}s`,
-            count: 0,
-            assets: [],
-            isExpanded: expandedGroups.has(`type_${asset.type}`),
-            totalEvents: 0,
-            totalAIReferrals: 0,
-            topSources: []
-          };
-        }
-
-        groups[asset.type].count++;
-        groups[asset.type].assets.push(asset);
-        groups[asset.type].totalEvents += asset.events_24h;
-        groups[asset.type].totalAIReferrals += asset.ai_referrals_24h;
-      });
-
-      // Aggregate top sources
-      Object.values(groups).forEach(group => {
-        const sourceMap: Record<string, number> = {};
-        group.assets.forEach(asset => {
-          asset.by_source_24h.forEach(source => {
-            sourceMap[source.slug] = (sourceMap[source.slug] || 0) + source.events;
-          });
-        });
-
-        group.topSources = Object.entries(sourceMap)
-          .map(([slug, events]) => ({ slug, events }))
-          .sort((a, b) => b.events - a.events)
-          .slice(0, 3);
-      });
-
-      return Object.values(groups).sort((a, b) => b.totalEvents - a.totalEvents);
-    }
-
-    return [];
+    // The new API already provides aggregated data, so we just need to format it
+    // and add UI state (isExpanded)
+    return assets.map(asset => ({
+      key: `asset_${asset.id}`,
+      title: asset.url,
+      count: 1,
+      assets: [asset],
+      isExpanded: expandedGroups.has(`asset_${asset.id}`),
+      // New API response structure
+      traffic_count: asset.traffic_count,
+      ai_referrals: asset.ai_referrals,
+      last_activity: asset.last_activity,
+      top_sources: asset.top_sources,
+      // Legacy fields for backward compatibility
+      totalEvents: asset.traffic_count || 0,
+      totalAIReferrals: asset.ai_referrals || 0,
+      topSources: asset.top_sources?.map(s => ({ slug: s.slug, events: s.count })) || []
+    }));
   };
 
   // Get paginated grouped content
@@ -782,7 +667,7 @@ const Content: React.FC = () => {
                       )}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Traffic (24h)
+                      Traffic ({filters.window === '15m' ? '15m' : filters.window === '7d' ? '7d' : '24h'})
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       AI Referrals
@@ -837,20 +722,20 @@ const Content: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
-                          {group.totalEvents.toLocaleString()}
+                          {group.traffic_count?.toLocaleString() || '0'}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
-                          {group.totalAIReferrals.toLocaleString()}
+                          {group.ai_referrals?.toLocaleString() || '0'}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-1">
-                            {group.topSources.length > 0 ? (
-                              group.topSources.map((source) => (
+                            {group.top_sources && group.top_sources.length > 0 ? (
+                              group.top_sources.map((source) => (
                                 <span
                                   key={source.slug}
                                   className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
                                 >
-                                  {source.slug}: {source.events}
+                                  {source.name || source.slug}: {source.count}
                                 </span>
                               ))
                             ) : (
@@ -859,8 +744,8 @@ const Content: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {group.assets[0].last_seen ? (
-                            new Date(group.assets[0].last_seen).toLocaleDateString()
+                          {group.last_activity ? (
+                            new Date(group.last_activity).toLocaleDateString()
                           ) : (
                             'Never'
                           )}
@@ -904,23 +789,22 @@ const Content: React.FC = () => {
                                           </div>
                                         </div>
                                         <div className="flex items-center space-x-4 text-sm text-gray-600">
-                                          <span>15m: {asset.events_15m}</span>
-                                          <span>24h: {asset.events_24h}</span>
-                                          <span>AI: {asset.ai_referrals_24h}</span>
+                                          <span>Traffic: {asset.traffic_count?.toLocaleString() || '0'}</span>
+                                          <span>AI: {asset.ai_referrals?.toLocaleString() || '0'}</span>
                                         </div>
                                       </div>
 
                                       {/* AI Sources Breakdown */}
-                                      {asset.by_source_24h.length > 0 && (
+                                      {asset.top_sources && asset.top_sources.length > 0 && (
                                         <div className="mb-3">
-                                          <h5 className="text-xs font-medium text-gray-700 mb-2">AI Sources (24h)</h5>
+                                          <h5 className="text-xs font-medium text-gray-700 mb-2">AI Sources</h5>
                                           <div className="flex flex-wrap gap-2">
-                                            {asset.by_source_24h.map((source) => (
+                                            {asset.top_sources.map((source) => (
                                               <span
                                                 key={source.slug}
                                                 className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
                                               >
-                                                {source.slug}: {source.events}
+                                                {source.name || source.slug}: {source.count}
                                               </span>
                                             ))}
                                           </div>

@@ -759,125 +759,107 @@ export async function handleApiRoutes(
             const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize)), 100);
             const offset = (pageNum - 1) * pageSizeNum;
 
-            // Build WHERE conditions
-            let whereConditions = ["ca.project_id = ?"];
-            let bindParams = [project_id];
-
-            if (q.trim()) {
-                whereConditions.push("ca.url LIKE ?");
-                bindParams.push(`%${q.trim()}%`);
+            // Calculate time bounds based on window
+            const now = Date.now();
+            let sinceISO: string;
+            switch (window) {
+                case "15m": sinceISO = new Date(now - 15 * 60 * 1000).toISOString(); break;
+                case "24h": sinceISO = new Date(now - 24 * 60 * 60 * 1000).toISOString(); break;
+                case "7d": sinceISO = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString(); break;
+                default: sinceISO = new Date(now - 24 * 60 * 60 * 1000).toISOString(); break;
             }
 
-            if (type.trim()) {
-                whereConditions.push("ca.type = ?");
-                bindParams.push(type.trim());
-            }
+            // Step 1: Build filtered event set (same logic as Events page)
+            let eventWhereConditions = ["ie.project_id = ?", "ie.occurred_at >= ?"];
+            let eventBindParams = [project_id, sinceISO];
 
-            // Add traffic class filter
             if (trafficClass.trim()) {
-                whereConditions.push(`EXISTS (
-                    SELECT 1 FROM interaction_events ie 
-                    WHERE ie.project_id = ca.project_id 
-                    AND ie.content_id = ca.id 
-                    AND ie.class = ?
-                )`);
-                bindParams.push(trafficClass);
+                eventWhereConditions.push("ie.class = ?");
+                eventBindParams.push(trafficClass);
             }
 
-            // Add AI source filter
             if (source.trim()) {
-                whereConditions.push(`EXISTS (
-                    SELECT 1 FROM interaction_events ie 
-                    JOIN ai_sources s ON s.id = ie.ai_source_id 
-                    WHERE ie.project_id = ca.project_id 
-                    AND ie.content_id = ca.id 
-                    AND s.slug = ?
-                )`);
-                bindParams.push(source);
+                eventWhereConditions.push("s.slug = ?");
+                eventBindParams.push(source);
             }
 
-            // Add bot category filter
             if (botCategory.trim()) {
-                whereConditions.push(`EXISTS (
-                    SELECT 1 FROM interaction_events ie 
-                    WHERE ie.project_id = ca.project_id 
-                    AND ie.content_id = ca.id 
-                    AND ie.bot_category = ?
-                )`);
-                bindParams.push(botCategory);
+                eventWhereConditions.push("ie.bot_category = ?");
+                eventBindParams.push(botCategory);
             }
 
-            const whereClause = whereConditions.join(" AND ");
+            const eventWhereClause = eventWhereConditions.join(" AND ");
 
-            // Get total count
-            const countResult = await env.OPTIVIEW_DB.prepare(`
-                SELECT COUNT(*) as total
-                FROM content_assets ca
-                WHERE ${whereClause}
-            `).bind(...bindParams).first();
-
-            // Get paginated content with metrics
-            const content = await env.OPTIVIEW_DB.prepare(`
+            // Step 2: Aggregate filtered events by content asset
+            const aggregationQuery = `
                 SELECT 
-                    ca.id, ca.url, ca.type, ca.metadata, ca.created_at,
-                    COALESCE((SELECT MAX(occurred_at) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id), '1970-01-01') AS last_seen,
-                    COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-1 day')), 0) AS events_24h,
-                    COALESCE((SELECT COUNT(*) FROM interaction_events ie WHERE ie.project_id=ca.project_id AND ie.content_id=ca.id AND ie.occurred_at>=datetime('now','-15 minutes')), 0) AS events_15m
-                FROM content_assets ca
-                WHERE ${whereClause}
-                ORDER BY ca.created_at DESC
+                    COALESCE(ie.content_id, 0) as content_id,
+                    ca.url,
+                    ca.type,
+                    COUNT(*) as traffic_count,
+                    COUNT(CASE WHEN ie.class = 'human_via_ai' THEN 1 END) as ai_referrals,
+                    MAX(ie.occurred_at) as last_activity,
+                    GROUP_CONCAT(DISTINCT s.slug) as source_slugs,
+                    GROUP_CONCAT(DISTINCT s.name) as source_names,
+                    GROUP_CONCAT(DISTINCT s.slug || ':' || COUNT(CASE WHEN s.slug = s.slug THEN 1 END)) as source_counts
+                FROM interaction_events ie
+                LEFT JOIN content_assets ca ON ca.id = ie.content_id
+                LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
+                WHERE ${eventWhereClause}
+                GROUP BY ie.content_id, ca.url, ca.type
+                ORDER BY traffic_count DESC
                 LIMIT ? OFFSET ?
-            `).bind(...bindParams, pageSizeNum, offset).all<any>();
+            `;
 
-            // Get AI referrals data for each content asset
-            const items = await Promise.all((content.results || []).map(async (row) => {
-                // Get AI referrals count for last 24h
-                const aiReferralsResult = await env.OPTIVIEW_DB.prepare(`
-                    SELECT COUNT(*) as ai_count
-                    FROM interaction_events ie
-                    WHERE ie.project_id = ? AND ie.content_id = ? 
-                      AND ie.occurred_at >= datetime('now','-1 day')
-                      AND ie.class IN ('human_via_ai', 'crawler')
-                `).bind(project_id, row.id).first<any>();
+            const aggregationResult = await env.OPTIVIEW_DB.prepare(aggregationQuery).bind(...eventBindParams, pageSizeNum, offset).all<any>();
 
-                // Get AI referrals breakdown by source for last 24h
-                const bySourceResult = await env.OPTIVIEW_DB.prepare(`
-                    SELECT 
-                        s.slug,
-                    s.name,
-                        COUNT(*) as count
-                    FROM interaction_events ie
-                    JOIN ai_sources s ON s.id = ie.ai_source_id
-                    WHERE ie.project_id = ? AND ie.content_id = ? 
-                      AND ie.occurred_at >= datetime('now','-1 day')
-                      AND ie.class IN ('human_via_ai', 'crawler')
-                      AND ie.ai_source_id IS NOT NULL
-                    GROUP BY ie.ai_source_id, s.slug, s.name
-                    ORDER BY count DESC
-                    LIMIT 5
-                `).bind(project_id, row.id).all<any>();
+            // Step 3: Apply AI Traffic Only filter if requested
+            let filteredItems = aggregationResult.results || [];
+            if (aiOnly === "true") {
+                filteredItems = filteredItems.filter(item => item.ai_referrals > 0);
+            }
+
+            // Step 4: Get total count for pagination
+            const totalCountQuery = `
+                SELECT COUNT(DISTINCT ie.content_id) as total
+                FROM interaction_events ie
+                LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
+                WHERE ${eventWhereClause}
+            `;
+            const totalResult = await env.OPTIVIEW_DB.prepare(totalCountQuery).bind(...eventBindParams).first<any>();
+
+            // Process the aggregated results
+            const items = filteredItems.map(row => {
+                // Parse source information
+                const sourceSlugs = row.source_slugs ? row.source_slugs.split(',') : [];
+                const sourceNames = row.source_names ? row.source_names.split(',') : [];
+                const sourceCounts = row.source_counts ? row.source_counts.split(',') : [];
+
+                // Build top sources array
+                const topSources = sourceSlugs.map((slug, index) => ({
+                    slug: slug.trim(),
+                    name: sourceNames[index]?.trim() || slug.trim(),
+                    count: parseInt(sourceCounts[index]?.split(':')[1] || '0')
+                })).filter(source => source.count > 0)
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 3);
 
                 return {
-                    id: row.id,
-                    url: row.url,
-                    type: row.type,
-                    last_seen: row.last_seen,
-                    events_15m: row.events_15m || 0,
-                    events_24h: row.events_24h || 0,
-                    ai_referrals_24h: aiReferralsResult?.ai_count || 0,
-                    by_source_24h: (bySourceResult.results || []).map(source => ({
-                        slug: source.slug,
-                        events: source.count
-                    })),
-                    coverage_score: row.events_24h > 0 ? 50 : 0
+                    id: row.content_id || 0,
+                    url: row.url || 'Unknown URL',
+                    type: row.type || 'page',
+                    traffic_count: row.traffic_count || 0,
+                    ai_referrals: row.ai_referrals || 0,
+                    last_activity: row.last_activity || new Date().toISOString(),
+                    top_sources: topSources
                 };
-            }));
+            });
 
             const response = new Response(JSON.stringify({
                 items,
                 page: pageNum,
                 pageSize: pageSizeNum,
-                total: countResult?.total || 0
+                total: totalResult?.total || 0
             }), {
                 headers: {
                     "Content-Type": "application/json",
