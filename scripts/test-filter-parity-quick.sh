@@ -22,14 +22,18 @@ EVENTS_RESPONSE=$(curl -s "$API_BASE/api/events/summary?project_id=$PROJECT_ID&w
 EVENTS_TOTAL=$(echo "$EVENTS_RESPONSE" | jq -r '.totals.events // 0')
 echo "Events total: $EVENTS_TOTAL"
 
-# Get Content total
-CONTENT_RESPONSE=$(curl -s "$API_BASE/api/content?project_id=$PROJECT_ID&window=24h&q=&type=&aiOnly=false&page=1&pageSize=50")
+# Get Content total (sum of traffic_count across all items)
+# Use a very large page size to get all items in one request
+CONTENT_RESPONSE=$(curl -s "$API_BASE/api/content?project_id=$PROJECT_ID&window=24h&q=&type=&aiOnly=false&page=1&pageSize=10000")
 CONTENT_TOTAL=$(echo "$CONTENT_RESPONSE" | jq -r '.total // 0')
-echo "Content total: $CONTENT_TOTAL"
+CONTENT_TRAFFIC_SUM=$(echo "$CONTENT_RESPONSE" | jq -r '.items[]?.traffic_count // 0' | awk '{sum += $1} END {print sum}')
 
-# Calculate delta
+echo "Content assets count: $CONTENT_TOTAL"
+echo "Content traffic sum: $CONTENT_TRAFFIC_SUM"
+
+# Calculate delta using traffic sum
 if [ "$EVENTS_TOTAL" -gt 0 ]; then
-    DELTA=$(echo "scale=2; (($CONTENT_TOTAL - $EVENTS_TOTAL) / $EVENTS_TOTAL) * 100" | bc -l)
+    DELTA=$(echo "scale=2; (($CONTENT_TRAFFIC_SUM - $EVENTS_TOTAL) / $EVENTS_TOTAL) * 100" | bc -l)
     DELTA_ABS=${DELTA#-}
     echo "Delta: ${DELTA}%"
     
@@ -53,12 +57,16 @@ EVENTS_AI_RESPONSE=$(curl -s "$API_BASE/api/events/summary?project_id=$PROJECT_I
 EVENTS_AI_TOTAL=$(echo "$EVENTS_AI_RESPONSE" | jq -r '.totals.events // 0')
 echo "Events Human via AI total: $EVENTS_AI_TOTAL"
 
-# Get Content Human via AI total
-CONTENT_AI_RESPONSE=$(curl -s "$API_BASE/api/content?project_id=$PROJECT_ID&window=24h&q=&type=&aiOnly=false&page=1&pageSize=50&class=human_via_ai")
+# Get Content Human via AI total (sum of ai_referrals across all items)
+# Use a very large page size to get all items in one request
+CONTENT_AI_RESPONSE=$(curl -s "$API_BASE/api/content?project_id=$PROJECT_ID&window=24h&q=&type=&aiOnly=false&page=1&pageSize=10000&class=human_via_ai")
 CONTENT_AI_TOTAL=$(echo "$CONTENT_AI_RESPONSE" | jq -r '.total // 0')
-echo "Content Human via AI total: $CONTENT_AI_TOTAL"
+CONTENT_AI_REFERRALS_SUM=$(echo "$CONTENT_AI_RESPONSE" | jq -r '.items[]?.ai_referrals // 0' | awk '{sum += $1} END {print sum}')
 
-if [ "$EVENTS_AI_TOTAL" -eq "$CONTENT_AI_TOTAL" ]; then
+echo "Content Human via AI assets count: $CONTENT_AI_TOTAL"
+echo "Content Human via AI referrals sum: $CONTENT_AI_REFERRALS_SUM"
+
+if [ "$EVENTS_AI_TOTAL" -eq "$CONTENT_AI_REFERRALS_SUM" ]; then
     echo "✅ PASS: Human via AI counts match exactly"
 else
     echo "❌ FAIL: Human via AI counts don't match"
