@@ -571,10 +571,35 @@ export function classifyTrafficV3(input: {
   }
 
   // 6. User-Agent pattern matching for crawlers (without Cloudflare verification)
+  // STRICT: Only match known bot patterns, never generic browser UAs
   if (userAgent) {
     for (const pattern of Object.keys(manifest.crawlers)) {
       const crawler = manifest.crawlers[pattern];
-      if (userAgent.indexOf(pattern) !== -1) {
+      
+      // Use strict pattern matching to avoid false positives
+      // Only match if the pattern appears as a distinct identifier
+      const isMatch = (() => {
+        const ua = userAgent.toLowerCase();
+        const patternLower = pattern.toLowerCase();
+        
+        // For bot patterns, look for exact matches or versioned patterns
+        if (patternLower.includes('bot') || patternLower.includes('crawler')) {
+          // Must match the exact bot name (e.g., "GPTBot", "PerplexityBot")
+          return ua.includes(patternLower);
+        }
+        
+        // For other patterns, be more restrictive
+        // Must not match generic browser components like "Chrome", "Safari", "AppleWebKit"
+        const genericBrowserTerms = ['chrome', 'safari', 'firefox', 'edge', 'webkit', 'applewebkit', 'mozilla'];
+        if (genericBrowserTerms.some(term => ua.includes(term))) {
+          return false; // Never classify browser UAs as crawlers
+        }
+        
+        // Only match if pattern is a distinct identifier
+        return ua.includes(patternLower);
+      })();
+      
+      if (isMatch) {
         return {
           class: 'crawler',
           reason: `Crawler detected: ${crawler.name}`,
@@ -584,8 +609,8 @@ export function classifyTrafficV3(input: {
             userAgent
           },
           debug: {
-            matchedRule: 'Crawler (UA pattern)',
-            signals: [`user_agent: ${userAgent}`]
+            matchedRule: `ua.${pattern.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+            signals: [`ua_pattern: ${pattern}`, `bot_category: ${crawler.category}`]
           }
         };
       }

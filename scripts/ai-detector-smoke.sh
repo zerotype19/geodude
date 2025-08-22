@@ -130,6 +130,7 @@ read -r -d '' CASES_JSON <<'JSON'
   {"name":"GoogleOther (Gemini fetcher) crawl","referrer":null,"user_agent":"Mozilla/5.0 (compatible; GoogleOther)","query":null,"headers":null,"expected":{"class":"crawler","botCategory":"ai_training"}},
 
   {"name":"Direct type-in (no referrer)","referrer":null,"user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"class":"direct_human","aiSourceSlug":null}},
+  {"name":"Plain Chrome UA must not be ai_training (regression test)","referrer":null,"user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"class":"direct_human","aiSourceSlug":null}},
   {"name":"Google Search → site (non-AI)","referrer":"https://www.google.com/","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36","query":null,"headers":null,"expected":{"class":"search","aiSourceSlug":"google"}},
   {"name":"Bing Search → site (non-Copilot)","referrer":"https://www.bing.com/","user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64; Trident/7.0; rv:11.0) like Gecko","query":null,"headers":null,"expected":{"class":"search","aiSourceSlug":"microsoft_bing"}},
 

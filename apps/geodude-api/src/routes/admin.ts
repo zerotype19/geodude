@@ -122,8 +122,23 @@ export async function handleAdminRoutes(
         }
 
         // Re-run classification using stored inputs
-        // Note: This would call the actual classifier function
-        // For now, return the inputs and current classification for debugging
+        const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3.js');
+        
+        // Get current host for classification (use a default if not available)
+        const currentHost = 'optiview.ai'; // Default host for classification
+        
+        // Re-run the classifier with stored inputs
+        const classification = classifyTrafficV3({
+          cfVerifiedBotCategory: undefined, // No CF data in stored event
+          referrerUrl: row.referrer,
+          userAgent: row.user_agent,
+          currentHost,
+          utmSource: undefined, // Extract from URL if needed
+          aiRef: undefined,
+          manifest: STATIC_MANIFEST_V3
+        });
+
+        // Get current stored classification for comparison
         const currentClassification = await env.OPTIVIEW_DB.prepare(`
           SELECT class, bot_category, json_extract(metadata, '$.classification_reason') as matched_rule
           FROM interaction_events WHERE id = ?
@@ -137,8 +152,16 @@ export async function handleAdminRoutes(
             user_agent: row.user_agent,
             headers
           },
+          reclassified: {
+            class: classification.class,
+            aiSourceSlug: classification.aiSourceSlug,
+            botCategory: classification.evidence.botCategory,
+            reason: classification.reason,
+            matchedRule: classification.debug.matchedRule,
+            signals: classification.debug.signals
+          },
           current_classification: currentClassification,
-          note: "Classifier function call would go here - this shows current stored classification"
+          note: "Reclassification completed - compare reclassified vs current"
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -332,8 +355,31 @@ export async function handleAdminRoutes(
         const results = [];
 
         for (const row of rows.results || []) {
-          // Check if this is actually a known bot pattern
-          const isKnownBot = getBotCategoryFromUA(row.user_agent);
+          // Check if this is actually a known bot pattern using the new strict logic
+          const isKnownBot = (() => {
+            if (!row.user_agent) return 'other';
+            
+            const ua = row.user_agent.toLowerCase();
+            
+            // Only match known bot patterns, never generic browser UAs
+            const knownBotPatterns = [
+              'gptbot', 'ccbot', 'google-extended', 'claudebot', 'perplexitybot',
+              'googlebot', 'bingbot', 'duckduckbot', 'applebot',
+              'slack', 'discord', 'twitter', 'linkedin',
+              'uptimerobot', 'pingdom'
+            ];
+            
+            // Check if UA contains any known bot pattern
+            const hasBotPattern = knownBotPatterns.some(pattern => ua.includes(pattern));
+            
+            // CRITICAL: Never classify browser UAs as bots
+            const browserTerms = ['chrome', 'safari', 'firefox', 'edge', 'webkit', 'applewebkit', 'mozilla'];
+            const isBrowser = browserTerms.some(term => ua.includes(term));
+            
+            if (isBrowser) return 'other'; // Never a bot
+            if (hasBotPattern) return 'bot'; // Known bot pattern
+            return 'other'; // Unknown, not a bot
+          })();
           
           if (isKnownBot === 'other') {
             // Derive fallback class by referrer
@@ -355,7 +401,7 @@ export async function handleAdminRoutes(
               old_class: 'crawler',
               old_bot_category: 'ai_training',
               new_class: newClass,
-              reason: 'Not a known bot pattern'
+              reason: 'Not a known bot pattern (browser UA or unknown)'
             });
           }
         }
