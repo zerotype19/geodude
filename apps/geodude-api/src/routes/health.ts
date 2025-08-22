@@ -305,7 +305,7 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
   if (url.pathname === "/admin/selfcheck/schema") {
     try {
       // Check if user is admin (basic check for now)
-      if (!req.headers.get("authorization")?.includes("Bearer ")) {
+      if (!request.headers.get("authorization")?.includes("Bearer ")) {
         const response = new Response(JSON.stringify({
           error: "Unauthorized",
           message: "Admin access required"
@@ -662,6 +662,114 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
       });
       return addCorsHeaders(response, origin);
     }
+  }
+
+  // Add filter parity health check endpoints
+  if (url.pathname === "/api/health/filter-parity" && request.method === "GET") {
+      try {
+          const { project_id, window = "24h" } = Object.fromEntries(url.searchParams);
+          if (!project_id) {
+              const response = new Response("Missing project_id", { status: 400 });
+              return addCorsHeaders(response, origin);
+          }
+
+          // Test basic filter parity
+          const testCases = [
+              {
+                  name: "All traffic",
+                  events_params: `project_id=${project_id}&window=${window}`,
+                  content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50`
+              },
+              {
+                  name: "Human via AI",
+                  events_params: `project_id=${project_id}&window=${window}&traffic_class=human_via_ai`,
+                  content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50&class=human_via_ai`
+              },
+              {
+                  name: "Crawler",
+                  events_params: `project_id=${project_id}&window=${window}&traffic_class=crawler`,
+                  content_params: `project_id=${project_id}&window=${window}&q=&type=&aiOnly=false&page=1&pageSize=50&class=crawler`
+              }
+          ];
+
+          const results = [];
+          let totalDelta = 0;
+          let testCount = 0;
+
+          for (const testCase of testCases) {
+              // Get Events summary
+              const eventsResult = await d1.prepare(`
+                  SELECT COUNT(*) as total
+                  FROM interaction_events ie
+                  WHERE ie.project_id = ? AND ie.occurred_at >= datetime('now', '-1 day')
+                  ${testCase.events_params.includes('traffic_class=human_via_ai') ? "AND ie.class = 'human_via_ai'" : ""}
+                  ${testCase.events_params.includes('traffic_class=crawler') ? "AND ie.class = 'crawler'" : ""}
+              `).bind(project_id).first<any>();
+
+              // Get Content total
+              const contentResult = await d1.prepare(`
+                  SELECT COUNT(DISTINCT ie.content_id) as total
+                  FROM interaction_events ie
+                  WHERE ie.project_id = ? AND ie.occurred_at >= datetime('now', '-1 day')
+                  ${testCase.content_params.includes('class=human_via_ai') ? "AND ie.class = 'human_via_ai'" : ""}
+                  ${testCase.content_params.includes('class=crawler') ? "AND ie.class = 'crawler'" : ""}
+              `).bind(project_id).first<any>();
+
+              const eventsTotal = eventsResult?.total || 0;
+              const contentTotal = contentResult?.total || 0;
+              
+              let delta = 0;
+              if (eventsTotal > 0) {
+                  delta = Math.abs((contentTotal - eventsTotal) / eventsTotal) * 100;
+              }
+              
+              totalDelta += delta;
+              testCount++;
+              
+              results.push({
+                  test: testCase.name,
+                  events_total: eventsTotal,
+                  content_total: contentTotal,
+                  delta_percent: Math.round(delta * 100) / 100,
+                  status: delta <= 1.0 ? "pass" : "fail"
+              });
+          }
+
+          const averageDelta = totalDelta / testCount;
+          const overallStatus = averageDelta <= 1.0 ? "healthy" : "degraded";
+
+          const response = new Response(JSON.stringify({
+              status: overallStatus,
+              timestamp: new Date().toISOString(),
+              project_id,
+              window,
+              average_delta_percent: Math.round(averageDelta * 100) / 100,
+              test_results: results,
+              thresholds: {
+                  healthy: "≤ 1.0%",
+                  degraded: "> 1.0%",
+                  critical: "> 5.0%"
+              }
+          }), {
+              headers: {
+                  "Content-Type": "application/json",
+                  "Cache-Control": "public, max-age=300"
+              }
+          });
+
+          return addCorsHeaders(response, origin);
+      } catch (e: any) {
+          console.error("filter_parity_health_error", { error: e.message, stack: e.stack });
+          const response = new Response(JSON.stringify({
+              status: "error",
+              error: e.message,
+              timestamp: new Date().toISOString()
+          }), { 
+              status: 500, 
+              headers: { "Content-Type": "application/json" } 
+          });
+          return addCorsHeaders(response, origin);
+      }
   }
 
   return null; // Not handled by this router
