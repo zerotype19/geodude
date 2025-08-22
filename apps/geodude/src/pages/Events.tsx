@@ -306,7 +306,7 @@ export default function Events() {
     }
 
     return stopAutoRefresh;
-  }, [project?.id, window, classFilter, sourceFilter, searchQuery, page]);
+  }, [project?.id, window, classFilter, sourceFilter, botCategoryFilter, searchQuery, page]);
 
   useEffect(() => {
     if (window && window !== getStoredWindow()) {
@@ -340,6 +340,10 @@ export default function Events() {
 
   function handleSourceFilter(slug: string) {
     updateParams({ source: slug === sourceFilter ? null : slug, page: null });
+  }
+
+  function handleBotCategoryFilter(category: string) {
+    updateParams({ bot_category: category === botCategoryFilter ? null : category, page: null });
   }
 
   function handleSearch(query: string) {
@@ -1015,7 +1019,7 @@ export default function Events() {
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Bot Categories</h4>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => updateParams({ bot_category: null })}
+                    onClick={() => handleBotCategoryFilter("")}
                     className={`px-3 py-1 rounded-full text-sm border ${!botCategoryFilter
                       ? "bg-blue-100 text-blue-800 border-blue-200"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -1025,7 +1029,7 @@ export default function Events() {
                   </button>
                   {/* We'll populate this dynamically based on available bot categories */}
                   <button
-                    onClick={() => updateParams({ bot_category: "ai_training" })}
+                    onClick={() => handleBotCategoryFilter("ai_training")}
                     className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "ai_training"
                       ? "bg-purple-100 text-purple-800 border-purple-200"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -1034,7 +1038,7 @@ export default function Events() {
                     AI Training
                   </button>
                   <button
-                    onClick={() => updateParams({ bot_category: "search_crawler" })}
+                    onClick={() => handleBotCategoryFilter("search_crawler")}
                     className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "search_crawler"
                       ? "bg-blue-100 text-blue-800 border-blue-200"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
@@ -1043,7 +1047,7 @@ export default function Events() {
                     Search Crawler
                   </button>
                   <button
-                    onClick={() => updateParams({ bot_category: "preview_bot" })}
+                    onClick={() => handleBotCategoryFilter("preview_bot")}
                     className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "preview_bot"
                       ? "bg-yellow-100 text-yellow-800 border-yellow-200"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
