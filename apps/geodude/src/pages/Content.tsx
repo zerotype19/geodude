@@ -19,10 +19,9 @@ interface ContentAsset {
 
 interface ContentSummary {
   totals: {
-    content_assets: number;
-    total_events: number;
-    ai_referrals: number;
+    events: number;
     ai_influenced: number;
+    ai_pct: number;
   };
   by_class: Array<{
     class: string;
@@ -637,9 +636,9 @@ const Content: React.FC = () => {
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                         }`}
                     >
-                      All ({summary.totals.content_assets})
+                      All ({total || 0})
                     </button>
-                    {summary.by_class.map((cls) => (
+                    {summary.by_class?.map((cls) => (
                       <button
                         key={cls.class}
                         onClick={() => handleClassFilter(cls.class)}
@@ -656,7 +655,7 @@ const Content: React.FC = () => {
                 </div>
 
                 {/* AI Sources */}
-                {summary.by_source.length > 0 && (
+                {summary.by_source && summary.by_source.length > 0 && (
                   <div className="mb-4">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">AI Sources</h4>
                     <div className="flex flex-wrap gap-2">
@@ -669,7 +668,7 @@ const Content: React.FC = () => {
                       >
                         All sources
                       </button>
-                      {summary.by_source.map((source) => (
+                      {summary.by_source?.map((source) => (
                         <button
                           key={source.slug}
                           onClick={() => handleSourceFilter(source.slug)}
@@ -686,7 +685,7 @@ const Content: React.FC = () => {
                 )}
 
                 {/* Bot Categories (if crawler class exists) */}
-                {summary.by_class.some(cls => cls.class === 'crawler') && (
+                {summary.by_class && summary.by_class.some(cls => cls.class === 'crawler') && (
                   <div className="mb-4">
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Bot Categories</h4>
                     <div className="flex flex-wrap gap-2">
