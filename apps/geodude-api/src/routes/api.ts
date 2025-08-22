@@ -798,13 +798,9 @@ export async function handleApiRoutes(
                     ca.type,
                     COUNT(*) as traffic_count,
                     COUNT(CASE WHEN ie.class = 'human_via_ai' THEN 1 END) as ai_referrals,
-                    MAX(ie.occurred_at) as last_activity,
-                    GROUP_CONCAT(DISTINCT s.slug) as source_slugs,
-                    GROUP_CONCAT(DISTINCT s.name) as source_names,
-                    GROUP_CONCAT(DISTINCT s.slug || ':' || COUNT(CASE WHEN s.slug = s.slug THEN 1 END)) as source_counts
+                    MAX(ie.occurred_at) as last_activity
                 FROM interaction_events ie
                 LEFT JOIN content_assets ca ON ca.id = ie.content_id
-                LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
                 WHERE ${eventWhereClause}
                 GROUP BY ie.content_id, ca.url, ca.type
                 ORDER BY traffic_count DESC
@@ -828,21 +824,34 @@ export async function handleApiRoutes(
             `;
             const totalResult = await env.OPTIVIEW_DB.prepare(totalCountQuery).bind(...eventBindParams).first<any>();
 
-            // Process the aggregated results
-            const items = filteredItems.map(row => {
-                // Parse source information
-                const sourceSlugs = row.source_slugs ? row.source_slugs.split(',') : [];
-                const sourceNames = row.source_names ? row.source_names.split(',') : [];
-                const sourceCounts = row.source_counts ? row.source_counts.split(',') : [];
+            // Process the aggregated results and get top sources for each content asset
+            const items = await Promise.all(filteredItems.map(async (row) => {
+                // Get top sources for this content asset
+                const topSourcesQuery = `
+                    SELECT 
+                        s.slug,
+                        s.name,
+                        COUNT(*) as count
+                    FROM interaction_events ie
+                    JOIN ai_sources s ON s.id = ie.ai_source_id
+                    WHERE ie.project_id = ? 
+                      AND ie.content_id = ? 
+                      AND ie.occurred_at >= ?
+                      AND ie.ai_source_id IS NOT NULL
+                    GROUP BY ie.ai_source_id, s.slug, s.name
+                    ORDER BY count DESC
+                    LIMIT 3
+                `;
 
-                // Build top sources array
-                const topSources = sourceSlugs.map((slug, index) => ({
-                    slug: slug.trim(),
-                    name: sourceNames[index]?.trim() || slug.trim(),
-                    count: parseInt(sourceCounts[index]?.split(':')[1] || '0')
-                })).filter(source => source.count > 0)
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 3);
+                const topSourcesResult = await env.OPTIVIEW_DB.prepare(topSourcesQuery)
+                    .bind(project_id, row.content_id, sinceISO)
+                    .all<any>();
+
+                const topSources = (topSourcesResult.results || []).map(source => ({
+                    slug: source.slug,
+                    name: source.name || source.slug,
+                    count: source.count
+                }));
 
                 return {
                     id: row.content_id || 0,
@@ -853,7 +862,7 @@ export async function handleApiRoutes(
                     last_activity: row.last_activity || new Date().toISOString(),
                     top_sources: topSources
                 };
-            });
+            }));
 
             const response = new Response(JSON.stringify({
                 items,
