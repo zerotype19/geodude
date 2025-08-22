@@ -109,235 +109,238 @@ interface HasAnyResponse {
   has_any: boolean;
 }
 
-// EventRow component for expandable rows
-function EventRow({ event, debugMode, summary }: {
-  event: EventItem;
-  debugMode: boolean;
-  summary: EventsSummary | null;
-}) {
-  const [open, setOpen] = useState<boolean>(!!debugMode);
-  const [loading, setLoading] = useState(false);
-  const [detail, setDetail] = useState<any | null>(null);
 
-  const toggle = async () => {
-    const next = !open;
-    setOpen(next);
-    if (next && !detail) {
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE}/api/events/detail?id=${event.id}`, FETCH_OPTS);
-        if (res.ok) {
-          const data = await res.json();
-          setDetail(data);
-        }
-      } catch (err) {
-        console.error('Failed to fetch event detail:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
 
-  return (
-    <>
-      <tr className="border-b hover:bg-gray-50">
-        <td className="py-3 pr-4 w-6">
-          <button onClick={toggle} className="p-1 hover:bg-gray-100 rounded">
-            {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-          </button>
-        </td>
-        <td className="py-3 pr-4">
-          <span
-            className="text-gray-600 cursor-help"
-            title={new Date(event.occurred_at).toLocaleString()}
-          >
-            {formatRelativeTime(event.occurred_at)}
-          </span>
-        </td>
-        <td className="py-3 pr-4">
-          <span className={`px-2 py-1 text-xs rounded-full ${getEventTypeColor(event.event_type)}`}>
-            {event.event_type}
-          </span>
-        </td>
-        <td className="py-3 pr-4">
-          <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(event.event_class)}`}>
-              {getTrafficClassLabel(event.event_class)}
-              {['direct_human', 'search'].includes(event.event_class) && summary?.ai_lite && (
-                <span className="ml-1 text-gray-500">ⓘ sampled</span>
-              )}
-            </span>
-            {event.bot_category && event.event_class === 'crawler' && (
-              <span className={`px-2 py-1 text-xs rounded-full border ${getBotCategoryColor(event.bot_category)}`}>
-                {getBotCategoryLabel(event.bot_category)}
-              </span>
-            )}
-          </div>
-        </td>
-        <td className="py-3 pr-4">
-          {event.source_name ? (
-            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-              {event.source_name}
-            </span>
-          ) : (
-            <span className="text-gray-400">—</span>
-          )}
-        </td>
-        <td className="py-3 pr-4">
-          {event.url ? (
-            <a
-              href={event.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 max-w-xs"
-            >
-              <span className="truncate">{truncateUrl(event.url)}</span>
-              <ExternalLink className="h-3 w-3 flex-shrink-0" />
-            </a>
-          ) : (
-            <span className="text-gray-400">—</span>
-          )}
-        </td>
-        <td className="py-3 pr-4 relative">
-          {event.metadata_preview && Object.keys(event.metadata_preview).length > 0 ? (
-            <button
-              onClick={() => setMetadataPopover({ id: event.id, metadata: event.metadata_preview })}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </button>
-          ) : (
-            <span className="text-gray-400">—</span>
-          )}
-          {renderMetadataPopover(event)}
-        </td>
-      </tr>
-
-      {open && (
-        <tr className="bg-gray-50/50">
-          <td colSpan={7}>
-            {loading && <div className="p-4 text-sm text-gray-500">Loading classification details...</div>}
-
-            {detail && (
-              <div className="p-4 grid gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Classification</div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600">Class:</span>
-                        <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(detail.classification.class)}`}>
-                          {getTrafficClassLabel(detail.classification.class)}
-                        </span>
-                      </div>
-                      {detail.classification.aiSourceSlug && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600">AI Source:</span>
-                          <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                            {detail.classification.aiSourceSlug}
-                          </span>
-                        </div>
-                      )}
-                      {detail.classification.botCategory && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600">Bot Category:</span>
-                          <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
-                            {detail.classification.botCategory}
-                          </span>
-                        </div>
-                      )}
-                      {detail.classification.referralChain && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600">Referral Chain:</span>
-                          <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
-                            {detail.classification.referralChain}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Rule Trace</div>
-                    <div className="space-y-2">
-                      <div className="text-xs">
-                        <span className="text-gray-600">Matched Rule:</span>
-                        <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded text-xs">
-                          {detail.debug?.matchedRule || '—'}
-                        </code>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Precedence: {detail.debug?.precedenceOrder?.join(' > ')}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Signals</div>
-                    <ul className="space-y-1">
-                      {(detail.debug?.signals || []).map((signal: string, i: number) => (
-                        <li key={i} className="text-xs text-gray-600">
-                          • {signal}
-                        </li>
-                      ))}
-                      {(!detail.debug?.signals || detail.debug.signals.length === 0) && (
-                        <li className="text-xs text-gray-400">No signals recorded</li>
-                      )}
-                    </ul>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw Inputs</div>
-                    <div className="space-y-2 text-xs">
-                      <div>
-                        <span className="text-gray-600">Referrer:</span>
-                        <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
-                          {detail.referrer || '—'}
-                        </code>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">User Agent:</span>
-                        <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded max-w-xs truncate block">
-                          {detail.user_agent || '—'}
-                        </code>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">CF Bot Verified:</span>
-                        <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
-                          {String(detail.debug?.cfBot || false)}
-                        </code>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="text-xs uppercase text-gray-500 font-medium">Raw JSON</div>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(JSON.stringify(detail, null, 2))}
-                      className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded border"
-                    >
-                      <Copy size={12} className="inline mr-1" />
-                      Copy
-                    </button>
-                  </div>
-                  <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
-                    {JSON.stringify(detail, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            )}
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
 
 export default function Events() {
   const { project } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // EventRow component for expandable rows (defined inside Events component for access to utilities)
+  function EventRow({ event, debugMode, summary }: { 
+    event: EventItem; 
+    debugMode: boolean; 
+    summary: EventsSummary | null; 
+  }) {
+    const [open, setOpen] = useState<boolean>(!!debugMode);
+    const [loading, setLoading] = useState(false);
+    const [detail, setDetail] = useState<any | null>(null);
+
+    const toggle = async () => {
+      const next = !open;
+      setOpen(next);
+      if (next && !detail) {
+        setLoading(true);
+        try {
+          const res = await fetch(`${API_BASE}/api/events/detail?id=${event.id}`, FETCH_OPTS);
+          if (res.ok) {
+            const data = await res.json();
+            setDetail(data);
+          }
+        } catch (err) {
+          console.error('Failed to fetch event detail:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    return (
+      <>
+        <tr className="border-b hover:bg-gray-50">
+          <td className="py-3 pr-4 w-6">
+            <button onClick={toggle} className="p-1 hover:bg-gray-100 rounded">
+              {open ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
+            </button>
+          </td>
+          <td className="py-3 pr-4">
+            <span
+              className="text-gray-600 cursor-help"
+              title={new Date(event.occurred_at).toLocaleString()}
+            >
+              {formatRelativeTime(event.occurred_at)}
+            </span>
+          </td>
+          <td className="py-3 pr-4">
+            <span className={`px-2 py-1 text-xs rounded-full ${getEventTypeColor(event.event_type)}`}>
+              {event.event_type}
+            </span>
+          </td>
+          <td className="py-3 pr-4">
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(event.event_class)}`}>
+                {getTrafficClassLabel(event.event_class)}
+                {['direct_human', 'search'].includes(event.event_class) && summary?.ai_lite && (
+                  <span className="ml-1 text-gray-500">ⓘ sampled</span>
+                )}
+              </span>
+              {event.bot_category && event.event_class === 'crawler' && (
+                <span className={`px-2 py-1 text-xs rounded-full border ${getBotCategoryColor(event.bot_category)}`}>
+                  {getBotCategoryLabel(event.bot_category)}
+                </span>
+              )}
+            </div>
+          </td>
+          <td className="py-3 pr-4">
+            {event.source_name ? (
+              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                {event.source_name}
+              </span>
+            ) : (
+              <span className="text-gray-400">—</span>
+            )}
+          </td>
+          <td className="py-3 pr-4">
+            {event.url ? (
+              <a
+                href={event.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 max-w-xs"
+              >
+                <span className="truncate">{truncateUrl(event.url)}</span>
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+              </a>
+            ) : (
+              <span className="text-gray-400">—</span>
+            )}
+          </td>
+          <td className="py-3 pr-4 relative">
+            {event.metadata_preview && Object.keys(event.metadata_preview).length > 0 ? (
+              <button
+                onClick={() => setMetadataPopover({ id: event.id, metadata: event.metadata_preview })}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            ) : (
+              <span className="text-gray-400">—</span>
+            )}
+            {renderMetadataPopover(event)}
+          </td>
+        </tr>
+
+        {open && (
+          <tr className="bg-gray-50/50">
+            <td colSpan={7}>
+              {loading && <div className="p-4 text-sm text-gray-500">Loading classification details...</div>}
+
+              {detail && (
+                <div className="p-4 grid gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Classification</div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600">Class:</span>
+                          <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(detail.classification.class)}`}>
+                            {getTrafficClassLabel(detail.classification.class)}
+                          </span>
+                        </div>
+                        {detail.classification.aiSourceSlug && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">AI Source:</span>
+                            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                              {detail.classification.aiSourceSlug}
+                            </span>
+                          </div>
+                        )}
+                        {detail.classification.botCategory && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">Bot Category:</span>
+                            <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                              {detail.classification.botCategory}
+                            </span>
+                          </div>
+                        )}
+                        {detail.classification.referralChain && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">Referral Chain:</span>
+                            <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                              {detail.classification.referralChain}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Rule Trace</div>
+                      <div className="space-y-2">
+                        <div className="text-xs">
+                          <span className="text-gray-600">Matched Rule:</span>
+                          <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded text-xs">
+                            {detail.debug?.matchedRule || '—'}
+                          </code>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Precedence: {detail.debug?.precedenceOrder?.join(' > ')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Signals</div>
+                      <ul className="space-y-1">
+                        {(detail.debug?.signals || []).map((signal: string, i: number) => (
+                          <li key={i} className="text-xs text-gray-600">
+                            • {signal}
+                          </li>
+                        ))}
+                        {(!detail.debug?.signals || detail.debug.signals.length === 0) && (
+                          <li className="text-xs text-gray-400">No signals recorded</li>
+                        )}
+                      </ul>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw Inputs</div>
+                      <div className="space-y-2 text-xs">
+                        <div>
+                          <span className="text-gray-600">Referrer:</span>
+                          <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
+                            {detail.referrer || '—'}
+                          </code>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">User Agent:</span>
+                          <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded max-w-xs truncate block">
+                            {detail.user_agent || '—'}
+                          </code>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">CF Bot Verified:</span>
+                          <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
+                            {String(detail.debug?.cfBot || false)}
+                          </code>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="text-xs uppercase text-gray-500 font-medium">Raw JSON</div>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(JSON.stringify(detail, null, 2))}
+                        className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded border"
+                      >
+                        <Copy size={12} className="inline mr-1" />
+                        Copy
+                      </button>
+                    </div>
+                    <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
+                      {JSON.stringify(detail, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </td>
+          </tr>
+        )}
+      </>
+    );
+  }
 
   // State
   const [summary, setSummary] = useState<EventsSummary | null>(null);
