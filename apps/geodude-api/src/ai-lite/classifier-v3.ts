@@ -590,7 +590,19 @@ export function classifyTrafficV3(input: {
         
         // For other patterns, be more restrictive
         // Must not match generic browser components like "Chrome", "Safari", "AppleWebKit"
-        const genericBrowserTerms = ['chrome', 'safari', 'firefox', 'edge', 'webkit', 'applewebkit', 'mozilla'];
+        // BUT allow known bot patterns even if they contain browser-like terms
+        const genericBrowserTerms = ['chrome', 'safari', 'firefox', 'edge', 'webkit', 'applewebkit'];
+        
+        // Special case: allow "mozilla" if it's part of a known bot pattern
+        if (ua.includes('mozilla') && !ua.includes(patternLower)) {
+          // Only block if it's a generic Mozilla UA without a known bot pattern
+          const isGenericMozilla = ua.includes('chrome') || ua.includes('safari') || ua.includes('firefox') || ua.includes('edge');
+          if (isGenericMozilla) {
+            return false; // Generic browser UA
+          }
+        }
+        
+        // Block other generic browser terms
         if (genericBrowserTerms.some(term => ua.includes(term))) {
           return false; // Never classify browser UAs as crawlers
         }
