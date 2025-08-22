@@ -2,6 +2,18 @@
 
 This document provides a comprehensive verification process to ensure that the Events and Content pages maintain perfect semantic parity in their filtering capabilities.
 
+## 🔧 Quick Start
+
+```bash
+# Lightweight spot check (3 basic tests)
+./scripts/test-filter-parity-quick.sh
+
+# Full parity test suite (8 comprehensive tests)  
+./scripts/verify-filter-parity.sh [staging|prod] [project_id]
+```
+
+**Note**: Tests can be run ad-hoc by engineers; no automated GitHub Actions pipeline is configured.
+
 ## 🎯 Overview
 
 **Goal**: Verify that selecting the same filters on Events and Content pages yields reconcilable data where:
@@ -196,19 +208,26 @@ Sum(ai_referrals) = 0 (crawlers aren't AI referrals)
 3. **Edge cases handled correctly**
 4. **Performance acceptable** (< 3 seconds for complex filters)
 5. **UI consistency** maintained across both pages
+6. **Automated scripts pass** when run manually
 
-## 🚀 Automated Testing
+## 🚀 Manual Testing Scripts
 
-### **CI Integration**
-- [ ] Filter parity tests run on every PR
-- [ ] Tests run daily against production
-- [ ] Slack notifications for failures
-- [ ] CI blocks merge on test failures
+### **Available Test Scripts**
+```bash
+# Lightweight spot check (3 basic tests)
+./scripts/test-filter-parity-quick.sh
 
-### **Monitoring**
-- [ ] Daily health checks against production
-- [ ] Alert on >3% drift over 48h
-- [ ] Alert if "AI Traffic Only" returns rows with AI Referrals = 0
+# Full parity test suite (8 comprehensive tests)
+./scripts/verify-filter-parity.sh [staging|prod] [project_id]
+```
+
+### **Health Monitoring Endpoint**
+```bash
+# Check filter parity health via API (optional monitoring)
+curl "$API_BASE/api/health/filter-parity?project_id=$PROJECT_ID&window=24h"
+```
+
+**Note**: Tests can be run ad-hoc by engineers; no automated GitHub Actions pipeline is configured.
 
 ## 🔍 Troubleshooting
 

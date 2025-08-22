@@ -664,8 +664,8 @@ export async function handleHealthRoutes(url: URL, request: Request, env: any, d
     }
   }
 
-  // Add filter parity health check endpoints
-  if (url.pathname === "/api/health/filter-parity" && request.method === "GET") {
+     // Filter parity health check endpoint (optional monitoring, not CI-enforced)
+   if (url.pathname === "/api/health/filter-parity" && request.method === "GET") {
       try {
           const { project_id, window = "24h" } = Object.fromEntries(url.searchParams);
           if (!project_id) {

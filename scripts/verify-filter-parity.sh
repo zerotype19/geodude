@@ -2,14 +2,17 @@
 
 # Filter Parity Verification Script
 # Tests that Events and Content pages return reconcilable data for the same filter slices
+# 
 # Usage: ./scripts/verify-filter-parity.sh [staging|prod] [project_id]
+# 
+# This is a manual testing tool for engineers to verify filter parity between 
+# Events and Content pages. No automated CI/GitHub Actions pipeline is configured.
 
 set -euo pipefail
 
 # Configuration
 ENVIRONMENT=${1:-staging}
 PROJECT_ID=${2:-"prj_UHoeticexample"}
-SLACK_WEBHOOK=${SLACK_WEBHOOK:-""}
 
 # API endpoints
 if [ "$ENVIRONMENT" = "prod" ]; then
@@ -310,58 +313,12 @@ main() {
         done
     fi
     
-    # Slack notification if webhook provided
-    if [ -n "$SLACK_WEBHOOK" ]; then
-        send_slack_notification
-    fi
+    # Note: Manual test run - no automated notifications
     
     exit $FAILED_TESTS
 }
 
-# Slack notification
-send_slack_notification() {
-    local color
-    local text
-    
-    if [ $FAILED_TESTS -eq 0 ]; then
-        color="good"
-        text="✅ Filter Parity Verification PASSED for $ENVIRONMENT"
-    else
-        color="danger"
-        text="❌ Filter Parity Verification FAILED for $ENVIRONMENT ($FAILED_TESTS/$TOTAL_TESTS failed)"
-    fi
-    
-    local payload
-    payload=$(cat <<EOF
-{
-    "attachments": [
-        {
-            "color": "$color",
-            "title": "Filter Parity Verification - $ENVIRONMENT",
-            "text": "$text",
-            "fields": [
-                {
-                    "title": "Project",
-                    "value": "$PROJECT_ID",
-                    "short": true
-                },
-                {
-                    "title": "Results",
-                    "value": "$PASSED_TESTS/$TOTAL_TESTS passed",
-                    "short": true
-                }
-            ],
-            "footer": "Optiview Filter Parity Monitor",
-            "ts": $(date +%s)
-        }
-    ]
-}
-EOF
-)
-    
-    curl -s -X POST -H 'Content-type: application/json' \
-        --data "$payload" "$SLACK_WEBHOOK" > /dev/null || true
-}
+# Manual test execution - no automated notifications
 
 # Run main function
 main "$@"

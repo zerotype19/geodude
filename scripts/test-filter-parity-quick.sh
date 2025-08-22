@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Quick Filter Parity Test
-# Tests basic functionality without full CI setup
+# Lightweight spot check for filter parity between Events and Content pages
+# Run this for a quick verification before deploying changes
 
 set -euo pipefail
 
