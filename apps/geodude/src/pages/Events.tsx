@@ -550,11 +550,8 @@ export default function Events() {
         .finally(() => {
           setLoading(false);
           setLastUpdated(new Date());
-          startAutoRefresh();
         });
     }
-
-    return stopAutoRefresh;
   }, [project?.id, window, classFilter, sourceFilter, botCategoryFilter, searchQuery, page]);
 
   useEffect(() => {
@@ -913,8 +910,6 @@ export default function Events() {
             <button
               onClick={() => {
                 refreshData();
-                setAutoRefreshCount(0);
-                startAutoRefresh();
               }}
               disabled={summaryLoading || recentLoading}
               className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
@@ -1522,36 +1517,7 @@ export default function Events() {
           </Card>
         )}
 
-        {/* Auto-refresh status */}
-        {autoRefreshCount > 0 && autoRefreshCount < 12 && (
-          <div className="text-center">
-            <span className="text-xs text-gray-500">
-              Auto-refreshing... ({autoRefreshCount}/12)
-            </span>
-            <button
-              onClick={stopAutoRefresh}
-              className="ml-2 text-xs text-blue-600 hover:text-blue-800"
-            >
-              Stop
-            </button>
-          </div>
-        )}
 
-        {/* Manual recheck button after auto-refresh ends */}
-        {autoRefreshCount >= 12 && (
-          <div className="text-center">
-            <button
-              onClick={() => {
-                refreshData();
-                setAutoRefreshCount(0);
-                startAutoRefresh();
-              }}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Recheck
-            </button>
-          </div>
-        )}
 
         {/* Classification Details Modal */}
         {showClassificationDetails && (
