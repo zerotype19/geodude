@@ -578,6 +578,105 @@ export async function handleApiRoutes(
         }
     }
 
+    // 6.3.1) Events Detail API
+    if (url.pathname === "/api/events/detail" && req.method === "GET") {
+        try {
+            const { id } = Object.fromEntries(url.searchParams);
+            if (!id) {
+                const response = new Response("Missing event id", { status: 400 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get detailed event information with classification details
+            const eventDetail = await env.OPTIVIEW_DB.prepare(`
+                SELECT 
+                    ie.id, 
+                    ie.occurred_at, 
+                    ie.url, 
+                    ie.event_type,
+                    ie.class as traffic_class,
+                    ie.ai_source_id,
+                    ie.bot_category,
+                    ie.metadata,
+                    COALESCE(ais.slug, 'unknown') as ai_source_slug,
+                    COALESCE(ais.name, 'Unknown AI Source') as ai_source_name,
+                    json_extract(ie.metadata, '$.referrer') as referrer,
+                    json_extract(ie.metadata, '$.user_agent') as user_agent,
+                    json_extract(ie.metadata, '$.classification_reason') as matched_rule,
+                    json_extract(ie.metadata, '$.debug') as signals,
+                    json_extract(ie.metadata, '$.cf_verified_category') as cf_bot_verified,
+                    json_extract(ie.metadata, '$.referral_chain') as referral_chain
+                FROM interaction_events ie
+                LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
+                WHERE ie.id = ?
+            `).bind(id).first<any>();
+
+            if (!eventDetail) {
+                const response = new Response("Event not found", { status: 404 });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Parse metadata and signals
+            let metadata = {};
+            let signals = [];
+            let matchedRule = null;
+
+            try {
+                if (eventDetail.metadata) {
+                    metadata = JSON.parse(eventDetail.metadata);
+                }
+                if (eventDetail.signals) {
+                    signals = JSON.parse(eventDetail.signals);
+                }
+                if (eventDetail.matched_rule) {
+                    matchedRule = eventDetail.matched_rule;
+                }
+            } catch (e) {
+                console.warn('Failed to parse event metadata:', e);
+            }
+
+            // Build response with classification details
+            const response = new Response(JSON.stringify({
+                id: eventDetail.id,
+                occurred_at: eventDetail.occurred_at,
+                url: eventDetail.url,
+                event_type: eventDetail.event_type,
+                referrer: eventDetail.referrer,
+                user_agent: eventDetail.user_agent,
+                trafficClass: eventDetail.traffic_class,
+                aiSourceSlug: eventDetail.ai_source_slug,
+                botCategory: eventDetail.bot_category,
+                classification: {
+                    class: eventDetail.traffic_class,
+                    aiSourceSlug: eventDetail.ai_source_slug,
+                    botCategory: eventDetail.bot_category,
+                    referralChain: eventDetail.referral_chain
+                },
+                debug: {
+                    matchedRule: matchedRule,
+                    signals: signals,
+                    cfBot: !!eventDetail.cf_bot_verified,
+                    precedenceOrder: ['crawler', 'human_via_ai', 'search', 'direct_human']
+                },
+                metadata: metadata
+            }), {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "private, max-age=60"
+                }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e: any) {
+            console.error("events_detail_error", { error: e.message, stack: e.stack });
+            const response = new Response(JSON.stringify({
+                error: "Internal server error",
+                message: e.message
+            }), { status: 500, headers: { "Content-Type": "application/json" } });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
     // 6.3.2) Events Recent API
     if (url.pathname === "/api/events/recent" && req.method === "GET") {
         try {

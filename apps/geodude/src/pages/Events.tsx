@@ -12,7 +12,9 @@ import {
   MoreVertical,
   Copy,
   AlertCircle,
-  Info
+  Info,
+  ChevronRight,
+  ChevronDown
 } from "lucide-react";
 // Simple SVG chart component instead of recharts
 function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: string) => string }) {
@@ -107,6 +109,232 @@ interface HasAnyResponse {
   has_any: boolean;
 }
 
+// EventRow component for expandable rows
+function EventRow({ event, debugMode, summary }: {
+  event: EventItem;
+  debugMode: boolean;
+  summary: EventsSummary | null;
+}) {
+  const [open, setOpen] = useState<boolean>(!!debugMode);
+  const [loading, setLoading] = useState(false);
+  const [detail, setDetail] = useState<any | null>(null);
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !detail) {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/events/detail?id=${event.id}`, FETCH_OPTS);
+        if (res.ok) {
+          const data = await res.json();
+          setDetail(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch event detail:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  return (
+    <>
+      <tr className="border-b hover:bg-gray-50">
+        <td className="py-3 pr-4 w-6">
+          <button onClick={toggle} className="p-1 hover:bg-gray-100 rounded">
+            {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          </button>
+        </td>
+        <td className="py-3 pr-4">
+          <span
+            className="text-gray-600 cursor-help"
+            title={new Date(event.occurred_at).toLocaleString()}
+          >
+            {formatRelativeTime(event.occurred_at)}
+          </span>
+        </td>
+        <td className="py-3 pr-4">
+          <span className={`px-2 py-1 text-xs rounded-full ${getEventTypeColor(event.event_type)}`}>
+            {event.event_type}
+          </span>
+        </td>
+        <td className="py-3 pr-4">
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(event.event_class)}`}>
+              {getTrafficClassLabel(event.event_class)}
+              {['direct_human', 'search'].includes(event.event_class) && summary?.ai_lite && (
+                <span className="ml-1 text-gray-500">ⓘ sampled</span>
+              )}
+            </span>
+            {event.bot_category && event.event_class === 'crawler' && (
+              <span className={`px-2 py-1 text-xs rounded-full border ${getBotCategoryColor(event.bot_category)}`}>
+                {getBotCategoryLabel(event.bot_category)}
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="py-3 pr-4">
+          {event.source_name ? (
+            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+              {event.source_name}
+            </span>
+          ) : (
+            <span className="text-gray-400">—</span>
+          )}
+        </td>
+        <td className="py-3 pr-4">
+          {event.url ? (
+            <a
+              href={event.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 max-w-xs"
+            >
+              <span className="truncate">{truncateUrl(event.url)}</span>
+              <ExternalLink className="h-3 w-3 flex-shrink-0" />
+            </a>
+          ) : (
+            <span className="text-gray-400">—</span>
+          )}
+        </td>
+        <td className="py-3 pr-4 relative">
+          {event.metadata_preview && Object.keys(event.metadata_preview).length > 0 ? (
+            <button
+              onClick={() => setMetadataPopover({ id: event.id, metadata: event.metadata_preview })}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          ) : (
+            <span className="text-gray-400">—</span>
+          )}
+          {renderMetadataPopover(event)}
+        </td>
+      </tr>
+
+      {open && (
+        <tr className="bg-gray-50/50">
+          <td colSpan={7}>
+            {loading && <div className="p-4 text-sm text-gray-500">Loading classification details...</div>}
+
+            {detail && (
+              <div className="p-4 grid gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Classification</div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600">Class:</span>
+                        <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(detail.classification.class)}`}>
+                          {getTrafficClassLabel(detail.classification.class)}
+                        </span>
+                      </div>
+                      {detail.classification.aiSourceSlug && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600">AI Source:</span>
+                          <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                            {detail.classification.aiSourceSlug}
+                          </span>
+                        </div>
+                      )}
+                      {detail.classification.botCategory && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600">Bot Category:</span>
+                          <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                            {detail.classification.botCategory}
+                          </span>
+                        </div>
+                      )}
+                      {detail.classification.referralChain && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600">Referral Chain:</span>
+                          <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                            {detail.classification.referralChain}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Rule Trace</div>
+                    <div className="space-y-2">
+                      <div className="text-xs">
+                        <span className="text-gray-600">Matched Rule:</span>
+                        <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded text-xs">
+                          {detail.debug?.matchedRule || '—'}
+                        </code>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Precedence: {detail.debug?.precedenceOrder?.join(' > ')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Signals</div>
+                    <ul className="space-y-1">
+                      {(detail.debug?.signals || []).map((signal: string, i: number) => (
+                        <li key={i} className="text-xs text-gray-600">
+                          • {signal}
+                        </li>
+                      ))}
+                      {(!detail.debug?.signals || detail.debug.signals.length === 0) && (
+                        <li className="text-xs text-gray-400">No signals recorded</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw Inputs</div>
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <span className="text-gray-600">Referrer:</span>
+                        <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
+                          {detail.referrer || '—'}
+                        </code>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">User Agent:</span>
+                        <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded max-w-xs truncate block">
+                          {detail.user_agent || '—'}
+                        </code>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">CF Bot Verified:</span>
+                        <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
+                          {String(detail.debug?.cfBot || false)}
+                        </code>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="text-xs uppercase text-gray-500 font-medium">Raw JSON</div>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(JSON.stringify(detail, null, 2))}
+                      className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded border"
+                    >
+                      <Copy size={12} className="inline mr-1" />
+                      Copy
+                    </button>
+                  </div>
+                  <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
+                    {JSON.stringify(detail, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 export default function Events() {
   const { project } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -127,6 +355,10 @@ export default function Events() {
   const [includeBaseline, setIncludeBaseline] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [includeTraining, setIncludeTraining] = useState(false);
+
+  // Debug mode state
+  const [debugMode, setDebugMode] = useState(false);
+  const [showClassificationDetails, setShowClassificationDetails] = useState(false);
 
   // URL params and filters
   const window = searchParams.get("window") || getStoredWindow() || "24h";
@@ -186,6 +418,20 @@ export default function Events() {
     if (project?.id) {
       setIncludeTrainingPref(project.id, checked);
     }
+  }
+
+  // Calculate correct % AI-Influenced with breakout counts
+  function computeAIInfluencedPercent(summary: EventsSummary, includeTraining: boolean) {
+    if (!summary) return { percent: 0, humanViaAI: 0, aiTrainingBots: 0 };
+    
+    const humanViaAI = summary.by_class.find(c => c.class === 'human_via_ai')?.count || 0;
+    const aiTrainingBots = includeTraining ? (summary.by_class.find(c => c.class === 'crawler')?.count || 0) : 0;
+    
+    const numerator = humanViaAI + aiTrainingBots;
+    const denominator = Math.max(1, summary.totals.events);
+    const percent = Math.round((numerator / denominator) * 1000) / 10; // 1 decimal
+    
+    return { percent, humanViaAI, aiTrainingBots };
   }
 
   // API calls
@@ -370,7 +616,7 @@ export default function Events() {
     switch (className) {
       case "direct_human": return "Direct Human";
       case "human_via_ai": return "Human via AI";
-              case "crawler": return "Crawler";
+      case "crawler": return "Crawler";
       case "search": return "Search";
       case "unknown": return "Unknown";
       default: return className;
@@ -594,6 +840,33 @@ export default function Events() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Debug Mode Toggle (Admin only) */}
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={debugMode}
+                  onChange={(e) => setDebugMode(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Debug Mode
+              </label>
+              <div className="relative group">
+                <Info className="h-3 w-3 text-gray-400 cursor-help" />
+                <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  Auto-expand all rows and show raw classification data
+                </div>
+              </div>
+            </div>
+
+            {/* Classification Details Button */}
+            <button
+              onClick={() => setShowClassificationDetails(true)}
+              className="px-3 py-1 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-300"
+            >
+              Show Classification Details
+            </button>
+
             {/* AI-Lite Baseline Toggle */}
             {summary?.ai_lite && (
               <div className="flex items-center gap-2">
@@ -692,7 +965,7 @@ export default function Events() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">🤖</div>
-                                        <div className="text-gray-600">Crawler</div>
+                <div className="text-gray-600">Crawler</div>
                 <div className="text-xs text-gray-500">Cloudflare verified bots</div>
                 <div className="text-xs text-gray-400 mt-1">1st Priority</div>
               </div>
@@ -814,13 +1087,30 @@ export default function Events() {
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-500">% AI-Influenced</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {formatPercentage(summary.totals.ai_influenced, summary.totals.events)}
+                      {(() => {
+                        const { percent, humanViaAI, aiTrainingBots } = computeAIInfluencedPercent(summary, includeTraining);
+                        return `${percent}%`;
+                      })()}
                       {includeTraining && (
                         <span className="ml-2 text-sm text-blue-600 font-normal">
                           + AI training
                         </span>
                       )}
                     </p>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Human via AI: {(() => {
+                        const { humanViaAI } = computeAIInfluencedPercent(summary, includeTraining);
+                        return humanViaAI;
+                      })()}
+                      {includeTraining && (
+                        <>
+                          {(() => {
+                            const { aiTrainingBots } = computeAIInfluencedPercent(summary, includeTraining);
+                            return ` + AI Training: ${aiTrainingBots}`;
+                          })()}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1072,6 +1362,35 @@ export default function Events() {
                 />
               </div>
             </div>
+
+            {/* Trust Cues - Show breakdown that equals Total Events */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
+              <div className="text-xs text-gray-600 mb-2 font-medium">Traffic Breakdown (must equal Total Events)</div>
+              <div className="flex flex-wrap gap-3 text-sm">
+                {summary.by_class.map((cls) => {
+                  const isAIClass = ['human_via_ai', 'crawler', 'citation'].includes(cls.class);
+                  const isBaselineClass = ['direct_human', 'search'].includes(cls.class);
+                  const showClass = !summary.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
+                  
+                  if (!showClass) return null;
+                  
+                  return (
+                    <div key={cls.class} className="flex items-center gap-1">
+                      <span className={`w-3 h-3 rounded-full ${getTrafficClassColor(cls.class).replace('bg-', 'bg-').split(' ')[0]}`}></span>
+                      <span className="text-gray-700">{getTrafficClassLabel(cls.class)}:</span>
+                      <span className="font-medium">{formatNumber(cls.count)}</span>
+                      {isBaselineClass && summary.ai_lite && (
+                        <span className="text-xs text-gray-500">(sampled)</span>
+                      )}
+                    </div>
+                  );
+                })}
+                <div className="flex items-center gap-1 ml-auto">
+                  <span className="text-gray-700 font-medium">Total:</span>
+                  <span className="font-bold">{formatNumber(summary.totals.events)}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1102,6 +1421,7 @@ export default function Events() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-gray-500 border-b">
+                        <th className="py-3 pr-4 w-6"></th>
                         <th className="py-3 pr-4">Time</th>
                         <th className="py-3 pr-4">Event</th>
                         <th className="py-3 pr-4">Traffic Class</th>
@@ -1112,101 +1432,12 @@ export default function Events() {
                     </thead>
                     <tbody>
                       {recent.items.map((item) => (
-                        <tr key={item.id} className="border-b hover:bg-gray-50">
-                          <td className="py-3 pr-4">
-                            <span
-                              className="text-gray-600 cursor-help"
-                              title={new Date(item.occurred_at).toLocaleString()}
-                            >
-                              {formatRelativeTime(item.occurred_at)}
-                            </span>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <span className={`px-2 py-1 text-xs rounded-full ${getEventTypeColor(item.event_type)}`}>
-                              {item.event_type}
-                            </span>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(item.event_class)}`}>
-                                {getTrafficClassLabel(item.event_class)}
-                                {['direct_human', 'search'].includes(item.event_class) && summary?.ai_lite && (
-                                  <span className="ml-1 text-gray-500">ⓘ sampled</span>
-                                )}
-                              </span>
-                              {item.bot_category && item.event_class === 'crawler' && (
-                                <span className={`px-2 py-1 text-xs rounded-full border ${getBotCategoryColor(item.bot_category)}`}>
-                                  {getBotCategoryLabel(item.bot_category)}
-                                </span>
-                              )}
-                              {item.event_class !== 'unknown' && (
-                                <div className="relative group">
-                                  <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                                    {getTrafficClassDescription(item.event_class)}
-                                    {item.bot_category && item.event_class === 'crawler' && (
-                                      <div className="mt-1 pt-1 border-t border-gray-700">
-                                        <strong>Bot Category:</strong> {getBotCategoryLabel(item.bot_category)}
-                                      </div>
-                                    )}
-                                    {item.classification_reason && (
-                                      <div className="mt-1 pt-1 border-t border-gray-700">
-                                        <strong>Reason:</strong> {item.classification_reason}
-                                      </div>
-                                    )}
-                                    {item.classification_confidence && (
-                                      <div className="mt-1">
-                                        <strong>Confidence:</strong> {(item.classification_confidence * 100).toFixed(0)}%
-                                      </div>
-                                    )}
-                                    {item.debug && item.debug.length > 0 && (
-                                      <div className="mt-1 pt-1 border-t border-gray-700">
-                                        <strong>Debug:</strong> {item.debug.join(', ')}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 pr-4">
-                            {item.source_name ? (
-                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                                {item.source_name}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 pr-4">
-                            {item.url ? (
-                              <a
-                                href={item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 max-w-xs"
-                              >
-                                <span className="truncate">{truncateUrl(item.url)}</span>
-                                <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                              </a>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 pr-4 relative">
-                            {item.metadata_preview && Object.keys(item.metadata_preview).length > 0 ? (
-                              <button
-                                onClick={() => setMetadataPopover({ id: item.id, metadata: item.metadata_preview })}
-                                className="text-gray-400 hover:text-gray-600"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </button>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                            {renderMetadataPopover(item)}
-                          </td>
-                        </tr>
+                        <EventRow
+                          key={item.id}
+                          event={item}
+                          debugMode={debugMode}
+                          summary={summary}
+                        />
                       ))}
                     </tbody>
                   </table>
@@ -1316,6 +1547,72 @@ export default function Events() {
             >
               Recheck
             </button>
+          </div>
+        )}
+
+        {/* Classification Details Modal */}
+        {showClassificationDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900">Classification Details</h2>
+                  <button
+                    onClick={() => setShowClassificationDetails(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                <div className="prose prose-sm max-w-none">
+                  <h4 className="text-lg font-medium text-gray-900 mb-3">Precedence Order</h4>
+                  <p className="text-gray-700 mb-4">
+                    <code className="px-2 py-1 bg-gray-100 rounded text-sm">
+                      Crawler → Human via AI → Search → Direct Human
+                    </code>
+                  </p>
+                  
+                  <h4 className="text-lg font-medium text-gray-900 mb-3">AI Sources (examples)</h4>
+                  <ul className="space-y-2 mb-4">
+                    <li className="flex items-center gap-2">
+                      <code className="px-2 py-1 bg-gray-100 rounded text-sm">chat.openai.com</code>
+                      <span className="text-gray-500">→</span>
+                      <strong className="text-blue-600">chatgpt</strong>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <code className="px-2 py-1 bg-gray-100 rounded text-sm">gemini.google.com</code>
+                      <span className="text-gray-500">→</span>
+                      <strong className="text-blue-600">google_gemini</strong>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <code className="px-2 py-1 bg-gray-100 rounded text-sm">www.bing.com/chat</code>
+                      <span className="text-gray-500">→</span>
+                      <strong className="text-blue-600">microsoft_copilot</strong>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <code className="px-2 py-1 bg-gray-100 rounded text-sm">www.perplexity.ai</code>
+                      <span className="text-gray-500">→</span>
+                      <strong className="text-blue-600">perplexity</strong>
+                    </li>
+                  </ul>
+                  
+                  <h4 className="text-lg font-medium text-gray-900 mb-3">Bot Categories</h4>
+                  <ul className="space-y-2 mb-4">
+                    <li><strong className="text-orange-600">AI Training</strong> (e.g., GPTBot, PerplexityBot)</li>
+                    <li><strong className="text-orange-600">Search Crawler</strong> (Googlebot, bingbot)</li>
+                    <li><strong className="text-orange-600">Preview Bot</strong> (Slack/Discord unfurlers)</li>
+                    <li><strong className="text-orange-600">Uptime Monitor</strong> (Pingdom, UptimeRobot)</li>
+                    <li><strong className="text-orange-600">SEO Tool</strong> (Ahrefs, SEMrush)</li>
+                  </ul>
+                  
+                  <p className="text-gray-700">
+                    Each event's expanded view shows the matched rule and signals used by the classifier.
+                    Use Debug Mode to automatically expand all rows and inspect classification details.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
