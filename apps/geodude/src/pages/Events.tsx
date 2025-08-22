@@ -224,7 +224,7 @@ export default function Events() {
         pageSize: "50"
       });
 
-      if (classFilter) params.append("trafficClass", classFilter);
+      if (classFilter) params.append("class", classFilter);
       if (sourceFilter) params.append("source", sourceFilter);
       if (botCategoryFilter) params.append("botCategory", botCategoryFilter);
       if (searchQuery) params.append("q", searchQuery);
@@ -366,7 +366,7 @@ export default function Events() {
     switch (className) {
       case "direct_human": return "Direct Human";
       case "human_via_ai": return "Human via AI";
-      case "crawler": return "AI Agent Crawl";
+              case "crawler": return "Crawler";
       case "search": return "Search";
       case "unknown": return "Unknown";
       default: return className;
@@ -688,7 +688,7 @@ export default function Events() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="text-center">
                 <div className="text-2xl font-bold text-orange-600">🤖</div>
-                <div className="text-gray-600">AI Agent Crawl</div>
+                                        <div className="text-gray-600">Crawler</div>
                 <div className="text-xs text-gray-500">Cloudflare verified bots</div>
                 <div className="text-xs text-gray-400 mt-1">1st Priority</div>
               </div>
@@ -1249,7 +1249,7 @@ export default function Events() {
                 <p><strong>Debug Trail:</strong> Hover over ℹ️ icons to see classification reasoning for each event.</p>
                 <div className="mt-2 p-2 bg-white border border-gray-200 rounded text-xs">
                   <strong>Example classifications:</strong><br />
-                  • <code>cf.verifiedBotCategory=Search Engine Crawler</code> → AI Agent Crawl (1st priority)<br />
+                  • <code>cf.verifiedBotCategory=Search Engine Crawler</code> → Crawler (1st priority)<br />
                   • <code>ref:chat.openai.com</code> → Human via AI (2nd priority)<br />
                   • <code>ref:www.google.com</code> → Search (3rd priority)<br />
                   • <code>no referrer</code> → Direct Human (4th priority)

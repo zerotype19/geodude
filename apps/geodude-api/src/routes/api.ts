@@ -438,7 +438,7 @@ export async function handleApiRoutes(
                         SELECT 
                             ts_hour,
                             SUM(events_count) as total_count,
-                            SUM(CASE WHEN class IN ('human_via_ai', 'ai_agent_crawl', 'citation') THEN events_count ELSE 0 END) as ai_count,
+                            SUM(CASE WHEN class IN ('human_via_ai', 'crawler', 'citation') THEN events_count ELSE 0 END) as ai_count,
                             SUM(CASE WHEN class IN ('direct_human', 'search') THEN events_count ELSE 0 END) as baseline_count
                         FROM traffic_rollup_hourly
                         WHERE project_id = ? AND ts_hour >= ? AND ts_hour <= ?
@@ -800,20 +800,20 @@ export async function handleApiRoutes(
                     FROM interaction_events ie
                     WHERE ie.project_id = ? AND ie.content_id = ? 
                       AND ie.occurred_at >= datetime('now','-1 day')
-                      AND ie.class IN ('human_via_ai', 'ai_agent_crawl')
+                      AND ie.class IN ('human_via_ai', 'crawler')
                 `).bind(project_id, row.id).first<any>();
 
                 // Get AI referrals breakdown by source for last 24h
                 const bySourceResult = await env.OPTIVIEW_DB.prepare(`
                     SELECT 
                         s.slug,
-                        s.name,
+                    s.name,
                         COUNT(*) as count
                     FROM interaction_events ie
                     JOIN ai_sources s ON s.id = ie.ai_source_id
                     WHERE ie.project_id = ? AND ie.content_id = ? 
                       AND ie.occurred_at >= datetime('now','-1 day')
-                      AND ie.class IN ('human_via_ai', 'ai_agent_crawl')
+                      AND ie.class IN ('human_via_ai', 'crawler')
                       AND ie.ai_source_id IS NOT NULL
                     GROUP BY ie.ai_source_id, s.slug, s.name
                     ORDER BY count DESC

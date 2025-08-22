@@ -59,7 +59,7 @@ const Referrals: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
   const [total, setTotal] = useState(0);
-  
+
   // Tab state
   const [activeTab, setActiveTab] = useState<'assistants' | 'search' | 'crawlers'>('assistants');
 
@@ -102,12 +102,12 @@ const Referrals: React.FC = () => {
     if (project?.id) {
       setReferralsTab(project.id, tab);
     }
-    
+
     // Update URL params
     const newParams = new URLSearchParams(searchParams);
     newParams.set('tab', tab);
     setSearchParams(newParams);
-    
+
     // Reset page when changing tabs
     setPage(1);
   };
@@ -116,7 +116,7 @@ const Referrals: React.FC = () => {
     if (!project?.id) return;
     try {
       const summaryUrl = `${API_BASE}/api/referrals/summary?project_id=${project.id}&window=${window}`;
-      
+
       const response = await fetch(summaryUrl, FETCH_OPTS);
       if (!response.ok) throw new Error('Failed to fetch summary');
       const data = await response.json();
@@ -142,7 +142,7 @@ const Referrals: React.FC = () => {
       if (searchQuery) params.append('q', searchQuery);
 
       const apiUrl = `${API_BASE}/api/referrals?${params}`;
-      
+
       const response = await fetch(apiUrl, FETCH_OPTS);
       if (!response.ok) throw new Error('Failed to fetch referrals');
       const data = await response.json();
@@ -240,7 +240,7 @@ const Referrals: React.FC = () => {
 
   const getTrafficClassDescription = (eventClass: string) => {
     switch (eventClass) {
-      case 'ai_agent_crawl': return 'Cloudflare-verified AI bots and crawlers (1st priority)';
+      case 'crawler': return 'Cloudflare-verified AI bots and crawlers (1st priority)';
       case 'human_via_ai': return 'Human traffic from AI assistant referrers (2nd priority)';
       case 'search': return 'Traditional search engine referrers (3rd priority)';
       case 'direct_human': return 'Direct visits or unknown referrers (4th priority)';
@@ -327,31 +327,28 @@ const Referrals: React.FC = () => {
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => handleTabChange('assistants')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'assistants'
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'assistants'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               AI Assistants
             </button>
             <button
               onClick={() => handleTabChange('search')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'search'
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'search'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               Search Engines
             </button>
             <button
               onClick={() => handleTabChange('crawlers')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'crawlers'
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'crawlers'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               Crawlers
             </button>
@@ -369,8 +366,8 @@ const Referrals: React.FC = () => {
                   key={w}
                   onClick={() => handleWindowChange(w)}
                   className={`px-3 py-1 text-sm rounded-md transition-colors ${window === w
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                     }`}
                 >
                   {w}

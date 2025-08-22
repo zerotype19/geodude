@@ -36,7 +36,7 @@ interface ContentDetail {
 // Traffic classification helper functions
 function getTrafficClassColor(className: string): string {
   switch (className) {
-    case "ai_agent_crawl": return "bg-orange-100 text-orange-800 border-orange-200";
+    case "crawler": return "bg-orange-100 text-orange-800 border-orange-200";
     case "human_via_ai": return "bg-blue-100 text-blue-800 border-blue-200";
     case "search": return "bg-green-100 text-green-800 border-green-200";
     case "direct_human": return "bg-gray-100 text-gray-800 border-gray-200";
@@ -59,7 +59,7 @@ function getTrafficClassDescription(className: string): string {
   switch (className) {
     case "direct_human": return "No referrer, direct visits";
     case "human_via_ai": return "AI assistant referrers (ChatGPT, Claude, etc.)";
-    case "ai_agent_crawl": return "Cloudflare verified bots and crawlers";
+    case "crawler": return "Cloudflare verified bots and crawlers";
     case "search": return "Search engine referrers (Google, Bing, etc.)";
     case "unknown": return "Unclassified traffic";
     default: return "Traffic classification";
@@ -503,8 +503,8 @@ const Content: React.FC = () => {
                 <button
                   onClick={() => setFilters(prev => ({ ...prev, aiOnly: !prev.aiOnly, page: 1 }))}
                   className={`px-3 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center space-x-2 ${filters.aiOnly
-                      ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700 border border-blue-600'
-                      : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 hover:border-gray-300'
+                    ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700 border border-blue-600'
+                    : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 hover:border-gray-300'
                     }`}
                 >
                   <div className="relative">
@@ -722,22 +722,22 @@ const Content: React.FC = () => {
                                         </div>
                                       </div>
 
-                                                                             {/* AI Sources Breakdown */}
-                                       {asset.by_source_24h.length > 0 && (
-                                         <div className="mb-3">
-                                           <h5 className="text-xs font-medium text-gray-700 mb-2">AI Sources (24h)</h5>
-                                           <div className="flex flex-wrap gap-2">
-                                             {asset.by_source_24h.map((source) => (
-                                               <span
-                                                 key={source.slug}
-                                                 className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
-                                               >
-                                                 {source.slug}: {source.events}
-                                               </span>
-                                             ))}
-                                           </div>
-                                         </div>
-                                       )}
+                                      {/* AI Sources Breakdown */}
+                                      {asset.by_source_24h.length > 0 && (
+                                        <div className="mb-3">
+                                          <h5 className="text-xs font-medium text-gray-700 mb-2">AI Sources (24h)</h5>
+                                          <div className="flex flex-wrap gap-2">
+                                            {asset.by_source_24h.map((source) => (
+                                              <span
+                                                key={source.slug}
+                                                className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
+                                              >
+                                                {source.slug}: {source.events}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
 
                                       {/* Recent Events (if loaded) */}
                                       {assetDetails[asset.id] && (
