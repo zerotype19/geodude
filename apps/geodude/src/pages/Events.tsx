@@ -85,6 +85,7 @@ interface EventItem {
 interface EventsSummary {
   totals: { events: number; ai_influenced: number; active_sources: number };
   by_class: Array<{ class: string; count: number }>;
+  by_bot_category?: Array<{ category: string; count: number }>;
   by_source_top: Array<{ ai_source_id: number; slug: string; name: string; count: number }>;
   timeseries: Array<{ ts: string; count: number }>;
   // AI-Lite fields
