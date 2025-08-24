@@ -1403,13 +1403,27 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          const orgData = await d1.prepare(`
-            SELECT o.id, o.name, o.created_ts 
-            FROM organization o
-            JOIN org_member om ON o.id = om.org_id
-            WHERE om.user_id = ?
-            LIMIT 1
-          `).bind(sessionData.user_id).first();
+          // First try to get the organization from session context
+          let orgData = null;
+          if (sessionData.current_org_id) {
+            orgData = await d1.prepare(`
+              SELECT o.id, o.name, o.created_ts 
+              FROM organization o
+              JOIN org_member om ON o.id = om.org_id
+              WHERE om.user_id = ? AND o.id = ?
+            `).bind(sessionData.user_id, sessionData.current_org_id).first();
+          }
+          
+          // Fallback to first available organization if no context or context is invalid
+          if (!orgData) {
+            orgData = await d1.prepare(`
+              SELECT o.id, o.name, o.created_ts 
+              FROM organization o
+              JOIN org_member om ON o.id = om.org_id
+              WHERE om.user_id = ?
+              LIMIT 1
+            `).bind(sessionData.user_id).first();
+          }
 
           if (!orgData) {
             const response = new Response(JSON.stringify({ error: "No organization found" }), {
@@ -8706,8 +8720,13 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          // Update session with new context (we'll store this in a separate table)
-          // For now, we'll return success and let the frontend handle context switching
+          // Update session with new context in the session table
+          await d1.prepare(`
+            UPDATE session 
+            SET current_org_id = ?, current_project_id = ?
+            WHERE session_id = ?
+          `).bind(organization_id, project_id, sessionId).run();
+
           const response = new Response(JSON.stringify({
             success: true,
             message: "Context switch successful",

@@ -558,6 +558,47 @@ export async function handleAdminRoutes(
       }
     }
 
+    // Quick schema check endpoint
+    if (pathname === '/admin/debug/schema' && request.method === 'GET') {
+      if (!checkAdminAuth(request)) {
+        return new Response(JSON.stringify({ error: 'Admin authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      try {
+        // Check session table schema
+        const sessionSchema = await env.OPTIVIEW_DB.prepare(`
+          PRAGMA table_info(session)
+        `).all();
+
+        // Check if session_context table exists
+        const sessionContextExists = await env.OPTIVIEW_DB.prepare(`
+          SELECT name FROM sqlite_master WHERE type='table' AND name='session_context'
+        `).first();
+
+        return new Response(JSON.stringify({
+          session_table: sessionSchema.results || [],
+          session_context_table: sessionContextExists ? 'exists' : 'not_found',
+          timestamp: new Date().toISOString()
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+
+      } catch (error) {
+        console.error('Schema check failed:', error);
+        return new Response(JSON.stringify({
+          error: 'Schema check failed',
+          details: error.message
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // Debug classification endpoint
     if (pathname === '/admin/debug/classify' && request.method === 'GET') {
       if (!checkAdminAuth(request)) {
