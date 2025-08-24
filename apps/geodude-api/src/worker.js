@@ -4869,6 +4869,56 @@ export default {
         }
       }
 
+      // 7.0.5) Events test endpoint (temporary for debugging)
+      if (url.pathname === "/api/events/test" && request.method === "GET") {
+        try {
+          const projectId = url.searchParams.get("project_id");
+          const limit = parseInt(url.searchParams.get("limit") || "5");
+          
+          if (!projectId) {
+            const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Test query
+          const events = await d1.prepare(`
+            SELECT 
+              ie.id,
+              ie.project_id,
+              ie.event_type,
+              ie.occurred_at
+            FROM interaction_events ie
+            WHERE ie.project_id = ?
+            ORDER BY ie.occurred_at DESC
+            LIMIT ?
+          `).bind(projectId, limit).all();
+
+          const response = new Response(JSON.stringify({
+            projectId,
+            limit,
+            events,
+            eventsType: typeof events,
+            eventsKeys: Object.keys(events || {}),
+            hasResults: !!events.results,
+            resultsLength: events.results?.length || 0,
+            firstEvent: events.results?.[0]
+          }, null, 2), {
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (e) {
+          console.error("Events test error:", e);
+          const response = new Response(JSON.stringify({ error: "Test failed", details: e.message }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // 7.1) Events CSV export endpoint
       if (url.pathname === "/api/events/export.csv" && request.method === "GET") {
         try {
