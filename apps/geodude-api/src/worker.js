@@ -1092,12 +1092,18 @@ export default {
 
           // Extract domain from frontend URL for cookie
           const frontendDomain = new URL(frontendUrl).hostname;
+          
+          // Set cookie domain to parent domain so it's available to all subdomains
+          const cookieDomain = frontendDomain.startsWith('www.') 
+            ? frontendDomain.substring(4) 
+            : frontendDomain;
+          const cookieDomainWithDot = `.${cookieDomain}`;
 
           const response = new Response("", {
             status: 302,
             headers: {
               "Location": redirectUrl,
-              "Set-Cookie": `optiview_session=${sessionId}; Domain=${frontendDomain}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
+              "Set-Cookie": `optiview_session=${sessionId}; Domain=${cookieDomainWithDot}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${parseInt(env.SESSION_TTL_HOURS || "720") * 3600}`
             }
           });
 
@@ -1392,7 +1398,7 @@ export default {
 
           const sessionId = sessionMatch[1];
           const sessionData = await d1.prepare(`
-            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            SELECT user_id, current_org_id, current_project_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
           if (!sessionData) {
@@ -1471,7 +1477,7 @@ export default {
 
           const sessionId = sessionMatch[1];
           const sessionData = await d1.prepare(`
-            SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            SELECT user_id, current_org_id, current_project_id FROM session WHERE session_id = ? AND expires_at > ?
           `).bind(sessionId, new Date().toISOString()).first();
 
           if (!sessionData) {
@@ -1482,15 +1488,30 @@ export default {
             return addCorsHeaders(response, request.headers.get("origin"));
           }
 
-          const projectData = await d1.prepare(`
-            SELECT p.id, p.name, p.slug, p.org_id, p.created_ts
-            FROM project p
-            JOIN organization o ON p.org_id = o.id
-            JOIN org_member om ON o.id = om.org_id
-            WHERE om.user_id = ?
-            ORDER BY p.created_ts DESC
-            LIMIT 1
-          `).bind(sessionData.user_id).first();
+          // First try to get the project from session context
+          let projectData = null;
+          if (sessionData.current_project_id) {
+            projectData = await d1.prepare(`
+              SELECT p.id, p.name, p.slug, p.org_id, p.created_ts
+              FROM project p
+              JOIN organization o ON p.org_id = o.id
+              JOIN org_member om ON o.id = om.org_id
+              WHERE om.user_id = ? AND p.id = ?
+            `).bind(sessionData.user_id, sessionData.current_project_id).first();
+          }
+          
+          // Fallback to first available project if no context or context is invalid
+          if (!projectData) {
+            projectData = await d1.prepare(`
+              SELECT p.id, p.name, p.slug, p.org_id, p.created_ts
+              FROM project p
+              JOIN organization o ON p.org_id = o.id
+              JOIN org_member om ON o.id = om.org_id
+              WHERE om.user_id = ?
+              ORDER BY p.created_ts DESC
+              LIMIT 1
+            `).bind(sessionData.user_id).first();
+          }
 
           if (!projectData) {
             const response = new Response(JSON.stringify({ error: "No project found" }), {
