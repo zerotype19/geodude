@@ -4869,6 +4869,86 @@ export default {
         }
       }
 
+      // 7.1) Events CSV export endpoint
+      if (url.pathname === "/api/events/export.csv" && request.method === "GET") {
+        try {
+          const projectId = url.searchParams.get("project_id");
+          const limit = parseInt(url.searchParams.get("limit") || "1000");
+          
+          if (!projectId) {
+            const response = new Response("error: project_id is required", {
+              status: 400,
+              headers: { "Content-Type": "text/csv" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Validate limit
+          if (limit < 1 || limit > 5000) {
+            const response = new Response("error: limit must be between 1 and 5000", {
+              status: 400,
+              headers: { "Content-Type": "text/csv" }
+            });
+            return addCorsHeaders(response, origin);
+          }
+
+          // Get events for CSV export
+          const events = await d1.prepare(`
+            SELECT 
+              ie.id,
+              ie.project_id,
+              ie.property_id,
+              ie.content_id,
+              ie.ai_source_id,
+              ie.event_type,
+              ie.metadata,
+              ie.occurred_at,
+              ie.sampled,
+              ie.class,
+              ie.bot_category
+            FROM interaction_events ie
+            WHERE ie.project_id = ?
+            ORDER BY ie.occurred_at DESC
+            LIMIT ?
+          `).bind(projectId, limit).all();
+
+          // Create CSV content
+          const csvHeader = "id,project_id,property_id,content_id,ai_source_id,event_type,metadata,occurred_at,sampled,class,bot_category\n";
+          const csvRows = (events.results || []).map(event => {
+            return [
+              event.id,
+              event.project_id,
+              event.property_id || '',
+              event.content_id || '',
+              event.ai_source_id || '',
+              event.event_type,
+              (event.metadata || '').replace(/"/g, '""'), // Escape quotes in metadata
+              event.occurred_at,
+              event.sampled,
+              event.class || '',
+              event.bot_category || ''
+            ].join(',');
+          }).join('\n');
+
+          const csvContent = csvHeader + csvRows;
+
+          const response = new Response(csvContent, {
+            headers: { 
+              "Content-Type": "text/csv",
+              "Content-Disposition": `attachment; filename="events-${projectId}-${new Date().toISOString().split('T')[0]}.csv"`
+            }
+          });
+          return addCorsHeaders(response, origin);
+        } catch (e) {
+          console.error("Events CSV export error:", e);
+          const response = new Response("error: Failed to export events", {
+            status: 500,
+            headers: { "Content-Type": "text/csv" }
+          });
+          return addCorsHeaders(response, origin);
+        }
+      }
+
       // 7) Events summary endpoint
       if (url.pathname === "/api/events/summary" && request.method === "GET") {
         try {

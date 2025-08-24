@@ -14,7 +14,8 @@ import {
   AlertCircle,
   Info,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Download
 } from "lucide-react";
 // Simple SVG chart component instead of recharts
 function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: string) => string }) {
@@ -118,10 +119,10 @@ export default function Events() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // EventRow component for expandable rows (defined inside Events component for access to utilities)
-  function EventRow({ event, debugMode, summary }: { 
-    event: EventItem; 
-    debugMode: boolean; 
-    summary: EventsSummary | null; 
+  function EventRow({ event, debugMode, summary }: {
+    event: EventItem;
+    debugMode: boolean;
+    summary: EventsSummary | null;
   }) {
     const [open, setOpen] = useState<boolean>(!!debugMode);
     const [loading, setLoading] = useState(false);
@@ -151,7 +152,7 @@ export default function Events() {
         <tr className="border-b hover:bg-gray-50">
           <td className="py-3 pr-4 w-6">
             <button onClick={toggle} className="p-1 hover:bg-gray-100 rounded">
-              {open ? <ChevronDown size={18}/> : <ChevronRight size={18}/>}
+              {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
             </button>
           </td>
           <td className="py-3 pr-4">
@@ -379,9 +380,10 @@ export default function Events() {
   // Debug mode state
   const [debugMode, setDebugMode] = useState(false);
   const [showClassificationDetails, setShowClassificationDetails] = useState(false);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
 
   // URL params and filters
-  const window = searchParams.get("window") || getStoredWindow() || "24h";
+  const timeWindow = searchParams.get("window") || getStoredWindow() || "24h";
   const classFilter = searchParams.get("class") || "";
   const sourceFilter = searchParams.get("source") || "";
   const botCategoryFilter = searchParams.get("bot_category") || "";
@@ -443,19 +445,19 @@ export default function Events() {
   // Calculate correct % AI-Influenced with breakout counts
   function computeAIInfluencedPercent(summary: EventsSummary, includeTraining: boolean) {
     if (!summary) return { percent: 0, humanViaAI: 0, aiTrainingBots: 0 };
-    
+
     const humanViaAI = summary.by_class.find(c => c.class === 'human_via_ai')?.count || 0;
-    
+
     // Only count AI training bots, not all crawlers (search crawlers, preview bots, etc.)
     let aiTrainingBots = 0;
     if (includeTraining && summary.by_bot_category) {
       aiTrainingBots = summary.by_bot_category.find(c => c.category === 'ai_training')?.count || 0;
     }
-    
+
     const numerator = humanViaAI + aiTrainingBots;
     const denominator = Math.max(1, summary.totals.events);
     const percent = Math.round((numerator / denominator) * 1000) / 10; // 1 decimal
-    
+
     return { percent, humanViaAI, aiTrainingBots };
   }
 
@@ -465,7 +467,7 @@ export default function Events() {
 
     setSummaryLoading(true);
     try {
-      const params = new URLSearchParams({ project_id: project.id, window });
+      const params = new URLSearchParams({ project_id: project.id, window: timeWindow });
       const response = await fetch(`${API_BASE}/api/events/summary?${params}`, FETCH_OPTS);
 
       if (response.ok) {
@@ -490,7 +492,7 @@ export default function Events() {
     try {
       const params = new URLSearchParams({
         project_id: project.id,
-        window,
+        window: timeWindow,
         page: page.toString(),
         pageSize: "50"
       });
@@ -519,7 +521,7 @@ export default function Events() {
     if (!project?.id) return;
 
     try {
-      const params = new URLSearchParams({ project_id: project.id, window });
+      const params = new URLSearchParams({ project_id: project.id, window: timeWindow });
       const response = await fetch(`${API_BASE}/api/events/has-any?${params}`, FETCH_OPTS);
 
       if (response.ok) {
@@ -528,6 +530,39 @@ export default function Events() {
       }
     } catch (err) {
       console.error('Failed to fetch has-any:', err);
+    }
+  }
+
+  // CSV Export function
+  async function handleExportCSV(limit: number) {
+    if (!project?.id) return;
+
+    try {
+      setShowExportDropdown(false);
+
+      const params = new URLSearchParams({
+        project_id: project.id,
+        limit: limit.toString()
+      });
+
+      const response = await fetch(`${API_BASE}/api/events/export.csv?${params}`, FETCH_OPTS);
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `events-${project.id}-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } else {
+        throw new Error(`Export failed: ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Failed to export CSV:', err);
+      alert('Failed to export CSV. Please try again.');
     }
   }
 
@@ -574,13 +609,13 @@ export default function Events() {
           setLastUpdated(new Date());
         });
     }
-  }, [project?.id, window, classFilter, sourceFilter, botCategoryFilter, searchQuery, page]);
+  }, [project?.id, timeWindow, classFilter, sourceFilter, botCategoryFilter, searchQuery, page]);
 
   useEffect(() => {
-    if (window && window !== getStoredWindow()) {
-      setStoredWindow(window);
+    if (timeWindow && timeWindow !== getStoredWindow()) {
+      setStoredWindow(timeWindow);
     }
-  }, [window, project?.id]);
+  }, [timeWindow, project?.id]);
 
   // Set default AI-only filter for AI-Lite mode
   useEffect(() => {
@@ -721,8 +756,8 @@ export default function Events() {
 
   function formatChartTime(isoString: string): string {
     const date = new Date(isoString);
-    if (window === "15m") return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    if (window === "24h") return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    if (timeWindow === "15m") return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    if (timeWindow === "24h") return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
@@ -889,6 +924,55 @@ export default function Events() {
               Show Classification Details
             </button>
 
+            {/* CSV Export Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                className="px-3 py-1 text-sm text-gray-700 bg-blue-100 hover:bg-blue-200 rounded-md border border-blue-300 flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+                <ChevronDown className="h-4 w-4" />
+              </button>
+
+              {showExportDropdown && (
+                <>
+                  {/* Backdrop */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowExportDropdown(false)}
+                  />
+
+                  {/* Dropdown */}
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                    <div className="py-1">
+                      <button
+                        onClick={() => handleExportCSV(500)}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export 500 most recent
+                      </button>
+                      <button
+                        onClick={() => handleExportCSV(1000)}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export 1000 most recent
+                      </button>
+                      <button
+                        onClick={() => handleExportCSV(1500)}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export 1500 most recent
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* AI-Lite Baseline Toggle */}
             {summary?.ai_lite && (
               <div className="flex items-center gap-2">
@@ -918,7 +1002,7 @@ export default function Events() {
                 <button
                   key={w}
                   onClick={() => handleWindowChange(w)}
-                  className={`px-3 py-1 text-sm font-medium ${window === w
+                  className={`px-3 py-1 text-sm font-medium ${timeWindow === w
                     ? "bg-blue-600 text-white"
                     : "bg-white text-gray-700 hover:bg-gray-50"
                     } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
@@ -1391,9 +1475,9 @@ export default function Events() {
                   const isAIClass = ['human_via_ai', 'crawler', 'citation'].includes(cls.class);
                   const isBaselineClass = ['direct_human', 'search'].includes(cls.class);
                   const showClass = !summary.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
-                  
+
                   if (!showClass) return null;
-                  
+
                   return (
                     <div key={cls.class} className="flex items-center gap-1">
                       <span className={`w-3 h-3 rounded-full ${getTrafficClassColor(cls.class).replace('bg-', 'bg-').split(' ')[0]}`}></span>
@@ -1555,7 +1639,7 @@ export default function Events() {
                     ×
                   </button>
                 </div>
-                
+
                 <div className="prose prose-sm max-w-none">
                   <h4 className="text-lg font-medium text-gray-900 mb-3">Precedence Order</h4>
                   <p className="text-gray-700 mb-4">
@@ -1563,7 +1647,7 @@ export default function Events() {
                       Crawler → Human via AI → Search → Direct Human
                     </code>
                   </p>
-                  
+
                   <h4 className="text-lg font-medium text-gray-900 mb-3">AI Sources (examples)</h4>
                   <ul className="space-y-2 mb-4">
                     <li className="flex items-center gap-2">
@@ -1587,7 +1671,7 @@ export default function Events() {
                       <strong className="text-blue-600">perplexity</strong>
                     </li>
                   </ul>
-                  
+
                   <h4 className="text-lg font-medium text-gray-900 mb-3">Bot Categories</h4>
                   <ul className="space-y-2 mb-4">
                     <li><strong className="text-orange-600">AI Training</strong> (e.g., GPTBot, PerplexityBot)</li>
@@ -1596,7 +1680,7 @@ export default function Events() {
                     <li><strong className="text-orange-600">Uptime Monitor</strong> (Pingdom, UptimeRobot)</li>
                     <li><strong className="text-orange-600">SEO Tool</strong> (Ahrefs, SEMrush)</li>
                   </ul>
-                  
+
                   <p className="text-gray-700">
                     Each event's expanded view shows the matched rule and signals used by the classifier.
                     Use Debug Mode to automatically expand all rows and inspect classification details.
