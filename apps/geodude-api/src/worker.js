@@ -4911,6 +4911,44 @@ export default {
             ORDER BY ie.occurred_at DESC
             LIMIT ?
           `).bind(projectId, limit).all();
+          
+          // Alternative approach: try to get results directly
+          let eventData = [];
+          try {
+            if (events && events.results && Array.isArray(events.results)) {
+              eventData = events.results;
+            } else if (Array.isArray(events)) {
+              eventData = events;
+            } else {
+              // Try to access the data directly
+              const rawEvents = await d1.prepare(`
+                SELECT 
+                  ie.id,
+                  ie.project_id,
+                  ie.property_id,
+                  ie.content_id,
+                  ie.ai_source_id,
+                  ie.event_type,
+                  ie.metadata,
+                  ie.occurred_at,
+                  ie.sampled,
+                  ie.class,
+                  ie.bot_category
+                FROM interaction_events ie
+                WHERE ie.project_id = ?
+                ORDER BY ie.occurred_at DESC
+                LIMIT ?
+              `).bind(projectId, limit).all();
+              
+              if (rawEvents && rawEvents.results) {
+                eventData = rawEvents.results;
+              } else if (Array.isArray(rawEvents)) {
+                eventData = rawEvents;
+              }
+            }
+          } catch (fallbackError) {
+            console.error('Fallback query failed:', fallbackError);
+          }
 
           console.log('CSV Export Debug:', {
             projectId,
@@ -4926,16 +4964,7 @@ export default {
           // Create CSV content
           const csvHeader = "id,project_id,property_id,content_id,ai_source_id,event_type,metadata,occurred_at,sampled,class,bot_category\n";
 
-          // Handle different possible result structures
-          let eventData = [];
-          if (events.results && Array.isArray(events.results)) {
-            eventData = events.results;
-          } else if (Array.isArray(events)) {
-            eventData = events;
-          } else if (events && typeof events === 'object') {
-            // Try to find the data in different possible properties
-            eventData = events.data || events.rows || events.items || [];
-          }
+          // eventData is now set above with fallback logic
 
           console.log('Event Data Debug:', {
             eventDataLength: eventData.length,
