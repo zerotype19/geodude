@@ -1092,10 +1092,10 @@ export default {
 
           // Extract domain from frontend URL for cookie
           const frontendDomain = new URL(frontendUrl).hostname;
-          
+
           // Set cookie domain to parent domain so it's available to all subdomains
-          const cookieDomain = frontendDomain.startsWith('www.') 
-            ? frontendDomain.substring(4) 
+          const cookieDomain = frontendDomain.startsWith('www.')
+            ? frontendDomain.substring(4)
             : frontendDomain;
           const cookieDomainWithDot = `.${cookieDomain}`;
 
@@ -1419,7 +1419,7 @@ export default {
               WHERE om.user_id = ? AND o.id = ?
             `).bind(sessionData.user_id, sessionData.current_org_id).first();
           }
-          
+
           // Fallback to first available organization if no context or context is invalid
           if (!orgData) {
             orgData = await d1.prepare(`
@@ -1499,7 +1499,7 @@ export default {
               WHERE om.user_id = ? AND p.id = ?
             `).bind(sessionData.user_id, sessionData.current_project_id).first();
           }
-          
+
           // Fallback to first available project if no context or context is invalid
           if (!projectData) {
             projectData = await d1.prepare(`
@@ -4874,7 +4874,7 @@ export default {
         try {
           const projectId = url.searchParams.get("project_id");
           const limit = parseInt(url.searchParams.get("limit") || "1000");
-          
+
           if (!projectId) {
             const response = new Response("error: project_id is required", {
               status: 400,
@@ -4912,9 +4912,39 @@ export default {
             LIMIT ?
           `).bind(projectId, limit).all();
 
+          console.log('CSV Export Debug:', {
+            projectId,
+            limit,
+            eventsCount: events.results?.length || 0,
+            hasResults: !!events.results,
+            firstEvent: events.results?.[0],
+            eventsKeys: Object.keys(events),
+            eventsType: typeof events,
+            eventsResultsType: typeof events.results
+          });
+
           // Create CSV content
           const csvHeader = "id,project_id,property_id,content_id,ai_source_id,event_type,metadata,occurred_at,sampled,class,bot_category\n";
-          const csvRows = (events.results || []).map(event => {
+
+          // Handle different possible result structures
+          let eventData = [];
+          if (events.results && Array.isArray(events.results)) {
+            eventData = events.results;
+          } else if (Array.isArray(events)) {
+            eventData = events;
+          } else if (events && typeof events === 'object') {
+            // Try to find the data in different possible properties
+            eventData = events.data || events.rows || events.items || [];
+          }
+
+          console.log('Event Data Debug:', {
+            eventDataLength: eventData.length,
+            eventDataType: typeof eventData,
+            isArray: Array.isArray(eventData),
+            firstEvent: eventData[0]
+          });
+
+          const csvRows = eventData.map(event => {
             return [
               event.id,
               event.project_id,
@@ -4930,10 +4960,16 @@ export default {
             ].join(',');
           }).join('\n');
 
+          console.log('CSV Debug:', {
+            headerLength: csvHeader.length,
+            rowsLength: csvRows.length,
+            totalLength: csvContent.length
+          });
+
           const csvContent = csvHeader + csvRows;
 
           const response = new Response(csvContent, {
-            headers: { 
+            headers: {
               "Content-Type": "text/csv",
               "Content-Disposition": `attachment; filename="events-${projectId}-${new Date().toISOString().split('T')[0]}.csv"`
             }
