@@ -2771,13 +2771,13 @@ export async function handleApiRoutes(
                 const { extractCfSignals, generateCfDebugSignals } = await import('../classifier/cf');
                 const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
                 
+                // Extract and normalize Cloudflare signals at the top level
+                const cfSignals = extractCfSignals(req);
+                
                 try {
                     // Extract referrer and user agent from metadata
                     const referrer = metadata?.referrer || metadata?.referer || null;
                     const userAgent = metadata?.user_agent || null;
-
-                    // Extract and normalize Cloudflare signals
-                    const cfSignals = extractCfSignals(req);
                     
                     // Get Cloudflare data for traffic classification (legacy compatibility)
                     const cfData = (req as any).cf;
