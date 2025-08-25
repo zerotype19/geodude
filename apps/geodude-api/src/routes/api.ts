@@ -2767,20 +2767,20 @@ export async function handleApiRoutes(
                 let classification: any = null;
                 let enrichedMetadata: any = metadata; // Default to original metadata
 
+                // Import required functions at the top level
+                const { extractCfSignals, generateCfDebugSignals } = await import('../classifier/cf');
+                const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
+                
                 try {
                     // Extract referrer and user agent from metadata
                     const referrer = metadata?.referrer || metadata?.referer || null;
                     const userAgent = metadata?.user_agent || null;
 
                     // Extract and normalize Cloudflare signals
-                    const { extractCfSignals, generateCfDebugSignals } = await import('../classifier/cf');
                     const cfSignals = extractCfSignals(req);
                     
                     // Get Cloudflare data for traffic classification (legacy compatibility)
                     const cfData = (req as any).cf;
-
-                    // Import classifier v3
-                    const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
 
                     // Get current host for self-referral detection
                     const currentHost = req.headers.get('host') || '';
