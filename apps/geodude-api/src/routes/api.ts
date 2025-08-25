@@ -2602,10 +2602,10 @@ export async function handleApiRoutes(
 
             // Get request body and validate size
             const bodyText = await req.text();
-            if (bodyText.length > 1024) {
+            if (bodyText.length > 10240) { // 10KB limit for events endpoint
                 const response = new Response(JSON.stringify({
                     error: "Request body too large",
-                    max_size_kb: 1,
+                    max_size_kb: 10,
                     actual_size_kb: Math.round(bodyText.length / 1024)
                 }), { status: 413, headers: { "Content-Type": "application/json" } });
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));

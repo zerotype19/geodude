@@ -24,7 +24,7 @@ export interface EndpointSchema {
 // Schema definitions for each endpoint
 export const ENDPOINT_SCHEMAS: Record<string, EndpointSchema> = {
   '/api/events': {
-    maxBodySizeKB: 1,
+    maxBodySizeKB: 10,
     allowedFields: {
       project_id: { required: true, type: 'string' },
       property_id: { required: true, type: 'number' },
