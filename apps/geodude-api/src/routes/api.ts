@@ -2779,6 +2779,9 @@ export async function handleApiRoutes(
                     // Get Cloudflare data for traffic classification (legacy compatibility)
                     const cfData = (req as any).cf;
 
+                    // Import classifier v3
+                    const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
+
                     // Get current host for self-referral detection
                     const currentHost = req.headers.get('host') || '';
 
