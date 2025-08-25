@@ -2774,6 +2774,9 @@ export async function handleApiRoutes(
                 // Extract and normalize Cloudflare signals at the top level
                 const cfSignals = extractCfSignals(req);
                 
+                // Initialize variables at the top level
+                let spoofReason = null;
+                
                 try {
                     // Extract referrer and user agent from metadata
                     const referrer = metadata?.referrer || metadata?.referer || null;
@@ -2790,7 +2793,6 @@ export async function handleApiRoutes(
                     const utmSource = url.searchParams.get('utm_source');
 
                     // Check for spoof guard: if referrer is search engine, ignore UTM params
-                    let spoofReason = null;
                     if (utmSource && referrer) {
                         const referrerHost = new URL(referrer).hostname.toLowerCase();
                         if (referrerHost === 'google.com' || referrerHost === 'bing.com' || referrerHost === 'duckduckgo.com') {
