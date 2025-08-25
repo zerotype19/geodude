@@ -29,7 +29,11 @@ export function extractCfSignals(request: Request): CloudflareSignals {
   let cfVerified = false;
   let cfSource: 'bot_management' | 'client.bot' | 'absent' = 'absent';
 
-  if (cfVerifiedBM !== null) {
+  // If we have a verifiedBotCategory, consider it verified (CF has already verified this bot)
+  if (cfCategoryRaw && cfCategoryRaw.trim() !== '') {
+    cfVerified = true;
+    cfSource = 'bot_management';
+  } else if (cfVerifiedBM !== null) {
     cfVerified = !!cfVerifiedBM;
     cfSource = 'bot_management';
   } else if (cfClientBot !== null) {

@@ -2823,6 +2823,16 @@ export async function handleApiRoutes(
                         botCategory: classification.evidence.botCategory
                     });
 
+                    // Warning log for CF precedence mismatches
+                    if (cfSignals.cfVerified && classification.class !== 'crawler') {
+                        console.warn('cf_precedence_mismatch', {
+                            cfCategory: cfSignals.cfCategoryRaw,
+                            class: classification.class,
+                            botCategory: classification.evidence?.botCategory,
+                            reason: classification.reason
+                        });
+                    }
+
                     // Store classification result for session handling
                     classificationResults.push(classification);
 

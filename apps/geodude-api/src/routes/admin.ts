@@ -780,6 +780,20 @@ export async function handleAdminRoutes(
           org: row.cf_org
         })) || [];
 
+        // Check for precedence mismatches (cf_verified_bot=1 but class!='crawler')
+        const mismatchResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT id, cf_verified_bot_category, class
+          FROM interaction_events 
+          WHERE occurred_at >= ? AND cf_verified_bot = 1 AND class != 'crawler'
+          ORDER BY occurred_at DESC
+          LIMIT 3
+        `).bind(cutoffTime).all();
+        
+        const mismatches = {
+          count: mismatchResult?.results?.length || 0,
+          sampleIds: mismatchResult?.results?.map(row => row.id) || []
+        };
+
         return new Response(JSON.stringify({
           window: window,
           totals: {
@@ -795,7 +809,8 @@ export async function handleAdminRoutes(
           samples: {
             any: samples,
             verified: verifiedSamples
-          }
+          },
+          mismatches
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -933,6 +948,100 @@ export async function handleAdminRoutes(
         console.error('Test event ingestion failed:', error);
         return new Response(JSON.stringify({
           error: 'Test event ingestion failed',
+          details: error.message
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Admin Reclassify CF-Verified Events - Backfill misclassified events
+    if (pathname === '/admin/tools/reclassify-cf-verified' && request.method === 'POST') {
+      if (!checkAdminAuth(request)) {
+        return new Response(JSON.stringify({ error: 'Admin authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      try {
+        const body = await request.json();
+        const { window_hours = 48 } = body;
+
+        // Find events in the window where cf_verified_bot = 1 but traffic_class != 'crawler'
+        const cutoffTime = new Date(Date.now() - (window_hours * 60 * 60 * 1000));
+        
+        const mismatchedEvents = await env.OPTIVIEW_DB.prepare(`
+          SELECT id, cf_verified_bot_category, signals
+          FROM interaction_events
+          WHERE cf_verified_bot = 1
+            AND class != 'crawler'
+            AND occurred_at >= ?
+          ORDER BY occurred_at DESC
+        `).bind(cutoffTime.toISOString()).all();
+
+        if (mismatchedEvents.results.length === 0) {
+          return new Response(JSON.stringify({
+            message: 'No misclassified CF-verified events found in the specified window',
+            window_hours,
+            cutoff_time: cutoffTime.toISOString()
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        let updatedCount = 0;
+        const { mapCfCategory } = await import('../classifier/cf');
+
+        for (const event of mismatchedEvents.results) {
+          try {
+            // Map the CF category to our internal bot category
+            const botCategory = mapCfCategory(event.cf_verified_bot_category);
+            
+            // Prepare updated signals
+            let updatedSignals = [];
+            if (event.signals) {
+              try {
+                updatedSignals = JSON.parse(event.signals);
+              } catch (e) {
+                updatedSignals = [];
+              }
+            }
+            updatedSignals.push('backfill.cf_precedence_fix');
+            
+            // Update the event
+            await env.OPTIVIEW_DB.prepare(`
+              UPDATE interaction_events
+              SET class = 'crawler',
+                  bot_category = ?,
+                  signals = ?
+              WHERE id = ?
+            `).bind(botCategory, JSON.stringify(updatedSignals), event.id).run();
+            
+            updatedCount++;
+          } catch (updateError) {
+            console.error(`Failed to update event ${event.id}:`, updateError);
+          }
+        }
+
+        return new Response(JSON.stringify({
+          message: 'CF-verified events reclassified successfully',
+          window_hours,
+          cutoff_time: cutoffTime.toISOString(),
+          total_mismatched: mismatchedEvents.results.length,
+          updated_count: updatedCount,
+          sample_updated_ids: mismatchedEvents.results.slice(0, 5).map(e => e.id)
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+
+      } catch (error) {
+        console.error('CF-verified reclassification failed:', error);
+        return new Response(JSON.stringify({
+          error: 'CF-verified reclassification failed',
           details: error.message
         }), {
           status: 500,
