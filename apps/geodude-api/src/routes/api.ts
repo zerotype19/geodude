@@ -334,8 +334,8 @@ export async function handleApiRoutes(
                     const aiEvents = (rollupTotals['human_via_ai']?.total || 0) +
                         (rollupTotals['citation']?.total || 0);
 
-                    // Note: AI training bots are counted separately and only when toggle is ON
-                    // This prevents inflating the metric with search crawlers and preview bots
+                    // Note: AI training bots are now always included in AI totals by default
+                    // This provides complete visibility into AI model training traffic
 
                     const directEstimated = rollupTotals['direct_human']?.total || 0;
                     const searchEstimated = rollupTotals['search']?.total || 0;

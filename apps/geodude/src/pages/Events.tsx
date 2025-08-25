@@ -65,7 +65,7 @@ import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../contexts/AuthContext";
 import { API_BASE, FETCH_OPTS } from '../config';
-import { getIncludeTraining, setIncludeTraining as setIncludeTrainingPref, getIncludeTrainingFromURL, syncIncludeTrainingFromURL } from '../lib/prefs';
+import { getIncludeTrainingFromURL, syncIncludeTrainingFromURL } from '../lib/prefs';
 
 interface EventItem {
   id: number;
@@ -375,7 +375,7 @@ export default function Events() {
   // AI-Lite state
   const [includeBaseline, setIncludeBaseline] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
-  const [includeTraining, setIncludeTraining] = useState(false);
+  const [includeTraining] = useState(true); // Always include AI training bots by default
 
   // Debug mode state
   const [debugMode, setDebugMode] = useState(false);
@@ -397,18 +397,15 @@ export default function Events() {
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
   const refreshCount = useRef(0);
 
-  // Initialize includeTraining from localStorage and URL params
+  // Initialize includeTraining from URL params (localStorage no longer needed)
   useEffect(() => {
-    if (project?.id) {
-      // Check URL param first, then localStorage
-      if (includeTrainingFromURL) {
-        setIncludeTraining(true);
-        syncIncludeTrainingFromURL(project.id, searchParams);
-      } else {
-        setIncludeTraining(getIncludeTraining(project.id));
-      }
+    if (project?.id && includeTrainingFromURL) {
+      syncIncludeTrainingFromURL(project.id, searchParams);
     }
   }, [project?.id, includeTrainingFromURL, searchParams]);
+
+  // AI training bots are now always included by default
+  // No initialization needed since includeTraining is always true
 
   // Local storage for window preference
   function getStoredWindow(): string | null {
@@ -435,11 +432,10 @@ export default function Events() {
   }
 
   // Handle include training toggle
+  // AI training toggle is no longer needed - bots are always included
   function handleIncludeTrainingToggle(checked: boolean) {
-    setIncludeTraining(checked);
-    if (project?.id) {
-      setIncludeTrainingPref(project.id, checked);
-    }
+    // This function is kept for compatibility but no longer functional
+    // AI training bots are always included by default
   }
 
   // Calculate correct % AI-Influenced with breakout counts
@@ -448,9 +444,9 @@ export default function Events() {
 
     const humanViaAI = summary.by_class.find(c => c.class === 'human_via_ai')?.count || 0;
 
-    // Only count AI training bots, not all crawlers (search crawlers, preview bots, etc.)
+    // Always count AI training bots (no longer optional)
     let aiTrainingBots = 0;
-    if (includeTraining && summary.by_bot_category) {
+    if (summary.by_bot_category) {
       aiTrainingBots = summary.by_bot_category.find(c => c.category === 'ai_training')?.count || 0;
     }
 
@@ -1046,14 +1042,14 @@ export default function Events() {
           </div>
         )}
 
-        {/* Hardened Classification System Status */}
+        {/* AI Classification System Status */}
         <Card>
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-medium text-gray-900">Hardened AI Detection System</h3>
+              <h3 className="text-lg font-medium text-gray-900">AI Detection System</h3>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                  ✅ Hardened System Active
+                  ✅ System Active
                 </span>
                 {summary?.tracking_mode && (
                   <span className={`px-2 py-1 text-xs rounded-full ${summary.tracking_mode === 'ai-lite'
@@ -1095,14 +1091,9 @@ export default function Events() {
 
             <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
               <div className="text-sm text-gray-700">
-                <strong>Hardened Classification:</strong> Uses Cloudflare bot detection, user agent analysis, and referrer patterns with strict precedence order.
-                AI sources are automatically managed and mapped for accurate attribution.
+                <strong>AI Classification System:</strong> Automatically detects and classifies AI training bots, AI assistant referrers, and search engines with strict precedence order.
               </div>
               <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-gray-600">
-                  <strong>System Status:</strong>
-                  <span className="ml-1 text-green-600">✅ Operational</span>
-                </span>
                 <span className="text-gray-600">
                   <strong>Classification Confidence:</strong>
                   <span className="ml-1 text-blue-600">High (95%+)</span>
@@ -1146,39 +1137,13 @@ export default function Events() {
                       <p className="text-sm font-medium text-gray-500">AI-Influenced</p>
                       <p className="text-2xl font-semibold text-gray-900">
                         {formatNumber(summary.totals.ai_influenced)}
-                        {includeTraining && (
-                          <span className="ml-2 text-sm text-blue-600 font-normal">
-                            + AI training
-                          </span>
-                        )}
                       </p>
                     </div>
                   </div>
 
-                  {/* Include AI Training Crawlers Toggle */}
-                  <div className="flex items-center space-x-2">
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={includeTraining}
-                        onChange={(e) => handleIncludeTrainingToggle(e.target.checked)}
-                        className="sr-only"
-                      />
-                      <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${includeTraining ? 'bg-blue-600' : 'bg-gray-200'
-                        }`}>
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${includeTraining ? 'translate-x-6' : 'translate-x-1'
-                          }`} />
-                      </div>
-                    </label>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-500">Include AI training</span>
-                      <div className="group relative">
-                        <Info className="h-3 w-3 text-gray-400 cursor-help" />
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                          Include AI training crawlers (GPTBot, CCBot, etc.) in AI totals
-                        </div>
-                      </div>
-                    </div>
+                  {/* AI Training bots are now always included by default */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500 text-green-600">✓ AI training included</span>
                   </div>
                 </div>
               </div>
@@ -1576,13 +1541,13 @@ export default function Events() {
           </div>
         </Card>
 
-        {/* Hardened Classification Debug Information */}
+        {/* AI Classification Debug Information */}
         {showDebugInfo && recent && recent.items.length > 0 && (
           <Card>
             <div className="p-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Hardened AI Detection System Details</h4>
+              <h4 className="text-sm font-medium text-gray-700 mb-3">AI Detection System Details</h4>
               <div className="text-xs text-gray-600 space-y-2">
-                <p><strong>Hardened Classification System:</strong> Uses Cloudflare bot detection, user agent analysis, and referrer patterns with strict precedence order.</p>
+                <p><strong>AI Classification System:</strong> Automatically detects and classifies AI training bots, AI assistant referrers, and search engines with strict precedence order.</p>
                 <p><strong>Classification Precedence:</strong> 1) Cloudflare verified bots → 2) AI referrers → 3) Search engines → 4) Direct human</p>
                 <p><strong>AI Source Management:</strong> Automatically creates and maps AI sources for accurate attribution and rollup tracking.</p>
                 <p><strong>Debug Trail:</strong> Hover over ℹ️ icons to see classification reasoning for each event.</p>
