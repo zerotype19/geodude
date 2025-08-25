@@ -813,6 +813,134 @@ export async function handleAdminRoutes(
       }
     }
 
+    // Admin Ingest Test Harness - for testing CF signal persistence
+    if (pathname === '/admin/tools/ingest-test-event' && request.method === 'POST') {
+      if (!checkAdminAuth(request)) {
+        return new Response(JSON.stringify({ error: 'Admin authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      try {
+        const body = await request.json();
+        const { url, referrer, ua, cf_verified, cf_category, cf_asn, cf_org, params } = body;
+
+        if (!url) {
+          return new Response(JSON.stringify({ error: 'Missing required field: url' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Extract and normalize Cloudflare signals
+        const { extractCfSignals, generateCfDebugSignals } = await import('../classifier/cf');
+        
+        // Create a mock request with CF fields for testing
+        const mockRequest = {
+          cf: {
+            bot_management: { verified_bot: cf_verified || false },
+            verifiedBotCategory: cf_category || null,
+            asn: cf_asn || null,
+            asOrganization: cf_org || null
+          }
+        } as any;
+
+        const cfSignals = extractCfSignals(mockRequest);
+        
+        // Check for spoof guard
+        let spoofReason = null;
+        if (referrer && params?.utm_source) {
+          try {
+            const referrerHost = new URL(referrer).hostname.toLowerCase();
+            if (referrerHost === 'google.com' || referrerHost === 'bing.com' || referrerHost === 'duckduckgo.com') {
+              spoofReason = 'search_referrer';
+            } else if (referrerHost.includes('chat.openai.com') || referrerHost.includes('perplexity.ai') || referrerHost.includes('gemini.google.com')) {
+              spoofReason = 'ai_assistant_referrer';
+            }
+          } catch (e) {
+            // Invalid referrer URL, ignore
+          }
+        }
+
+        // Classify traffic
+        const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
+        const classification = classifyTrafficV3({
+          cfVerifiedBotCategory: cfSignals.cfCategoryRaw,
+          cfVerified: cfSignals.cfVerified,
+          referrerUrl: referrer || null,
+          userAgent: ua || 'Mozilla/5.0 (Test)',
+          currentHost: 'test.example.com',
+          utmSource: spoofReason ? null : params?.utm_source,
+          manifest: STATIC_MANIFEST_V3
+        });
+
+        // Generate signals
+        const cfDebugSignals = generateCfDebugSignals(cfSignals);
+        if (spoofReason) {
+          cfDebugSignals.push(`params_spoof_guard=${spoofReason}`);
+        }
+        const allSignals = [...(classification.debug?.signals || []), ...cfDebugSignals];
+
+        // Insert into database
+        const result = await env.OPTIVIEW_DB.prepare(`
+          INSERT INTO interaction_events (
+            project_id, property_id, content_id, ai_source_id, 
+            event_type, metadata, occurred_at, sampled, class, bot_category,
+            cf_verified_bot, cf_verified_bot_category, cf_asn, cf_org,
+            ppc_request_headers, ppc_response_headers, signals
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          'prj_cTSh3LZ8qMVZ', // test project_id
+          1, // test property_id
+          null, // content_id
+          null, // ai_source_id
+          'view', // event_type
+          JSON.stringify({
+            url,
+            referrer,
+            user_agent: ua,
+            params,
+            test_event: true,
+            timestamp: new Date().toISOString()
+          }),
+          new Date().toISOString(), // occurred_at
+          0, // sampled
+          classification.class, // class
+          classification.evidence?.botCategory || null, // bot_category
+          cfSignals.cfVerified ? 1 : 0, // cf_verified_bot
+          cfSignals.cfCategoryRaw, // cf_verified_bot_category
+          cfSignals.cfASN, // cf_asn
+          cfSignals.cfOrg, // cf_org
+          null, // ppc_request_headers
+          null, // ppc_response_headers
+          allSignals.length > 0 ? JSON.stringify(allSignals) : null // signals
+        ).run();
+
+        return new Response(JSON.stringify({
+          id: result.meta?.last_row_id,
+          cf_signals: cfSignals,
+          classification,
+          spoof_reason: spoofReason,
+          signals_generated: allSignals,
+          message: 'Test event ingested successfully'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+
+      } catch (error) {
+        console.error('Test event ingestion failed:', error);
+        return new Response(JSON.stringify({
+          error: 'Test event ingestion failed',
+          details: error.message
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // No matching admin route
     return null;
 

@@ -55,14 +55,39 @@ export async function updateRollup(
  */
 export async function insertEvent(
   env: any,
-  eventData: EventInsertData
+  eventData: EventInsertData & {
+    cfSignals?: any;
+    classification?: any;
+    spoofReason?: string | null;
+  }
 ): Promise<number | null> {
   try {
+    // Generate CF debug signals if available
+    let signals = [];
+    if (eventData.cfSignals) {
+      const { generateCfDebugSignals } = await import('../classifier/cf');
+      const cfDebugSignals = generateCfDebugSignals(eventData.cfSignals);
+      
+      // Add spoof guard signal if present
+      if (eventData.spoofReason) {
+        cfDebugSignals.push(`params_spoof_guard=${eventData.spoofReason}`);
+      }
+      
+      // Combine with existing signals from classification
+      if (eventData.classification?.debug?.signals) {
+        signals = [...eventData.classification.debug.signals, ...cfDebugSignals];
+      } else {
+        signals = cfDebugSignals;
+      }
+    }
+
     const result = await env.OPTIVIEW_DB.prepare(`
       INSERT INTO interaction_events (
         project_id, property_id, content_id, ai_source_id, 
-        event_type, metadata, occurred_at, sampled
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        event_type, metadata, occurred_at, sampled,
+        cf_verified_bot, cf_verified_bot_category, cf_asn, cf_org,
+        ppc_request_headers, ppc_response_headers, signals
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       eventData.project_id,
       eventData.property_id,
@@ -71,7 +96,14 @@ export async function insertEvent(
       eventData.event_type,
       eventData.metadata,
       eventData.occurred_at,
-      eventData.sampled
+      eventData.sampled,
+      eventData.cfSignals?.cfVerified ? 1 : 0,
+      eventData.cfSignals?.cfCategoryRaw || null,
+      eventData.cfSignals?.cfASN || null,
+      eventData.cfSignals?.cfOrg || null,
+      null, // ppc_request_headers (not implemented yet)
+      null, // ppc_response_headers (not implemented yet)
+      signals.length > 0 ? JSON.stringify(signals) : null
     ).run();
 
     return result.meta?.last_row_id || null;
