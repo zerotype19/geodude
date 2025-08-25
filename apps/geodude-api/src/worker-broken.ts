@@ -195,6 +195,10 @@ export default {
       // 5) Core AI Traffic Classification & Logging (for direct visits)
       if (req.method === "GET" || req.method === "POST") {
         try {
+          // Extract and normalize Cloudflare signals
+          const { extractCfSignals } = await import("./classifier/cf");
+          const cfSignals = extractCfSignals(req);
+          
           // Classify the incoming request
           const classification = await classifyRequest(req, env);
 
@@ -206,7 +210,7 @@ export default {
             // Resolve content by URL path
             const content = await resolveContent(env, project.id, url.pathname);
 
-            // Log the interaction event
+            // Log the interaction event with CF signals
             await logInteraction(env, {
               project_id: project.id,
               content_id: content?.id || null,
@@ -220,7 +224,10 @@ export default {
                 source: classification.source_name || null,
                 ip: await hashString(req.headers.get("cf-connecting-ip") || ""),
                 latency_ms: 0 // Will be measured in production
-              }
+              },
+              cfSignals,
+              classification,
+              spoofReason: null
             });
 
             // Add trace header for debugging
