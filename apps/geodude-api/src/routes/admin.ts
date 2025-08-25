@@ -613,14 +613,22 @@ export async function handleAdminRoutes(
       const userAgent = urlParams.get('ua') || 'Mozilla/5.0 (Test)';
       const utmSource = urlParams.get('utm_source');
       const aiRef = urlParams.get('ai_ref');
+      
+      // Allow CF field injection for testing
+      const cfVerified = urlParams.get('cf_verified') === '1';
+      const cfCategory = urlParams.get('cf_category');
+      const cfAsn = urlParams.get('cf_asn');
+      const cfOrg = urlParams.get('cf_org');
 
       // Note: referrer is optional - some tests (like crawler detection) only use User-Agent
 
       try {
         // Import classifier v3
-        const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3.js');
+        const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
 
         const classification = classifyTrafficV3({
+          cfVerifiedBotCategory: cfCategory,
+          cfVerified: cfVerified,
           referrerUrl: referrer || null,
           userAgent,
           currentHost: 'test.example.com',
@@ -632,6 +640,12 @@ export async function handleAdminRoutes(
         return new Response(JSON.stringify({
           referrer,
           user_agent: userAgent,
+          cf_injected: {
+            verified: cfVerified,
+            category: cfCategory,
+            asn: cfAsn,
+            org: cfOrg
+          },
           classification
         }), {
           status: 200,
@@ -642,6 +656,155 @@ export async function handleAdminRoutes(
         console.error('Debug classification failed:', error);
         return new Response(JSON.stringify({
           error: 'Classification failed',
+          details: error.message
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // CF Signals Health Endpoint
+    if (pathname === '/admin/health/cf-signals' && request.method === 'GET') {
+      if (!checkAdminAuth(request)) {
+        return new Response(JSON.stringify({ error: 'Admin authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const { searchParams } = url;
+      let window = searchParams.get('window') || '60m';
+      
+      // Parse window parameter (accept m, h, d)
+      const windowMatch = window.match(/^(\d+)([mhd])$/);
+      if (!windowMatch) {
+        return new Response(JSON.stringify({ error: 'Invalid window format. Use: 15m, 60m, 2h, 1d' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const amount = parseInt(windowMatch[1]);
+      const unit = windowMatch[2];
+      
+      // Convert to minutes for SQL
+      let minutesAgo: number;
+      switch (unit) {
+        case 'm': minutesAgo = amount; break;
+        case 'h': minutesAgo = amount * 60; break;
+        case 'd': minutesAgo = amount * 60 * 24; break;
+        default: minutesAgo = 60; // fallback to 60m
+      }
+
+      try {
+        const cutoffTime = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
+        
+        // Get total requests in window
+        const totalResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT COUNT(*) as total FROM interaction_events 
+          WHERE occurred_at >= ?
+        `).bind(cutoffTime).first();
+        
+        const totalRequests = totalResult?.total || 0;
+
+        // Get requests with any CF fields
+        const cfFieldsResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT COUNT(*) as count FROM interaction_events 
+          WHERE occurred_at >= ? AND (
+            cf_verified_bot IS NOT NULL OR 
+            cf_verified_bot_category IS NOT NULL OR 
+            cf_asn IS NOT NULL OR 
+            cf_org IS NOT NULL
+          )
+        `).bind(cutoffTime).first();
+        
+        const withAnyCfFields = cfFieldsResult?.count || 0;
+
+        // Get verified bot count
+        const verifiedResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT COUNT(*) as count FROM interaction_events 
+          WHERE occurred_at >= ? AND cf_verified_bot = 1
+        `).bind(cutoffTime).first();
+        
+        const verifiedBots = verifiedResult?.count || 0;
+
+        // Get category breakdown
+        const categoriesResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT cf_verified_bot_category as raw, COUNT(*) as count
+          FROM interaction_events 
+          WHERE occurred_at >= ? AND cf_verified_bot = 1 AND cf_verified_bot_category IS NOT NULL
+          GROUP BY cf_verified_bot_category
+          ORDER BY count DESC
+        `).bind(cutoffTime).all();
+        
+        const categories = categoriesResult?.results?.map(row => ({
+          raw: row.raw,
+          count: row.count
+        })) || [];
+
+        // Get sample records
+        const samplesResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT cf_verified_bot, cf_verified_bot_category as rawCategory, cf_asn, cf_org
+          FROM interaction_events 
+          WHERE occurred_at >= ? AND (
+            cf_verified_bot IS NOT NULL OR 
+            cf_verified_bot_category IS NOT NULL OR 
+            cf_asn IS NOT NULL OR 
+            cf_org IS NOT NULL
+          )
+          ORDER BY occurred_at DESC
+          LIMIT 3
+        `).bind(cutoffTime).all();
+        
+        const samples = samplesResult?.results?.map(row => ({
+          verified: !!row.cf_verified_bot,
+          rawCategory: row.rawCategory,
+          asn: row.cf_asn,
+          org: row.cf_org
+        })) || [];
+
+        // Get verified bot samples
+        const verifiedSamplesResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT cf_verified_bot_category as rawCategory, cf_asn, cf_org
+          FROM interaction_events 
+          WHERE occurred_at >= ? AND cf_verified_bot = 1
+          ORDER BY occurred_at DESC
+          LIMIT 3
+        `).bind(cutoffTime).all();
+        
+        const verifiedSamples = verifiedSamplesResult?.results?.map(row => ({
+          verified: true,
+          rawCategory: row.rawCategory,
+          asn: row.cf_asn,
+          org: row.cf_org
+        })) || [];
+
+        return new Response(JSON.stringify({
+          window: window,
+          totals: {
+            totalRequests,
+            withAnyCfFields,
+            pctWithCfFields: totalRequests > 0 ? Math.round((withAnyCfFields / totalRequests) * 1000) / 10 : 0
+          },
+          verified: {
+            count: verifiedBots,
+            pctOfTotal: totalRequests > 0 ? Math.round((verifiedBots / totalRequests) * 1000) / 10 : 0
+          },
+          categories,
+          samples: {
+            any: samples,
+            verified: verifiedSamples
+          }
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+
+      } catch (error) {
+        console.error('CF signals health check failed:', error);
+        return new Response(JSON.stringify({
+          error: 'CF signals health check failed',
           details: error.message
         }), {
           status: 500,

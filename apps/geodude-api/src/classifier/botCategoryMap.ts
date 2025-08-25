@@ -14,6 +14,7 @@ export type BotCategory =
 // Cloudflare verified bot category mapping
 export const CF_CATEGORY_MAP: Record<string, BotCategory> = {
     "Search Engine Crawler": "search_crawler",
+    "AI Model Training": "ai_training",
     "Page Preview": "preview_bot",
     "Monitoring & Analytics": "uptime_monitor",
     "AI Crawler": "ai_training",

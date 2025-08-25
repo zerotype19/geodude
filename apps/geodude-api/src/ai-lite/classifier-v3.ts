@@ -173,6 +173,7 @@ export const STATIC_MANIFEST_V3: ClassifierManifestV3 = {
  */
 export function classifyTrafficV3(input: {
   cfVerifiedBotCategory?: string;
+  cfVerified?: boolean;
   referrerUrl?: string | null;
   userAgent?: string | null;
   currentHost: string;
@@ -180,14 +181,14 @@ export function classifyTrafficV3(input: {
   aiRef?: string;
   manifest: ClassifierManifestV3;
 }): TrafficClassificationV3 {
-  const { cfVerifiedBotCategory, referrerUrl, userAgent, currentHost, utmSource, aiRef, manifest } = input;
+  const { cfVerifiedBotCategory, cfVerified, referrerUrl, userAgent, currentHost, utmSource, aiRef, manifest } = input;
 
-  // 1. Cloudflare verified bot → crawler (highest precedence)
-  if (cfVerifiedBotCategory) {
+  // 1. Cloudflare verified bot → crawler (highest precedence, no guesswork)
+  if (cfVerified === true) {
     const botCategory = normalizeCfCategory(cfVerifiedBotCategory);
     return {
       class: 'crawler',
-      reason: `Cloudflare verified bot: ${cfVerifiedBotCategory}`,
+      reason: `Cloudflare verified bot: ${cfVerifiedBotCategory || 'unknown'}`,
       confidence: 1.0,
       evidence: {
         cfVerifiedCategory: cfVerifiedBotCategory,
@@ -196,7 +197,7 @@ export function classifyTrafficV3(input: {
       },
       debug: {
         matchedRule: 'Cloudflare verified bot',
-        signals: [`cf_verified_category: ${cfVerifiedBotCategory}`]
+        signals: [`cf.verified=true`, `cf_verified_category: ${cfVerifiedBotCategory || 'unknown'}`]
       }
     };
   }

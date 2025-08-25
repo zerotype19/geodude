@@ -644,9 +644,14 @@ export async function handleApiRoutes(
                     json_extract(ie.metadata, '$.referrer') as referrer,
                     json_extract(ie.metadata, '$.user_agent') as user_agent,
                     json_extract(ie.metadata, '$.classification_reason') as matched_rule,
-                    json_extract(ie.metadata, '$.debug') as signals,
-                    json_extract(ie.metadata, '$.cf_verified_category') as cf_bot_verified,
-                    json_extract(ie.metadata, '$.referral_chain') as referral_chain
+                    ie.signals,
+                    json_extract(ie.metadata, '$.referral_chain') as referral_chain,
+                    ie.cf_verified_bot,
+                    ie.cf_verified_bot_category,
+                    ie.cf_asn,
+                    ie.cf_org,
+                    ie.ppc_request_headers,
+                    ie.ppc_response_headers
                 FROM interaction_events ie
                 LEFT JOIN ai_sources ais ON ais.id = ie.ai_source_id
                 WHERE ie.id = ?
@@ -696,8 +701,15 @@ export async function handleApiRoutes(
                 debug: {
                     matchedRule: matchedRule,
                     signals: signals,
-                    cfBot: !!eventDetail.cf_bot_verified,
                     precedenceOrder: ['crawler', 'human_via_ai', 'search', 'direct_human']
+                },
+                cf: {
+                    verifiedBot: !!eventDetail.cf_verified_bot,
+                    verifiedBotCategory: eventDetail.cf_verified_bot_category,
+                    asn: eventDetail.cf_asn,
+                    org: eventDetail.cf_org,
+                    ppcRequestHeaders: eventDetail.ppc_request_headers ? JSON.parse(eventDetail.ppc_request_headers) : null,
+                    ppcResponseHeaders: eventDetail.ppc_response_headers ? JSON.parse(eventDetail.ppc_response_headers) : null
                 },
                 metadata: metadata
             }), {
@@ -2760,11 +2772,12 @@ export async function handleApiRoutes(
                     const referrer = metadata?.referrer || metadata?.referer || null;
                     const userAgent = metadata?.user_agent || null;
 
-                    // Get Cloudflare data for traffic classification
+                    // Extract and normalize Cloudflare signals
+                    const { extractCfSignals, generateCfDebugSignals } = await import('../classifier/cf');
+                    const cfSignals = extractCfSignals(req);
+                    
+                    // Get Cloudflare data for traffic classification (legacy compatibility)
                     const cfData = (req as any).cf;
-
-                    // Classify traffic with AI Impact v2 system (classifier v3)
-                    const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
 
                     // Get current host for self-referral detection
                     const currentHost = req.headers.get('host') || '';
@@ -2773,12 +2786,24 @@ export async function handleApiRoutes(
                     const url = new URL(req.url);
                     const utmSource = url.searchParams.get('utm_source');
 
+                    // Check for spoof guard: if referrer is search engine, ignore UTM params
+                    let spoofReason = null;
+                    if (utmSource && referrer) {
+                        const referrerHost = new URL(referrer).hostname.toLowerCase();
+                        if (referrerHost === 'google.com' || referrerHost === 'bing.com' || referrerHost === 'duckduckgo.com') {
+                            spoofReason = 'search_referrer';
+                        } else if (referrerHost.includes('chat.openai.com') || referrerHost.includes('perplexity.ai') || referrerHost.includes('gemini.google.com')) {
+                            spoofReason = 'ai_assistant_referrer';
+                        }
+                    }
+
                     classification = classifyTrafficV3({
-                        cfVerifiedBotCategory: cfData?.verifiedBotCategory,
+                        cfVerifiedBotCategory: cfSignals.cfCategoryRaw,
+                        cfVerified: cfSignals.cfVerified,
                         referrerUrl: referrer,
                         userAgent,
                         currentHost,
-                        utmSource,
+                        utmSource: spoofReason ? null : utmSource, // Ignore UTM if spoof detected
                         manifest: STATIC_MANIFEST_V3
                     });
 
@@ -2813,7 +2838,7 @@ export async function handleApiRoutes(
                         referrerUrl: referrer,
                         classification,
                         ua: userAgent,
-                        cfVerifiedBotCategory: cfData?.verifiedBotCategory,
+                        cfVerifiedBotCategory: cfSignals.cfCategoryRaw,
                         versions: {
                             classifier: 'v3.0.0',
                             manifest: 'v3'
@@ -2917,6 +2942,17 @@ export async function handleApiRoutes(
 
 
                 try {
+                    // Generate CF debug signals
+                    const cfDebugSignals = generateCfDebugSignals(cfSignals);
+                    
+                    // Add spoof guard signal if present
+                    if (spoofReason) {
+                        cfDebugSignals.push(`params_spoof_guard=${spoofReason}`);
+                    }
+                    
+                    // Combine with existing signals from classification
+                    const allSignals = [...(classification.debug?.signals || []), ...cfDebugSignals];
+                    
                     // Debug logging to identify undefined values
                     const insertValues = [
                         project_id,
@@ -2928,7 +2964,14 @@ export async function handleApiRoutes(
                         occurred_at || now,
                         isSampled ? 1 : 0, // Add sampled flag
                         classification.class, // Add traffic classification
-                        classification.evidence.botCategory || null // Add bot category
+                        classification.evidence.botCategory || null, // Add bot category
+                        cfSignals.cfVerified ? 1 : 0, // cf_verified_bot
+                        cfSignals.cfCategoryRaw, // cf_verified_bot_category
+                        cfSignals.cfASN, // cf_asn
+                        cfSignals.cfOrg, // cf_org
+                        null, // ppc_request_headers (not implemented yet)
+                        null, // ppc_response_headers (not implemented yet)
+                        JSON.stringify(allSignals) // signals column
                     ];
 
 
@@ -2949,8 +2992,10 @@ export async function handleApiRoutes(
                     const result = await env.OPTIVIEW_DB.prepare(`
                         INSERT INTO interaction_events (
                             project_id, property_id, content_id, ai_source_id, 
-                            event_type, metadata, occurred_at, sampled, class, bot_category
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            event_type, metadata, occurred_at, sampled, class, bot_category,
+                            cf_verified_bot, cf_verified_bot_category, cf_asn, cf_org,
+                            ppc_request_headers, ppc_response_headers, signals
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `).bind(...insertValues).run();
 
                     insertResults.push(result);

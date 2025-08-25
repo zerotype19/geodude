@@ -421,10 +421,10 @@ export default {
 
             // Get request body and validate size
             const bodyText = await req.text();
-            if (bodyText.length > 1024) {
+            if (bodyText.length > 10240) { // 10KB limit for events endpoint
               const response = new Response(JSON.stringify({
                 error: "Request body too large",
-                max_size_kb: 1,
+                max_size_kb: 10,
                 actual_size_kb: Math.round(bodyText.length / 1024)
               }), { status: 413, headers: { "Content-Type": "application/json" } });
               return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
@@ -462,6 +462,26 @@ export default {
             UPDATE api_keys SET last_used_at = ? WHERE key_id = ?
           `).bind(Date.now(), authResult.keyId).run();
 
+            // Extract and normalize Cloudflare signals
+            const { extractCfSignals } = await import('./classifier/cf');
+            const cfSignals = extractCfSignals(req);
+            
+            // Check for spoof guard: if referrer is search engine, ignore UTM params
+            let spoofReason = null;
+            const referrer = sanitizedMetadata.metadata?.referrer || sanitizedMetadata.metadata?.referer;
+            if (referrer) {
+              try {
+                const referrerHost = new URL(referrer).hostname.toLowerCase();
+                if (referrerHost === 'google.com' || referrerHost === 'bing.com' || referrerHost === 'duckduckgo.com') {
+                  spoofReason = 'search_referrer';
+                } else if (referrerHost.includes('chat.openai.com') || referrerHost.includes('perplexity.ai') || referrerHost.includes('gemini.google.com')) {
+                  spoofReason = 'ai_assistant_referrer';
+                }
+              } catch (e) {
+                // Invalid referrer URL, ignore
+              }
+            }
+
             // Sanitize metadata before logging
             const sanitizedMetadata = sanitizeMetadata(validation.sanitizedData.metadata || {});
 
@@ -474,13 +494,15 @@ export default {
               });
             }
 
-            // Log the interaction with sanitized data
+            // Log the interaction with sanitized data and CF signals
             const result = await logInteraction(env, {
               project_id: validation.sanitizedData.project_id,
               content_id: validation.sanitizedData.content_id,
               ai_source_id: validation.sanitizedData.ai_source_id,
               event_type: validation.sanitizedData.event_type,
-              metadata: sanitizedMetadata.metadata
+              metadata: sanitizedMetadata.metadata,
+              cfSignals,
+              spoofReason
             });
 
             const response = new Response(JSON.stringify({
@@ -2724,6 +2746,9 @@ async function logInteraction(env: Env, event: {
   ai_source_id?: number | null;
   event_type: string;
   metadata: any;
+  cfSignals?: any;
+  classification?: any;
+  spoofReason?: string | null;
 }) {
   try {
     // Add ruleset version to metadata
@@ -2732,16 +2757,45 @@ async function logInteraction(env: Env, event: {
       ruleset_version: getCurrentRulesetVersion()
     };
 
+    // Generate CF debug signals if available
+    let signals = [];
+    if (event.cfSignals) {
+      const { generateCfDebugSignals } = await import('./classifier/cf');
+      const cfDebugSignals = generateCfDebugSignals(event.cfSignals);
+      
+      // Add spoof guard signal if present
+      if (event.spoofReason) {
+        cfDebugSignals.push(`params_spoof_guard=${event.spoofReason}`);
+      }
+      
+      // Combine with existing signals from classification
+      if (event.classification?.debug?.signals) {
+        signals = [...event.classification.debug.signals, ...cfDebugSignals];
+      } else {
+        signals = cfDebugSignals;
+      }
+    }
+
     const result = await env.OPTIVIEW_DB.prepare(`
-      INSERT INTO interaction_events (project_id, content_id, ai_source_id, event_type, metadata, occurred_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO interaction_events (
+        project_id, content_id, ai_source_id, event_type, metadata, occurred_at,
+        cf_verified_bot, cf_verified_bot_category, cf_asn, cf_org,
+        ppc_request_headers, ppc_response_headers, signals
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       event.project_id,
       event.content_id,
       event.ai_source_id,
       event.event_type,
       JSON.stringify(metadataWithVersion),
-      Date.now()
+      Date.now(),
+      event.cfSignals?.cfVerified ? 1 : 0,
+      event.cfSignals?.cfCategoryRaw || null,
+      event.cfSignals?.cfASN || null,
+      event.cfSignals?.cfOrg || null,
+      null, // ppc_request_headers (not implemented yet)
+      null, // ppc_response_headers (not implemented yet)
+      signals.length > 0 ? JSON.stringify(signals) : null
     ).run();
 
     return result;
