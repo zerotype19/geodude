@@ -503,7 +503,6 @@ export default function Events() {
   const [showClassificationDetails, setShowClassificationDetails] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [showCfOverview, setShowCfOverview] = useState(false);
-  const [timeWindow, setTimeWindow] = useState("24h");
 
   // URL params and filters
   const timeWindow = searchParams.get("window") || getStoredWindow() || "24h";
@@ -797,10 +796,7 @@ export default function Events() {
     updateParams({ cf_org: org === cfOrgFilter ? null : org, page: null });
   }
 
-  function handleWindowChange(window: string) {
-    setTimeWindow(window);
-    updateParams({ window, page: null });
-  }
+
 
   function handleSearch(query: string) {
     updateParams({ q: query || null, page: null });
@@ -1214,7 +1210,7 @@ export default function Events() {
                   </span>
                 </div>
                 <div className="text-sm text-gray-600">
-                  Hardened classification: CF verified > AI referrers > Search > Direct (strict precedence).
+                  Hardened classification: CF verified {'>'} AI referrers {'>'} Search {'>'} Direct (strict precedence).
                 </div>
               </div>
               
@@ -1309,7 +1305,10 @@ export default function Events() {
             </Card>
 
             {/* CF Verified Bots - Only show when > 0 */}
-            {summary.by_class.find(cls => cls.class === 'crawler')?.count > 0 && (
+            {(() => {
+              const cfVerifiedCount = summary?.by_class?.find(cls => cls.class === 'crawler')?.count || 0;
+              return cfVerifiedCount > 0;
+            })() && (
               <Card>
                 <div className="p-4">
                   <div className="flex items-center">
@@ -1399,7 +1398,10 @@ export default function Events() {
         )}
 
         {/* CF Signals Overview - Collapsible */}
-        {summary && summary.by_class.find(cls => cls.class === 'crawler')?.count > 0 && (
+        {(() => {
+          const cfVerifiedCount = summary?.by_class?.find(cls => cls.class === 'crawler')?.count || 0;
+          return cfVerifiedCount > 0;
+        })() && (
           <Card>
             <div className="p-4">
               <button
@@ -1409,7 +1411,7 @@ export default function Events() {
                 <div className="flex items-center gap-3">
                   <h4 className="text-lg font-medium text-gray-900">🛡️ Cloudflare Signals Overview</h4>
                   <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                    {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0} CF Verified
+                    {summary?.by_class?.find(cls => cls.class === 'crawler')?.count || 0} CF Verified
                   </span>
                   <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
                     100% CF Precedence
