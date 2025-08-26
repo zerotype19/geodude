@@ -619,7 +619,7 @@ export default function Events() {
         project_id: project.id,
         window: timeWindow,
         page: page.toString(),
-        pageSize: "50"
+        pageSize: "200"
       });
 
       if (classFilter) params.append("class", classFilter);
