@@ -502,6 +502,8 @@ export default function Events() {
   const [debugMode, setDebugMode] = useState(false);
   const [showClassificationDetails, setShowClassificationDetails] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [showCfOverview, setShowCfOverview] = useState(false);
+  const [timeWindow, setTimeWindow] = useState("24h");
 
   // URL params and filters
   const timeWindow = searchParams.get("window") || getStoredWindow() || "24h";
@@ -793,6 +795,11 @@ export default function Events() {
 
   function handleCfOrgFilter(org: string) {
     updateParams({ cf_org: org === cfOrgFilter ? null : org, page: null });
+  }
+
+  function handleWindowChange(window: string) {
+    setTimeWindow(window);
+    updateParams({ window, page: null });
   }
 
   function handleSearch(query: string) {
@@ -1192,100 +1199,59 @@ export default function Events() {
           </div>
         )}
 
-        {/* AI Classification System Status */}
+        {/* Compressed Hero - AI Detection System */}
         <Card>
           <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-medium text-gray-900">AI Detection System</h3>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                  ✅ System Active
-                </span>
-                {summary?.tracking_mode && (
-                  <span className={`px-2 py-1 text-xs rounded-full ${summary.tracking_mode === 'ai-lite'
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-purple-100 text-purple-800'
-                    }`}>
-                    {summary.tracking_mode === 'ai-lite' ? 'AI-Lite Mode' : 'Full Tracking'}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-medium text-gray-900">AI Detection System</span>
+                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                    ✅ CF Signals Active
                   </span>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">🤖</div>
-                <div className="text-gray-600">Crawler</div>
-                <div className="text-xs text-gray-500">CF verified bots</div>
-                <div className="text-xs text-gray-400 mt-1">1st Priority</div>
-                <div className="text-xs text-green-600 font-medium">CF Wins Always</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">🧠</div>
-                <div className="text-gray-600">Human via AI</div>
-                <div className="text-xs text-gray-500">AI assistant referrers</div>
-                <div className="text-xs text-gray-400 mt-1">2nd Priority</div>
-                <div className="text-xs text-blue-600 font-medium">If no CF</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">🔍</div>
-                <div className="text-gray-600">Search</div>
-                <div className="text-xs text-gray-500">Search engine referrers</div>
-                <div className="text-xs text-gray-400 mt-1">3rd Priority</div>
-                <div className="text-xs text-green-600 font-medium">If no CF/AI</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-600">👤</div>
-                <div className="text-gray-600">Direct Human</div>
-                <div className="text-xs text-gray-500">No referrer, direct visits</div>
-                <div className="text-xs text-gray-400 mt-1">4th Priority</div>
-                <div className="text-xs text-gray-600 font-medium">Default fallback</div>
-              </div>
-            </div>
-
-            <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-              <div className="text-sm text-gray-700">
-                <strong>AI Classification System:</strong> Automatically detects and classifies traffic with strict precedence order. <strong>Cloudflare verification always wins</strong> over any other signals.
-              </div>
-              <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-gray-600">
-                  <strong>Classification Confidence:</strong>
-                  <span className="ml-1 text-blue-600">High (95%+)</span>
-                </span>
-              </div>
-              <div className="mt-2 text-xs text-gray-600">
-                <strong>CF Precedence:</strong> When Cloudflare marks a bot as verified (e.g., "Search Engine Crawler"), it automatically gets classified as a crawler regardless of user agent, referrer, or other signals.
+                  <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0} verified
+                  </span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  Hardened classification: CF verified > AI referrers > Search > Direct (strict precedence).
+                </div>
               </div>
               
-              {/* CF Signals Health Indicator */}
-              <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-green-800 font-medium">
-                    🛡️ CF Signals Active
-                  </span>
-                  <span className="text-green-600">
-                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0} verified bots detected
-                  </span>
-                </div>
-                <div className="text-xs text-green-700 mt-1">
-                  Cloudflare bot management is providing real-time verification signals
-                </div>
+              <button
+                onClick={() => setShowClassificationDetails(true)}
+                className="px-3 py-1 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-300"
+              >
+                Show Details
+              </button>
+            </div>
+            
+            {/* CF Precedence Indicator */}
+            <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+                <span>Crawler</span>
+                <span className="text-green-600 font-medium">CF wins always</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                <span>Human via AI</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                <span>Search</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-gray-400"></span>
+                <span>Direct Human</span>
               </div>
             </div>
-
-            {summary?.ai_lite && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="text-sm text-blue-800">
-                  <strong>AI-Lite Mode Active:</strong> Baseline traffic (search, direct human) is sampled at {summary.baseline?.sample_pct || 2}% to reduce storage while maintaining analytical insights.
-                </div>
-              </div>
-            )}
           </div>
         </Card>
 
-        {/* KPI Row */}
+        {/* KPI Row - Essential Stats Only */}
         {summary && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <div className="p-4">
                 <div className="flex items-center">
@@ -1312,8 +1278,6 @@ export default function Events() {
                       </p>
                     </div>
                   </div>
-
-                  {/* AI Training bots are now always included by default */}
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-500 text-green-600">✓ AI training included</span>
                   </div>
@@ -1329,65 +1293,38 @@ export default function Events() {
                     <p className="text-sm font-medium text-gray-500">% AI-Influenced</p>
                     <p className="text-2xl font-semibold text-gray-900">
                       {(() => {
-                        const { percent, humanViaAI, aiTrainingBots } = computeAIInfluencedPercent(summary, includeTraining);
+                        const { percent } = computeAIInfluencedPercent(summary, includeTraining);
                         return `${percent}%`;
                       })()}
-                      {includeTraining && (
-                        <span className="ml-2 text-sm text-blue-600 font-normal">
-                          + AI training
-                        </span>
-                      )}
                     </p>
                     <div className="text-xs text-gray-500 mt-1">
-                      Human via AI: {(() => {
-                        const { humanViaAI } = computeAIInfluencedPercent(summary, includeTraining);
-                        return humanViaAI;
+                      {(() => {
+                        const { humanViaAI, aiTrainingBots } = computeAIInfluencedPercent(summary, includeTraining);
+                        return `Human: ${humanViaAI} + AI Training: ${aiTrainingBots}`;
                       })()}
-                      {includeTraining && (
-                        <>
-                          {(() => {
-                            const { aiTrainingBots } = computeAIInfluencedPercent(summary, includeTraining);
-                            return ` + AI Training: ${aiTrainingBots}`;
-                          })()}
-                        </>
-                      )}
                     </div>
                   </div>
                 </div>
               </div>
             </Card>
 
-            <Card>
-              <div className="p-4">
-                <div className="flex items-center">
-                  <User className="h-5 w-5 text-purple-400" />
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500">Active Sources</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {summary.totals.active_sources}
-                    </p>
+            {/* CF Verified Bots - Only show when > 0 */}
+            {summary.by_class.find(cls => cls.class === 'crawler')?.count > 0 && (
+              <Card>
+                <div className="p-4">
+                  <div className="flex items-center">
+                    <div className="h-5 w-5 text-green-600">🛡️</div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-500">CF Verified Bots</p>
+                      <p className="text-2xl font-semibold text-gray-900">
+                        {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Cloudflare verified</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-
-            {/* CF Signals Summary Card */}
-            <Card>
-              <div className="p-4">
-                <div className="flex items-center">
-                  <div className="h-5 w-5 text-green-600">🛡️</div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-500">CF Verified Bots</p>
-                    <p className="text-2xl font-semibold text-gray-900">
-                      {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Cloudflare verified' : 'None detected'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            )}
           </div>
         )}
 
@@ -1461,55 +1398,228 @@ export default function Events() {
           </Card>
         )}
 
-        {/* CF Signals Quick Stats */}
-        {summary && (
+        {/* CF Signals Overview - Collapsible */}
+        {summary && summary.by_class.find(cls => cls.class === 'crawler')?.count > 0 && (
           <Card>
             <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-lg font-medium text-gray-900">🛡️ Cloudflare Signals Overview</h4>
-                <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowCfOverview(!showCfOverview)}
+                className="flex w-full items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <h4 className="text-lg font-medium text-gray-900">🛡️ Cloudflare Signals Overview</h4>
                   <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                    Active
+                    {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0} CF Verified
+                  </span>
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    100% CF Precedence
                   </span>
                 </div>
-              </div>
+                <span className="text-sm text-gray-500">
+                  {showCfOverview ? 'Hide' : 'Show'}
+                </span>
+              </button>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0}
+              {showCfOverview && (
+                <div className="mt-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0}
+                      </div>
+                      <div className="text-gray-600">CF Verified Bots</div>
+                      <div className="text-xs text-gray-500">Highest precedence</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? '100%' : '0%'}
+                      </div>
+                      <div className="text-gray-600">CF Precedence</div>
+                      <div className="text-xs text-gray-500">Always wins</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Active' : 'None'}
+                      </div>
+                      <div className="text-gray-600">Bot Categories</div>
+                      <div className="text-xs text-gray-500">Search, AI Training</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Real-time' : 'Offline'}
+                      </div>
+                      <div className="text-gray-600">Signal Source</div>
+                      <div className="text-xs text-gray-500">CF Edge</div>
+                    </div>
                   </div>
-                  <div className="text-gray-600">CF Verified Bots</div>
-                  <div className="text-xs text-gray-500">Highest precedence</div>
+                  
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+                    <div className="text-sm text-green-800">
+                      <strong>CF Precedence System:</strong> When Cloudflare verifies a bot, it automatically gets classified as a crawler with highest priority. 
+                      This overrides any user agent patterns, referrer information, or other classification signals.
+                    </div>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? '100%' : '0%'}
-                  </div>
-                  <div className="text-gray-600">CF Precedence</div>
-                  <div className="text-xs text-gray-500">Always wins</div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Simplified Filter Toolbar */}
+        {summary && (
+          <Card>
+            <div className="p-4 space-y-4">
+              {/* Row 1: Always Visible */}
+              <div className="flex items-center gap-4">
+                {/* Time Window */}
+                <div className="flex rounded-lg border border-gray-300">
+                  {["15m", "24h", "7d"].map((w) => (
+                    <button
+                      key={w}
+                      onClick={() => handleWindowChange(w)}
+                      className={`px-3 py-2 text-sm font-medium ${timeWindow === w
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-gray-700 hover:bg-gray-50"
+                        } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
+                    >
+                      {w}
+                    </button>
+                  ))}
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">
-                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Active' : 'None'}
-                  </div>
-                  <div className="text-gray-600">Bot Categories</div>
-                  <div className="text-xs text-gray-500">Search, AI Training</div>
+
+                {/* Traffic Class Segmented */}
+                <div className="flex rounded-lg border border-gray-300">
+                  <button
+                    onClick={() => handleClassFilter("")}
+                    className={`px-3 py-2 text-sm font-medium ${!classFilter
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                      } rounded-l-md`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => handleClassFilter("crawler")}
+                    className={`px-3 py-2 text-sm font-medium ${classFilter === "crawler"
+                      ? "bg-orange-600 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                  >
+                    Crawler
+                  </button>
+                  <button
+                    onClick={() => handleClassFilter("search")}
+                    className={`px-3 py-2 text-sm font-medium ${classFilter === "search"
+                      ? "bg-green-600 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                  >
+                    Search
+                  </button>
+                  <button
+                    onClick={() => handleClassFilter("human_via_ai")}
+                    className={`px-3 py-2 text-sm font-medium ${classFilter === "human_via_ai"
+                      ? "bg-purple-600 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                  >
+                    Human via AI
+                  </button>
+                  <button
+                    onClick={() => handleClassFilter("direct_human")}
+                    className={`px-3 py-2 text-sm font-medium ${classFilter === "direct_human"
+                      ? "bg-gray-600 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                      } rounded-r-md`}
+                  >
+                    Direct
+                  </button>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Real-time' : 'Offline'}
-                  </div>
-                  <div className="text-gray-600">Signal Source</div>
-                  <div className="text-xs text-gray-500">CF Edge</div>
+
+                {/* Search Input */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search URLs and event types..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    className="pl-9 pr-3 py-2 border border-gray-300 rounded-md w-full text-sm"
+                  />
                 </div>
               </div>
-              
-              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
-                <div className="text-sm text-green-800">
-                  <strong>CF Precedence System:</strong> When Cloudflare verifies a bot, it automatically gets classified as a crawler with highest priority. 
-                  This overrides any user agent patterns, referrer information, or other classification signals.
+
+              {/* Row 2: Compact Dropdowns */}
+              <div className="flex items-center gap-4">
+                {/* AI Sources Dropdown */}
+                <div className="relative">
+                  <button className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 flex items-center gap-2">
+                    <span>AI Sources</span>
+                    {sourceFilter && (
+                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                        {sourceFilter}
+                      </span>
+                    )}
+                    <span className="text-gray-500">•</span>
+                    <span className="text-gray-600">{summary?.by_source_top.length || 0}</span>
+                  </button>
+                  {/* Dropdown content would go here */}
                 </div>
+
+                {/* Bot Categories Dropdown */}
+                <div className="relative">
+                  <button className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 flex items-center gap-2">
+                    <span>Bot Categories</span>
+                    {botCategoryFilter && (
+                      <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                        {botCategoryFilter}
+                      </span>
+                    )}
+                  </button>
+                  {/* Dropdown content would go here */}
+                </div>
+
+                {/* Cloudflare Dropdown */}
+                <div className="relative">
+                  <button className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 flex items-center gap-2">
+                    <span>🛡️ Cloudflare</span>
+                    {(cfVerifiedFilter || cfCategoryFilter || cfAsnFilter || cfOrgFilter) && (
+                      <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </button>
+                  {/* Dropdown content would go here */}
+                </div>
+
+                {/* CF Filter Status Indicator */}
+                {(cfVerifiedFilter || cfCategoryFilter || cfAsnFilter || cfOrgFilter) && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+                    <span className="text-xs text-blue-700 font-medium">🛡️ CF Filters:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {cfVerifiedFilter && (
+                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                          {cfVerifiedFilter === 'true' ? '✓ Verified' : '✗ Not Verified'}
+                        </span>
+                      )}
+                      {cfCategoryFilter && (
+                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                          {cfCategoryFilter}
+                        </span>
+                      )}
+                      {cfAsnFilter && (
+                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                          ASN: {cfAsnFilter}
+                        </span>
+                      )}
+                      {cfOrgFilter && (
+                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded max-w-24 truncate" title={cfOrgFilter}>
+                          Org: {cfOrgFilter}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </Card>
