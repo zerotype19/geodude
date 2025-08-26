@@ -1264,7 +1264,7 @@ export default function Events() {
                     🛡️ CF Signals Active
                   </span>
                   <span className="text-green-600">
-                    {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0} verified bots detected
+                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0} verified bots detected
                   </span>
                 </div>
                 <div className="text-xs text-green-700 mt-1">
@@ -1400,21 +1400,21 @@ export default function Events() {
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-500">Direct Traffic</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {formatNumber(summary.baseline.direct_events)}
+                    {formatNumber(summary?.baseline?.direct_events || 0)}
                   </p>
                   <p className="text-xs text-gray-500">estimated from rollups</p>
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-500">Search Traffic</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {formatNumber(summary.baseline.search_events)}
+                    {formatNumber(summary?.baseline?.search_events || 0)}
                   </p>
                   <p className="text-xs text-gray-500">estimated from rollups</p>
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-500">Sampled Rows</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {formatNumber(summary.baseline.sampled_rows_retained)}
+                    {formatNumber(summary?.baseline?.sampled_rows_retained || 0)}
                   </p>
                   <p className="text-xs text-gray-500">retained for detail view</p>
                 </div>
@@ -1429,7 +1429,7 @@ export default function Events() {
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Events Over Time</h3>
-                {summary.ai_lite && summary.baseline && (
+                {summary?.ai_lite && summary?.baseline && (
                   <div className="text-xs text-gray-500">
                     {includeBaseline ? (
                       <span className="flex items-center gap-1">
@@ -1447,7 +1447,7 @@ export default function Events() {
                   </div>
                 )}
               </div>
-              {summary.timeseries.length > 0 ? (
+              {summary?.timeseries.length > 0 ? (
                 <SimpleLineChart
                   data={summary.timeseries}
                   formatTime={formatChartTime}
@@ -1477,21 +1477,21 @@ export default function Events() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0}
+                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0}
                   </div>
                   <div className="text-gray-600">CF Verified Bots</div>
                   <div className="text-xs text-gray-500">Highest precedence</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
-                    {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? '100%' : '0%'}
+                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? '100%' : '0%'}
                   </div>
                   <div className="text-gray-600">CF Precedence</div>
                   <div className="text-xs text-gray-500">Always wins</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">
-                    {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Active' : 'None'}
+                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Active' : 'None'}
                   </div>
                   <div className="text-gray-600">Bot Categories</div>
                   <div className="text-xs text-gray-500">Search, AI Training</div>
@@ -1519,7 +1519,7 @@ export default function Events() {
         {summary && (
           <div className="space-y-4">
             {/* Class Chips */}
-            {summary.by_class.length > 0 && (
+            {summary?.by_class.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Traffic Classes</h4>
                 <div className="flex flex-wrap gap-2">
@@ -1530,12 +1530,12 @@ export default function Events() {
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                       }`}
                   >
-                    All ({formatNumber(summary.totals.events)})
+                    All ({formatNumber(summary?.totals.events || 0)})
                   </button>
-                  {summary.by_class.map((cls) => {
+                  {summary?.by_class.map((cls) => {
                     const isAIClass = ['human_via_ai', 'crawler', 'citation'].includes(cls.class);
                     const isBaselineClass = ['direct_human', 'search'].includes(cls.class);
-                    const showClass = !summary.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
+                    const showClass = !summary?.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
 
                     if (!showClass) return null;
 
@@ -1559,11 +1559,11 @@ export default function Events() {
                 </div>
 
                 {/* AI-Lite Mode Note */}
-                {summary.ai_lite && (
+                {summary?.ai_lite && (
                   <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
                     <Info className="h-3 w-3" />
                     <span>
-                      AI-Lite mode: AI traffic shown in full detail, baseline traffic sampled at {summary.baseline?.sample_pct || 2}%
+                      AI-Lite mode: AI traffic shown in full detail, baseline traffic sampled at {summary?.baseline?.sample_pct || 2}%
                     </span>
                   </div>
                 )}
@@ -1587,7 +1587,7 @@ export default function Events() {
             )}
 
             {/* Source Chips */}
-            {summary.by_source_top.length > 0 && (
+            {summary?.by_source_top.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">AI Sources</h4>
                 <div className="flex flex-wrap gap-2">
@@ -1600,7 +1600,7 @@ export default function Events() {
                   >
                     All sources
                   </button>
-                  {summary.by_source_top.slice(0, 6).map((source) => (
+                  {summary?.by_source_top.slice(0, 6).map((source) => (
                     <button
                       key={source.slug}
                       onClick={() => handleSourceFilter(source.slug)}
@@ -1617,7 +1617,7 @@ export default function Events() {
             )}
 
             {/* Bot Category Chips */}
-            {summary.by_class.some(cls => cls.class === 'crawler') && (
+            {summary?.by_class.some(cls => cls.class === 'crawler') && (
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Bot Categories</h4>
                 <div className="flex flex-wrap gap-2">
@@ -1818,10 +1818,10 @@ export default function Events() {
             <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
               <div className="text-xs text-gray-600 mb-2 font-medium">Traffic Breakdown (must equal Total Events)</div>
               <div className="flex flex-wrap gap-3 text-sm">
-                {summary.by_class.map((cls) => {
+                {summary?.by_class.map((cls) => {
                   const isAIClass = ['human_via_ai', 'crawler', 'citation'].includes(cls.class);
                   const isBaselineClass = ['direct_human', 'search'].includes(cls.class);
-                  const showClass = !summary.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
+                  const showClass = !summary?.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
 
                   if (!showClass) return null;
 
@@ -1852,12 +1852,12 @@ export default function Events() {
                   <div className="flex items-center gap-1">
                     <span className="w-3 h-3 rounded-full bg-green-500"></span>
                     <span className="text-gray-700">CF Verified Bots:</span>
-                    <span className="font-medium">{summary.by_class.find(cls => cls.class === 'crawler')?.count || 0}</span>
+                    <span className="font-medium">{summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="w-3 h-3 rounded-full bg-blue-500"></span>
                     <span className="text-gray-700">Other Traffic:</span>
-                    <span className="font-medium">{summary.totals.events - (summary.by_class.find(cls => cls.class === 'crawler')?.count || 0)}</span>
+                    <span className="font-medium">{summary?.totals.events - (summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0)}</span>
                   </div>
                 </div>
               </div>
@@ -1984,7 +1984,7 @@ export default function Events() {
                 <div className="text-sm text-gray-600">
                   <p className="font-medium mb-1">AI-Lite Mode Active</p>
                   <p>
-                    Non-AI events (direct human, search) are sampled at {summary.baseline?.sample_pct || 2}% for performance.
+                    Non-AI events (direct human, search) are sampled at {summary?.baseline?.sample_pct || 2}% for performance.
                     Only sampled baseline events appear in the table above. For complete baseline counts, see the rollup data above.
                   </p>
                 </div>
