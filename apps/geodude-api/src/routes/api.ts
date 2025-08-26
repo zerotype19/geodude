@@ -741,7 +741,12 @@ export async function handleApiRoutes(
                 botCategory,
                 q,
                 page = "1",
-                pageSize = "50"
+                pageSize = "50",
+                // CF Signal filters
+                cf_verified,
+                cf_category,
+                cf_asn,
+                cf_org
             } = Object.fromEntries(url.searchParams);
 
             if (!project_id) {
@@ -795,6 +800,31 @@ export async function handleApiRoutes(
                 params.push(searchTerm, searchTerm);
             }
 
+            // Add CF verification filter
+            if (cf_verified === 'true') {
+                whereConditions.push("e.cf_verified_bot = 1");
+            } else if (cf_verified === 'false') {
+                whereConditions.push("e.cf_verified_bot = 0");
+            }
+
+            // Add CF category filter
+            if (cf_category) {
+                whereConditions.push("e.cf_verified_bot_category = ?");
+                params.push(cf_category);
+            }
+
+            // Add CF ASN filter
+            if (cf_asn) {
+                whereConditions.push("e.cf_asn = ?");
+                params.push(parseInt(cf_asn));
+            }
+
+            // Add CF organization filter
+            if (cf_org) {
+                whereConditions.push("e.cf_org LIKE ?");
+                params.push(`%${cf_org}%`);
+            }
+
             const whereClause = whereConditions.join(" AND ");
 
             // Get total count
@@ -815,6 +845,8 @@ export async function handleApiRoutes(
                     json_extract(e.metadata,'$.referrer') AS referrer,
                     json_extract(e.metadata,'$.user_agent') AS user_agent,
                     e.ai_source_id, s.slug, s.name,
+                    e.cf_verified_bot, e.cf_verified_bot_category, e.cf_asn, e.cf_org,
+                    e.signals,
                     json_object(
                         'p', json_extract(e.metadata,'$.pathname'),
                         'r', json_extract(e.metadata,'$.referrer'),
@@ -853,7 +885,13 @@ export async function handleApiRoutes(
                     content_id: row.content_id,
                     property_id: row.property_id,
                     bot_category: row.bot_category,
-                    metadata_preview: row.metadata_preview
+                    metadata_preview: row.metadata_preview,
+                    // CF Signal fields
+                    cf_verified_bot: !!row.cf_verified_bot,
+                    cf_verified_bot_category: row.cf_verified_bot_category,
+                    cf_asn: row.cf_asn,
+                    cf_org: row.cf_org,
+                    signals: row.signals ? JSON.parse(row.signals) : null
                 };
             }));
 
