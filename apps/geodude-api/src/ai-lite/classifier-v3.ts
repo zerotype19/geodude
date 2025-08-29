@@ -237,133 +237,84 @@ export function classifyTrafficV3(input: {
     // Only proceed with referrer classification if we have valid host/path
     if (referrerHost && referrerPath) {
       // Check for self-referral (same domain)
-    if (referrerHost === currentHost.toLowerCase()) {
-      return {
-        class: 'direct_human',
-        reason: 'Self-referral (same domain)',
-        confidence: 1.0,
-        evidence: {
-          referrerHost,
-          referrerPath,
-          isSelfReferral: true
-        },
-        debug: {
-          matchedRule: 'Self-referral (same domain)',
-          signals: [`referrer_host: ${referrerHost}`]
-        }
-      };
-    }
-
-    // Check if referrer is a known AI assistant
-    const assistant = manifest.assistants[referrerHost];
-    if (assistant) {
-      // Check path restrictions
-      if (assistant.paths && assistant.paths.length > 0) {
-        const isAssistantPath = assistant.paths.some(path =>
-          referrerPath.indexOf(path) === 0
-        );
-        if (!isAssistantPath) {
-          // Not an AI path, treat as search if it's a search engine
-          const searchEngine = manifest.searchEngines[referrerHost];
-          if (searchEngine) {
-            return {
-              class: 'search',
-              aiSourceSlug: searchEngine.slug,
-              aiSourceName: searchEngine.name,
-              reason: `Search engine: ${searchEngine.name}`,
-              confidence: 0.9,
-              evidence: {
-                referrerHost,
-                referrerPath,
-                utmSource
-              },
-              debug: {
-                matchedRule: 'Search engine (path restriction)',
-                signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
-              }
-            };
+      if (referrerHost === currentHost.toLowerCase()) {
+        return {
+          class: 'direct_human',
+          reason: 'Self-referral (same domain)',
+          confidence: 1.0,
+          evidence: {
+            referrerHost,
+            referrerPath,
+            isSelfReferral: true
+          },
+          debug: {
+            matchedRule: 'Self-referral (same domain)',
+            signals: [`referrer_host: ${referrerHost}`]
           }
-        }
+        };
       }
 
-      // Valid AI assistant path
-      return {
-        class: 'human_via_ai',
-        aiSourceSlug: assistant.slug,
-        aiSourceName: assistant.name,
-        reason: `AI assistant: ${assistant.name}`,
-        confidence: 0.95,
-        evidence: {
-          referrerHost,
-          referrerPath,
-          utmSource
-        },
-        debug: {
-          matchedRule: 'AI assistant (path restriction)',
-          signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
+      // Check if referrer is a known AI assistant
+      const assistant = manifest.assistants[referrerHost];
+      if (assistant) {
+        // Check path restrictions
+        if (assistant.paths && assistant.paths.length > 0) {
+          const isAssistantPath = assistant.paths.some(path =>
+            referrerPath.indexOf(path) === 0
+          );
+          if (!isAssistantPath) {
+            // Not an AI path, treat as search if it's a search engine
+            const searchEngine = manifest.searchEngines[referrerHost];
+            if (searchEngine) {
+              return {
+                class: 'search',
+                aiSourceSlug: searchEngine.slug,
+                aiSourceName: searchEngine.name,
+                reason: `Search engine: ${searchEngine.name}`,
+                confidence: 0.9,
+                evidence: {
+                  referrerHost,
+                  referrerPath,
+                  utmSource
+                },
+                debug: {
+                  matchedRule: 'Search engine (path restriction)',
+                  signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
+                }
+              };
+            }
+          }
         }
-      };
-    }
 
-    // 3. Search referrer → search (normalized host detection)
-    if (referrerHost === 'google.com' || referrerHost === 'bing.com') {
-      // Special handling for major search engines
-      if (referrerHost === 'bing.com' && referrerPath.indexOf('/chat') === 0) {
-        // Bing chat is AI assistant
+        // Valid AI assistant path
         return {
           class: 'human_via_ai',
-          aiSourceSlug: 'microsoft_copilot',
-          aiSourceName: 'Microsoft Copilot',
-          reason: 'AI assistant on search domain: Microsoft Copilot',
-          confidence: 0.9,
+          aiSourceSlug: assistant.slug,
+          aiSourceName: assistant.name,
+          reason: `AI assistant: ${assistant.name}`,
+          confidence: 0.95,
           evidence: {
             referrerHost,
             referrerPath,
             utmSource
           },
           debug: {
-            matchedRule: 'AI assistant on search domain (Bing chat)',
-            signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
-          }
-        };
-      } else {
-        // Regular search traffic
-        const searchName = referrerHost === 'google.com' ? 'Google' : 'Microsoft Bing';
-        const searchSlug = referrerHost === 'google.com' ? 'google' : 'microsoft_bing';
-        return {
-          class: 'search',
-          aiSourceSlug: searchSlug,
-          aiSourceName: searchName,
-          reason: `Search engine: ${searchName}`,
-          confidence: 0.9,
-          evidence: {
-            referrerHost,
-            referrerPath,
-            utmSource
-          },
-          debug: {
-            matchedRule: 'Search engine (host detection)',
+            matchedRule: 'AI assistant (path restriction)',
             signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
           }
         };
       }
-    }
 
-    // Fallback to manifest-based search detection
-    const searchEngine = manifest.searchEngines[referrerHost];
-    if (searchEngine) {
-      // Check if path is excluded (AI paths)
-      if (searchEngine.excludePaths && searchEngine.excludePaths.some(path =>
-        referrerPath.indexOf(path) === 0
-      )) {
-        // This is an AI path on a search domain, treat as AI
-        const assistant = manifest.assistants[referrerHost];
-        if (assistant) {
+      // 3. Search referrer → search (normalized host detection)
+      if (referrerHost === 'google.com' || referrerHost === 'bing.com') {
+        // Special handling for major search engines
+        if (referrerHost === 'bing.com' && referrerPath.indexOf('/chat') === 0) {
+          // Bing chat is AI assistant
           return {
             class: 'human_via_ai',
-            aiSourceSlug: assistant.slug,
-            aiSourceName: assistant.name,
-            reason: `AI assistant on search domain: ${assistant.name}`,
+            aiSourceSlug: 'microsoft_copilot',
+            aiSourceName: 'Microsoft Copilot',
+            reason: 'AI assistant on search domain: Microsoft Copilot',
             confidence: 0.9,
             evidence: {
               referrerHost,
@@ -371,32 +322,81 @@ export function classifyTrafficV3(input: {
               utmSource
             },
             debug: {
-              matchedRule: 'AI assistant on search domain (manifest exclusion)',
+              matchedRule: 'AI assistant on search domain (Bing chat)',
+              signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
+            }
+          };
+        } else {
+          // Regular search traffic
+          const searchName = referrerHost === 'google.com' ? 'Google' : 'Microsoft Bing';
+          const searchSlug = referrerHost === 'google.com' ? 'google' : 'microsoft_bing';
+          return {
+            class: 'search',
+            aiSourceSlug: searchSlug,
+            aiSourceName: searchName,
+            reason: `Search engine: ${searchName}`,
+            confidence: 0.9,
+            evidence: {
+              referrerHost,
+              referrerPath,
+              utmSource
+            },
+            debug: {
+              matchedRule: 'Search engine (host detection)',
               signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
             }
           };
         }
       }
 
-      return {
-        class: 'search',
-        aiSourceSlug: searchEngine.slug,
-        aiSourceName: searchEngine.name,
-        reason: `Search engine: ${searchEngine.name}`,
-        confidence: 0.9,
-        evidence: {
-          referrerHost,
-          referrerPath,
-          utmSource
-        },
-        debug: {
-          matchedRule: 'Search engine (manifest)',
-          signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
+      // Fallback to manifest-based search detection
+      const searchEngine = manifest.searchEngines[referrerHost];
+      if (searchEngine) {
+        // Check if path is excluded (AI paths)
+        if (searchEngine.excludePaths && searchEngine.excludePaths.some(path =>
+          referrerPath.indexOf(path) === 0
+        )) {
+          // This is an AI path on a search domain, treat as AI
+          const assistant = manifest.assistants[referrerHost];
+          if (assistant) {
+            return {
+              class: 'human_via_ai',
+              aiSourceSlug: assistant.slug,
+              aiSourceName: assistant.name,
+              reason: `AI assistant on search domain: ${assistant.name}`,
+              confidence: 0.9,
+              evidence: {
+                referrerHost,
+                referrerPath,
+                utmSource
+              },
+              debug: {
+                matchedRule: 'AI assistant on search domain (manifest exclusion)',
+                signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
+              }
+            };
+          }
         }
-      };
+
+        return {
+          class: 'search',
+          aiSourceSlug: searchEngine.slug,
+          aiSourceName: searchEngine.name,
+          reason: `Search engine: ${searchEngine.name}`,
+          confidence: 0.9,
+          evidence: {
+            referrerHost,
+            referrerPath,
+            utmSource
+          },
+          debug: {
+            matchedRule: 'Search engine (manifest)',
+            signals: [`referrer_host: ${referrerHost}`, `referrer_path: ${referrerPath}`]
+          }
+        };
+      }
     }
   }
-  } // Close the referrer classification block
 
   // 4. Social sharing with AI attribution (Slack/Discord)
   if (referrerUrl) {
@@ -409,7 +409,7 @@ export function classifyTrafficV3(input: {
       referrerHost = null;
     }
     
-        if (referrerHost && manifest.socialShareHosts.includes(referrerHost)) {
+    if (referrerHost && manifest.socialShareHosts.includes(referrerHost)) {
       // Extract AI source from query parameters
       let aiSlug: string | undefined;
       let referralChain: string | undefined;
@@ -526,7 +526,6 @@ export function classifyTrafficV3(input: {
       }
     }
   }
-  } // Close the social sharing block
 
   // 5. UTM source and AI reference detection (when no referrer)
   if (utmSource && !referrerUrl) {
