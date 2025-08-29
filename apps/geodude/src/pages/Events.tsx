@@ -403,38 +403,39 @@ export default function Events() {
                           </div>
                         )}
                       </div>
-                    <div>
-                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw Inputs</div>
-                      <div className="space-y-2 text-xs">
-                        <div>
-                          <span className="text-gray-600">Referrer:</span>
-                          <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
-                            {detail.referrer || '—'}
-                          </code>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">User Agent:</span>
-                          <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded max-w-xs truncate block">
-                            {detail.user_agent || '—'}
-                          </code>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">CF Bot Verified:</span>
-                          <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
-                            {String(detail.debug?.cfBot || false)}
-                          </code>
-                        </div>
-                        {detail.cf?.verifiedBot && (
-                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                            <div className="text-xs text-green-800 font-medium">
-                              ⚡ CF Precedence: This bot was classified as crawler because Cloudflare verified it, 
-                              regardless of user agent or referrer patterns.
-                            </div>
+                      <div>
+                        <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw Inputs</div>
+                        <div className="space-y-2 text-xs">
+                          <div>
+                            <span className="text-gray-600">Referrer:</span>
+                            <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
+                              {detail.referrer || '—'}
+                            </code>
                           </div>
-                        )}
+                          <div>
+                            <span className="text-gray-600">User Agent:</span>
+                            <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded max-w-xs truncate block">
+                              {detail.user_agent || '—'}
+                            </code>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">CF Bot Verified:</span>
+                            <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
+                              {String(detail.debug?.cfBot || false)}
+                            </code>
+                          </div>
+                          {detail.cf?.verifiedBot && (
+                            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                              <div className="text-xs text-green-800 font-medium">
+                                ⚡ CF Precedence: This bot was classified as crawler because Cloudflare verified it, 
+                                regardless of user agent or referrer patterns.
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -1311,7 +1312,7 @@ export default function Events() {
             })() && (
               <Card>
                 <button 
-                  onClick={() => handleCfVerifiedFilter()}
+                  onClick={() => handleCfVerifiedFilter('true')}
                   className="w-full p-4 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center">
@@ -1524,7 +1525,7 @@ export default function Events() {
               <div className="flex items-center gap-4">
                 {/* Simple CF Filter */}
                 <button
-                  onClick={() => handleCfVerifiedFilter()}
+                  onClick={() => handleCfVerifiedFilter('true')}
                   className={`px-3 py-2 text-sm border rounded-md ${
                     cfVerifiedFilter === 'true' 
                       ? 'bg-green-100 text-green-800 border-green-300' 
