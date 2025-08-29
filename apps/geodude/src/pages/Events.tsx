@@ -25,30 +25,60 @@ function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: s
   const minValue = Math.min(...data.map(d => d.count));
   const range = Math.max(1, maxValue - minValue);
 
+  // Handle edge case where data.length === 1
+  if (data.length === 1) {
+    return (
+      <div className="relative h-64 w-full">
+        <svg viewBox="0 0 300 120" className="w-full h-full">
+          <circle
+            cx="150"
+            cy="20"
+            r="3"
+            fill="#3B82F6"
+          />
+        </svg>
+        <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500 px-2">
+          <span>{formatTime(data[0].ts)}</span>
+        </div>
+      </div>
+    );
+  }
+
   const points = data.map((d, i) => {
     const x = (i / (data.length - 1)) * 300;
     const y = 100 - ((d.count - minValue) / range) * 80;
+    // Ensure we have valid numbers
+    if (isNaN(x) || isNaN(y)) return null;
     return `${x},${y}`;
-  }).join(' ');
+  }).filter(Boolean).join(' ');
 
   return (
     <div className="relative h-64 w-full">
       <svg viewBox="0 0 300 120" className="w-full h-full">
-        <polyline
-          fill="none"
-          stroke="#3B82F6"
-          strokeWidth="2"
-          points={points}
-        />
-        {data.map((d, i) => (
-          <circle
-            key={i}
-            cx={(i / (data.length - 1)) * 300}
-            cy={100 - ((d.count - minValue) / range) * 80}
-            r="3"
-            fill="#3B82F6"
+        {points && (
+          <polyline
+            fill="none"
+            stroke="#3B82F6"
+            strokeWidth="2"
+            points={points}
           />
-        ))}
+        )}
+        {data.map((d, i) => {
+          const cx = (i / (data.length - 1)) * 300;
+          const cy = 100 - ((d.count - minValue) / range) * 80;
+          // Skip rendering if coordinates are invalid
+          if (isNaN(cx) || isNaN(cy)) return null;
+          
+          return (
+            <circle
+              key={i}
+              cx={cx}
+              cy={cy}
+              r="3"
+              fill="#3B82F6"
+            />
+          );
+        })}
       </svg>
       <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500 px-2">
         {data.length > 0 && (
