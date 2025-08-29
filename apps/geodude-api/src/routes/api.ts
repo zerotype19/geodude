@@ -2832,11 +2832,20 @@ export async function handleApiRoutes(
 
                     // Check for spoof guard: if referrer is search engine, ignore UTM params
                     if (utmSource && referrer) {
-                        const referrerHost = new URL(referrer).hostname.toLowerCase();
-                        if (referrerHost === 'google.com' || referrerHost === 'bing.com' || referrerHost === 'duckduckgo.com') {
-                            spoofReason = 'search_referrer';
-                        } else if (referrerHost.includes('chat.openai.com') || referrerHost.includes('perplexity.ai') || referrerHost.includes('gemini.google.com')) {
-                            spoofReason = 'ai_assistant_referrer';
+                        let referrerHost: string | null = null;
+                        try {
+                            referrerHost = new URL(referrer).hostname.toLowerCase();
+                        } catch (error) {
+                            console.warn('Invalid referrer URL in spoof guard check:', referrer, error);
+                            referrerHost = null;
+                        }
+                        
+                        if (referrerHost) {
+                            if (referrerHost === 'google.com' || referrerHost === 'bing.com' || referrerHost === 'duckduckgo.com') {
+                                spoofReason = 'search_referrer';
+                            } else if (referrerHost.includes('chat.openai.com') || referrerHost.includes('perplexity.ai') || referrerHost.includes('gemini.google.com')) {
+                                spoofReason = 'ai_assistant_referrer';
+                            }
                         }
                     }
 
@@ -2846,6 +2855,7 @@ export async function handleApiRoutes(
                         referrerUrl: referrer,
                         userAgent,
                         currentHost,
+                        url: url,
                         utmSource: spoofReason ? null : utmSource, // Ignore UTM if spoof detected
                         manifest: STATIC_MANIFEST_V3
                     });
@@ -2862,12 +2872,12 @@ export async function handleApiRoutes(
                     });
 
                     // Warning log for CF precedence mismatches
-                    if (cfSignals.cfVerified && classification.class !== 'crawler') {
+                    if (cfSignals.cfVerified && classification?.class !== 'crawler') {
                         console.warn('cf_precedence_mismatch', {
                             cfCategory: cfSignals.cfCategoryRaw,
-                            class: classification.class,
-                            botCategory: classification.evidence?.botCategory,
-                            reason: classification.reason
+                            class: classification?.class,
+                            botCategory: classification?.evidence?.botCategory,
+                            reason: classification?.reason
                         });
                     }
 
@@ -2875,7 +2885,7 @@ export async function handleApiRoutes(
                     classificationResults.push(classification);
 
                     // Ensure AI source exists and get ID
-                    if (classification.aiSourceSlug) {
+                    if (classification?.aiSourceSlug) {
                         const category = trafficClass === 'crawler' ? 'crawler' : 'assistant';
                         aiSourceId = await ensureAISourceWithMapping(
                             env,
@@ -2889,7 +2899,16 @@ export async function handleApiRoutes(
                     const { buildAuditMetaV3 } = await import('../ai-lite/classifier-v3');
                     const auditMeta = buildAuditMetaV3({
                         referrerUrl: referrer,
-                        classification,
+                        classification: classification || {
+                            class: 'direct_human',
+                            reason: 'Classification failed, fallback to direct human',
+                            confidence: 0.1,
+                            evidence: {},
+                            debug: {
+                                matchedRule: 'classification_error_fallback',
+                                signals: ['classification_error']
+                            }
+                        },
                         ua: userAgent,
                         cfVerifiedBotCategory: cfSignals.cfCategoryRaw,
                         versions: {
@@ -2937,6 +2956,18 @@ export async function handleApiRoutes(
                     // Fall back to default behavior
                     shouldInsertRow = true;
                     isSampled = false;
+                    // Set a default classification to prevent null reference errors
+                    classification = {
+                        class: 'direct_human',
+                        reason: 'Classification failed, fallback to direct human',
+                        confidence: 0.1,
+                        evidence: {},
+                        debug: {
+                            matchedRule: 'classification_error_fallback',
+                            signals: ['classification_error']
+                        }
+                    };
+                    trafficClass = 'direct_human';
                 }
 
                 // AI-Lite: Check for crawl deduplication (within 10 minutes)
@@ -2977,7 +3008,7 @@ export async function handleApiRoutes(
                         timestamp: new Date(occurred_at || now),
                         trafficClass,
                         isSampled,
-                        botCategory: classification.evidence.botCategory || null
+                        botCategory: classification?.evidence?.botCategory || null
                     });
                 } catch (rollupError) {
                     console.error('Error updating rollup:', rollupError);
@@ -3004,7 +3035,7 @@ export async function handleApiRoutes(
                     }
                     
                     // Combine with existing signals from classification
-                    const allSignals = [...(classification.debug?.signals || []), ...cfDebugSignals];
+                    const allSignals = [...(classification?.debug?.signals || []), ...cfDebugSignals];
                     
                     // Debug logging to identify undefined values
                     const insertValues = [
@@ -3016,8 +3047,8 @@ export async function handleApiRoutes(
                         JSON.stringify(enrichedMetadata || {}),
                         occurred_at || now,
                         isSampled ? 1 : 0, // Add sampled flag
-                        classification.class, // Add traffic classification
-                        classification.evidence.botCategory || null, // Add bot category
+                        classification?.class || 'direct_human', // Add traffic classification
+                        classification?.evidence?.botCategory || null, // Add bot category
                         cfSignals.cfVerified ? 1 : 0, // cf_verified_bot
                         cfSignals.cfCategoryRaw, // cf_verified_bot_category
                         cfSignals.cfASN, // cf_asn

@@ -238,38 +238,13 @@ export default function Events() {
             )}
           </td>
           
-          {/* CF Signals Column */}
+          {/* CF Column - Simple Icon */}
           <td className="py-3 pr-4">
-            <div className="space-y-1">
-              {/* CF Verification Status */}
-              {event.cf_verified_bot !== undefined && (
-                <div className="text-xs">
-                  <span className={`px-1 py-0.5 rounded ${event.cf_verified_bot ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {event.cf_verified_bot ? '✓ Verified' : '✗ Not Verified'}
-                  </span>
-                </div>
-              )}
-              
-              {/* CF Category */}
-              {event.cf_verified_bot_category && (
-                <div className="text-xs">
-                  <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded">
-                    {event.cf_verified_bot_category}
-                  </span>
-                </div>
-              )}
-              
-              {/* CF ASN/Org */}
-              {(event.cf_asn || event.cf_org) && (
-                <div className="text-xs text-gray-600">
-                  {event.cf_asn && <span className="block">ASN: {event.cf_asn}</span>}
-                  {event.cf_org && <span className="block truncate max-w-24" title={event.cf_org}>{event.cf_org}</span>}
-                </div>
-              )}
-              
-              {/* No CF Data */}
-              {event.cf_verified_bot === undefined && !event.cf_verified_bot_category && !event.cf_asn && !event.cf_org && (
-                <span className="text-xs text-gray-400">No CF data</span>
+            <div className="flex items-center justify-center">
+              {event.cf_verified_bot ? (
+                <span className="text-green-600" title="CF Verified Bot">🛡️</span>
+              ) : (
+                <span className="text-gray-400" title="No CF Signal">—</span>
               )}
             </div>
           </td>
@@ -289,24 +264,12 @@ export default function Events() {
               <span className="text-gray-400">—</span>
             )}
           </td>
-          <td className="py-3 pr-4 relative">
-            {event.metadata_preview && Object.keys(event.metadata_preview).length > 0 ? (
-              <button
-                onClick={() => setMetadataPopover({ id: event.id, metadata: event.metadata_preview })}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
-            ) : (
-              <span className="text-gray-400">—</span>
-            )}
-            {renderMetadataPopover(event)}
-          </td>
+
         </tr>
 
         {open && (
           <tr className="bg-gray-50/50">
-            <td colSpan={7}>
+            <td colSpan={6}>
               {loading && <div className="p-4 text-sm text-gray-500">Loading classification details...</div>}
 
               {detail && (
@@ -412,32 +375,34 @@ export default function Events() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Signals</div>
-                      <ul className="space-y-1">
-                        {(detail.debug?.signals || []).map((signal: string, i: number) => (
-                          <li key={i} className="text-xs text-gray-600">
-                            • {signal}
-                          </li>
-                        ))}
-                        {(!detail.debug?.signals || detail.debug.signals.length === 0) && (
-                          <li className="text-xs text-gray-400">No signals recorded</li>
+                  {/* Signals Section - Only visible in debug mode */}
+                  {debugMode && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs uppercase text-gray-500 font-medium mb-2">Signals</div>
+                        <ul className="space-y-1">
+                          {(detail.debug?.signals || []).map((signal: string, i: number) => (
+                            <li key={i} className="text-xs text-gray-600">
+                              • {signal}
+                            </li>
+                          ))}
+                          {(!detail.debug?.signals || detail.debug.signals.length === 0) && (
+                            <li className="text-xs text-gray-400">No signals recorded</li>
+                          )}
+                        </ul>
+                        
+                        {/* CF Precedence Indicator */}
+                        {detail.cf?.verifiedBot && (
+                          <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
+                            <div className="text-xs text-green-800 font-medium">
+                              🛡️ CF Precedence Applied
+                            </div>
+                            <div className="text-xs text-green-700 mt-1">
+                              Cloudflare verification overrode all other classification signals
+                            </div>
+                          </div>
                         )}
-                      </ul>
-                      
-                      {/* CF Precedence Indicator */}
-                      {detail.cf?.verifiedBot && (
-                        <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
-                          <div className="text-xs text-green-800 font-medium">
-                            🛡️ CF Precedence Applied
-                          </div>
-                          <div className="text-xs text-green-700 mt-1">
-                            Cloudflare verification overrode all other classification signals
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
                     <div>
                       <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw Inputs</div>
                       <div className="space-y-2 text-xs">
@@ -1078,7 +1043,7 @@ export default function Events() {
           <div className="flex items-center gap-4">
             {/* Debug Mode Toggle (Admin only) */}
             <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
+              <label className={`flex items-center gap-2 text-sm ${debugMode ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
                 <input
                   type="checkbox"
                   checked={debugMode}
@@ -1086,6 +1051,11 @@ export default function Events() {
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 Debug Mode
+                {debugMode && (
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    Active
+                  </span>
+                )}
               </label>
               <div className="relative group">
                 <Info className="h-3 w-3 text-gray-400 cursor-help" />
@@ -1340,7 +1310,10 @@ export default function Events() {
               return cfVerifiedCount > 0;
             })() && (
               <Card>
-                <div className="p-4">
+                <button 
+                  onClick={() => handleCfVerifiedFilter()}
+                  className="w-full p-4 hover:bg-gray-50 transition-colors"
+                >
                   <div className="flex items-center">
                     <div className="h-5 w-5 text-green-600">🛡️</div>
                     <div className="ml-3">
@@ -1348,10 +1321,10 @@ export default function Events() {
                       <p className="text-2xl font-semibold text-gray-900">
                         {summary.by_class.find(cls => cls.class === 'crawler')?.count || 0}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Cloudflare verified</p>
+                      <p className="text-xs text-gray-500 mt-1">Cloudflare verified • Click to filter</p>
                     </div>
                   </div>
-                </div>
+                </button>
               </Card>
             )}
           </div>
@@ -1361,28 +1334,28 @@ export default function Events() {
         {summary?.ai_lite && summary.baseline && (
           <Card>
             <div className="p-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Baseline Traffic (Rollup Data)</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Baseline Traffic</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="text-center">
-                  <p className="text-sm font-medium text-gray-500">Direct Traffic</p>
+                  <p className="text-sm font-medium text-gray-500">Direct</p>
                   <p className="text-2xl font-semibold text-gray-900">
                     {formatNumber(summary?.baseline?.direct_events || 0)}
                   </p>
-                  <p className="text-xs text-gray-500">estimated from rollups</p>
+                  <p className="text-xs text-gray-500">rollup data</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-gray-500">Search Traffic</p>
+                  <p className="text-sm font-medium text-gray-500">Search</p>
                   <p className="text-2xl font-semibold text-gray-900">
                     {formatNumber(summary?.baseline?.search_events || 0)}
                   </p>
-                  <p className="text-xs text-gray-500">estimated from rollups</p>
+                  <p className="text-xs text-gray-500">rollup data</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-gray-500">Sampled Rows</p>
+                  <p className="text-sm font-medium text-gray-500">Sampled</p>
                   <p className="text-2xl font-semibold text-gray-900">
                     {formatNumber(summary?.baseline?.sampled_rows_retained || 0)}
                   </p>
-                  <p className="text-xs text-gray-500">retained for detail view</p>
+                  <p className="text-xs text-gray-500">detail rows</p>
                 </div>
               </div>
             </div>
@@ -1400,9 +1373,9 @@ export default function Events() {
                     {includeBaseline ? (
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                        AI traffic (full detail)
+                        AI traffic
                         <span className="w-2 h-2 bg-gray-400 rounded-full ml-2"></span>
-                        Baseline (estimated from rollups)
+                        Baseline
                       </span>
                     ) : (
                       <span className="flex items-center gap-1">
@@ -1427,7 +1400,7 @@ export default function Events() {
           </Card>
         )}
 
-        {/* CF Signals Overview - Collapsible */}
+        {/* CF Signals Overview - Collapsible by Default */}
         {(() => {
           const cfVerifiedCount = summary?.by_class?.find(cls => cls.class === 'crawler')?.count || 0;
           return cfVerifiedCount > 0;
@@ -1454,42 +1427,8 @@ export default function Events() {
               
               {showCfOverview && (
                 <div className="mt-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0}
-                      </div>
-                      <div className="text-gray-600">CF Verified Bots</div>
-                      <div className="text-xs text-gray-500">Highest precedence</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? '100%' : '0%'}
-                      </div>
-                      <div className="text-gray-600">CF Precedence</div>
-                      <div className="text-xs text-gray-500">Always wins</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Active' : 'None'}
-                      </div>
-                      <div className="text-gray-600">Bot Categories</div>
-                      <div className="text-xs text-gray-500">Search, AI Training</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0 > 0 ? 'Real-time' : 'Offline'}
-                      </div>
-                      <div className="text-gray-600">Signal Source</div>
-                      <div className="text-xs text-gray-500">CF Edge</div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
-                    <div className="text-sm text-green-800">
-                      <strong>CF Precedence System:</strong> When Cloudflare verifies a bot, it automatically gets classified as a crawler with highest priority. 
-                      This overrides any user agent patterns, referrer information, or other classification signals.
-                    </div>
+                  <div className="text-sm text-gray-600">
+                    Cloudflare verified bots automatically get classified as crawlers with highest priority, overriding all other signals.
                   </div>
                 </div>
               )}
@@ -1583,75 +1522,19 @@ export default function Events() {
 
               {/* Row 2: Compact Dropdowns */}
               <div className="flex items-center gap-4">
-                {/* AI Sources Dropdown */}
-                <div className="relative">
-                  <button className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 flex items-center gap-2">
-                    <span>AI Sources</span>
-                    {sourceFilter && (
-                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                        {sourceFilter}
-                      </span>
-                    )}
-                    <span className="text-gray-500">•</span>
-                    <span className="text-gray-600">{summary?.by_source_top.length || 0}</span>
-                  </button>
-                  {/* Dropdown content would go here */}
-                </div>
+                {/* Simple CF Filter */}
+                <button
+                  onClick={() => handleCfVerifiedFilter()}
+                  className={`px-3 py-2 text-sm border rounded-md ${
+                    cfVerifiedFilter === 'true' 
+                      ? 'bg-green-100 text-green-800 border-green-300' 
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  🛡️ CF Verified Only
+                </button>
 
-                {/* Bot Categories Dropdown */}
-                <div className="relative">
-                  <button className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 flex items-center gap-2">
-                    <span>Bot Categories</span>
-                    {botCategoryFilter && (
-                      <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
-                        {botCategoryFilter}
-                      </span>
-                    )}
-                  </button>
-                  {/* Dropdown content would go here */}
-                </div>
 
-                {/* Cloudflare Dropdown */}
-                <div className="relative">
-                  <button className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50 flex items-center gap-2">
-                    <span>🛡️ Cloudflare</span>
-                    {(cfVerifiedFilter || cfCategoryFilter || cfAsnFilter || cfOrgFilter) && (
-                      <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                        Active
-                      </span>
-                    )}
-                  </button>
-                  {/* Dropdown content would go here */}
-                </div>
-
-                {/* CF Filter Status Indicator */}
-                {(cfVerifiedFilter || cfCategoryFilter || cfAsnFilter || cfOrgFilter) && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                    <span className="text-xs text-blue-700 font-medium">🛡️ CF Filters:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {cfVerifiedFilter && (
-                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                          {cfVerifiedFilter === 'true' ? '✓ Verified' : '✗ Not Verified'}
-                        </span>
-                      )}
-                      {cfCategoryFilter && (
-                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                          {cfCategoryFilter}
-                        </span>
-                      )}
-                      {cfAsnFilter && (
-                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                          ASN: {cfAsnFilter}
-                        </span>
-                      )}
-                      {cfOrgFilter && (
-                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded max-w-24 truncate" title={cfOrgFilter}>
-                          Org: {cfOrgFilter}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </Card>
@@ -1705,7 +1588,7 @@ export default function Events() {
                   <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
                     <Info className="h-3 w-3" />
                     <span>
-                      AI-Lite mode: AI traffic shown in full detail, baseline traffic sampled at {summary?.baseline?.sample_pct || 2}%
+                      AI-Lite: Baseline sampled at {summary?.baseline?.sample_pct || 2}%
                     </span>
                   </div>
                 )}
@@ -1717,7 +1600,7 @@ export default function Events() {
                     className="text-xs text-gray-600 hover:text-gray-800 flex items-center gap-1 px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
                   >
                     <Info className="h-3 w-3" />
-                    {showDebugInfo ? 'Hide' : 'Show'} Classification Details
+                    {showDebugInfo ? 'Hide' : 'Show'} Details
                   </button>
                   {showDebugInfo && (
                     <span className="text-xs text-gray-500">
@@ -2039,9 +1922,9 @@ export default function Events() {
                         <th className="py-3 pr-4">Event</th>
                         <th className="py-3 pr-4">Traffic Class</th>
                         <th className="py-3 pr-4">AI Source</th>
-                        <th className="py-3 pr-4">CF Signals</th>
+                        <th className="py-3 pr-4">CF</th>
                         <th className="py-3 pr-4">URL</th>
-                        <th className="py-3 pr-4">Metadata</th>
+
                       </tr>
                     </thead>
                     <tbody>
@@ -2124,10 +2007,9 @@ export default function Events() {
               <div className="flex items-start gap-2">
                 <Info className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-gray-600">
-                  <p className="font-medium mb-1">AI-Lite Mode Active</p>
+                  <p className="font-medium mb-1">AI-Lite Mode</p>
                   <p>
-                    Non-AI events (direct human, search) are sampled at {summary?.baseline?.sample_pct || 2}% for performance.
-                    Only sampled baseline events appear in the table above. For complete baseline counts, see the rollup data above.
+                    Baseline events sampled at {summary?.baseline?.sample_pct || 2}% for performance. See rollup data above for totals.
                   </p>
                 </div>
               </div>
@@ -2161,8 +2043,7 @@ export default function Events() {
                   </p>
                   <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
                     <p className="text-sm text-green-800">
-                      <strong>Cloudflare Precedence:</strong> When Cloudflare verifies a bot (e.g., "Search Engine Crawler"), 
-                      it automatically gets classified as a crawler with highest priority, regardless of user agent patterns or referrer information.
+                      <strong>Cloudflare Precedence:</strong> CF verified bots get highest priority, overriding all other signals.
                     </p>
                   </div>
 
@@ -2202,19 +2083,17 @@ export default function Events() {
                   <h4 className="text-lg font-medium text-gray-900 mb-3">Cloudflare Signals</h4>
                   <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
                     <p className="text-sm text-blue-800 mb-2">
-                      <strong>CF Verification:</strong> Cloudflare automatically verifies legitimate bots and provides detailed signals:
+                      <strong>CF Verification:</strong> Cloudflare provides bot verification signals:
                     </p>
                     <ul className="text-sm text-blue-700 space-y-1">
-                      <li>• <strong>verifiedBotCategory:</strong> "Search Engine Crawler", "AI Model Training", "Page Preview"</li>
-                      <li>• <strong>ASN:</strong> Autonomous System Number (e.g., 15169 for Google)</li>
-                      <li>• <strong>Organization:</strong> Company name (e.g., "Google LLC", "OpenAI")</li>
-                      <li>• <strong>Geolocation:</strong> Country, city, region from CF edge</li>
+                      <li>• <strong>Category:</strong> "Search Engine Crawler", "AI Model Training", "Page Preview"</li>
+                      <li>• <strong>ASN:</strong> Autonomous System Number</li>
+                      <li>• <strong>Organization:</strong> Company name</li>
                     </ul>
                   </div>
 
                   <p className="text-gray-700">
-                    Each event's expanded view shows the matched rule and signals used by the classifier.
-                    Use Debug Mode to automatically expand all rows and inspect classification details.
+                    Use Debug Mode to expand rows and see classification details.
                   </p>
                 </div>
               </div>

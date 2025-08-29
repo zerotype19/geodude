@@ -11,13 +11,21 @@ export const normalizeHost = (h: string): string =>
 /**
  * Extract and normalize base host from URL
  */
-export const baseHost = (u?: string | null): string | null =>
-  u ? normalizeHost(new URL(u).hostname) : null;
+export const baseHost = (u?: string | null): string | null => {
+  if (!u) return null;
+  try {
+    return normalizeHost(new URL(u).hostname);
+  } catch (error) {
+    console.warn('Invalid URL in baseHost:', u, error);
+    return null;
+  }
+};
 
 export interface TrafficClassificationV3 {
   class: 'human_via_ai' | 'crawler' | 'search' | 'direct_human';
   aiSourceSlug?: string | null;
   aiSourceName?: string | null;
+  botCategory?: BotCategory;
   reason: string;
   confidence: number;
   evidence: {
@@ -214,11 +222,21 @@ export function classifyTrafficV3(input: {
 
   // 2. AI assistant referrer → human_via_ai
   if (referrerUrl) {
-    const referrer = new URL(referrerUrl);
-    const referrerHost = normalizeHost(referrer.hostname);
-    const referrerPath = referrer.pathname;
-
-    // Check for self-referral (same domain)
+    let referrer, referrerHost, referrerPath;
+    try {
+      referrer = new URL(referrerUrl);
+      referrerHost = normalizeHost(referrer.hostname);
+      referrerPath = referrer.pathname;
+    } catch (error) {
+      console.warn('Invalid referrer URL in classifier:', referrerUrl, error);
+      // Skip referrer-based classification if URL is invalid
+      referrerHost = null;
+      referrerPath = null;
+    }
+    
+    // Only proceed with referrer classification if we have valid host/path
+    if (referrerHost && referrerPath) {
+      // Check for self-referral (same domain)
     if (referrerHost === currentHost.toLowerCase()) {
       return {
         class: 'direct_human',
@@ -378,13 +396,20 @@ export function classifyTrafficV3(input: {
       };
     }
   }
+  } // Close the referrer classification block
 
   // 4. Social sharing with AI attribution (Slack/Discord)
   if (referrerUrl) {
-    const referrer = new URL(referrerUrl);
-    const referrerHost = normalizeHost(referrer.hostname);
-
-    if (manifest.socialShareHosts.includes(referrerHost)) {
+    let referrer, referrerHost;
+    try {
+      referrer = new URL(referrerUrl);
+      referrerHost = normalizeHost(referrer.hostname);
+    } catch (error) {
+      console.warn('Invalid referrer URL in social sharing classifier:', referrerUrl, error);
+      referrerHost = null;
+    }
+    
+        if (referrerHost && manifest.socialShareHosts.includes(referrerHost)) {
       // Extract AI source from query parameters
       let aiSlug: string | undefined;
       let referralChain: string | undefined;
@@ -501,6 +526,7 @@ export function classifyTrafficV3(input: {
       }
     }
   }
+  } // Close the social sharing block
 
   // 5. UTM source and AI reference detection (when no referrer)
   if (utmSource && !referrerUrl) {
@@ -661,12 +687,22 @@ export function classifyTrafficV3(input: {
   }
 
   // 7. Default → direct_human
+  let referrerHost: string | undefined;
+  if (referrerUrl) {
+    try {
+      referrerHost = new URL(referrerUrl).hostname;
+    } catch (error) {
+      console.warn('Invalid referrer URL in default case:', referrerUrl, error);
+      referrerHost = undefined;
+    }
+  }
+  
   return {
     class: 'direct_human',
     reason: 'No referrer or unknown source',
     confidence: 0.7,
     evidence: {
-      referrerHost: referrerUrl ? new URL(referrerUrl).hostname : undefined,
+      referrerHost,
       utmSource
     },
     debug: {
@@ -698,7 +734,15 @@ export function buildAuditMetaV3(input: {
   cf_verified_category: string | null;
   bot_category: string | null;
 } {
-  const u = input.referrerUrl ? new URL(input.referrerUrl) : null;
+  let u: URL | null = null;
+  if (input.referrerUrl) {
+    try {
+      u = new URL(input.referrerUrl);
+    } catch (error) {
+      console.warn('Invalid referrer URL in buildAuditMetaV3:', input.referrerUrl, error);
+      u = null;
+    }
+  }
 
   return {
     referrer_url: input.referrerUrl ?? null,
