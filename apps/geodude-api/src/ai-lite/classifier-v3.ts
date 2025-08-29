@@ -1,4 +1,6 @@
 import { normalizeCfCategory, BotCategory } from '../classifier/botCategoryMap';
+import { mapCfCategory } from '../classifier/cf';
+import { detectAiFromParams } from '../classifier/params';
 
 /**
  * Normalize hostname by removing www./m. prefixes and converting to lowercase
@@ -177,27 +179,35 @@ export function classifyTrafficV3(input: {
   referrerUrl?: string | null;
   userAgent?: string | null;
   currentHost: string;
+  url: string;
   utmSource?: string;
   aiRef?: string;
   manifest: ClassifierManifestV3;
 }): TrafficClassificationV3 {
-  const { cfVerifiedBotCategory, cfVerified, referrerUrl, userAgent, currentHost, utmSource, aiRef, manifest } = input;
+  const { cfVerifiedBotCategory, cfVerified, referrerUrl, userAgent, currentHost, url, utmSource, aiRef, manifest } = input;
 
   // 1. Cloudflare verified bot → crawler (highest precedence, no guesswork)
   if (cfVerified === true) {
-    const botCategory = normalizeCfCategory(cfVerifiedBotCategory);
+    const mapped = mapCfCategory(cfVerifiedBotCategory);
+    const signals = [
+      'cf.verified=true',
+      `cf.cat=${cfVerifiedBotCategory || 'unknown'}`,
+      `cf.cat_mapped=${mapped}`
+    ];
+    
     return {
       class: 'crawler',
-      reason: `Cloudflare verified bot: ${cfVerifiedBotCategory || 'unknown'}`,
+      botCategory: mapped,
+      reason: 'cf.verified_bot',
       confidence: 1.0,
       evidence: {
         cfVerifiedCategory: cfVerifiedBotCategory,
-        botCategory,
+        botCategory: mapped,
         userAgent: userAgent || undefined
       },
       debug: {
-        matchedRule: 'Cloudflare verified bot',
-        signals: [`cf.verified=true`, `cf_verified_category: ${cfVerifiedBotCategory || 'unknown'}`]
+        matchedRule: 'cf.verified_bot',
+        signals
       }
     };
   }
@@ -567,6 +577,26 @@ export function classifyTrafficV3(input: {
       debug: {
         matchedRule: 'UTM source without referrer',
         signals: [`utm_source: ${utmSource}`]
+      }
+    };
+  }
+
+  // 6. AI source detection from URL parameters (when no referrer)
+  const { slug: aiSlugFromParams, spoof } = detectAiFromParams(input.url, baseHost(input.referrer));
+  if (aiSlugFromParams) {
+    const signals = [`params_ai_source=${aiSlugFromParams}`];
+    if (spoof) signals.push('params_spoof_guard=search_referrer');
+    return {
+      class: 'human_via_ai',
+      aiSourceSlug: aiSlugFromParams,
+      reason: 'params.ai_source',
+      confidence: 0.9,
+      evidence: {
+        aiRef: aiSlugFromParams
+      },
+      debug: {
+        matchedRule: 'params.ai_source',
+        signals
       }
     };
   }

@@ -1,4 +1,5 @@
 import { normalizeCfCategory } from '../classifier/botCategoryMap';
+import { mapCfCategory } from '../classifier/cf';
 import { upsertRollup } from '../ai-lite/rollups';
 
 /**
@@ -611,8 +612,18 @@ export async function handleAdminRoutes(
       const urlParams = new URLSearchParams(url.search);
       const referrer = urlParams.get('referrer');
       const userAgent = urlParams.get('ua') || 'Mozilla/5.0 (Test)';
-      const utmSource = urlParams.get('utm_source');
-      const aiRef = urlParams.get('ai_ref');
+      
+      // Handle URL parameter more carefully - it might contain query parameters
+      let testUrl = urlParams.get('url') || 'https://test.example.com/';
+      
+      // If the URL parameter was truncated due to & characters, try to reconstruct it
+      // This handles cases where the URL contains query parameters
+      if (testUrl && !testUrl.includes('?') && url.search.includes('url=')) {
+        const urlMatch = url.search.match(/url=([^&]+)/);
+        if (urlMatch) {
+          testUrl = decodeURIComponent(urlMatch[1]);
+        }
+      }
       
       // Allow CF field injection for testing
       const cfVerified = urlParams.get('cf_verified') === '1';
@@ -620,11 +631,29 @@ export async function handleAdminRoutes(
       const cfAsn = urlParams.get('cf_asn');
       const cfOrg = urlParams.get('cf_org');
 
-      // Note: referrer is optional - some tests (like crawler detection) only use User-Agent
-
       try {
-        // Import classifier v3
+        // Import classifier v3 and params detection
         const { classifyTrafficV3, STATIC_MANIFEST_V3 } = await import('../ai-lite/classifier-v3');
+        const { detectAiFromParams } = await import('../classifier/params');
+
+        // Parse referrer host for spoof guard
+        const referrerHost = referrer ? new URL(referrer).hostname : null;
+        
+        // Detect AI from URL parameters (same logic as ingest)
+        const { slug: aiSlugFromParams, spoof } = detectAiFromParams(testUrl, referrerHost);
+        
+        // Build signals array for consistency with ingest
+        const signals = [];
+        if (cfVerified) {
+          signals.push('cf.verified=true');
+          if (cfCategory) signals.push(`cf.cat=${cfCategory}`);
+        }
+        if (aiSlugFromParams) {
+          signals.push(`params_ai_source=${aiSlugFromParams}`);
+        }
+        if (spoof) {
+          signals.push('params_spoof_guard=search_referrer');
+        }
 
         const classification = classifyTrafficV3({
           cfVerifiedBotCategory: cfCategory,
@@ -632,21 +661,29 @@ export async function handleAdminRoutes(
           referrerUrl: referrer || null,
           userAgent,
           currentHost: 'test.example.com',
-          utmSource,
-          aiRef,
+          url: testUrl,
+          utmSource: aiSlugFromParams ? null : undefined, // Let classifier handle UTM parsing
+          aiRef: aiSlugFromParams ? null : undefined, // Let classifier handle AI ref parsing
           manifest: STATIC_MANIFEST_V3
         });
 
         return new Response(JSON.stringify({
           referrer,
           user_agent: userAgent,
+          test_url: testUrl,
           cf_injected: {
             verified: cfVerified,
             category: cfCategory,
             asn: cfAsn,
             org: cfOrg
           },
-          classification
+          classification: {
+            ...classification,
+            debug: {
+              ...classification.debug,
+              signals: [...(classification.debug?.signals || []), ...signals]
+            }
+          }
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -794,6 +831,28 @@ export async function handleAdminRoutes(
           sampleIds: mismatchResult?.results?.map(row => row.id) || []
         };
 
+        // Check for CF verified bots without bot category
+        const cfNoBotCatResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT COUNT(*) as count
+          FROM interaction_events 
+          WHERE occurred_at >= ? AND cf_verified_bot = 1 AND (bot_category IS NULL OR bot_category = '')
+        `).bind(cutoffTime).first();
+        
+        const cfVerifiedWithoutCategory = {
+          count: cfNoBotCatResult?.count || 0
+        };
+
+        // Check for AI param detection (from signals)
+        const aiParamResult = await env.OPTIVIEW_DB.prepare(`
+          SELECT COUNT(*) as count
+          FROM interaction_events 
+          WHERE occurred_at >= ? AND class = 'human_via_ai' AND signals LIKE '%params_ai_source%'
+        `).bind(cutoffTime).first();
+        
+        const aiParamDetected = {
+          count: aiParamResult?.count || 0
+        };
+
         return new Response(JSON.stringify({
           window: window,
           totals: {
@@ -810,7 +869,9 @@ export async function handleAdminRoutes(
             any: samples,
             verified: verifiedSamples
           },
-          mismatches
+          mismatches,
+          cfVerifiedWithoutCategory,
+          aiParamDetected
         }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -820,6 +881,92 @@ export async function handleAdminRoutes(
         console.error('CF signals health check failed:', error);
         return new Response(JSON.stringify({
           error: 'CF signals health check failed',
+          details: error.message
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // Backfill CF bot categories for existing verified bots
+    if (pathname === '/admin/tools/backfill-cf-botcat' && request.method === 'POST') {
+      if (!checkAdminAuth(request)) {
+        return new Response(JSON.stringify({ error: 'Admin authentication required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      try {
+        const body = await request.json();
+        const { window = '48h' } = body;
+        
+        // Parse window parameter
+        const windowMatch = window.match(/^(\d+)([mhd])$/);
+        if (!windowMatch) {
+          return new Response(JSON.stringify({ error: 'Invalid window format. Use: 15m, 60m, 2h, 1d' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const amount = parseInt(windowMatch[1]);
+        const unit = windowMatch[2];
+        
+        // Convert to minutes for SQL
+        let minutesAgo: number;
+        switch (unit) {
+          case 'm': minutesAgo = amount; break;
+          case 'h': minutesAgo = amount * 60; break;
+          case 'd': minutesAgo = amount * 60 * 24; break;
+          default: minutesAgo = 48 * 60; // fallback to 48h
+        }
+
+        const cutoffTime = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
+        
+        // Get events that need backfilling
+        const eventsToUpdate = await env.OPTIVIEW_DB.prepare(`
+          SELECT id, cf_verified_bot_category, bot_category, signals
+          FROM interaction_events 
+          WHERE occurred_at >= ? AND cf_verified_bot = 1 AND (bot_category IS NULL OR bot_category = '')
+        `).bind(cutoffTime).all();
+        
+        let updatedCount = 0;
+        for (const row of eventsToUpdate.results || []) {
+          const mappedCategory = mapCfCategory(row.cf_verified_bot_category);
+          
+          // Update bot_category and append backfill signal
+          const currentSignals = row.signals ? JSON.parse(row.signals) : {};
+          const updatedSignals = {
+            ...currentSignals,
+            'backfill.cf.botcat': mappedCategory,
+            'backfill.timestamp': new Date().toISOString()
+          };
+          
+          await env.OPTIVIEW_DB.prepare(`
+            UPDATE interaction_events 
+            SET bot_category = ?, signals = ?
+            WHERE id = ?
+          `).bind(mappedCategory, JSON.stringify(updatedSignals), row.id).run();
+          
+          updatedCount++;
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          window,
+          updatedCount,
+          message: `Updated ${updatedCount} events with CF bot categories`
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+
+      } catch (error) {
+        console.error('CF bot category backfill failed:', error);
+        return new Response(JSON.stringify({
+          error: 'CF bot category backfill failed',
           details: error.message
         }), {
           status: 500,
@@ -886,6 +1033,7 @@ export async function handleAdminRoutes(
           referrerUrl: referrer || null,
           userAgent: ua || 'Mozilla/5.0 (Test)',
           currentHost: 'test.example.com',
+          url: url,
           utmSource: spoofReason ? null : params?.utm_source,
           manifest: STATIC_MANIFEST_V3
         });
