@@ -200,31 +200,31 @@ export default function Events() {
             </span>
           </td>
           <td className="py-3 pr-4">
-            <span className={`px-2 py-1 text-xs rounded-full ${getEventTypeColor(event.event_type)}`}>
-              {event.event_type}
-            </span>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-gray-900">
+                {event.event_type === 'pageview' ? 'view' : event.event_type === 'click' ? 'click' : event.event_type}
+              </span>
+              <span className="text-xs text-gray-500">
+                {event.event_type}
+              </span>
+            </div>
           </td>
           <td className="py-3 pr-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-1">
               <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(event.event_class)}`}>
                 {getTrafficClassLabel(event.event_class)}
-                {['direct_human', 'search'].includes(event.event_class) && summary?.ai_lite && (
-                  <span className="ml-1 text-gray-500">ⓘ sampled</span>
-                )}
               </span>
               
-              {/* CF Verification Badge */}
-              {event.cf_verified_bot && (
-                <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 border border-green-200">
-                  ✓ CF Verified
+              {/* Bot Category as sublabel */}
+              {event.bot_category && event.event_class === 'crawler' && (
+                <span className="text-xs text-gray-500">
+                  {getBotCategoryLabel(event.bot_category)}
                 </span>
               )}
               
-              {/* Bot Category Badge */}
-              {event.bot_category && event.event_class === 'crawler' && (
-                <span className={`px-2 py-1 text-xs rounded-full border ${getBotCategoryColor(event.bot_category)}`}>
-                  {getBotCategoryLabel(event.bot_category)}
-                </span>
+              {/* AI-Lite sampled indicator */}
+              {['direct_human', 'search'].includes(event.event_class) && summary?.ai_lite && (
+                <span className="text-xs text-gray-500">ⓘ sampled</span>
               )}
             </div>
           </td>
@@ -238,9 +238,9 @@ export default function Events() {
             )}
           </td>
           
-          {/* CF Column - Simple Icon */}
+          {/* CF Column - Icon Only */}
           <td className="py-3 pr-4">
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center text-muted-foreground">
               {event.cf_verified_bot ? (
                 <span className="text-green-600" title="CF Verified Bot">🛡️</span>
               ) : (
@@ -273,8 +273,36 @@ export default function Events() {
               {loading && <div className="p-4 text-sm text-gray-500">Loading classification details...</div>}
 
               {detail && (
-                <div className="p-4 grid gap-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="p-4">
+                  {/* Top-right buttons */}
+                  <div className="flex justify-end gap-2 mb-4">
+                    <button
+                      onClick={() => navigator.clipboard.writeText(JSON.stringify(detail, null, 2))}
+                      className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded border"
+                    >
+                      <Copy size={12} className="inline mr-1" />
+                      Copy JSON
+                    </button>
+                    <button
+                      onClick={() => {
+                        const params = new URLSearchParams({
+                          ua: detail.user_agent || '',
+                          referrer: detail.referrer || '',
+                          url: detail.url || ''
+                        });
+                        const cURL = `curl -H "Authorization: Bearer $ADMIN_TOKEN" "https://api.optiview.ai/admin/debug/classify?${params.toString()}"`;
+                        navigator.clipboard.writeText(cURL);
+                      }}
+                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 rounded border"
+                      title="Copy cURL command to reproduce classification"
+                    >
+                      <Copy size={12} className="inline mr-1" />
+                      Copy cURL
+                    </button>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs uppercase text-gray-500 font-medium mb-2">Classification</div>
                       <div className="space-y-2">
@@ -438,36 +466,12 @@ export default function Events() {
                   )}
 
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="text-xs uppercase text-gray-500 font-medium">Raw JSON</div>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(JSON.stringify(detail, null, 2))}
-                        className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded border"
-                      >
-                        <Copy size={12} className="inline mr-1" />
-                        Copy
-                      </button>
-                      <button
-                        onClick={() => {
-                          const params = new URLSearchParams({
-                            ua: detail.user_agent || '',
-                            referrer: detail.referrer || '',
-                            url: detail.url || ''
-                          });
-                          const cURL = `curl -H "Authorization: Bearer $ADMIN_TOKEN" "https://api.optiview.ai/admin/debug/classify?${params.toString()}"`;
-                          navigator.clipboard.writeText(cURL);
-                        }}
-                        className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 rounded border"
-                        title="Copy cURL command to reproduce classification"
-                      >
-                        <Copy size={12} className="inline mr-1" />
-                        Copy cURL
-                      </button>
-                    </div>
+                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw JSON</div>
                     <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
                       {JSON.stringify(detail, null, 2)}
                     </pre>
                   </div>
+                    </div>
                 </div>
               )}
             </td>
@@ -805,12 +809,12 @@ export default function Events() {
   // Utility functions
   function getTrafficClassColor(className: string): string {
     switch (className) {
-      case "direct_human": return "bg-gray-100 text-gray-800";
-      case "human_via_ai": return "bg-blue-100 text-blue-800";
       case "crawler": return "bg-orange-100 text-orange-800";
       case "search": return "bg-green-100 text-green-800";
-      case "unknown": return "bg-gray-100 text-gray-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "human_via_ai": return "bg-violet-100 text-violet-800";
+      case "direct_human": return "bg-gray-100 text-gray-600";
+      case "unknown": return "bg-gray-100 text-gray-600";
+      default: return "bg-gray-100 text-gray-600";
     }
   }
 
@@ -1146,22 +1150,6 @@ export default function Events() {
               </div>
             )}
 
-            {/* Window Selector */}
-            <div className="flex rounded-lg border border-gray-300">
-              {["15m", "24h", "7d"].map((w) => (
-                <button
-                  key={w}
-                  onClick={() => handleWindowChange(w)}
-                  className={`px-3 py-1 text-sm font-medium ${timeWindow === w
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-50"
-                    } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
-                >
-                  {w}
-                </button>
-              ))}
-            </div>
-
             {/* Refresh Button */}
             <button
               onClick={() => {
@@ -1196,55 +1184,124 @@ export default function Events() {
           </div>
         )}
 
-        {/* Compressed Hero - AI Detection System */}
+        {/* Simplified Hero - AI Detection System */}
         <Card>
           <div className="p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-medium text-gray-900">AI Detection System</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600">
+                  Classification precedence: CF verified → AI referrer → Params → Search → Direct.
+                </span>
+                {(summary?.by_class?.find(cls => cls.class === 'crawler')?.count || 0) > 0 && (
                   <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                    ✅ CF Signals Active
+                    CF Signals Active
                   </span>
-                  <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                    {summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0} verified
-                  </span>
-                </div>
-                <div className="text-sm text-gray-600">
-                  Hardened classification: CF verified {'>'} AI referrers {'>'} Search {'>'} Direct (strict precedence).
-                </div>
+                )}
               </div>
               
               <button
                 onClick={() => setShowClassificationDetails(true)}
                 className="px-3 py-1 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-300"
               >
-                Show Details
+                Details
               </button>
-            </div>
-            
-            {/* CF Precedence Indicator */}
-            <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-                <span>Crawler</span>
-                <span className="text-green-600 font-medium">CF wins always</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                <span>Human via AI</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                <span>Search</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-gray-400"></span>
-                <span>Direct Human</span>
-              </div>
             </div>
           </div>
         </Card>
+
+        {/* Compact Filters Toolbar - Sticky */}
+        <div className="sticky top-14 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border border-gray-200 rounded-lg p-4 shadow-sm">
+          {/* Row 1: Time, Traffic Class, Search */}
+          <div className="flex items-center gap-4 mb-3">
+            {/* Time segmented control */}
+            <div className="flex rounded-lg border border-gray-300">
+              {["15m", "24h", "7d"].map((w) => (
+                <button
+                  key={w}
+                  onClick={() => handleWindowChange(w)}
+                  className={`px-3 py-2 text-sm font-medium ${timeWindow === w
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50"
+                    } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+
+            {/* Traffic Class segmented */}
+            <div className="flex rounded-lg border border-gray-300">
+              {["", "crawler", "search", "human_via_ai", "direct_human"].map((cls) => (
+                <button
+                  key={cls}
+                  onClick={() => handleClassFilter(cls)}
+                  className={`px-3 py-2 text-sm font-medium ${classFilter === cls
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50"
+                    } ${cls === "" ? "rounded-l-md" : cls === "direct_human" ? "rounded-r-md" : ""}`}
+                >
+                  {cls === "" ? "All" : cls === "crawler" ? "Crawler" : cls === "search" ? "Search" : cls === "human_via_ai" ? "Human via AI" : "Direct"}
+                </button>
+              ))}
+            </div>
+
+            {/* Search input */}
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search URLs & event types..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Dropdowns */}
+          <div className="flex items-center gap-4">
+            {/* AI Sources multi-select dropdown */}
+            <div className="relative">
+              <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2">
+                AI Sources {sourceFilter && `• ${sourceFilter.split(',').length}`}
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              {/* TODO: Implement dropdown content */}
+            </div>
+
+            {/* Bot Categories multi-select dropdown */}
+            <div className="relative">
+              <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2">
+                Bot Categories {botCategoryFilter && `• ${botCategoryFilter.split(',').length}`}
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              {/* TODO: Implement dropdown content */}
+            </div>
+
+            {/* Cloudflare dropdown */}
+            <div className="relative">
+              <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2">
+                Cloudflare {cfVerifiedFilter && "• Active"}
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              {/* TODO: Implement dropdown content */}
+            </div>
+
+            {/* CF Verified Only toggle */}
+            <button
+              onClick={() => handleCfVerifiedFilter('true')}
+              className={`px-3 py-2 text-sm border rounded-lg ${
+                cfVerifiedFilter === 'true' 
+                  ? 'bg-green-100 text-green-800 border-green-300' 
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              🛡️ CF Verified Only
+            </button>
+          </div>
+        </div>
 
         {/* KPI Row - Essential Stats Only */}
         {summary && (
@@ -1413,13 +1470,10 @@ export default function Events() {
                 className="flex w-full items-center justify-between"
               >
                 <div className="flex items-center gap-3">
-                  <h4 className="text-lg font-medium text-gray-900">🛡️ Cloudflare Signals Overview</h4>
-                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                    {summary?.by_class?.find(cls => cls.class === 'crawler')?.count || 0} CF Verified
-                  </span>
-                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                    100% CF Precedence
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-600">🛡️</span>
+                    <span className="text-lg font-medium text-gray-900">CF Verified: {summary?.by_class?.find(cls => cls.class === 'crawler')?.count || 0} • Precedence: 100%</span>
+                  </div>
                 </div>
                 <span className="text-sm text-gray-500">
                   {showCfOverview ? 'Hide' : 'Show'}
@@ -1428,118 +1482,17 @@ export default function Events() {
               
               {showCfOverview && (
                 <div className="mt-4">
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 mb-4">
                     Cloudflare verified bots automatically get classified as crawlers with highest priority, overriding all other signals.
                   </div>
+                  {/* TODO: Add category chips and other CF details here */}
                 </div>
               )}
             </div>
           </Card>
         )}
 
-        {/* Simplified Filter Toolbar */}
-        {summary && (
-          <Card>
-            <div className="p-4 space-y-4">
-              {/* Row 1: Always Visible */}
-              <div className="flex items-center gap-4">
-                {/* Time Window */}
-                <div className="flex rounded-lg border border-gray-300">
-                  {["15m", "24h", "7d"].map((w) => (
-                    <button
-                      key={w}
-                      onClick={() => handleWindowChange(w)}
-                      className={`px-3 py-2 text-sm font-medium ${timeWindow === w
-                        ? "bg-blue-600 text-white"
-                        : "bg-white text-gray-700 hover:bg-gray-50"
-                        } ${w === "15m" ? "rounded-l-md" : w === "7d" ? "rounded-r-md" : ""}`}
-                    >
-                      {w}
-                    </button>
-                  ))}
-                </div>
 
-                {/* Traffic Class Segmented */}
-                <div className="flex rounded-lg border border-gray-300">
-                  <button
-                    onClick={() => handleClassFilter("")}
-                    className={`px-3 py-2 text-sm font-medium ${!classFilter
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
-                      } rounded-l-md`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => handleClassFilter("crawler")}
-                    className={`px-3 py-2 text-sm font-medium ${classFilter === "crawler"
-                      ? "bg-orange-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                  >
-                    Crawler
-                  </button>
-                  <button
-                    onClick={() => handleClassFilter("search")}
-                    className={`px-3 py-2 text-sm font-medium ${classFilter === "search"
-                      ? "bg-green-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                  >
-                    Search
-                  </button>
-                  <button
-                    onClick={() => handleClassFilter("human_via_ai")}
-                    className={`px-3 py-2 text-sm font-medium ${classFilter === "human_via_ai"
-                      ? "bg-purple-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                  >
-                    Human via AI
-                  </button>
-                  <button
-                    onClick={() => handleClassFilter("direct_human")}
-                    className={`px-3 py-2 text-sm font-medium ${classFilter === "direct_human"
-                      ? "bg-gray-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
-                      } rounded-r-md`}
-                  >
-                    Direct
-                  </button>
-                </div>
-
-                {/* Search Input */}
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search URLs and event types..."
-                    value={searchQuery}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    className="pl-9 pr-3 py-2 border border-gray-300 rounded-md w-full text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Compact Dropdowns */}
-              <div className="flex items-center gap-4">
-                {/* Simple CF Filter */}
-                <button
-                  onClick={() => handleCfVerifiedFilter('true')}
-                  className={`px-3 py-2 text-sm border rounded-md ${
-                    cfVerifiedFilter === 'true' 
-                      ? 'bg-green-100 text-green-800 border-green-300' 
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  🛡️ CF Verified Only
-                </button>
-
-
-              </div>
-            </div>
-          </Card>
-        )}
 
         {/* Filter Chips */}
         {summary && (
@@ -1921,11 +1874,10 @@ export default function Events() {
                         <th className="py-3 pr-4 w-6"></th>
                         <th className="py-3 pr-4">Time</th>
                         <th className="py-3 pr-4">Event</th>
-                        <th className="py-3 pr-4">Traffic Class</th>
+                        <th className="py-3 pr-4">Class</th>
                         <th className="py-3 pr-4">AI Source</th>
                         <th className="py-3 pr-4">CF</th>
                         <th className="py-3 pr-4">URL</th>
-
                       </tr>
                     </thead>
                     <tbody>
