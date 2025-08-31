@@ -503,6 +503,11 @@ export default function Events() {
   const [showClassificationDetails, setShowClassificationDetails] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [showCfOverview, setShowCfOverview] = useState(false);
+  
+  // Dropdown state
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+  const [showBotCategoryDropdown, setShowBotCategoryDropdown] = useState(false);
+  const [showCfDropdown, setShowCfDropdown] = useState(false);
 
   // URL params and filters
   const timeWindow = searchParams.get("window") || getStoredWindow() || "24h";
@@ -524,6 +529,21 @@ export default function Events() {
   // Refs for auto-refresh
   const refreshInterval = useRef<NodeJS.Timeout | null>(null);
   const refreshCount = useRef(0);
+  
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.dropdown-container')) {
+        setShowSourceDropdown(false);
+        setShowBotCategoryDropdown(false);
+        setShowCfDropdown(false);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Initialize includeTraining from URL params (localStorage no longer needed)
   useEffect(() => {
@@ -596,6 +616,7 @@ export default function Events() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Summary data loaded:', data);
         setSummary(data);
         setError(null);
       } else {
@@ -739,7 +760,7 @@ export default function Events() {
           setLastUpdated(new Date());
         });
     }
-  }, [project?.id, timeWindow, classFilter, sourceFilter, botCategoryFilter, searchQuery, page]);
+  }, [project?.id, timeWindow, classFilter, sourceFilter, botCategoryFilter, searchQuery, page, cfVerifiedFilter, cfCategoryFilter, cfAsnFilter, cfOrgFilter]);
 
   useEffect(() => {
     if (timeWindow && timeWindow !== getStoredWindow()) {
@@ -1263,35 +1284,199 @@ export default function Events() {
           {/* Row 2: Dropdowns */}
           <div className="flex items-center gap-4">
             {/* AI Sources multi-select dropdown */}
-            <div className="relative">
-              <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2">
+            <div className="relative dropdown-container">
+              <button 
+                onClick={() => setShowSourceDropdown(!showSourceDropdown)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2"
+              >
                 AI Sources {sourceFilter && `• ${sourceFilter.split(',').length}`}
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className={`h-4 w-4 transition-transform ${showSourceDropdown ? 'rotate-180' : ''}`} />
               </button>
-              {/* TODO: Implement dropdown content */}
+              
+              {showSourceDropdown && (
+                <>
+                  {/* Backdrop */}
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setShowSourceDropdown(false)}
+                  />
+                  
+                  {/* Dropdown */}
+                  <div className="absolute left-0 top-full mt-1 w-64 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-40 max-h-60 overflow-y-auto">
+                    <div className="py-2">
+                      <button
+                        onClick={() => {
+                          handleSourceFilter("");
+                          setShowSourceDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        All Sources
+                      </button>
+                      {summary?.by_source_top?.map((source) => (
+                        <button
+                          key={source.slug}
+                          onClick={() => {
+                            handleSourceFilter(source.slug);
+                            setShowSourceDropdown(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between"
+                        >
+                          <span>{source.name}</span>
+                          <span className="text-xs text-gray-500">({formatNumber(source.count)})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Bot Categories multi-select dropdown */}
-            <div className="relative">
-              <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2">
+            <div className="relative dropdown-container">
+              <button 
+                onClick={() => setShowBotCategoryDropdown(!showBotCategoryDropdown)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2"
+              >
                 Bot Categories {botCategoryFilter && `• ${botCategoryFilter.split(',').length}`}
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className={`h-4 w-4 transition-transform ${showBotCategoryDropdown ? 'rotate-180' : ''}`} />
               </button>
-              {/* TODO: Implement dropdown content */}
+              
+              {showBotCategoryDropdown && (
+                <>
+                  {/* Backdrop */}
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setShowBotCategoryDropdown(false)}
+                  />
+                  
+                  {/* Dropdown */}
+                  <div className="absolute left-0 top-full mt-1 w-64 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-40">
+                    <div className="py-2">
+                      <button
+                        onClick={() => {
+                          handleBotCategoryFilter("");
+                          setShowBotCategoryDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        All Categories
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleBotCategoryFilter("ai_training");
+                          setShowBotCategoryDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        AI Training
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleBotCategoryFilter("search_crawler");
+                          setShowBotCategoryDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Search Crawler
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleBotCategoryFilter("preview_bot");
+                          setShowBotCategoryDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Preview Bot
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Cloudflare dropdown */}
-            <div className="relative">
-              <button className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2">
+            <div className="relative dropdown-container">
+              <button 
+                onClick={() => setShowCfDropdown(!showCfDropdown)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 flex items-center gap-2"
+              >
                 Cloudflare {cfVerifiedFilter && "• Active"}
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className={`h-4 w-4 transition-transform ${showCfDropdown ? 'rotate-180' : ''}`} />
               </button>
-              {/* TODO: Implement dropdown content */}
+              
+              {showCfDropdown && (
+                <>
+                  {/* Backdrop */}
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setShowCfDropdown(false)}
+                  />
+                  
+                  {/* Dropdown */}
+                  <div className="absolute left-0 top-full mt-1 w-64 bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 z-40">
+                    <div className="py-2">
+                      <div className="px-4 py-2 text-sm text-gray-500 border-b">
+                        CF Category
+                      </div>
+                      <button
+                        onClick={() => {
+                          updateParams({ cf_category: null });
+                          setShowCfDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        All Categories
+                      </button>
+                      <button
+                        onClick={() => {
+                          updateParams({ cf_category: 'search_crawler' });
+                          setShowCfDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Search Crawler
+                      </button>
+                      <button
+                        onClick={() => {
+                          updateParams({ cf_category: 'ai_training' });
+                          setShowCfDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        AI Training
+                      </button>
+                      
+                      <div className="px-4 py-2 text-sm text-gray-500 border-b mt-2">
+                        ASN / Organization
+                      </div>
+                      <div className="px-4 py-2">
+                        <input
+                          type="text"
+                          placeholder="ASN (e.g., 15169)"
+                          value={cfAsnFilter}
+                          onChange={(e) => updateParams({ cf_asn: e.target.value || null })}
+                          className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="px-4 py-2">
+                        <input
+                          type="text"
+                          placeholder="Organization"
+                          value={cfOrgFilter}
+                          onChange={(e) => updateParams({ cf_org: e.target.value || null })}
+                          className="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* CF Verified Only toggle */}
             <button
-              onClick={() => handleCfVerifiedFilter('true')}
+              onClick={() => handleCfVerifiedFilter(cfVerifiedFilter === 'true' ? '' : 'true')}
               className={`px-3 py-2 text-sm border rounded-lg ${
                 cfVerifiedFilter === 'true' 
                   ? 'bg-green-100 text-green-800 border-green-300' 
