@@ -19,7 +19,16 @@ import {
 } from "lucide-react";
 // Simple SVG chart component instead of recharts
 function SimpleLineChart({ data, formatTime }: { data: any[], formatTime: (ts: string) => string }) {
-  if (!data || data.length === 0) return null;
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="text-center">
+          <div className="text-lg font-medium mb-2">No events data available</div>
+          <div className="text-sm">Start tracking events to see your data here</div>
+        </div>
+      </div>
+    );
+  }
 
   const maxValue = Math.max(...data.map(d => d.count));
   const minValue = Math.min(...data.map(d => d.count));
@@ -616,7 +625,6 @@ export default function Events() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Summary data loaded:', data);
         setSummary(data);
         setError(null);
       } else {
@@ -1606,7 +1614,7 @@ export default function Events() {
         )}
 
         {/* Timeseries Chart */}
-        {summary && (
+        {summary ? (
           <Card>
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
@@ -1629,16 +1637,35 @@ export default function Events() {
                   </div>
                 )}
               </div>
-              {summary?.timeseries.length > 0 ? (
+              {summary?.timeseries && summary.timeseries.length > 0 ? (
                 <SimpleLineChart
                   data={summary.timeseries}
                   formatTime={formatChartTime}
                 />
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  No data in this time window
+                <div className="flex items-center justify-center h-64 text-gray-500">
+                  <div className="text-center">
+                    <div className="text-lg font-medium mb-2">No events data available</div>
+                    <div className="text-sm mb-4">Start tracking events to see your data here</div>
+                    <div className="text-xs text-gray-400 max-w-md">
+                      Add the Geodude tracking script to your website to begin collecting event data. 
+                      Visit the <a href="/install" className="text-blue-600 hover:text-blue-800 underline">Installation</a> page for setup instructions.
+                    </div>
+                  </div>
                 </div>
               )}
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <div className="p-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Events Over Time</h3>
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                <div className="text-center">
+                  <div className="text-lg font-medium mb-2">Loading events data...</div>
+                  <div className="text-sm">Please wait while we fetch your event data</div>
+                </div>
+              </div>
             </div>
           </Card>
         )}
