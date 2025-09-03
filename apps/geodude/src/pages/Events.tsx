@@ -209,14 +209,9 @@ export default function Events() {
             </span>
           </td>
           <td className="py-3 pr-4">
-            <div className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-gray-900">
-                {event.event_type === 'pageview' ? 'view' : event.event_type === 'click' ? 'click' : event.event_type}
-              </span>
-              <span className="text-xs text-gray-500">
-                {event.event_type}
-              </span>
-            </div>
+            <span className="text-sm font-medium text-gray-900">
+              {event.event_type === 'pageview' ? 'view' : event.event_type === 'click' ? 'click' : event.event_type}
+            </span>
           </td>
           <td className="py-3 pr-4">
             <div className="flex flex-col gap-1">
@@ -278,11 +273,11 @@ export default function Events() {
 
         {open && (
           <tr className="bg-gray-50/50">
-            <td colSpan={6}>
+            <td colSpan={7} className="w-full">
               {loading && <div className="p-4 text-sm text-gray-500">Loading classification details...</div>}
 
               {detail && (
-                <div className="p-4">
+                <div className="p-4 w-full">
                   {/* Top-right buttons */}
                   <div className="flex justify-end gap-2 mb-4">
                     <button
@@ -310,114 +305,115 @@ export default function Events() {
                     </button>
                   </div>
                   
-                  <div className="grid gap-4">
-                    <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Classification</div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-600">Class:</span>
-                          <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(detail.classification.class)}`}>
-                            {getTrafficClassLabel(detail.classification.class)}
-                          </span>
+                  <div className="grid gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div>
+                        <div className="text-xs uppercase text-gray-500 font-medium mb-3">Classification</div>
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">Class:</span>
+                            <span className={`px-2 py-1 text-xs rounded-full ${getTrafficClassColor(detail.classification.class)}`}>
+                              {getTrafficClassLabel(detail.classification.class)}
+                            </span>
+                          </div>
+                          {detail.classification.aiSourceSlug && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">AI Source:</span>
+                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                {detail.classification.aiSourceSlug}
+                              </span>
+                            </div>
+                          )}
+                          {detail.classification.botCategory && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">Bot Category:</span>
+                              <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                                {detail.classification.botCategory}
+                              </span>
+                            </div>
+                          )}
+                          {detail.classification.referralChain && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">Referral Chain:</span>
+                              <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                                {detail.classification.referralChain}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        {detail.classification.aiSourceSlug && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">AI Source:</span>
-                            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                              {detail.classification.aiSourceSlug}
-                            </span>
-                          </div>
-                        )}
-                        {detail.classification.botCategory && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">Bot Category:</span>
-                            <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
-                              {detail.classification.botCategory}
-                            </span>
-                          </div>
-                        )}
-                        {detail.classification.referralChain && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">Referral Chain:</span>
-                            <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
-                              {detail.classification.referralChain}
-                            </span>
-                          </div>
-                        )}
                       </div>
-                    </div>
 
-                    {/* CF Signals Section */}
-                    <div>
-                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Cloudflare Signals</div>
-                      <div className="space-y-2">
-                        {detail.cf?.verifiedBot ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">Status:</span>
-                            <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                              ✓ Verified Bot
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">Status:</span>
-                            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
-                              Not Verified
-                            </span>
-                          </div>
-                        )}
-                        
-                        {detail.cf?.verifiedBotCategory && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">Category:</span>
-                            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                              {detail.cf.verifiedBotCategory}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {detail.cf?.asn && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">ASN:</span>
-                            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
-                              {detail.cf.asn}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {detail.cf?.org && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">Organization:</span>
-                            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded max-w-32 truncate" title={detail.cf.org}>
-                              {detail.cf.org}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase text-gray-500 font-medium mb-2">Rule Trace</div>
-                      <div className="space-y-2">
-                        <div className="text-xs">
-                          <span className="text-gray-600">Matched Rule:</span>
-                          <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded text-xs">
-                            {detail.debug?.matchedRule || '—'}
-                          </code>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Precedence: {detail.debug?.precedenceOrder?.join(' > ')}
+                      {/* CF Signals Section */}
+                      <div>
+                        <div className="text-xs uppercase text-gray-500 font-medium mb-3">Cloudflare Signals</div>
+                        <div className="space-y-3">
+                          {detail.cf?.verifiedBot ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">Status:</span>
+                              <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                                ✓ Verified Bot
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">Status:</span>
+                              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">
+                                Not Verified
+                              </span>
+                            </div>
+                          )}
+                          
+                          {detail.cf?.verifiedBotCategory && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">Category:</span>
+                              <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                {detail.cf.verifiedBotCategory}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {detail.cf?.asn && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">ASN:</span>
+                              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+                                {detail.cf.asn}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {detail.cf?.org && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600">Organization:</span>
+                              <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded max-w-32 truncate" title={detail.cf.org}>
+                                {detail.cf.org}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
+
+                      <div>
+                        <div className="text-xs uppercase text-gray-500 font-medium mb-3">Rule Trace</div>
+                        <div className="space-y-3">
+                          <div className="text-xs">
+                            <span className="text-gray-600">Matched Rule:</span>
+                            <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded text-xs">
+                              {detail.debug?.matchedRule || '—'}
+                            </code>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Precedence: {detail.debug?.precedenceOrder?.join(' > ')}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
                   {/* Signals Section - Only visible in debug mode */}
                   {debugMode && (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div>
-                        <div className="text-xs uppercase text-gray-500 font-medium mb-2">Signals</div>
-                        <ul className="space-y-1">
+                        <div className="text-xs uppercase text-gray-500 font-medium mb-3">Signals</div>
+                        <ul className="space-y-2">
                           {(detail.debug?.signals || []).map((signal: string, i: number) => (
                             <li key={i} className="text-xs text-gray-600">
                               • {signal}
@@ -430,7 +426,7 @@ export default function Events() {
                         
                         {/* CF Precedence Indicator */}
                         {detail.cf?.verifiedBot && (
-                          <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
+                          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
                             <div className="text-xs text-green-800 font-medium">
                               🛡️ CF Precedence Applied
                             </div>
@@ -441,8 +437,8 @@ export default function Events() {
                         )}
                       </div>
                       <div>
-                        <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw Inputs</div>
-                        <div className="space-y-2 text-xs">
+                        <div className="text-xs uppercase text-gray-500 font-medium mb-3">Raw Inputs</div>
+                        <div className="space-y-3 text-xs">
                           <div>
                             <span className="text-gray-600">Referrer:</span>
                             <code className="ml-1 px-1 py-0.5 bg-gray-100 rounded">
@@ -462,7 +458,7 @@ export default function Events() {
                             </code>
                           </div>
                           {detail.cf?.verifiedBot && (
-                            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
                               <div className="text-xs text-green-800 font-medium">
                                 ⚡ CF Precedence: This bot was classified as crawler because Cloudflare verified it, 
                                 regardless of user agent or referrer patterns.
@@ -474,9 +470,9 @@ export default function Events() {
                     </div>
                   )}
 
-                  <div>
-                    <div className="text-xs uppercase text-gray-500 font-medium mb-2">Raw JSON</div>
-                    <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
+                  <div className="mt-6">
+                    <div className="text-xs uppercase text-gray-500 font-medium mb-3">Raw JSON</div>
+                    <pre className="text-xs bg-gray-100 p-4 rounded overflow-auto max-h-60 w-full">
                       {JSON.stringify(detail, null, 2)}
                     </pre>
                   </div>
@@ -1706,354 +1702,72 @@ export default function Events() {
 
 
 
-        {/* Filter Chips */}
-        {summary && (
-          <div className="space-y-4">
-            {/* Class Chips */}
-            {summary?.by_class.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Traffic Classes</h4>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleClassFilter("")}
-                    className={`px-3 py-1 rounded-full text-sm border ${!classFilter
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                  >
-                    All ({formatNumber(summary?.totals.events || 0)})
-                  </button>
-                  {summary?.by_class.map((cls) => {
-                    const isAIClass = ['human_via_ai', 'crawler', 'citation'].includes(cls.class);
-                    const isBaselineClass = ['direct_human', 'search'].includes(cls.class);
-                    const showClass = !summary?.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
-
-                    if (!showClass) return null;
-
-                    return (
-                      <button
-                        key={cls.class}
-                        onClick={() => handleClassFilter(cls.class)}
-                        className={`px-3 py-1 rounded-full text-sm border ${classFilter === cls.class
-                          ? "bg-blue-100 text-blue-800 border-blue-200"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                          } ${isBaselineClass ? 'opacity-75' : ''}`}
-                        title={getTrafficClassDescription(cls.class)}
-                      >
-                        {getTrafficClassLabel(cls.class)} ({formatNumber(cls.count)})
-                        {isBaselineClass && summary.ai_lite && (
-                          <span className="ml-1 text-xs text-gray-500">ⓘ sampled</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* AI-Lite Mode Note */}
-                {summary?.ai_lite && (
-                  <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-                    <Info className="h-3 w-3" />
-                    <span>
-                      AI-Lite: Baseline sampled at {summary?.baseline?.sample_pct || 2}%
-                    </span>
-                  </div>
-                )}
-
-                {/* Classification Debug Toggle */}
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    onClick={() => setShowDebugInfo(!showDebugInfo)}
-                    className="text-xs text-gray-600 hover:text-gray-800 flex items-center gap-1 px-2 py-1 rounded border border-gray-300 hover:bg-gray-50"
-                  >
-                    <Info className="h-3 w-3" />
-                    {showDebugInfo ? 'Hide' : 'Show'} Details
-                  </button>
-                  {showDebugInfo && (
-                    <span className="text-xs text-gray-500">
-                      ℹ️ Hover over traffic class badges to see classification reasoning
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Source Chips */}
-            {summary?.by_source_top.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">AI Sources</h4>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleSourceFilter("")}
-                    className={`px-3 py-1 rounded-full text-sm border ${!sourceFilter
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                  >
-                    All sources
-                  </button>
-                  {summary?.by_source_top.slice(0, 6).map((source) => (
-                    <button
-                      key={source.slug}
-                      onClick={() => handleSourceFilter(source.slug)}
-                      className={`px-3 py-1 rounded-full text-sm border ${sourceFilter === source.slug
-                        ? "bg-blue-100 text-blue-800 border-blue-200"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                        }`}
-                    >
-                      {source.name} ({formatNumber(source.count)})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Bot Category Chips */}
-            {summary?.by_class.some(cls => cls.class === 'crawler') && (
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Bot Categories</h4>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleBotCategoryFilter("")}
-                    className={`px-3 py-1 rounded-full text-sm border ${!botCategoryFilter
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                  >
-                    All bot types
-                  </button>
-                  {/* We'll populate this dynamically based on available bot categories */}
-                  <button
-                    onClick={() => handleBotCategoryFilter("ai_training")}
-                    className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "ai_training"
-                      ? "bg-purple-100 text-purple-800 border-purple-200"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                  >
-                    AI Training
-                  </button>
-                  <button
-                    onClick={() => handleBotCategoryFilter("search_crawler")}
-                    className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "search_crawler"
-                      ? "bg-blue-100 text-blue-800 border-blue-200"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                  >
-                    Search Crawler
-                  </button>
-                  <button
-                    onClick={() => handleBotCategoryFilter("preview_bot")}
-                    className={`px-3 py-1 rounded-full text-sm border ${botCategoryFilter === "preview_bot"
-                      ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                  >
-                    Preview Bot
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* CF Signal Filter Chips */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Cloudflare Signals</h4>
+        {/* Active Filters Summary */}
+        {(classFilter || sourceFilter || botCategoryFilter || cfVerifiedFilter || cfCategoryFilter || cfAsnFilter || cfOrgFilter || searchQuery) && (
+          <Card>
+            <div className="p-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Active Filters</h4>
               <div className="flex flex-wrap gap-2">
-                {/* CF Verification Filter */}
+                {classFilter && (
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    Class: {getTrafficClassLabel(classFilter)}
+                  </span>
+                )}
+                {sourceFilter && (
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    Source: {sourceFilter}
+                  </span>
+                )}
+                {botCategoryFilter && (
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    Bot: {getBotCategoryLabel(botCategoryFilter)}
+                  </span>
+                )}
+                {cfVerifiedFilter && (
+                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                    CF: {cfVerifiedFilter === 'true' ? 'Verified' : 'Not Verified'}
+                  </span>
+                )}
+                {cfCategoryFilter && (
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    CF Category: {cfCategoryFilter}
+                  </span>
+                )}
+                {cfAsnFilter && (
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    ASN: {cfAsnFilter}
+                  </span>
+                )}
+                {cfOrgFilter && (
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    Org: {cfOrgFilter}
+                  </span>
+                )}
+                {searchQuery && (
+                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                    Search: "{searchQuery}"
+                  </span>
+                )}
                 <button
-                  onClick={() => handleCfVerifiedFilter("")}
-                  className={`px-3 py-1 rounded-full text-sm border ${!cfVerifiedFilter
-                    ? "bg-blue-100 text-blue-800 border-blue-200"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
+                  onClick={() => {
+                    updateParams({
+                      class: null,
+                      source: null,
+                      bot_category: null,
+                      cf_verified: null,
+                      cf_category: null,
+                      cf_asn: null,
+                      cf_org: null,
+                      q: null
+                    });
+                  }}
+                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-300 rounded-full hover:bg-gray-50"
                 >
-                  All CF Status
+                  Clear All
                 </button>
-                <button
-                  onClick={() => handleCfVerifiedFilter("true")}
-                  className={`px-3 py-1 rounded-full text-sm border ${cfVerifiedFilter === "true"
-                    ? "bg-green-100 text-green-800 border-green-200"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                >
-                  ✓ CF Verified Only
-                </button>
-                <button
-                  onClick={() => handleCfVerifiedFilter("false")}
-                  className={`px-3 py-1 rounded-full text-sm border ${cfVerifiedFilter === "false"
-                    ? "bg-red-100 text-red-800 border-red-200"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                >
-                  ✗ CF Not Verified
-                </button>
-              </div>
-
-              {/* CF Category Filter */}
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleCfCategoryFilter("")}
-                  className={`px-3 py-1 rounded-full text-sm border ${!cfCategoryFilter
-                    ? "bg-blue-100 text-blue-800 border-blue-200"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                >
-                  All CF Categories
-                </button>
-                <button
-                  onClick={() => handleCfCategoryFilter("Search Engine Crawler")}
-                  className={`px-3 py-1 rounded-full text-sm border ${cfCategoryFilter === "Search Engine Crawler"
-                    ? "bg-orange-100 text-orange-800 border-orange-200"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                >
-                  Search Crawler
-                </button>
-                <button
-                  onClick={() => handleCfCategoryFilter("AI Model Training")}
-                  className={`px-3 py-1 rounded-full text-sm border ${cfCategoryFilter === "AI Model Training"
-                    ? "bg-purple-100 text-purple-800 border-purple-200"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                >
-                  AI Training
-                </button>
-                <button
-                  onClick={() => handleCfCategoryFilter("Page Preview")}
-                  className={`px-3 py-1 rounded-full text-sm border ${cfCategoryFilter === "Page Preview"
-                    ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                >
-                  Preview Bot
-                </button>
-              </div>
-
-              {/* CF ASN/Org Filters */}
-              <div className="mt-2 flex flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Filter by ASN (e.g., 15169)"
-                    value={cfAsnFilter}
-                    onChange={(e) => handleCfAsnFilter(e.target.value)}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-md w-32"
-                  />
-                  <button
-                    onClick={() => handleCfAsnFilter("")}
-                    className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Filter by Organization"
-                    value={cfOrgFilter}
-                    onChange={(e) => handleCfOrgFilter(e.target.value)}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-md w-40"
-                  />
-                  <button
-                    onClick={() => handleCfOrgFilter("")}
-                    className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Clear
-                  </button>
-                </div>
               </div>
             </div>
-
-            {/* Search Input */}
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search URLs and event types..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-9 pr-3 py-2 border border-gray-300 rounded-md w-full text-sm"
-                />
-              </div>
-              
-              {/* CF Filter Status Indicator */}
-              {(cfVerifiedFilter || cfCategoryFilter || cfAsnFilter || cfOrgFilter) && (
-                <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
-                  <span className="text-xs text-blue-700 font-medium">🛡️ CF Filters Active:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {cfVerifiedFilter && (
-                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                        {cfVerifiedFilter === 'true' ? '✓ Verified' : '✗ Not Verified'}
-                      </span>
-                    )}
-                    {cfCategoryFilter && (
-                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                        {cfCategoryFilter}
-                      </span>
-                    )}
-                    {cfAsnFilter && (
-                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                        ASN: {cfAsnFilter}
-                      </span>
-                    )}
-                    {cfOrgFilter && (
-                      <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded max-w-24 truncate" title={cfOrgFilter}>
-                        Org: {cfOrgFilter}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Trust Cues - Show breakdown that equals Total Events */}
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
-              <div className="text-xs text-gray-600 mb-2 font-medium">Traffic Breakdown (must equal Total Events)</div>
-              <div className="flex flex-wrap gap-3 text-sm">
-                {summary?.by_class.map((cls) => {
-                  const isAIClass = ['human_via_ai', 'crawler', 'citation'].includes(cls.class);
-                  const isBaselineClass = ['direct_human', 'search'].includes(cls.class);
-                  const showClass = !summary?.ai_lite || isAIClass || (isBaselineClass && includeBaseline);
-
-                  if (!showClass) return null;
-
-                  return (
-                    <div key={cls.class} className="flex items-center gap-1">
-                      <span className={`w-3 h-3 rounded-full ${getTrafficClassColor(cls.class).replace('bg-', 'bg-').split(' ')[0]}`}></span>
-                      <span className="text-gray-700">{getTrafficClassLabel(cls.class)}:</span>
-                      <span className="font-medium">{formatNumber(cls.count)}</span>
-                      {isBaselineClass && summary.ai_lite && (
-                        <span className="text-xs text-gray-500">(sampled)</span>
-                      )}
-                      {cls.class === 'crawler' && (
-                        <span className="text-xs text-green-600 font-medium">(CF verified)</span>
-                      )}
-                    </div>
-                  );
-                })}
-                <div className="flex items-center gap-1 ml-auto">
-                  <span className="text-gray-700 font-medium">Total:</span>
-                  <span className="font-bold">{formatNumber(summary.totals.events)}</span>
-                </div>
-              </div>
-              
-              {/* CF Signals Summary */}
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="text-xs text-gray-600 mb-2 font-medium">Cloudflare Signals Summary</div>
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <div className="flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                    <span className="text-gray-700">CF Verified Bots:</span>
-                    <span className="font-medium">{summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                    <span className="text-gray-700">Other Traffic:</span>
-                    <span className="font-medium">{summary?.totals.events - (summary?.by_class.find(cls => cls.class === 'crawler')?.count || 0)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          </Card>
         )}
 
         {/* Recent Events Table */}
