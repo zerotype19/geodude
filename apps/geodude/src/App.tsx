@@ -51,6 +51,23 @@ function AppRoutes() {
   );
 }
 
+// Add a simple wrapper to catch any errors
+function ErrorBoundary({ children }: { children: React.ReactNode }) {
+  try {
+    return <>{children}</>;
+  } catch (error) {
+    console.error('❌ Error in routing:', error);
+    return (
+      <div className="min-h-screen bg-red-100 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-red-800">ROUTING ERROR</h1>
+          <p className="text-xl text-red-600 mt-4">Error: {String(error)}</p>
+        </div>
+      </div>
+    );
+  }
+}
+
 function App() {
   console.log("🚀 GEODUDE APP STARTING - MINIMAL ROUTING (NO AUTH CHECKS)");
   return (

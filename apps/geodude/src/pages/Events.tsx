@@ -160,6 +160,7 @@ interface HasAnyResponse {
 
 
 export default function Events() {
+  console.log('📊 Events page rendering...');
   const { project } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
