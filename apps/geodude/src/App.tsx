@@ -18,13 +18,17 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Funnels from "./pages/Funnels";
 import Recommendations from "./pages/Recommendations";
+import TestPage from "./pages/TestPage";
 
 // Ultra-simple route component - no loading states, no complex logic
 function AppRoutes() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  console.log('🔍 AppRoutes: user =', user, 'loading =', loading);
 
   // If no user, show login
   if (!user) {
+    console.log('❌ AppRoutes: No user, showing login routes');
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -37,6 +41,7 @@ function AppRoutes() {
   }
 
   // If user exists, show all pages
+  console.log('✅ AppRoutes: User exists, showing all routes');
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/events" replace />} />
@@ -53,6 +58,7 @@ function AppRoutes() {
       <Route path="/install" element={<Install />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/api-keys" element={<ApiKeys />} />
+      <Route path="/test" element={<TestPage />} />
       <Route path="/data-policy" element={<DataPolicy />} />
       <Route path="/docs/*" element={<Docs />} />
       <Route path="/terms" element={<Terms />} />
