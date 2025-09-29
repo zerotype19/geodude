@@ -93,7 +93,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Clear the session cookie
     document.cookie = 'optiview_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname;
     
-    // Redirect to login page
+    // Use window.location.href for a full page reload to clear any cached state
     window.location.href = '/login';
   };
 
@@ -167,12 +167,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .then(res => res.ok ? res.json() : null)
           .then(data => data && setOrganization(data))
           .catch(err => console.log('⚠️ AuthContext: Organization fetch failed:', err)),
-        
+
         fetch(`${API_BASE}/api/auth/project`, { credentials: 'include' })
           .then(res => res.ok ? res.json() : null)
           .then(data => data && setProject(data))
           .catch(err => console.log('⚠️ AuthContext: Project fetch failed:', err))
-      ]);
+      ]).catch(err => console.log('⚠️ AuthContext: Background fetch failed:', err));
 
       console.log('✅ AuthContext: User state updated successfully');
     } catch (err) {

@@ -8963,6 +8963,57 @@ export default {
         }
       }
 
+      // 4.7) Logout endpoint
+      if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+        try {
+          const sessionCookie = request.headers.get("cookie");
+          if (!sessionCookie) {
+            const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+          if (!sessionMatch) {
+            const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
+            return addCorsHeaders(response, request.headers.get("origin"));
+          }
+
+          const sessionId = sessionMatch[1];
+          
+          // Delete the session from the database
+          await d1.prepare(`
+            DELETE FROM session WHERE session_id = ?
+          `).bind(sessionId).run();
+
+          // Return success response with cookie clearing
+          const response = new Response(JSON.stringify({ 
+            success: true, 
+            message: "Logged out successfully" 
+          }), {
+            status: 200,
+            headers: { 
+              "Content-Type": "application/json",
+              "Set-Cookie": "optiview_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + (url.hostname || "optiview.ai") + "; HttpOnly; Secure; SameSite=Lax"
+            }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
+
+        } catch (e) {
+          console.error("Logout error:", e);
+          const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
+          return addCorsHeaders(response, request.headers.get("origin"));
+        }
+      }
+
       // 4.5) Dev Test Endpoint - Magic Link Token Peek (TEST_MODE only)
       if (url.pathname === "/_test/magic-link" && request.method === "GET" && config.TEST_MODE) {
         try {

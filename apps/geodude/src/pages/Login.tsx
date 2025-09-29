@@ -32,7 +32,7 @@ export default function Login() {
         },
         body: JSON.stringify({
           email: state.email,
-          continue_path: '/onboarding'
+          continue_path: '/events'
         }),
       });
 
