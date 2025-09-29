@@ -80,7 +80,7 @@ function AppRoutes() {
       <Route path="/citations" element={<Citations />} />
       <Route path="/recommendations" element={<Recommendations />} />
       <Route path="/sources" element={<Sources />} />
-      <Route path="/install" element={<DebugInstall />} />
+      <Route path="/install" element={<Navigate to="/setup" replace />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/api-keys" element={<DebugApiKeys />} />
       <Route path="/test" element={<TestPage />} />

@@ -18,7 +18,7 @@ export const INSIGHTS_NAV: NavItem[] = [
 ];
 
 export const SETUP_NAV: NavItem[] = [
-  { label: "Install",     href: "/install",        match: p => p.startsWith("/install") },
+  { label: "Install",     href: "/setup",        match: p => p.startsWith("/setup") },
   { label: "Sources",     href: "/sources",        match: p => p.startsWith("/sources") },
   { label: "API Keys",    href: "/api-keys",       match: p => p.startsWith("/api-keys") },
   { label: "Data Policy", href: "/data-policy",    match: p => p.startsWith("/data-policy") },
