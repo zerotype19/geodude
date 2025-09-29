@@ -16,55 +16,73 @@ import Docs from "./pages/Docs";
 import Login from "./pages/Login";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
-import Onboarding from "./pages/Onboarding";
 import Funnels from "./pages/Funnels";
 import Recommendations from "./pages/Recommendations";
-import LandingGate from "./components/LandingGate";
 import { useEffect } from "react";
 
-// Protected Route Component
+// Protected Route Component - Simple and direct
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
+  // Show loading while checking auth
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Redirect to login if not authenticated
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
+  // Render the protected content
   return <>{children}</>;
 };
 
-// Landing Gate handles smart routing only for root path "/"
-// All other routes go directly to their pages without redirect logic
-
-// Public Route Component (redirects to home if already logged in)
+// Public Route Component - Simple and direct
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
+  // Show loading while checking auth
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
+  // Redirect to events if already authenticated
   if (user) {
     return <Navigate to="/events" replace />;
   }
 
+  // Render the public content
   return <>{children}</>;
 };
 
 function AppRoutes() {
   return (
     <Routes>
+      {/* Public Routes */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/onboarding" element={<Onboarding />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/admin/health" element={<AdminHealth />} />
 
-      {/* Smart landing only for root path - checks for data and redirects accordingly */}
-      <Route path="/" element={<LandingGate />} />
+      {/* Root path - simple redirect to events */}
+      <Route path="/" element={<Navigate to="/events" replace />} />
 
-      {/* Protected Routes - these load directly without redirect logic */}
+      {/* All Protected Routes - direct access, no complex logic */}
       <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
       <Route path="/content" element={<ProtectedRoute><Content /></ProtectedRoute>} />
       <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
@@ -80,36 +98,14 @@ function AppRoutes() {
       <Route path="/data-policy" element={<ProtectedRoute><DataPolicy /></ProtectedRoute>} />
       <Route path="/docs/*" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
 
-      {/* Public Routes */}
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/admin/health" element={<AdminHealth />} />
-
-      {/* SPA fallback - any unmatched route goes to events */}
-      <Route path="*" element={<ProtectedRoute><Events /></ProtectedRoute>} />
+      {/* Fallback - redirect to events */}
+      <Route path="*" element={<Navigate to="/events" replace />} />
     </Routes>
   );
 }
 
 function App() {
-  // NUCLEAR BUNDLE CHANGE: Force completely different content hash
-  const buildTimestamp = "DEPLOYMENT_2025-08-19T02-35-00Z";
-  const cacheBuster = Date.now(); // Add runtime cache buster
-  const debugInfo = {
-    timestamp: buildTimestamp,
-    cacheBuster,
-    buildId: Math.random().toString(36),
-    forced: true
-  };
-  console.log("🚀 GEODUDE APP STARTING:", debugInfo);
-  
-  // Add cache-busting effect to prevent 308 redirects
-  useEffect(() => {
-    // Force a fresh navigation to clear any cached redirects
-    if (window.location.pathname === '/') {
-      console.log(`🔄 App: Cache busting root path [${cacheBuster}]`);
-    }
-  }, [cacheBuster]);
+  console.log("🚀 GEODUDE APP STARTING - SIMPLIFIED ROUTING");
   
   return (
     <AuthProvider>
