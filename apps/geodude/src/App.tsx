@@ -18,95 +18,53 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import Funnels from "./pages/Funnels";
 import Recommendations from "./pages/Recommendations";
-import { useEffect } from "react";
 
-// Protected Route Component - Simple and direct
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-
-  // Only show loading for a very short time, then let pages load
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect to login if not authenticated
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Render the protected content
-  return <>{children}</>;
-};
-
-// Public Route Component - Simple and direct
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-
-  // Show loading while checking auth
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect to events if already authenticated
-  if (user) {
-    return <Navigate to="/events" replace />;
-  }
-
-  // Render the public content
-  return <>{children}</>;
-};
-
+// Ultra-simple route component - no loading states, no complex logic
 function AppRoutes() {
+  const { user } = useAuth();
+
+  // If no user, show login
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/admin/health" element={<AdminHealth />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // If user exists, show all pages
   return (
     <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/" element={<Navigate to="/events" replace />} />
+      <Route path="/login" element={<Navigate to="/events" replace />} />
+      <Route path="/events" element={<Events />} />
+      <Route path="/content" element={<Content />} />
+      <Route path="/referrals" element={<Referrals />} />
+      <Route path="/conversions" element={<Conversions />} />
+      <Route path="/funnels" element={<Funnels />} />
+      <Route path="/journeys" element={<Journeys />} />
+      <Route path="/citations" element={<Citations />} />
+      <Route path="/recommendations" element={<Recommendations />} />
+      <Route path="/sources" element={<Sources />} />
+      <Route path="/install" element={<Install />} />
+      <Route path="/settings" element={<Settings />} />
+      <Route path="/api-keys" element={<ApiKeys />} />
+      <Route path="/data-policy" element={<DataPolicy />} />
+      <Route path="/docs/*" element={<Docs />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/admin/health" element={<AdminHealth />} />
-
-      {/* Root path - simple redirect to events */}
-      <Route path="/" element={<Navigate to="/events" replace />} />
-
-      {/* All Protected Routes - direct access, no complex logic */}
-      <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
-      <Route path="/content" element={<ProtectedRoute><Content /></ProtectedRoute>} />
-      <Route path="/referrals" element={<ProtectedRoute><Referrals /></ProtectedRoute>} />
-      <Route path="/conversions" element={<ProtectedRoute><Conversions /></ProtectedRoute>} />
-      <Route path="/funnels" element={<ProtectedRoute><Funnels /></ProtectedRoute>} />
-      <Route path="/journeys" element={<ProtectedRoute><Journeys /></ProtectedRoute>} />
-      <Route path="/citations" element={<ProtectedRoute><Citations /></ProtectedRoute>} />
-      <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
-      <Route path="/sources" element={<ProtectedRoute><Sources /></ProtectedRoute>} />
-      <Route path="/install" element={<ProtectedRoute><Install /></ProtectedRoute>} />
-      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      <Route path="/api-keys" element={<ProtectedRoute><ApiKeys /></ProtectedRoute>} />
-      <Route path="/data-policy" element={<ProtectedRoute><DataPolicy /></ProtectedRoute>} />
-      <Route path="/docs/*" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
-
-      {/* Fallback - redirect to events */}
       <Route path="*" element={<Navigate to="/events" replace />} />
     </Routes>
   );
 }
 
 function App() {
-  console.log("🚀 GEODUDE APP STARTING - SIMPLIFIED ROUTING");
-  
+  console.log("🚀 GEODUDE APP STARTING - ULTRA SIMPLE ROUTING");
   return (
     <AuthProvider>
       <Router>

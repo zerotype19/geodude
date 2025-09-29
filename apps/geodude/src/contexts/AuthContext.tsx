@@ -141,7 +141,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const refreshUserData = async () => {
-    // Don't set loading to true - let pages load immediately
     console.log('🔍 AuthContext: Attempting to fetch user data...');
 
     try {
@@ -154,12 +153,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
         setOrganization(null);
         setProject(null);
+        setLoading(false);
         return;
       }
 
       const userData = await userResponse.json();
       console.log('✅ AuthContext: User data received:', userData);
       setUser(userData);
+      setLoading(false); // Set loading to false immediately after getting user
 
       // Try to get organization and project data in background - don't block
       Promise.all([
@@ -181,8 +182,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setOrganization(null);
       setProject(null);
-    } finally {
-      setLoading(false); // Always set loading to false when done
+      setLoading(false);
     }
   };
 
