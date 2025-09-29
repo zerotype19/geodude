@@ -1,137 +1,103 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import Sources from "./pages/Sources";
-import Content from "./pages/Content";
 import Events from "./pages/Events";
-import Referrals from "./pages/Referrals";
-import Conversions from "./pages/Conversions";
-import Citations from "./pages/Citations";
-import Journeys from "./pages/Journeys";
-import Settings from "./pages/Settings";
-import Install from "./pages/Install";
-import AdminHealth from "./pages/AdminHealth";
-import ApiKeys from "./pages/ApiKeys";
-
-// Debug imports
-console.log('🔍 Import debug - Install:', Install);
-console.log('🔍 Import debug - ApiKeys:', ApiKeys);
-import DataPolicy from "./pages/DataPolicy";
-import Docs from "./pages/Docs";
 import Login from "./pages/Login";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
-import Funnels from "./pages/Funnels";
-import Recommendations from "./pages/Recommendations";
-import TestPage from "./pages/TestPage";
+import AdminHealth from "./pages/AdminHealth";
 
-// Route logger component
-function RouteLogger() {
-  const location = window.location;
-  console.log('📍 Current route:', location.pathname, location.search);
-  
-  // Track route changes
-  React.useEffect(() => {
-    const handleRouteChange = () => {
-      console.log('🔄 Route changed to:', window.location.pathname);
-    };
-    
-    // Listen for navigation events
-    window.addEventListener('popstate', handleRouteChange);
-    
-    return () => {
-      window.removeEventListener('popstate', handleRouteChange);
-    };
-  }, []);
-  
-  return null;
-}
-
-// Debug wrapper for Install page
-function DebugInstall() {
-  console.log('🔧 DebugInstall wrapper called');
-  return <Install />;
-}
-
-// Debug wrapper for ApiKeys page
-function DebugApiKeys() {
-  console.log('🔑 DebugApiKeys wrapper called');
-  return <ApiKeys />;
-}
-
-// MINIMAL ROUTING - NO AUTH CHECKS, NO COMPLEX LOGIC
-function AppRoutes() {
-  console.log('🔍 AppRoutes: Rendering all routes without auth checks');
-  console.log('🔍 AppRoutes: Current URL is:', window.location.href);
-  console.log('🔍 AppRoutes: Current pathname is:', window.location.pathname);
-  
+// Simple test pages
+function InstallPage() {
   return (
-    <>
-      <RouteLogger />
+    <div className="min-h-screen bg-blue-100 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-blue-800">INSTALL PAGE</h1>
+        <p className="text-xl text-blue-600 mt-4">Install functionality goes here</p>
+      </div>
+    </div>
+  );
+}
+
+function ApiKeysPage() {
+  return (
+    <div className="min-h-screen bg-green-100 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-green-800">API KEYS PAGE</h1>
+        <p className="text-xl text-green-600 mt-4">API Keys functionality goes here</p>
+      </div>
+    </div>
+  );
+}
+
+function ContentPage() {
+  return (
+    <div className="min-h-screen bg-purple-100 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-purple-800">CONTENT PAGE</h1>
+        <p className="text-xl text-purple-600 mt-4">Content functionality goes here</p>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPage() {
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-gray-800">SETTINGS PAGE</h1>
+        <p className="text-xl text-gray-600 mt-4">Settings functionality goes here</p>
+      </div>
+    </div>
+  );
+}
+
+// Ultra-simple routing - no complex logic
+function AppRoutes() {
+  const { user } = useAuth();
+  
+  console.log('🔍 AppRoutes: user =', user ? 'authenticated' : 'not authenticated');
+  console.log('🔍 AppRoutes: current path =', window.location.pathname);
+
+  // If no user, show login
+  if (!user) {
+    return (
       <Routes>
-      <Route path="/" element={<div className="min-h-screen bg-yellow-100 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold text-yellow-800">ROOT PAGE</h1><p className="text-xl text-yellow-600 mt-4">You are on the root page</p></div></div>} />
-      <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/admin/health" element={<AdminHealth />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // If user exists, show all pages
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/events" replace />} />
+      <Route path="/login" element={<Navigate to="/events" replace />} />
       <Route path="/events" element={<Events />} />
-      <Route path="/content" element={<Content />} />
-      <Route path="/referrals" element={<Referrals />} />
-      <Route path="/conversions" element={<Conversions />} />
-      <Route path="/funnels" element={<Funnels />} />
-      <Route path="/journeys" element={<Journeys />} />
-      <Route path="/citations" element={<Citations />} />
-      <Route path="/recommendations" element={<Recommendations />} />
-      <Route path="/sources" element={<Sources />} />
-      <Route path="/install" element={<Navigate to="/setup" replace />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/api-keys" element={<DebugApiKeys />} />
-      <Route path="/test" element={<TestPage />} />
-      <Route path="/debug123" element={<div className="min-h-screen bg-orange-100 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold text-orange-800">DEBUG ROUTE WORKS!</h1><p className="text-xl text-orange-600 mt-4">This is a completely new route</p></div></div>} />
-      <Route path="/setup" element={<DebugInstall />} />
-      <Route path="/data-policy" element={<DataPolicy />} />
-      <Route path="/docs/*" element={<Docs />} />
+      <Route path="/content" element={<ContentPage />} />
+      <Route path="/install" element={<InstallPage />} />
+      <Route path="/api-keys" element={<ApiKeysPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/admin/health" element={<AdminHealth />} />
       <Route path="*" element={<Navigate to="/events" replace />} />
-      </Routes>
-    </>
+    </Routes>
   );
 }
 
-// Add a simple wrapper to catch any errors
-function ErrorBoundary({ children }: { children: React.ReactNode }) {
-  try {
-    return <>{children}</>;
-  } catch (error) {
-    console.error('❌ Error in routing:', error);
-    return (
-      <div className="min-h-screen bg-red-100 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-red-800">ROUTING ERROR</h1>
-          <p className="text-xl text-red-600 mt-4">Error: {String(error)}</p>
-        </div>
-      </div>
-    );
-  }
-}
-
 function App() {
-  console.log("🚀 GEODUDE APP STARTING - MINIMAL ROUTING (NO AUTH CHECKS)");
-  
-  // Add URL change listener
-  React.useEffect(() => {
-    const handleUrlChange = () => {
-      console.log('🔗 URL changed to:', window.location.pathname);
-    };
-    
-    window.addEventListener('popstate', handleUrlChange);
-    return () => window.removeEventListener('popstate', handleUrlChange);
-  }, []);
-  
-  // TEMPORARILY REMOVE AuthProvider to test if it's causing redirects
+  console.log("🚀 GEODUDE APP STARTING - ULTRA SIMPLE ROUTING");
   return (
-    <Router>
-      <AppRoutes />
-    </Router>
+    <AuthProvider>
+      <Router>
+        <AppRoutes />
+      </Router>
+    </AuthProvider>
   );
 }
 
