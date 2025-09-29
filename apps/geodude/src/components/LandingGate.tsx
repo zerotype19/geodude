@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function LandingGate() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, project, loading } = useAuth();
 
   // Add cache-busting timestamp to prevent 308 redirect caching
@@ -14,8 +15,17 @@ export default function LandingGate() {
     let cancelled = false;
 
     async function handleRouting() {
+      // Only handle routing if we're actually on the root path
+      if (location.pathname !== '/') {
+        console.log(`🎯 LandingGate: Not on root path (${location.pathname}), skipping redirect logic`);
+        return;
+      }
+
       // Wait for auth to load
-      if (loading) return;
+      if (loading) {
+        console.log(`🎯 LandingGate: Still loading auth...`);
+        return;
+      }
 
       // If not authenticated, go to login
       if (!user) {
@@ -48,7 +58,7 @@ export default function LandingGate() {
     return () => {
       cancelled = true;
     };
-  }, [user, project?.id, loading, navigate, timestamp]);
+  }, [user, project?.id, loading, navigate, timestamp, location.pathname]);
 
   // Show loading spinner while determining redirect
   return (

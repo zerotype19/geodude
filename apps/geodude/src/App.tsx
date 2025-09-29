@@ -49,7 +49,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/events" replace />;
   }
 
   return <>{children}</>;
