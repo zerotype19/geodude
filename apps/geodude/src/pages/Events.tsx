@@ -161,6 +161,18 @@ interface HasAnyResponse {
 
 export default function Events() {
   console.log('📊 Events page rendering...');
+  
+  // TEMPORARY: Return simple test content
+  return (
+    <div className="min-h-screen bg-purple-100 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-purple-800">EVENTS PAGE WORKS!</h1>
+        <p className="text-xl text-purple-600 mt-4">Events page is rendering correctly</p>
+        <p className="text-lg text-purple-500 mt-2">Check console for debug logs</p>
+      </div>
+    </div>
+  );
+  
   const { project } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
