@@ -123,12 +123,11 @@ function App() {
     return () => window.removeEventListener('popstate', handleUrlChange);
   }, []);
   
+  // TEMPORARILY REMOVE AuthProvider to test if it's causing redirects
   return (
-    <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
-    </AuthProvider>
+    <Router>
+      <AppRoutes />
+    </Router>
   );
 }
 
