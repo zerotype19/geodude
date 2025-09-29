@@ -85,6 +85,7 @@ function AppRoutes() {
       <Route path="/api-keys" element={<DebugApiKeys />} />
       <Route path="/test" element={<TestPage />} />
       <Route path="/debug123" element={<div className="min-h-screen bg-orange-100 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold text-orange-800">DEBUG ROUTE WORKS!</h1><p className="text-xl text-orange-600 mt-4">This is a completely new route</p></div></div>} />
+      <Route path="/setup" element={<DebugInstall />} />
       <Route path="/data-policy" element={<DataPolicy />} />
       <Route path="/docs/*" element={<Docs />} />
       <Route path="/terms" element={<Terms />} />
