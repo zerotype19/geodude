@@ -209,16 +209,16 @@ export default function Onboarding() {
         login(userData, orgData, projectData);
         
         // Redirect to main app
-        window.location.href = '/';
+        window.location.href = '/events';
       } else {
         console.error('Failed to get user data for login');
         // Still redirect, the auth context will handle loading the data
-        window.location.href = '/';
+        window.location.href = '/events';
       }
     } catch (error) {
       console.error('Error completing onboarding:', error);
       // Still redirect, the auth context will handle loading the data
-      window.location.href = '/';
+      window.location.href = '/events';
     }
   };
 

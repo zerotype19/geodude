@@ -93,7 +93,7 @@ function AppRoutes() {
 
 function App() {
   // NUCLEAR BUNDLE CHANGE: Force completely different content hash
-  const buildTimestamp = "DEPLOYMENT_2025-08-19T02-27-00Z";
+  const buildTimestamp = "DEPLOYMENT_2025-08-19T02-35-00Z";
   const cacheBuster = Date.now(); // Add runtime cache buster
   const debugInfo = {
     timestamp: buildTimestamp,

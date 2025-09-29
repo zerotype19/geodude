@@ -57,7 +57,7 @@ export default function MagicLink() {
               // User has completed onboarding, go to main app
               console.log('🏠 Redirecting to main app...');
               setTimeout(() => {
-                navigate('/');
+                navigate('/events');
               }, 1000);
             } else {
               // New user, go to onboarding
