@@ -16,6 +16,134 @@ export async function handleApiRoutes(
     console.log('🔍 handleApiRoutes: Called for', url.pathname, req.method);
     console.log('🔍 handleApiRoutes: env keys:', Object.keys(env || {}));
 
+    // 0) JS Tag endpoint for customer installation
+    if (url.pathname === "/v1/tag.js" && req.method === "GET") {
+        try {
+            const debug = url.searchParams.get("debug") === "1";
+
+            // Generate the hosted tag runtime
+            const generateRuntime = (debug = false) => {
+                const runtime = `${debug ? '// Optiview Analytics Hosted Tag v1.0 (Debug Build)\n' : ''}(function() {
+  var optiview = window.optiview = window.optiview || {};
+  
+  // BEGIN apiBase detection (minifier-safe)
+  // Safe string builders to prevent naive minifier issues
+  var SL = String.fromCharCode(47);           
+  var S2 = SL + SL;                           
+  var COLON = String.fromCharCode(58);        
+  function joinProtoHost(proto, host) {       
+    return proto + COLON + S2 + host;
+  }
+  
+  // Default endpoint components
+  var DEFAULT_HOST = "api.optiview.ai";
+  var DEFAULT_PROTO = "https";
+  var defaultBase = joinProtoHost(DEFAULT_PROTO, DEFAULT_HOST);
+  
+  // Robust apiBase detection
+  var apiBase = defaultBase;
+  
+  // Allow explicit override via data-endpoint (optional attr)
+  var ds = (document.currentScript || document.getElementsByTagName("script")[document.getElementsByTagName("script").length - 1]).dataset || {};
+  if (ds && ds.endpoint) {
+    apiBase = String(ds.endpoint);
+  } else {
+    try {
+      var src = (document.currentScript && document.currentScript.src) ||
+                (function(s){ return s && s[s.length-1] ? s[s.length-1].src : ""; })(document.getElementsByTagName("script"));
+      if (src) {
+        var u = new URL(src, location.href);
+        apiBase = joinProtoHost(u.protocol.replace(COLON,""), u.host);
+      }
+    } catch (e) { /* keep defaultBase */ }
+  }
+  
+  // Final sanity: require protocol and double slash
+  var protocolPattern = new RegExp("^https?" + COLON + S2 + "[^" + SL + "]+$", "i");
+  if (!protocolPattern.test(apiBase)) { apiBase = defaultBase; }
+  // END apiBase detection
+  
+  ${debug ? 'try { console.debug("[optiview] apiBase =", apiBase); } catch(e){}' : ''}
+  
+  // Read configuration from data attributes (reuse ds from above)
+  var keyId = ds.keyId;
+  var projectId = ds.projectId;
+  
+  if (!keyId || !projectId) {
+    ${debug ? 'console.error("[optiview] Missing required data attributes: data-key-id and data-project-id");' : ''}
+    return;
+  }
+  
+  // Core tracking function
+  optiview.track = function(eventType, data) {
+    try {
+      var payload = {
+        event_type: eventType,
+        project_id: projectId,
+        url: location.href,
+        referrer: document.referrer || "",
+        user_agent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+        data: data || {}
+      };
+      
+      // Send to API
+      fetch(apiBase + "/api/events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Optiview-Key-Id": keyId
+        },
+        body: JSON.stringify(payload)
+      }).catch(function(e) {
+        ${debug ? 'console.error("[optiview] Failed to send event:", e);' : ''}
+      });
+    } catch (e) {
+      ${debug ? 'console.error("[optiview] Error in track function:", e);' : ''}
+    }
+  };
+  
+  // Auto-track pageviews
+  optiview.track("pageview");
+  
+  // Track clicks on links
+  document.addEventListener("click", function(e) {
+    if (e.target.tagName === "A") {
+      optiview.track("click", {
+        element: "link",
+        href: e.target.href,
+        text: e.target.textContent
+      });
+    }
+  });
+  
+})();`;
+
+                return runtime;
+            };
+
+            const runtime = generateRuntime(debug);
+            
+            const response = new Response(runtime, {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/javascript",
+                    "Cache-Control": "public, max-age=3600",
+                    "ETag": `"${Date.now()}"`
+                }
+            });
+            
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (error) {
+            console.error("Tag.js generation error:", error);
+            const response = new Response("// Optiview Analytics Error", {
+                status: 500,
+                headers: { "Content-Type": "application/javascript" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
     // 6.1) API Keys Management
     if (url.pathname === "/api/keys" && req.method === "POST") {
         try {

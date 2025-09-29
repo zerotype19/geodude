@@ -920,7 +920,7 @@ async function getCitationsHealth(d1: any, orgId: string) {
       SELECT COUNT(*) as total
       FROM ai_citation_event ace
       JOIN properties p ON p.id = ace.property_id
-      JOIN projects pr ON pr.id = p.project_id
+      JOIN project pr ON pr.id = p.project_id
       WHERE pr.org_id = ? AND ace.created_at >= ?
     `).bind(orgId, last24h.toISOString()).first();
 
@@ -929,7 +929,7 @@ async function getCitationsHealth(d1: any, orgId: string) {
       SELECT COUNT(DISTINCT ace.surface) as total
       FROM ai_citation_event ace
       JOIN properties p ON p.id = ace.property_id
-      JOIN projects pr ON pr.id = p.project_id
+      JOIN project pr ON pr.id = p.project_id
       WHERE pr.org_id = ? AND ace.created_at >= ?
     `).bind(orgId, last24h.toISOString()).first();
 
@@ -940,7 +940,7 @@ async function getCitationsHealth(d1: any, orgId: string) {
         COUNT(*) as count
       FROM ai_citation_event ace
       JOIN properties p ON p.id = ace.property_id
-      JOIN projects pr ON pr.id = p.project_id
+      JOIN project pr ON pr.id = p.project_id
       WHERE pr.org_id = ? AND ace.created_at >= ?
       GROUP BY ace.evidence_type
       ORDER BY count DESC

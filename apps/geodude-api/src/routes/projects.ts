@@ -16,7 +16,7 @@ export async function handleProjectRoutes(url: URL, request: Request, env: any, 
       // Get projects for organization
       const projects = await d1.prepare(`
         SELECT id, name, created_at, updated_at
-        FROM projects 
+        FROM project 
         WHERE organization_id = ? 
         ORDER BY created_at DESC
       `).bind(organizationId).all();
@@ -54,7 +54,7 @@ export async function handleProjectRoutes(url: URL, request: Request, env: any, 
 
       // Create project
       const result = await d1.prepare(`
-        INSERT INTO projects (name, organization_id, created_at, updated_at)
+        INSERT INTO project (name, organization_id, created_at, updated_at)
         VALUES (?, ?, ?, ?)
       `).bind(name, organization_id, Date.now(), Date.now()).run();
 

@@ -248,7 +248,7 @@ export async function handleAuthRoutes(url: URL, request: Request, env: any, d1:
 
       // Create project
       const result = await d1.prepare(`
-        INSERT INTO projects (name, organization_id, created_at)
+        INSERT INTO project (name, organization_id, created_at)
         VALUES (?, ?, ?)
       `).bind(name, organization_id, Date.now()).run();
 
