@@ -1,3 +1,4 @@
+import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Sources from "./pages/Sources";
@@ -20,12 +21,21 @@ import Funnels from "./pages/Funnels";
 import Recommendations from "./pages/Recommendations";
 import TestPage from "./pages/TestPage";
 
+// Route logger component
+function RouteLogger() {
+  const location = window.location;
+  console.log('📍 Current route:', location.pathname, location.search);
+  return null;
+}
+
 // MINIMAL ROUTING - NO AUTH CHECKS, NO COMPLEX LOGIC
 function AppRoutes() {
   console.log('🔍 AppRoutes: Rendering all routes without auth checks');
   
   return (
-    <Routes>
+    <>
+      <RouteLogger />
+      <Routes>
       <Route path="/" element={<Navigate to="/events" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/events" element={<Events />} />
@@ -47,7 +57,8 @@ function AppRoutes() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/admin/health" element={<AdminHealth />} />
       <Route path="*" element={<Navigate to="/events" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 
@@ -70,6 +81,17 @@ function ErrorBoundary({ children }: { children: React.ReactNode }) {
 
 function App() {
   console.log("🚀 GEODUDE APP STARTING - MINIMAL ROUTING (NO AUTH CHECKS)");
+  
+  // Add URL change listener
+  React.useEffect(() => {
+    const handleUrlChange = () => {
+      console.log('🔗 URL changed to:', window.location.pathname);
+    };
+    
+    window.addEventListener('popstate', handleUrlChange);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, []);
+  
   return (
     <AuthProvider>
       <Router>
