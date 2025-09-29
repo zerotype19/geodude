@@ -29,6 +29,21 @@ import TestPage from "./pages/TestPage";
 function RouteLogger() {
   const location = window.location;
   console.log('📍 Current route:', location.pathname, location.search);
+  
+  // Track route changes
+  React.useEffect(() => {
+    const handleRouteChange = () => {
+      console.log('🔄 Route changed to:', window.location.pathname);
+    };
+    
+    // Listen for navigation events
+    window.addEventListener('popstate', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, []);
+  
   return null;
 }
 
@@ -52,7 +67,7 @@ function AppRoutes() {
     <>
       <RouteLogger />
       <Routes>
-      <Route path="/" element={<Navigate to="/events" replace />} />
+      <Route path="/" element={<div className="min-h-screen bg-yellow-100 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold text-yellow-800">ROOT PAGE</h1><p className="text-xl text-yellow-600 mt-4">You are on the root page</p></div></div>} />
       <Route path="/login" element={<Login />} />
       <Route path="/events" element={<Events />} />
       <Route path="/content" element={<Content />} />
