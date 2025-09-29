@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start as false to prevent blocking
   const [error, setError] = useState<string | null>(null);
 
   const login = (userData: User, orgData: Organization, projectData: Project) => {
@@ -141,73 +141,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const refreshUserData = async () => {
+    // Don't set loading to true - let pages load immediately
+    console.log('🔍 AuthContext: Attempting to fetch user data...');
+
     try {
-      setLoading(true);
-      setError(null);
-
-      // Always attempt to get user data - the HttpOnly cookie will be sent automatically
-      console.log('🔍 AuthContext: Attempting to fetch user data...');
-
-      // Get current user data
-      console.log('🔍 AuthContext: Calling /api/auth/me...');
       const userResponse = await fetch(`${API_BASE}/api/auth/me`, {
         credentials: 'include',
       });
 
-      console.log('🔍 AuthContext: /api/auth/me response status:', userResponse.status);
-
       if (!userResponse.ok) {
-        console.log('❌ AuthContext: /api/auth/me failed:', userResponse.status, userResponse.statusText);
-        // User is not authenticated
+        console.log('❌ AuthContext: User not authenticated');
         setUser(null);
         setOrganization(null);
         setProject(null);
-        setLoading(false);
         return;
       }
 
       const userData = await userResponse.json();
       console.log('✅ AuthContext: User data received:', userData);
-      
-      // Get user's organization and project
-      console.log('🔍 AuthContext: Calling /api/auth/organization...');
-      const orgResponse = await fetch(`${API_BASE}/api/auth/organization`, {
-        credentials: 'include',
-      });
-
-      console.log('🔍 AuthContext: /api/auth/organization response status:', orgResponse.status);
-
-      if (orgResponse.ok) {
-        const orgData = await orgResponse.json();
-        console.log('✅ AuthContext: Organization data received:', orgData);
-        setOrganization(orgData);
-        
-        // Get project data
-        console.log('🔍 AuthContext: Calling /api/auth/project...');
-        const projectResponse = await fetch(`${API_BASE}/api/auth/project`, {
-          credentials: 'include',
-        });
-
-        console.log('🔍 AuthContext: /api/auth/project response status:', projectResponse.status);
-
-        if (projectResponse.ok) {
-          const projectData = await projectResponse.json();
-          console.log('✅ AuthContext: Project data received:', projectData);
-          setProject(projectData);
-        }
-      }
-
       setUser(userData);
+
+      // Try to get organization and project data in background - don't block
+      Promise.all([
+        fetch(`${API_BASE}/api/auth/organization`, { credentials: 'include' })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => data && setOrganization(data))
+          .catch(err => console.log('⚠️ AuthContext: Organization fetch failed:', err)),
+        
+        fetch(`${API_BASE}/api/auth/project`, { credentials: 'include' })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => data && setProject(data))
+          .catch(err => console.log('⚠️ AuthContext: Project fetch failed:', err))
+      ]);
+
       console.log('✅ AuthContext: User state updated successfully');
     } catch (err) {
       console.error('❌ AuthContext: Failed to refresh user data:', err);
       setError(err instanceof Error ? err.message : 'Failed to refresh user data');
-      // If we can't get user data, they might be logged out
       setUser(null);
       setOrganization(null);
       setProject(null);
-    } finally {
-      setLoading(false);
     }
   };
 

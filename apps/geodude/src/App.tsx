@@ -24,7 +24,7 @@ import { useEffect } from "react";
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
-  // Show loading while checking auth
+  // Only show loading for a very short time, then let pages load
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
