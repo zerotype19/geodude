@@ -181,6 +181,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(null);
       setOrganization(null);
       setProject(null);
+    } finally {
+      setLoading(false); // Always set loading to false when done
     }
   };
 
