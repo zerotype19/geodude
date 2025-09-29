@@ -20,32 +20,14 @@ import Funnels from "./pages/Funnels";
 import Recommendations from "./pages/Recommendations";
 import TestPage from "./pages/TestPage";
 
-// Ultra-simple route component - no loading states, no complex logic
+// MINIMAL ROUTING - NO AUTH CHECKS, NO COMPLEX LOGIC
 function AppRoutes() {
-  const { user, loading } = useAuth();
-
-  console.log('🔍 AppRoutes: user =', user, 'loading =', loading);
-
-  // If no user, show login
-  if (!user) {
-    console.log('❌ AppRoutes: No user, showing login routes');
-    return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/admin/health" element={<AdminHealth />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    );
-  }
-
-  // If user exists, show all pages
-  console.log('✅ AppRoutes: User exists, showing all routes');
+  console.log('🔍 AppRoutes: Rendering all routes without auth checks');
+  
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/events" replace />} />
-      <Route path="/login" element={<Navigate to="/events" replace />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/events" element={<Events />} />
       <Route path="/content" element={<Content />} />
       <Route path="/referrals" element={<Referrals />} />
@@ -70,7 +52,7 @@ function AppRoutes() {
 }
 
 function App() {
-  console.log("🚀 GEODUDE APP STARTING - ULTRA SIMPLE ROUTING");
+  console.log("🚀 GEODUDE APP STARTING - MINIMAL ROUTING (NO AUTH CHECKS)");
   return (
     <AuthProvider>
       <Router>
