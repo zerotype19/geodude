@@ -12,6 +12,10 @@ import Settings from "./pages/Settings";
 import Install from "./pages/Install";
 import AdminHealth from "./pages/AdminHealth";
 import ApiKeys from "./pages/ApiKeys";
+
+// Debug imports
+console.log('🔍 Import debug - Install:', Install);
+console.log('🔍 Import debug - ApiKeys:', ApiKeys);
 import DataPolicy from "./pages/DataPolicy";
 import Docs from "./pages/Docs";
 import Login from "./pages/Login";
@@ -26,6 +30,18 @@ function RouteLogger() {
   const location = window.location;
   console.log('📍 Current route:', location.pathname, location.search);
   return null;
+}
+
+// Debug wrapper for Install page
+function DebugInstall() {
+  console.log('🔧 DebugInstall wrapper called');
+  return <Install />;
+}
+
+// Debug wrapper for ApiKeys page
+function DebugApiKeys() {
+  console.log('🔑 DebugApiKeys wrapper called');
+  return <ApiKeys />;
 }
 
 // MINIMAL ROUTING - NO AUTH CHECKS, NO COMPLEX LOGIC
@@ -47,9 +63,9 @@ function AppRoutes() {
       <Route path="/citations" element={<Citations />} />
       <Route path="/recommendations" element={<Recommendations />} />
       <Route path="/sources" element={<Sources />} />
-      <Route path="/install" element={<Install />} />
+      <Route path="/install" element={<DebugInstall />} />
       <Route path="/settings" element={<Settings />} />
-      <Route path="/api-keys" element={<ApiKeys />} />
+      <Route path="/api-keys" element={<DebugApiKeys />} />
       <Route path="/test" element={<TestPage />} />
       <Route path="/data-policy" element={<DataPolicy />} />
       <Route path="/docs/*" element={<Docs />} />
