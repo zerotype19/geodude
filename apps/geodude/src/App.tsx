@@ -1,55 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Events from "./pages/Events";
+import Install from "./pages/Install";
+import ApiKeys from "./pages/ApiKeys";
+import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import AdminHealth from "./pages/AdminHealth";
-
-// Simple page components
-function InstallPage() {
-  return (
-    <div className="min-h-screen bg-blue-100 flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-blue-800">INSTALL PAGE</h1>
-        <p className="text-xl text-blue-600 mt-4">Install functionality goes here</p>
-      </div>
-    </div>
-  );
-}
-
-function ApiKeysPage() {
-  return (
-    <div className="min-h-screen bg-green-100 flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-green-800">API KEYS PAGE</h1>
-        <p className="text-xl text-green-600 mt-4">API Keys functionality goes here</p>
-      </div>
-    </div>
-  );
-}
-
-function ContentPage() {
-  return (
-    <div className="min-h-screen bg-purple-100 flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-purple-800">CONTENT PAGE</h1>
-        <p className="text-xl text-purple-600 mt-4">Content functionality goes here</p>
-      </div>
-    </div>
-  );
-}
-
-function SettingsPage() {
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-800">SETTINGS PAGE</h1>
-        <p className="text-xl text-gray-600 mt-4">Settings functionality goes here</p>
-      </div>
-    </div>
-  );
-}
 
 // Simple navigation component
 function Navigation({ onNavigate }: { onNavigate: (page: string) => void }) {
@@ -125,10 +83,10 @@ function AppContent() {
     <div>
       <Navigation onNavigate={navigate} />
       {currentPage === 'events' && <Events />}
-      {currentPage === 'content' && <ContentPage />}
-      {currentPage === 'install' && <InstallPage />}
-      {currentPage === 'api-keys' && <ApiKeysPage />}
-      {currentPage === 'settings' && <SettingsPage />}
+      {currentPage === 'content' && <div className="min-h-screen bg-purple-100 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold text-purple-800">CONTENT PAGE</h1><p className="text-xl text-purple-600 mt-4">Content functionality goes here</p></div></div>}
+      {currentPage === 'install' && <Install />}
+      {currentPage === 'api-keys' && <ApiKeys />}
+      {currentPage === 'settings' && <Settings />}
     </div>
   );
 }

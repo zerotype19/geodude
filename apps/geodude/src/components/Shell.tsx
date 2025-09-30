@@ -1,25 +1,15 @@
 import { ReactNode } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { INSIGHTS_NAV, SETUP_NAV } from "../nav.config";
-import TopNav from "./TopNav";
+import SimpleTopNav from "./SimpleTopNav";
 
 interface ShellProps {
   children: ReactNode;
 }
 
 export default function Shell({ children }: ShellProps) {
-  const { user, project } = useAuth();
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* New TopNav replaces all header navigation */}
-      <TopNav
-        project={project}
-        user={user}
-        navItemsInsights={INSIGHTS_NAV}
-        navItemsSetup={SETUP_NAV}
-        isAdmin={!!(user?.is_admin)}
-      />
+      {/* Simple TopNav without React Router dependencies */}
+      <SimpleTopNav />
 
       {/* Main content - breadcrumbs and page content */}
       <main className="flex-1">

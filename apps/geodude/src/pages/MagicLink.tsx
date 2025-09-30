@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE } from '../config';
 
 export default function MagicLink() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { refreshUserData } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [error, setError] = useState<string>('');
@@ -18,7 +15,9 @@ export default function MagicLink() {
       setHasProcessed(true);
 
       try {
-        const token = searchParams.get('token');
+        // Get token from URL search params manually
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
 
         if (!token) {
           setError('No token provided');
@@ -57,21 +56,21 @@ export default function MagicLink() {
               // User has completed onboarding, go to main app
               console.log('🏠 Redirecting to main app...');
               setTimeout(() => {
-                navigate('/events');
+                window.location.href = '/events';
               }, 1000);
             } else {
               // New user, go to onboarding
               console.log('📝 Redirecting to onboarding...');
               setTimeout(() => {
-                navigate('/onboarding');
+                window.location.href = '/onboarding';
               }, 1000);
             }
           } else {
-            setError('Magic link validation failed');
-            setStatus('error');
-            setTimeout(() => {
-              navigate('/login');
-            }, 2000);
+          setError('Magic link validation failed');
+          setStatus('error');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
           }
         } else {
           // Handle different error cases
@@ -84,7 +83,7 @@ export default function MagicLink() {
           }
           setStatus('error');
           setTimeout(() => {
-            navigate('/login');
+            window.location.href = '/login';
           }, 2000);
         }
       } catch (err) {
@@ -92,13 +91,13 @@ export default function MagicLink() {
         setError('Network error. Please try again.');
         setStatus('error');
         setTimeout(() => {
-          navigate('/login');
+          window.location.href = '/login';
         }, 2000);
       }
     };
 
     handleMagicLink();
-  }, [searchParams, navigate, refreshUserData, hasProcessed]);
+  }, [refreshUserData, hasProcessed]);
 
   if (status === 'loading') {
     return (
@@ -145,7 +144,7 @@ export default function MagicLink() {
           <p className="text-gray-600 mt-2">{error}</p>
           <div className="mt-6">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => window.location.href = '/login'}
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               Back to Login
