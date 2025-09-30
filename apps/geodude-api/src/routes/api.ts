@@ -5446,6 +5446,215 @@ export async function handleApiRoutes(
         }
     }
 
+    // Authentication endpoints
+    // 1) Get current user
+    if (url.pathname === "/api/auth/me" && req.method === "GET") {
+        try {
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const userData = await env.OPTIVIEW_DB.prepare(`
+                SELECT id, email, is_admin, created_at FROM user WHERE id = ?
+            `).bind(sessionData.user_id).first();
+
+            if (!userData) {
+                const response = new Response(JSON.stringify({ error: "User not found" }), {
+                    status: 404,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const response = new Response(JSON.stringify({
+                id: userData.id,
+                email: userData.email,
+                is_admin: userData.is_admin === 1,
+                created_at: userData.created_at
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (e) {
+            console.error("Get user error:", e);
+            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 2) Get user's organization
+    if (url.pathname === "/api/auth/organization" && req.method === "GET") {
+        try {
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const orgData = await env.OPTIVIEW_DB.prepare(`
+                SELECT o.id, o.name, o.created_at
+                FROM organization o
+                JOIN user u ON u.organization_id = o.id
+                WHERE u.id = ?
+            `).bind(sessionData.user_id).first();
+
+            if (!orgData) {
+                const response = new Response(JSON.stringify({ error: "No organization found" }), {
+                    status: 404,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const response = new Response(JSON.stringify({
+                id: orgData.id,
+                name: orgData.name,
+                created_at: orgData.created_at
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (e) {
+            console.error("Get organization error:", e);
+            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // 3) Get user's project
+    if (url.pathname === "/api/auth/project" && req.method === "GET") {
+        try {
+            const sessionCookie = req.headers.get("cookie");
+            if (!sessionCookie) {
+                const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionMatch = sessionCookie.match(/optiview_session=([^;]+)/);
+            if (!sessionMatch) {
+                const response = new Response(JSON.stringify({ error: "Invalid session" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const sessionId = sessionMatch[1];
+            const sessionData = await env.OPTIVIEW_DB.prepare(`
+                SELECT user_id FROM session WHERE session_id = ? AND expires_at > ?
+            `).bind(sessionId, new Date().toISOString()).first();
+
+            if (!sessionData) {
+                const response = new Response(JSON.stringify({ error: "Session expired" }), {
+                    status: 401,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const projectData = await env.OPTIVIEW_DB.prepare(`
+                SELECT p.id, p.name, p.organization_id, p.created_at
+                FROM project p
+                JOIN user u ON u.organization_id = p.organization_id
+                WHERE u.id = ?
+                ORDER BY p.created_at DESC
+                LIMIT 1
+            `).bind(sessionData.user_id).first();
+
+            if (!projectData) {
+                const response = new Response(JSON.stringify({ error: "No project found" }), {
+                    status: 404,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const response = new Response(JSON.stringify({
+                id: projectData.id,
+                name: projectData.name,
+                organization_id: projectData.organization_id,
+                created_at: projectData.created_at
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (e) {
+            console.error("Get project error:", e);
+            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
     return null; // No API route matched
 }
 
