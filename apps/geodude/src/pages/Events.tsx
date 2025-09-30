@@ -11,6 +11,7 @@ interface EventSummary {
     ai_influenced: number;
     ai_pct: number;
   };
+  unique_pages?: number;
   by_class: Array<{
     class: string;
     count: number;
@@ -316,7 +317,7 @@ const Events: React.FC = () => {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Unique Pages</dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        {summary.totals.unique_pages?.toLocaleString() || '0'}
+                        {summary.unique_pages?.toLocaleString() || '0'}
                       </dd>
                     </dl>
                   </div>

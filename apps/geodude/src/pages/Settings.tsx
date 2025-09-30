@@ -16,7 +16,7 @@ interface Project {
   id: string;
   name: string;
   organization_id: string;
-  created_at: string;
+  created_ts: number;
   primary_property?: Property;
 }
 
@@ -161,7 +161,7 @@ const Settings: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Created</label>
                   <p className="mt-1 text-sm text-gray-900">
-                    {new Date(project.created_at).toLocaleDateString()}
+                    {new Date(project.created_ts * 1000).toLocaleDateString()}
                   </p>
                 </div>
                 {project.primary_property && (
