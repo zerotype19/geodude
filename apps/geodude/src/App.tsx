@@ -52,7 +52,7 @@ function SettingsPage() {
 }
 
 // Simple navigation component
-function Navigation() {
+function Navigation({ onNavigate }: { onNavigate: (page: string) => void }) {
   const { user } = useAuth();
   
   if (!user) return null;
@@ -61,11 +61,11 @@ function Navigation() {
     <nav className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex space-x-8 py-4">
-          <a href="/events" className="text-gray-700 hover:text-blue-600">Events</a>
-          <a href="/content" className="text-gray-700 hover:text-blue-600">Content</a>
-          <a href="/install" className="text-gray-700 hover:text-blue-600">Install</a>
-          <a href="/api-keys" className="text-gray-700 hover:text-blue-600">API Keys</a>
-          <a href="/settings" className="text-gray-700 hover:text-blue-600">Settings</a>
+          <button onClick={() => onNavigate('events')} className="text-gray-700 hover:text-blue-600">Events</button>
+          <button onClick={() => onNavigate('content')} className="text-gray-700 hover:text-blue-600">Content</button>
+          <button onClick={() => onNavigate('install')} className="text-gray-700 hover:text-blue-600">Install</button>
+          <button onClick={() => onNavigate('api-keys')} className="text-gray-700 hover:text-blue-600">API Keys</button>
+          <button onClick={() => onNavigate('settings')} className="text-gray-700 hover:text-blue-600">Settings</button>
         </div>
       </div>
     </nav>
@@ -81,12 +81,16 @@ function AppContent() {
   useEffect(() => {
     const handlePopState = () => {
       const path = window.location.pathname;
-      if (path === '/events') setCurrentPage('events');
+      console.log('🔍 URL changed to:', path);
+      if (path === '/events' || path === '/') setCurrentPage('events');
       else if (path === '/content') setCurrentPage('content');
       else if (path === '/install') setCurrentPage('install');
       else if (path === '/api-keys') setCurrentPage('api-keys');
       else if (path === '/settings') setCurrentPage('settings');
-      else setCurrentPage('events');
+      else {
+        console.log('🔍 Unknown path, defaulting to events:', path);
+        setCurrentPage('events');
+      }
     };
     
     // Set initial page from URL
@@ -119,7 +123,7 @@ function AppContent() {
   
   return (
     <div>
-      <Navigation />
+      <Navigation onNavigate={navigate} />
       {currentPage === 'events' && <Events />}
       {currentPage === 'content' && <ContentPage />}
       {currentPage === 'install' && <InstallPage />}
