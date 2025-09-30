@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Events from "./pages/Events";
+import Content from "./pages/Content";
 import Install from "./pages/Install";
 import ApiKeys from "./pages/ApiKeys";
 import Settings from "./pages/Settings";
@@ -9,26 +10,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import AdminHealth from "./pages/AdminHealth";
 
-// Simple navigation component
-function Navigation({ onNavigate }: { onNavigate: (page: string) => void }) {
-  const { user } = useAuth();
-  
-  if (!user) return null;
-  
-  return (
-    <nav className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex space-x-8 py-4">
-          <button onClick={() => onNavigate('events')} className="text-gray-700 hover:text-blue-600">Events</button>
-          <button onClick={() => onNavigate('content')} className="text-gray-700 hover:text-blue-600">Content</button>
-          <button onClick={() => onNavigate('install')} className="text-gray-700 hover:text-blue-600">Install</button>
-          <button onClick={() => onNavigate('api-keys')} className="text-gray-700 hover:text-blue-600">API Keys</button>
-          <button onClick={() => onNavigate('settings')} className="text-gray-700 hover:text-blue-600">Settings</button>
-        </div>
-      </div>
-    </nav>
-  );
-}
+// Navigation is handled by SimpleTopNav in each page's Shell component
 
 // Main app component - NO REACT ROUTER
 function AppContent() {
@@ -81,9 +63,8 @@ function AppContent() {
   
   return (
     <div>
-      <Navigation onNavigate={navigate} />
       {currentPage === 'events' && <Events />}
-      {currentPage === 'content' && <div className="min-h-screen bg-purple-100 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold text-purple-800">CONTENT PAGE</h1><p className="text-xl text-purple-600 mt-4">Content functionality goes here</p></div></div>}
+      {currentPage === 'content' && <Content />}
       {currentPage === 'install' && <Install />}
       {currentPage === 'api-keys' && <ApiKeys />}
       {currentPage === 'settings' && <Settings />}

@@ -5482,7 +5482,7 @@ export async function handleApiRoutes(
             }
 
             const userData = await env.OPTIVIEW_DB.prepare(`
-                SELECT id, email, is_admin, created_at FROM user WHERE id = ?
+                SELECT id, email, is_admin, created_ts FROM user WHERE id = ?
             `).bind(sessionData.user_id).first();
 
             if (!userData) {
@@ -5497,7 +5497,7 @@ export async function handleApiRoutes(
                 id: userData.id,
                 email: userData.email,
                 is_admin: userData.is_admin === 1,
-                created_at: userData.created_at
+                created_at: new Date(userData.created_ts * 1000).toISOString()
             }), {
                 headers: { "Content-Type": "application/json" }
             });
@@ -5549,7 +5549,7 @@ export async function handleApiRoutes(
             }
 
             const orgData = await env.OPTIVIEW_DB.prepare(`
-                SELECT o.id, o.name, o.created_at
+                SELECT o.id, o.name, o.created_ts
                 FROM organization o
                 JOIN user u ON u.organization_id = o.id
                 WHERE u.id = ?
@@ -5566,7 +5566,7 @@ export async function handleApiRoutes(
             const response = new Response(JSON.stringify({
                 id: orgData.id,
                 name: orgData.name,
-                created_at: orgData.created_at
+                created_at: new Date(orgData.created_ts * 1000).toISOString()
             }), {
                 headers: { "Content-Type": "application/json" }
             });
@@ -5618,11 +5618,11 @@ export async function handleApiRoutes(
             }
 
             const projectData = await env.OPTIVIEW_DB.prepare(`
-                SELECT p.id, p.name, p.organization_id, p.created_at
+                SELECT p.id, p.name, p.org_id, p.created_ts
                 FROM project p
-                JOIN user u ON u.organization_id = p.organization_id
+                JOIN user u ON u.organization_id = p.org_id
                 WHERE u.id = ?
-                ORDER BY p.created_at DESC
+                ORDER BY p.created_ts DESC
                 LIMIT 1
             `).bind(sessionData.user_id).first();
 
@@ -5637,8 +5637,8 @@ export async function handleApiRoutes(
             const response = new Response(JSON.stringify({
                 id: projectData.id,
                 name: projectData.name,
-                organization_id: projectData.organization_id,
-                created_at: projectData.created_at
+                organization_id: projectData.org_id,
+                created_at: new Date(projectData.created_ts * 1000).toISOString()
             }), {
                 headers: { "Content-Type": "application/json" }
             });
