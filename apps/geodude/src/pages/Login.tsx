@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { API_BASE } from '../config';
 
@@ -17,8 +16,6 @@ export default function Login() {
     error: '',
     success: ''
   });
-
-  const navigate = useNavigate();
 
   const handleRequestMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
