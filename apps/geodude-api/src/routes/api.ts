@@ -5446,6 +5446,49 @@ export async function handleApiRoutes(
         }
     }
 
+    // Content API endpoints (placeholders for now)
+    if (url.pathname === "/api/content" && req.method === "GET") {
+        try {
+            const response = new Response(JSON.stringify({
+                content: [],
+                total: 0
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e) {
+            console.error("Content fetch error:", e);
+            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    if (url.pathname === "/api/content/summary" && req.method === "GET") {
+        try {
+            const response = new Response(JSON.stringify({
+                total_items: 0,
+                ai_influenced: 0,
+                ai_percentage: 0,
+                total_page_views: 0,
+                total_ai_referrals: 0,
+                by_type: []
+            }), {
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        } catch (e) {
+            console.error("Content summary error:", e);
+            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
     // Authentication endpoints
     // 1) Get current user
     if (url.pathname === "/api/auth/me" && req.method === "GET") {
