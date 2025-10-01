@@ -165,15 +165,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Try to get organization and project data in background - don't block
       Promise.all([
         fetch(`${API_BASE}/api/auth/organization`, { credentials: 'include' })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => data && setOrganization(data))
-          .catch(err => console.log('⚠️ AuthContext: Organization fetch failed:', err)),
+          .then(res => {
+            console.log('🔍 AuthContext: Organization response status:', res.status);
+            return res.ok ? res.json() : null;
+          })
+          .then(data => {
+            console.log('🔍 AuthContext: Organization data:', data);
+            if (data) {
+              setOrganization(data);
+              console.log('✅ AuthContext: Organization set:', data);
+            } else {
+              console.log('⚠️ AuthContext: No organization data received');
+            }
+          })
+          .catch(err => console.error('❌ AuthContext: Organization fetch failed:', err)),
 
         fetch(`${API_BASE}/api/auth/project`, { credentials: 'include' })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => data && setProject(data))
-          .catch(err => console.log('⚠️ AuthContext: Project fetch failed:', err))
-      ]).catch(err => console.log('⚠️ AuthContext: Background fetch failed:', err));
+          .then(res => {
+            console.log('🔍 AuthContext: Project response status:', res.status);
+            return res.ok ? res.json() : null;
+          })
+          .then(data => {
+            console.log('🔍 AuthContext: Project data:', data);
+            if (data) {
+              setProject(data);
+              console.log('✅ AuthContext: Project set:', data);
+            } else {
+              console.log('⚠️ AuthContext: No project data received');
+            }
+          })
+          .catch(err => console.error('❌ AuthContext: Project fetch failed:', err))
+      ]).catch(err => console.error('❌ AuthContext: Background fetch failed:', err));
 
       console.log('✅ AuthContext: User state updated successfully');
     } catch (err) {
