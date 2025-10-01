@@ -1028,7 +1028,7 @@ export async function handleApiRoutes(
             const filteredTotal = filteredItems.length;
 
             const result = {
-                items: filteredItems,
+                events: filteredItems,
                 page: pageNum,
                 pageSize: pageSizeNum,
                 total: filteredTotal
