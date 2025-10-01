@@ -47,6 +47,8 @@ const Events: React.FC = () => {
   const [recentEvents, setRecentEvents] = useState<RecentEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [filters, setFilters] = useState({
     window: '24h',
     page: 1,
@@ -97,7 +99,7 @@ const Events: React.FC = () => {
     }
   };
 
-  const fetchRecentEvents = async () => {
+  const fetchRecentEvents = async (append = false) => {
     if (!project?.id) return;
 
     try {
@@ -112,7 +114,11 @@ const Events: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setRecentEvents(data.events || []);
+        if (append) {
+          setRecentEvents(prev => [...prev, ...(data.events || [])]);
+        } else {
+          setRecentEvents(data.events || []);
+        }
       } else {
         console.error('Failed to fetch recent events');
       }
@@ -394,30 +400,81 @@ const Events: React.FC = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {recentEvents.map((event) => (
-                      <tr key={event.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 text-gray-400 mr-2" />
-                            {new Date(event.occurred_at).toLocaleString()}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {event.event_type}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTrafficClassColor(event.event_class)}`}>
-                            {getTrafficClassLabel(event.event_class)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {event.source_name || 'Unknown'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          <div className="max-w-xs truncate" title={event.path}>
-                            {event.path}
-                          </div>
-                        </td>
-                      </tr>
+                      <React.Fragment key={event.id}>
+                        <tr 
+                          onClick={() => setExpandedEventId(expandedEventId === event.id ? null : event.id)}
+                          className="hover:bg-gray-50 cursor-pointer"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div className="flex items-center">
+                              <Clock className="h-4 w-4 text-gray-400 mr-2" />
+                              {new Date(event.occurred_at).toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {event.event_type}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTrafficClassColor(event.event_class)}`}>
+                              {getTrafficClassLabel(event.event_class)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {event.source_name || 'Unknown'}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            <div className="max-w-xs truncate" title={event.path}>
+                              {event.path}
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedEventId === event.id && (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-4 bg-gray-50">
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">URL:</span>
+                                    <p className="text-sm text-gray-900 break-all">{event.url || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">Event ID:</span>
+                                    <p className="text-sm text-gray-900 font-mono">{event.id}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">Content ID:</span>
+                                    <p className="text-sm text-gray-900">{event.content_id || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">Property ID:</span>
+                                    <p className="text-sm text-gray-900">{event.property_id || 'N/A'}</p>
+                                  </div>
+                                  {event.bot_category && (
+                                    <div>
+                                      <span className="text-xs font-medium text-gray-500">Bot Category:</span>
+                                      <p className="text-sm text-gray-900">{event.bot_category}</p>
+                                    </div>
+                                  )}
+                                  {event.cf_verified_bot && (
+                                    <div>
+                                      <span className="text-xs font-medium text-gray-500">Cloudflare Verified:</span>
+                                      <p className="text-sm text-gray-900">{event.cf_verified_bot_category || 'Yes'}</p>
+                                    </div>
+                                  )}
+                                </div>
+                                {event.metadata_preview && (
+                                  <div>
+                                    <span className="text-xs font-medium text-gray-500">Metadata:</span>
+                                    <pre className="mt-1 text-xs text-gray-900 bg-white p-2 rounded border overflow-x-auto">
+                                      {JSON.stringify(event.metadata_preview, null, 2)}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -425,13 +482,19 @@ const Events: React.FC = () => {
             )}
 
             {/* Pagination */}
-            {recentEvents.length === filters.pageSize && (
+            {recentEvents.length === filters.pageSize * filters.page && (
               <div className="mt-4 flex justify-center">
                 <button
-                  onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  onClick={async () => {
+                    setLoadingMore(true);
+                    setFilters(prev => ({ ...prev, page: prev.page + 1 }));
+                    await fetchRecentEvents(true);
+                    setLoadingMore(false);
+                  }}
+                  disabled={loadingMore}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                 >
-                  Load More
+                  {loadingMore ? 'Loading...' : 'Load More'}
                 </button>
               </div>
             )}
