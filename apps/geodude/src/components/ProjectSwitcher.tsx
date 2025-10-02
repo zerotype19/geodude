@@ -220,8 +220,10 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
   };
 
   const handleCreateProject = () => {
+    console.log('🔄 Opening create project modal...');
     setIsOpen(false);
     setShowCreateModal(true);
+    console.log('✅ Create project modal state set to true');
     // Call the optional prop if provided
     if (onCreateProject) {
       onCreateProject();
@@ -401,9 +403,13 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
       />
 
       {/* Create Project Modal */}
+      {console.log('🔍 ProjectSwitcher render - showCreateModal:', showCreateModal)}
       <CreateProjectModal
         isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          console.log('🔄 Closing create project modal...');
+          setShowCreateModal(false);
+        }}
       />
     </div>
   );
