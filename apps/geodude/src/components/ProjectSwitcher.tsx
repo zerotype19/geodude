@@ -139,10 +139,11 @@ function RenameProjectModal({ isOpen, onClose, project, onSuccess }: RenameModal
 export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProps) {
   const { user, organization, project, switchContext } = useAuth();
   
-  // Custom navigation function (no React Router) - use window.location for reliability
+  // Custom navigation function (no React Router) - use replaceState to avoid security issues
   const navigate = (page: string) => {
     const url = page.startsWith('/') ? page : `/${page}`;
-    window.location.href = url;
+    window.history.replaceState({}, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
   const [isOpen, setIsOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -191,15 +192,24 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
       return;
     }
 
+    console.log('🔄 Switching to project:', selectedProject.name, selectedProject.id);
+    console.log('🔄 Current project:', project?.name, project?.id);
+
     try {
       // Switch to the selected project
+      console.log('🔄 Calling switchContext...');
       await switchContext(organization!.id, selectedProject.id);
+      console.log('✅ switchContext completed');
 
       // Persist last project
       localStorage.setItem('ov:lastProjectId', selectedProject.id);
 
-      // Navigate to events
-      navigate('/events');
+      // Small delay to ensure context is updated
+      setTimeout(() => {
+        console.log('🔄 Navigating to /events...');
+        // Navigate to events
+        navigate('/events');
+      }, 100);
 
       setIsOpen(false);
     } catch (error) {
