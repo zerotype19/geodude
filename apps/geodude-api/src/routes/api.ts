@@ -2813,9 +2813,54 @@ export async function handleApiRoutes(
             if (body.event_type && !body.events) {
                 // Convert old format to new format
                 console.log("🔄 Converting old individual event format to new batched format");
+                
+                // For old format, we need to get property_id from the URL or use a default
+                let property_id = body.property_id;
+                if (!property_id && body.url) {
+                    try {
+                        // Try to extract property_id from the URL domain
+                        const url = new URL(body.url);
+                        const domain = url.hostname;
+                        
+                        // Look up property by domain and project_id
+                        const property = await env.OPTIVIEW_DB.prepare(`
+                            SELECT id FROM properties 
+                            WHERE project_id = ? AND domain = ?
+                            LIMIT 1
+                        `).bind(body.project_id, domain).first();
+                        
+                        if (property) {
+                            property_id = property.id;
+                            console.log(`🔍 Found property_id ${property_id} for domain ${domain}`);
+                        } else {
+                            // Create a default property for this domain
+                            const nowTs = Math.floor(Date.now() / 1000);
+                            const insertResult = await env.OPTIVIEW_DB.prepare(`
+                                INSERT INTO properties (project_id, domain, created_ts, updated_ts)
+                                VALUES (?, ?, ?, ?)
+                            `).bind(body.project_id, domain, nowTs, nowTs).run();
+                            
+                            property_id = insertResult.meta.last_row_id;
+                            console.log(`🆕 Created new property_id ${property_id} for domain ${domain}`);
+                        }
+                    } catch (e) {
+                        console.error("Error finding/creating property:", e);
+                        // Fallback to a default property_id if we can't determine it
+                        property_id = 1; // This is a fallback - in production you might want to handle this differently
+                    }
+                }
+                
+                if (!property_id) {
+                    const response = new Response(JSON.stringify({
+                        error: "Validation failed",
+                        details: ["Could not determine property_id from request data"]
+                    }), { status: 400, headers: { "Content-Type": "application/json" } });
+                    return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                }
+                
                 normalizedBody = {
                     project_id: body.project_id,
-                    property_id: body.property_id,
+                    property_id: property_id,
                     events: [{
                         event_type: body.event_type,
                         metadata: {
