@@ -5868,14 +5868,24 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
+            // Get the current project from session context, or fallback to most recent
             const projectData = await env.OPTIVIEW_DB.prepare(`
                 SELECT p.id, p.name, p.org_id, p.created_ts
                 FROM project p
                 JOIN org_member om ON om.org_id = p.org_id
-                WHERE om.user_id = ?
-                ORDER BY p.created_ts DESC
+                JOIN session s ON s.user_id = om.user_id
+                WHERE s.session_id = ? AND s.expires_at > ? AND p.id = s.current_project_id
+                UNION ALL
+                SELECT p.id, p.name, p.org_id, p.created_ts
+                FROM project p
+                JOIN org_member om ON om.org_id = p.org_id
+                WHERE om.user_id = ? AND NOT EXISTS (
+                    SELECT 1 FROM session s2 
+                    WHERE s2.session_id = ? AND s2.current_project_id IS NOT NULL
+                )
+                ORDER BY created_ts DESC
                 LIMIT 1
-            `).bind(sessionData.user_id).first();
+            `).bind(sessionId, new Date().toISOString(), sessionData.user_id, sessionId).first();
 
             if (!projectData) {
                 const response = new Response(JSON.stringify({ error: "No project found" }), {

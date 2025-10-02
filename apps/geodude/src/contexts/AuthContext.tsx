@@ -135,6 +135,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!response.ok) throw new Error('Failed to switch context');
 
+      // Small delay to ensure server-side context is fully updated
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       // Refresh user data to get the new context
       await refreshUserData();
     } catch (err) {
