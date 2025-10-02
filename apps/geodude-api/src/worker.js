@@ -2999,7 +2999,7 @@ export default {
 
           // Generate project ID
           const projectId = `prj_${generateToken().substring(0, 12)}`;
-          const nowTs = Math.floor(Date.now());
+          const nowTs = Math.floor(Date.now() / 1000);
 
           // Create slug from name (simple version)
           const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');

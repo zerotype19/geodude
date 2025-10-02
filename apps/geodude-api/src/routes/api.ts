@@ -272,12 +272,19 @@ export async function handleApiRoutes(
             `).bind(project_id).all();
 
             // Transform timestamps to ISO strings
-            const transformedProperties = properties.results.map(prop => ({
-                id: prop.id,
-                project_id: prop.project_id,
-                domain: prop.domain,
-                created_at: new Date(prop.created_ts * 1000).toISOString()
-            }));
+            const transformedProperties = properties.results.map(prop => {
+                // Handle both millisecond and second timestamps
+                const timestamp = prop.created_ts > 10000000000 ? 
+                    prop.created_ts : // Already in milliseconds
+                    prop.created_ts * 1000; // Convert seconds to milliseconds
+                
+                return {
+                    id: prop.id,
+                    project_id: prop.project_id,
+                    domain: prop.domain,
+                    created_at: new Date(timestamp).toISOString()
+                };
+            });
 
             const response = new Response(JSON.stringify(transformedProperties), {
                 headers: { "Content-Type": "application/json" }
@@ -5880,11 +5887,16 @@ export async function handleApiRoutes(
                 return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
             }
 
+            // Handle both millisecond and second timestamps
+            const timestamp = projectData.created_ts > 10000000000 ? 
+                projectData.created_ts : // Already in milliseconds
+                projectData.created_ts * 1000; // Convert seconds to milliseconds
+
             const response = new Response(JSON.stringify({
                 id: projectData.id,
                 name: projectData.name,
                 organization_id: projectData.org_id,
-                created_at: new Date(projectData.created_ts * 1000).toISOString()
+                created_at: new Date(timestamp).toISOString()
             }), {
                 headers: { "Content-Type": "application/json" }
             });
