@@ -2491,9 +2491,9 @@ export default {
             const toISOString = (ts) => {
               if (!ts) return null;
 
-              // If timestamp is > 1e12, it's likely already in milliseconds
-              // If timestamp is < 1e12, it's likely in seconds
-              const msTimestamp = ts > 1e12 ? ts : ts * 1000;
+              // If timestamp is > 10000000000, it's likely already in milliseconds
+              // If timestamp is < 10000000000, it's likely in seconds
+              const msTimestamp = ts > 10000000000 ? ts : ts * 1000;
 
               // Sanity check: if year would be > 3000, there's corrupted data
               if (msTimestamp > new Date('3000-01-01').getTime()) {
