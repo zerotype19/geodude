@@ -66,7 +66,7 @@ const ApiKeys: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setApiKeys(prev => [data.key, ...prev]);
+        setApiKeys(prev => [data, ...prev]);
         setNewKeyName('');
         setShowCreateModal(false);
       } else {
