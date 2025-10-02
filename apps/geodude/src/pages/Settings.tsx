@@ -16,7 +16,7 @@ interface Project {
   id: string;
   name: string;
   organization_id: string;
-  created_ts: number;
+  created_at: string;
   primary_property?: Property;
 }
 

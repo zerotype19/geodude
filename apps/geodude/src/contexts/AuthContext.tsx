@@ -27,7 +27,7 @@ interface Project {
   name: string;
   slug: string;
   org_id: string;
-  created_ts: number;
+  created_at: string;
   primary_property?: Property | null;
 }
 
