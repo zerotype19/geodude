@@ -43,7 +43,9 @@ const Settings: React.FC = () => {
       const response = await fetch(`${API_BASE}/api/properties?project_id=${project.id}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
-        setProperties(data.properties || []);
+        // The API returns the array directly, not wrapped in a properties object
+        const propertiesArray = Array.isArray(data) ? data : (data.properties || []);
+        setProperties(propertiesArray);
       } else {
         console.error('Failed to fetch properties');
       }
@@ -73,13 +75,14 @@ const Settings: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setProperties(prev => [data.property, ...prev]);
+        // The API returns the property object directly
+        setProperties(prev => [data, ...prev]);
         setNewPropertyDomain('');
         setShowAddProperty(false);
         setAddError('');
       } else {
         const errorData = await response.json();
-        setAddError(errorData.message || 'Failed to add property');
+        setAddError(errorData.error || errorData.message || 'Failed to add property');
       }
     } catch (error) {
       setAddError('Network error occurred');
