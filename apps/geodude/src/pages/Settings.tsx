@@ -164,7 +164,7 @@ const Settings: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Created</label>
                   <p className="mt-1 text-sm text-gray-900">
-                    {new Date(project.created_ts * 1000).toLocaleDateString()}
+                    {project.created_at ? new Date(project.created_at).toLocaleDateString() : 'Unknown'}
                   </p>
                 </div>
                 {project.primary_property && (
