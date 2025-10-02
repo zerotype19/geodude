@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ChevronDown, Search, Plus, Building2, MoreHorizontal, Edit, Settings } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { API_BASE, FETCH_OPTS } from "../config";
+import CreateProjectModal from "./CreateProjectModal";
 
 interface Project {
   id: string;
@@ -11,7 +12,7 @@ interface Project {
 }
 
 interface ProjectSwitcherProps {
-  onCreateProject: () => void;
+  onCreateProject?: () => void; // Made optional since we'll handle it internally
 }
 
 interface RenameModalProps {
@@ -151,6 +152,7 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
   const [loading, setLoading] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Load projects when dropdown opens
   useEffect(() => {
@@ -219,7 +221,17 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
 
   const handleCreateProject = () => {
     setIsOpen(false);
-    onCreateProject();
+    setShowCreateModal(true);
+    // Call the optional prop if provided
+    if (onCreateProject) {
+      onCreateProject();
+    }
+  };
+
+  const handleCreateProjectSuccess = () => {
+    setShowCreateModal(false);
+    // Refresh the projects list
+    loadProjects();
   };
 
   const handleRenameProject = () => {
@@ -386,6 +398,12 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
         onClose={() => setShowRenameModal(false)}
         project={project}
         onSuccess={handleRenameSuccess}
+      />
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
       />
     </div>
   );

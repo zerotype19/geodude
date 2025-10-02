@@ -68,7 +68,7 @@ export default function SimpleTopNav() {
           <div className="flex items-center gap-2 ml-auto">
             {/* Project and Property Switchers */}
             <div className="hidden lg:flex items-center gap-2">
-              <ProjectSwitcher onCreateProject={() => console.log('Create project modal coming soon')} />
+              <ProjectSwitcher />
               <PropertySwitcher onCreateProperty={() => console.log('Create property modal coming soon')} />
             </div>
 
