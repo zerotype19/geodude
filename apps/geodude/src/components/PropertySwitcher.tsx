@@ -153,12 +153,7 @@ export default function PropertySwitcher({ onCreateProperty }: PropertySwitcherP
     }
   }, [isOpen, project?.id]);
 
-  // Set selected property when properties load
-  useEffect(() => {
-    if (properties.length > 0 && !selectedProperty) {
-      setSelectedProperty(properties[0]);
-    }
-  }, [properties, selectedProperty]);
+  // Note: selectedProperty is now managed by AuthContext
 
   const loadProperties = async () => {
     if (!project?.id) return;

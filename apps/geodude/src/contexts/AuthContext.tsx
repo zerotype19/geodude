@@ -135,6 +135,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!response.ok) throw new Error('Failed to switch context');
 
+      // Clear selectedProperty when switching projects
+      setSelectedProperty(null);
+
       // Small delay to ensure server-side context is fully updated
       await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -217,6 +220,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     refreshUserData();
   }, []);
+
+  // Load selectedProperty when project changes
+  useEffect(() => {
+    const loadSelectedProperty = async () => {
+      if (!project?.id || selectedProperty) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/properties?project_id=${project.id}`, {
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const properties = await response.json();
+          if (properties && properties.length > 0) {
+            setSelectedProperty(properties[0]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load properties for selectedProperty:', err);
+      }
+    };
+
+    loadSelectedProperty();
+  }, [project?.id, selectedProperty]);
 
   const value: AuthContextType = {
     user,
