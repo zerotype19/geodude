@@ -2952,8 +2952,8 @@ export async function handleApiRoutes(
                             timestamp: body.timestamp,
                             data: body.data,
                             // Map old fields to new metadata structure
-                            pathname: body.pathname || (body.url ? new URL(body.url).pathname : location?.pathname),
-                            title: body.title || document?.title?.slice(0, 120),
+                            pathname: body.pathname || (body.url ? new URL(body.url).pathname : null),
+                            title: body.title || null,
                             ...body.metadata
                         },
                         occurred_at: body.occurred_at || body.timestamp || new Date().toISOString()
