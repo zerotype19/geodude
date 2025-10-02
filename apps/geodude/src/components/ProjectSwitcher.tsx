@@ -161,6 +161,11 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
     }
   }, [isOpen, organization?.id]);
 
+  // Debug modal state
+  useEffect(() => {
+    console.log('🔍 ProjectSwitcher render - showCreateModal:', showCreateModal);
+  }, [showCreateModal]);
+
   const loadProjects = async () => {
     if (!organization?.id) return;
 
@@ -403,7 +408,6 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
       />
 
       {/* Create Project Modal */}
-      {console.log('🔍 ProjectSwitcher render - showCreateModal:', showCreateModal)}
       <CreateProjectModal
         isOpen={showCreateModal}
         onClose={() => {
