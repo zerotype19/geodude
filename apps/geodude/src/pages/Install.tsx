@@ -193,18 +193,13 @@ const Install: React.FC = () => {
   const generateSnippet = () => {
     if (!selectedApiKey || !selectedProperty) return '';
 
-    return `<!-- Optiview Analytics -->
-<script>
-  (function() {
-    var script = document.createElement('script');
-    script.src = '${API_BASE}/v1/tag.js';
-    script.async = true;
-    script.setAttribute('data-key', '${selectedApiKey.id}');
-    script.setAttribute('data-property', '${selectedProperty.id}');
-    document.head.appendChild(script);
-  })();
-</script>
-<!-- End Optiview Analytics -->`;
+    return `<link rel="preconnect" href="https://api.optiview.ai" crossorigin>
+<script defer src="https://api.optiview.ai/v1/tag.js"
+  data-key-id="${selectedApiKey.id}"
+  data-project-id="${project?.id}"
+  data-property-id="${selectedProperty.id}"
+  data-clicks="1"
+  data-spa="1"></script>`;
   };
 
   if (!user) {

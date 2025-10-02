@@ -298,7 +298,8 @@ export default function InstallWizard() {
     if (config.batchSize !== 10) attrs.push(`data-batch-size="${config.batchSize}"`);
     if (config.flushMs !== 3000) attrs.push(`data-flush-ms="${config.flushMs}"`);
 
-    return `<script async src="https://api.optiview.ai/v1/tag.js"\n  ${attrs.join('\n  ')}></script>`;
+    return `<link rel="preconnect" href="https://api.optiview.ai" crossorigin>
+<script defer src="https://api.optiview.ai/v1/tag.js"\n  ${attrs.join('\n  ')}></script>`;
   };
 
   const copySnippet = async () => {
