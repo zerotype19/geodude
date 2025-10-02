@@ -21,8 +21,9 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
   const { user, organization, switchContext } = useAuth();
   // Custom navigation function (no React Router)
   const navigate = (page: string) => {
-    window.history.pushState({}, '', `/${page}`);
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    // Use window.location.href for navigation to avoid SecurityError
+    const path = page.startsWith('/') ? page : `/${page}`;
+    window.location.href = path;
   };
   const [formData, setFormData] = useState<FormData>({
     name: "",
