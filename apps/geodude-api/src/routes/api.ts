@@ -2934,7 +2934,34 @@ export async function handleApiRoutes(
 
             // Parse and validate body
             const body = JSON.parse(bodyText);
-            const validation = validateRequestBody("/api/events", body, bodyText.length);
+            
+            // Check if this is the old individual event format (backward compatibility)
+            let normalizedBody = body;
+            if (body.event_type && !body.events) {
+                // Convert old format to new format
+                console.log("🔄 Converting old individual event format to new batched format");
+                normalizedBody = {
+                    project_id: body.project_id,
+                    property_id: body.property_id,
+                    events: [{
+                        event_type: body.event_type,
+                        metadata: {
+                            url: body.url,
+                            referrer: body.referrer,
+                            user_agent: body.user_agent,
+                            timestamp: body.timestamp,
+                            data: body.data,
+                            // Map old fields to new metadata structure
+                            pathname: body.pathname || (body.url ? new URL(body.url).pathname : location?.pathname),
+                            title: body.title || document?.title?.slice(0, 120),
+                            ...body.metadata
+                        },
+                        occurred_at: body.occurred_at || body.timestamp || new Date().toISOString()
+                    }]
+                };
+            }
+            
+            const validation = validateRequestBody("/api/events", normalizedBody, bodyText.length);
 
             if (!validation.valid) {
                 const response = new Response(JSON.stringify({
