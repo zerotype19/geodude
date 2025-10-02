@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Menu, X, User, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import ProjectSwitcher from './ProjectSwitcher';
+import PropertySwitcher from './PropertySwitcher';
 
 export default function SimpleTopNav() {
   const { user, project } = useAuth();
@@ -64,12 +66,11 @@ export default function SimpleTopNav() {
 
           {/* Right side */}
           <div className="flex items-center gap-2 ml-auto">
-            {/* Project info */}
-            {project && (
-              <div className="hidden sm:block text-sm text-slate-600">
-                {project.name}
-              </div>
-            )}
+            {/* Project and Property Switchers */}
+            <div className="hidden lg:flex items-center gap-2">
+              <ProjectSwitcher onCreateProject={() => console.log('Create project modal coming soon')} />
+              <PropertySwitcher onCreateProperty={() => console.log('Create property modal coming soon')} />
+            </div>
 
             {/* User menu */}
             <div className="relative">

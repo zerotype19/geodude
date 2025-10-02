@@ -35,6 +35,7 @@ interface AuthContextType {
   user: User | null;
   organization: Organization | null;
   project: Project | null;
+  selectedProperty: Property | null;
   loading: boolean;
   error: string | null;
   login: (userData: User, orgData: Organization, projectData: Project) => void;
@@ -43,6 +44,7 @@ interface AuthContextType {
   listOrganizations: () => Promise<Organization[]>;
   listProjects: () => Promise<Project[]>;
   switchContext: (organizationId: string, projectId: string) => Promise<void>;
+  setSelectedProperty: (property: Property | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,6 +65,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [project, setProject] = useState<Project | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(false); // Start as false to prevent blocking
   const [error, setError] = useState<string | null>(null);
 
@@ -216,6 +219,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     organization,
     project,
+    selectedProperty,
     loading,
     error,
     login,
@@ -224,6 +228,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     listOrganizations,
     listProjects,
     switchContext,
+    setSelectedProperty,
   };
 
   return (

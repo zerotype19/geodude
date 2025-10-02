@@ -30,10 +30,9 @@ interface VerificationData {
 }
 
 const Install: React.FC = () => {
-  const { user, project } = useAuth();
+  const { user, project, selectedProperty, setSelectedProperty } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedApiKey, setSelectedApiKey] = useState<ApiKey | null>(null);
   const [loading, setLoading] = useState(true);
   const [verificationData, setVerificationData] = useState<VerificationData | null>(null);
@@ -84,7 +83,7 @@ const Install: React.FC = () => {
         // The API returns the array directly, not wrapped in a properties object
         const propertiesArray = Array.isArray(data) ? data : (data.properties || []);
         setProperties(propertiesArray);
-        if (propertiesArray.length > 0) {
+        if (propertiesArray.length > 0 && !selectedProperty) {
           setSelectedProperty(propertiesArray[0]);
         }
       }
