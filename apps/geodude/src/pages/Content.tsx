@@ -5,14 +5,14 @@ import { FileText, Search, Filter, Download, RefreshCw } from 'lucide-react';
 import Shell from '../components/Shell';
 
 interface ContentItem {
-  id: string;
+  id: number;
   url: string;
   title: string;
-  content_type: string;
-  created_at: string;
-  ai_influenced: boolean;
+  pathname: string;
   page_views: number;
   ai_referrals: number;
+  ai_percentage: number;
+  last_seen: string;
 }
 
 interface ContentSummary {
@@ -25,6 +25,7 @@ interface ContentSummary {
     type: string;
     count: number;
   }>;
+  content_items: ContentItem[];
 }
 
 export default function Content() {
@@ -52,22 +53,15 @@ export default function Content() {
         limit: '50'
       });
 
-      const [contentResponse, summaryResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/content?${params}`, { credentials: 'include' }),
-        fetch(`${API_BASE}/api/content/summary?${params}`, { credentials: 'include' })
-      ]);
+      const response = await fetch(`${API_BASE}/api/content/summary?${params}`, { credentials: 'include' });
 
-      if (!contentResponse.ok) {
+      if (!response.ok) {
         throw new Error('Failed to fetch content');
       }
 
-      const contentData = await contentResponse.json();
-      setContent(contentData.content || []);
-
-      if (summaryResponse.ok) {
-        const summaryData = await summaryResponse.json();
-        setSummary(summaryData);
-      }
+      const data = await response.json();
+      setSummary(data);
+      setContent(data.content_items || []);
     } catch (err) {
       console.error('Content fetch error:', err);
       setError('Failed to load content data');
@@ -360,11 +354,11 @@ export default function Content() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {item.content_type}
+                          page
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {item.ai_influenced ? (
+                        {item.ai_referrals > 0 ? (
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                             Yes
                           </span>
@@ -381,7 +375,7 @@ export default function Content() {
                         {item.ai_referrals.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.created_at).toLocaleDateString()}
+                        {new Date(item.last_seen).toLocaleDateString()}
                       </td>
                     </tr>
                   ))}
