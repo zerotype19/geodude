@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { ChevronDown, Search, Plus, Building2, MoreHorizontal, Edit, Settings } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { API_BASE, FETCH_OPTS } from "../config";
-import { useNavigate } from "react-router-dom";
 
 interface Project {
   id: string;
@@ -139,7 +138,12 @@ function RenameProjectModal({ isOpen, onClose, project, onSuccess }: RenameModal
 
 export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProps) {
   const { user, organization, project, switchContext } = useAuth();
-  const navigate = useNavigate();
+  
+  // Custom navigation function (no React Router)
+  const navigate = (page: string) => {
+    window.history.pushState({}, '', `/${page}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
   const [isOpen, setIsOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState("");

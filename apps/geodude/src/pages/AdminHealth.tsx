@@ -3,7 +3,7 @@ import { API_BASE, FETCH_OPTS } from "../config";
 import Shell from "../components/Shell";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+// Removed React Router dependency
 
 interface HealthMetrics {
   kv: { connected: boolean };
@@ -49,7 +49,11 @@ interface HealthMetrics {
 
 export default function AdminHealth() {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  // Custom navigation function (no React Router)
+  const navigate = (page: string) => {
+    window.history.pushState({}, '', `/${page}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
   const [health, setHealth] = useState<HealthMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

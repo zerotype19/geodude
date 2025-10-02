@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+// Removed React Router dependency
 import { NavItem } from '../nav.config';
 
 interface NavTabsProps {
@@ -7,7 +7,8 @@ interface NavTabsProps {
 }
 
 export function NavTabs({ items }: NavTabsProps) {
-  const location = useLocation();
+  // Get current path from window.location (no React Router)
+  const location = { pathname: window.location.pathname };
 
   // Compute active state for each item
   const tabsWithActive = items.map(item => ({

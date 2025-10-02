@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+// Removed React Router dependency
 import { Settings } from 'lucide-react';
 import { NavItem } from '../nav.config';
 
@@ -10,7 +10,8 @@ interface SetupMenuProps {
 
 export function SetupMenu({ items, isAdmin }: SetupMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const location = useLocation();
+  // Get current path from window.location (no React Router)
+  const location = { pathname: window.location.pathname };
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE, FETCH_OPTS } from '../config';
 import { CheckCircle, Clock, AlertTriangle, Eye, EyeOff, Copy, ExternalLink, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,11 +47,15 @@ interface ConfigState {
 
 export default function InstallWizard() {
   const { project } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+  
+  // Custom navigation function (no React Router)
+  const navigate = (page: string) => {
+    window.history.pushState({}, '', `/${page}`);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
 
-  // Parse URL parameters
-  const urlParams = new URLSearchParams(location.search);
+  // Parse URL parameters from current URL
+  const urlParams = new URLSearchParams(window.location.search);
   const preselectedKeyId = urlParams.get('key_id');
   const preselectedPropertyId = urlParams.get('property_id');
   const preselectedProjectId = urlParams.get('project_id');
