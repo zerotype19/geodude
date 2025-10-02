@@ -3233,9 +3233,13 @@ export default {
 
       // Properties API endpoints
       if (url.pathname === "/api/properties" && request.method === "GET") {
+        console.log("🔍 Worker: Handling properties GET request");
+        console.log("🔍 Worker: URL pathname:", url.pathname);
+        console.log("🔍 Worker: Request method:", request.method);
         try {
           const sessionCookie = request.headers.get("cookie");
           if (!sessionCookie) {
+            console.log("🔍 Worker: No session cookie found");
             const response = new Response(JSON.stringify({ error: "Not authenticated" }), {
               status: 401,
               headers: { "Content-Type": "application/json" }
@@ -3327,6 +3331,7 @@ export default {
             created_at: new Date(prop.created_ts * 1000).toISOString()
           }));
 
+          console.log("🔍 Worker: Properties query successful, returning", transformedProperties.length, "properties");
           const response = new Response(JSON.stringify(transformedProperties), {
             headers: {
               "Content-Type": "application/json",

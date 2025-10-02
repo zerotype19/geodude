@@ -251,6 +251,142 @@ export async function handleApiRoutes(
         }
     }
 
+    // Properties API
+    if (url.pathname === "/api/properties" && req.method === "GET") {
+        try {
+            const { project_id } = Object.fromEntries(url.searchParams);
+            if (!project_id) {
+                const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Get properties for the project
+            const properties = await env.OPTIVIEW_DB.prepare(`
+                SELECT id, project_id, domain, created_ts
+                FROM properties 
+                WHERE project_id = ? 
+                ORDER BY created_ts DESC
+            `).bind(project_id).all();
+
+            // Transform timestamps to ISO strings
+            const transformedProperties = properties.results.map(prop => ({
+                id: prop.id,
+                project_id: prop.project_id,
+                domain: prop.domain,
+                created_at: new Date(prop.created_ts * 1000).toISOString()
+            }));
+
+            const response = new Response(JSON.stringify(transformedProperties), {
+                headers: { "Content-Type": "application/json" }
+            });
+
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("Properties error:", error);
+            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
+    // Properties POST API
+    if (url.pathname === "/api/properties" && req.method === "POST") {
+        try {
+            const body = await req.json();
+            const { project_id, domain } = body;
+
+            if (!project_id || !domain) {
+                const response = new Response(JSON.stringify({ error: "project_id and domain are required" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Normalize domain
+            let normalizedDomain;
+            try {
+                let cleanDomain = domain.trim().toLowerCase();
+                cleanDomain = cleanDomain.replace(/^https?:\/\//, '');
+                cleanDomain = cleanDomain.split('/')[0].split('?')[0].split('#')[0];
+                cleanDomain = cleanDomain.split(':')[0];
+
+                if (!cleanDomain || cleanDomain === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(cleanDomain)) {
+                    const response = new Response(JSON.stringify({ error: "Invalid domain: IPs and localhost not allowed" }), {
+                        status: 400,
+                        headers: { "Content-Type": "application/json" }
+                    });
+                    return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                }
+
+                if (!cleanDomain.includes('.') || cleanDomain.startsWith('.') || cleanDomain.endsWith('.')) {
+                    const response = new Response(JSON.stringify({ error: "Invalid domain format" }), {
+                        status: 400,
+                        headers: { "Content-Type": "application/json" }
+                    });
+                    return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+                }
+
+                normalizedDomain = cleanDomain;
+            } catch (e) {
+                const response = new Response(JSON.stringify({ error: "Invalid domain format" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            const nowTs = Math.floor(Date.now() / 1000);
+
+            // Check for duplicate domain in this project
+            const existingProperty = await env.OPTIVIEW_DB.prepare(`
+                SELECT id FROM properties WHERE project_id = ? AND domain = ?
+            `).bind(project_id, normalizedDomain).first();
+
+            if (existingProperty) {
+                const response = new Response(JSON.stringify({ error: "duplicate_property" }), {
+                    status: 409,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Insert new property
+            const insertResult = await env.OPTIVIEW_DB.prepare(`
+                INSERT INTO properties (project_id, domain, created_ts, updated_ts)
+                VALUES (?, ?, ?, ?)
+            `).bind(project_id, normalizedDomain, nowTs, nowTs).run();
+
+            // Return the created property
+            const createdProperty = {
+                id: insertResult.meta.last_row_id,
+                project_id: project_id,
+                domain: normalizedDomain,
+                created_at: new Date(nowTs * 1000).toISOString()
+            };
+
+            const response = new Response(JSON.stringify(createdProperty), {
+                status: 201,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+
+        } catch (error) {
+            console.error("Create property error:", error);
+            const response = new Response(JSON.stringify({ error: "Internal server error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            });
+            return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+        }
+    }
+
     if (url.pathname === "/api/keys" && req.method === "GET") {
         try {
             // Ensure required indexes exist for events endpoints

@@ -40,6 +40,11 @@ const Install: React.FC = () => {
   const [verificationStatus, setVerificationStatus] = useState<'waiting' | 'connected' | 'error'>('waiting');
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
+  
+  // Property creation state
+  const [newPropertyDomain, setNewPropertyDomain] = useState('');
+  const [propertyError, setPropertyError] = useState<string | null>(null);
+  const [isCreatingProperty, setIsCreatingProperty] = useState(false);
 
   useEffect(() => {
     if (project?.id) {
@@ -76,9 +81,11 @@ const Install: React.FC = () => {
       const response = await fetch(`${API_BASE}/api/properties?project_id=${project.id}`, FETCH_OPTS);
       if (response.ok) {
         const data = await response.json();
-        setProperties(data.properties || []);
-        if (data.properties && data.properties.length > 0) {
-          setSelectedProperty(data.properties[0]);
+        // The API returns the array directly, not wrapped in a properties object
+        const propertiesArray = Array.isArray(data) ? data : (data.properties || []);
+        setProperties(propertiesArray);
+        if (propertiesArray.length > 0) {
+          setSelectedProperty(propertiesArray[0]);
         }
       }
     } catch (error) {
@@ -141,6 +148,45 @@ const Install: React.FC = () => {
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy:', error);
+    }
+  };
+
+  const createProperty = async () => {
+    if (!project?.id || !newPropertyDomain.trim()) return;
+
+    setIsCreatingProperty(true);
+    setPropertyError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/properties`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: project.id,
+          domain: newPropertyDomain.trim()
+        })
+      });
+
+      if (response.ok) {
+        const newProperty = await response.json();
+        setProperties(prev => [newProperty, ...prev]);
+        setSelectedProperty(newProperty);
+        setNewPropertyDomain('');
+        setPropertyError(null);
+      } else {
+        const error = await response.json();
+        if (response.status === 409) {
+          setPropertyError('That domain is already registered for this project.');
+        } else {
+          setPropertyError(error.error || 'Failed to create property');
+        }
+      }
+    } catch (error) {
+      console.error('Error creating property:', error);
+      setPropertyError('Network error. Please try again.');
+    } finally {
+      setIsCreatingProperty(false);
     }
   };
 
@@ -247,14 +293,46 @@ const Install: React.FC = () => {
                 </div>
 
                 {properties.length === 0 && (
-                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <div className="flex">
-                      <AlertTriangle className="h-5 w-5 text-yellow-400" />
-                      <div className="ml-3">
-                        <h3 className="text-sm font-medium text-yellow-800">No properties found</h3>
-                        <p className="mt-1 text-sm text-yellow-700">
-                          You need to create a property first. Go to Settings to add a property.
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="space-y-4">
+                      <div className="flex">
+                        <AlertTriangle className="h-5 w-5 text-blue-400" />
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-blue-800">No properties found</h3>
+                          <p className="mt-1 text-sm text-blue-700">
+                            Create a property to start tracking your website.
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Property Creation Form */}
+                      <div className="space-y-3">
+                        <div className="flex space-x-3">
+                          <input
+                            type="text"
+                            placeholder="example.com"
+                            value={newPropertyDomain}
+                            onChange={(e) => setNewPropertyDomain(e.target.value)}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <button
+                            onClick={createProperty}
+                            disabled={isCreatingProperty || !newPropertyDomain.trim()}
+                            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          >
+                            {isCreatingProperty ? 'Adding...' : 'Add Property'}
+                          </button>
+                        </div>
+                        
+                        <p className="text-xs text-blue-600">
+                          Enter the exact hostname where you'll install the tag (no http/https, no path). Example: www.example.com or example.com.
                         </p>
+                        
+                        {propertyError && (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                            <p className="text-sm text-red-600">{propertyError}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
