@@ -15,17 +15,33 @@ interface EventSummary {
   by_class: Array<{
     class: string;
     count: number;
+    estimated?: boolean;
   }>;
-  by_source: Array<{
+  by_source_top?: Array<{
+    ai_source_id: string;
     slug: string;
     name: string;
     count: number;
   }>;
+  by_bot_category?: Array<{
+    category: string;
+    count: number;
+  }>;
   timeseries: Array<{
     ts: string;
-    events: number;
-    ai_referrals: number;
+    count: number;
+    ai_count?: number;
+    baseline_count?: number;
+    estimated?: boolean;
   }>;
+  baseline?: {
+    direct_events: number;
+    search_events: number;
+    sampled_rows_retained: number;
+    sample_pct: number;
+  };
+  tracking_mode?: string;
+  ai_lite?: boolean;
 }
 
 interface RecentEvent {
@@ -34,11 +50,18 @@ interface RecentEvent {
   event_type: string;
   event_class: string;
   source_name?: string;
-  path: string;
+  url?: string;
+  content_id?: string;
+  property_id?: string;
+  bot_category?: string;
   user_agent?: string;
   referrer?: string;
-  classification_reason?: string;
-  classification_confidence?: number;
+  metadata_preview?: any;
+  cf_verified_bot?: boolean;
+  cf_verified_bot_category?: string;
+  cf_asn?: number;
+  cf_org?: string;
+  signals?: any;
 }
 
 const Events: React.FC = () => {
@@ -423,8 +446,8 @@ const Events: React.FC = () => {
                             {event.source_name || 'Unknown'}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-900">
-                            <div className="max-w-xs truncate" title={event.path}>
-                              {event.path}
+                            <div className="max-w-xs truncate" title={event.url || 'N/A'}>
+                              {event.url ? new URL(event.url).pathname : 'N/A'}
                             </div>
                           </td>
                         </tr>
