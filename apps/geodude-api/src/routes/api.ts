@@ -5468,13 +5468,79 @@ export async function handleApiRoutes(
 
     if (url.pathname === "/api/content/summary" && req.method === "GET") {
         try {
+            const { project_id, time_window = "24h", content_type = "all", search = "", limit = "50" } = Object.fromEntries(url.searchParams);
+            
+            if (!project_id) {
+                const response = new Response(JSON.stringify({ error: "project_id is required" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" }
+                });
+                return attach(addBasicSecurityHeaders(addCorsHeaders(response, origin)));
+            }
+
+            // Calculate time bounds
+            const now = Date.now();
+            let sinceISO: string;
+            switch (time_window) {
+                case "15m": sinceISO = new Date(now - 15 * 60 * 1000).toISOString(); break;
+                case "24h": sinceISO = new Date(now - 24 * 60 * 60 * 1000).toISOString(); break;
+                case "7d": sinceISO = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString(); break;
+                default: sinceISO = new Date(now - 24 * 60 * 60 * 1000).toISOString(); break;
+            }
+
+            // Get content items from interaction_events (using content_id and metadata)
+            const contentQuery = `
+                SELECT 
+                    content_id,
+                    json_extract(metadata, '$.title') as title,
+                    json_extract(metadata, '$.url') as url,
+                    json_extract(metadata, '$.pathname') as pathname,
+                    COUNT(*) as page_views,
+                    COUNT(CASE WHEN class = 'human_via_ai' OR (class = 'crawler' AND json_extract(metadata, '$.bot_category') = 'ai_training') THEN 1 END) as ai_referrals,
+                    MAX(occurred_at) as last_seen
+                FROM interaction_events 
+                WHERE project_id = ? 
+                  AND occurred_at >= ?
+                  AND content_id IS NOT NULL
+                  ${search ? "AND (json_extract(metadata, '$.title') LIKE ? OR json_extract(metadata, '$.url') LIKE ?)" : ""}
+                GROUP BY content_id
+                ORDER BY page_views DESC
+                LIMIT ?
+            `;
+
+            const params = search ? [project_id, sinceISO, `%${search}%`, `%${search}%`, parseInt(limit)] : [project_id, sinceISO, parseInt(limit)];
+            const contentResult = await env.OPTIVIEW_DB.prepare(contentQuery).bind(...params).all<any>();
+
+            const contentItems = (contentResult.results || []).map(row => ({
+                id: row.content_id,
+                title: row.title || 'Untitled',
+                url: row.url || '',
+                pathname: row.pathname || '',
+                page_views: row.page_views,
+                ai_referrals: row.ai_referrals,
+                ai_percentage: row.page_views > 0 ? (row.ai_referrals / row.page_views) * 100 : 0,
+                last_seen: row.last_seen
+            }));
+
+            // Calculate totals
+            const totalItems = contentItems.length;
+            const totalPageViews = contentItems.reduce((sum, item) => sum + item.page_views, 0);
+            const totalAiReferrals = contentItems.reduce((sum, item) => sum + item.ai_referrals, 0);
+            const aiPercentage = totalPageViews > 0 ? (totalAiReferrals / totalPageViews) * 100 : 0;
+
+            // Group by content type (simplified - could be enhanced)
+            const byType = [
+                { type: 'pages', count: totalItems, ai_referrals: totalAiReferrals }
+            ];
+
             const response = new Response(JSON.stringify({
-                total_items: 0,
-                ai_influenced: 0,
-                ai_percentage: 0,
-                total_page_views: 0,
-                total_ai_referrals: 0,
-                by_type: []
+                total_items: totalItems,
+                ai_influenced: totalAiReferrals,
+                ai_percentage: aiPercentage,
+                total_page_views: totalPageViews,
+                total_ai_referrals: totalAiReferrals,
+                by_type: byType,
+                content_items: contentItems
             }), {
                 headers: { "Content-Type": "application/json" }
             });
