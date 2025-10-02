@@ -139,10 +139,10 @@ function RenameProjectModal({ isOpen, onClose, project, onSuccess }: RenameModal
 export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProps) {
   const { user, organization, project, switchContext } = useAuth();
   
-  // Custom navigation function (no React Router) - triggers App component's handlePopState
+  // Custom navigation function (no React Router) - use window.location for reliability
   const navigate = (page: string) => {
-    window.history.pushState({}, '', `/${page}`);
-    window.dispatchEvent(new PopStateEvent('popstate'));
+    const url = page.startsWith('/') ? page : `/${page}`;
+    window.location.href = url;
   };
   const [isOpen, setIsOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
