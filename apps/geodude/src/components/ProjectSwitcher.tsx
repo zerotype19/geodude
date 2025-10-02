@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Search, Plus, Building2, MoreHorizontal, Edit, Settings } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { API_BASE, FETCH_OPTS } from "../config";
@@ -399,22 +400,28 @@ export default function ProjectSwitcher({ onCreateProject }: ProjectSwitcherProp
         </>
       )}
 
-      {/* Rename Modal */}
-      <RenameProjectModal
-        isOpen={showRenameModal}
-        onClose={() => setShowRenameModal(false)}
-        project={project}
-        onSuccess={handleRenameSuccess}
-      />
+      {/* Rename Modal - Rendered via Portal */}
+      {showRenameModal && createPortal(
+        <RenameProjectModal
+          isOpen={showRenameModal}
+          onClose={() => setShowRenameModal(false)}
+          project={project}
+          onSuccess={handleRenameSuccess}
+        />,
+        document.body
+      )}
 
-      {/* Create Project Modal */}
-      <CreateProjectModal
-        isOpen={showCreateModal}
-        onClose={() => {
-          console.log('🔄 Closing create project modal...');
-          setShowCreateModal(false);
-        }}
-      />
+      {/* Create Project Modal - Rendered via Portal */}
+      {showCreateModal && createPortal(
+        <CreateProjectModal
+          isOpen={showCreateModal}
+          onClose={() => {
+            console.log('🔄 Closing create project modal...');
+            setShowCreateModal(false);
+          }}
+        />,
+        document.body
+      )}
     </div>
   );
 }

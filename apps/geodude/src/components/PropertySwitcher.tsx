@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Search, Plus, Globe, MoreHorizontal, Edit, Settings, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { API_BASE, FETCH_OPTS } from "../config";
@@ -389,13 +390,16 @@ export default function PropertySwitcher({ onCreateProperty }: PropertySwitcherP
         </>
       )}
 
-      {/* Rename Modal */}
-      <RenamePropertyModal
-        isOpen={showRenameModal}
-        onClose={() => setShowRenameModal(false)}
-        property={selectedProperty}
-        onSuccess={handleRenameSuccess}
-      />
+      {/* Rename Modal - Rendered via Portal */}
+      {showRenameModal && createPortal(
+        <RenamePropertyModal
+          isOpen={showRenameModal}
+          onClose={() => setShowRenameModal(false)}
+          property={selectedProperty}
+          onSuccess={handleRenameSuccess}
+        />,
+        document.body
+      )}
     </div>
   );
 }
