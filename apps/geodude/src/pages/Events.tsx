@@ -429,9 +429,9 @@ const Events: React.FC = () => {
                           className="hover:bg-gray-50 cursor-pointer"
                         >
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div className="flex items-center">
+                            <div className="flex items-center" title={`UTC: ${new Date(event.occurred_at).toISOString()}`}>
                               <Clock className="h-4 w-4 text-gray-400 mr-2" />
-                              {new Date(event.occurred_at).toLocaleString()}
+                              {new Date(event.occurred_at).toLocaleString(undefined, { timeZoneName: 'short' })}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
