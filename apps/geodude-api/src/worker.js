@@ -4839,7 +4839,29 @@ export default {
             return addCorsHeaders(response, origin);
           }
 
-          // Get recent events from interaction_events table
+          // Optional filters (align with frontend)
+          const windowParam = url.searchParams.get("window") || "24h"; // 15m | 24h | 7d
+          const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+          const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get("pageSize") || "20", 10)));
+          const offset = (page - 1) * pageSize;
+
+          // Compute lower bound timestamp in ISO
+          const now = Date.now();
+          let sinceISO;
+          switch (windowParam) {
+            case "15m":
+              sinceISO = new Date(now - 15 * 60 * 1000).toISOString();
+              break;
+            case "7d":
+              sinceISO = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+              break;
+            case "24h":
+            default:
+              sinceISO = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+              break;
+          }
+
+          // Fetch recent events filtered by time window, ordered newest first, paginated
           const events = await d1.prepare(`
             SELECT 
               ie.id,
@@ -4852,14 +4874,14 @@ export default {
             FROM interaction_events ie
             LEFT JOIN content_assets ca ON ca.id = ie.content_id
             LEFT JOIN ai_sources s ON s.id = ie.ai_source_id
-            WHERE ie.project_id = ?
+            WHERE ie.project_id = ? AND ie.occurred_at >= ?
             ORDER BY ie.occurred_at DESC
-            LIMIT 100
-          `).bind(projectId).all();
+            LIMIT ? OFFSET ?
+          `).bind(projectId, sinceISO, pageSize, offset).all();
 
           const response = new Response(JSON.stringify({
             events: events.results || [],
-            total: events.results?.length || 0
+            total: events.results?.length || 0,
           }), {
             headers: { "Content-Type": "application/json" }
           });
