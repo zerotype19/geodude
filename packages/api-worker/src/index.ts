@@ -733,6 +733,16 @@ export default {
           trust: audit.score_trust,
         } : null;
 
+        // Transform issues to match frontend expectations
+        const transformedIssues = (issues.results as any[]).map((issue: any) => ({
+          category: issue.issue_type?.split('_')[0] || 'general',
+          severity: issue.severity,
+          code: issue.issue_type,
+          message: issue.message,
+          url: issue.page_url,
+          details: issue.details,
+        }));
+
         const response: any = {
           id: audit.id,
           property_id: audit.property_id,
@@ -746,7 +756,7 @@ export default {
           completed_at: audit.completed_at,
           error: audit.error,
           pages: pages.results,
-          issues: issues.results,
+          issues: transformedIssues,
           citations: citations,
         };
 
