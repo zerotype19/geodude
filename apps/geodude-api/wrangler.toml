@@ -45,6 +45,7 @@ RETENTION_BASELINE_SAMPLED_DAYS = "14"
 binding = "OPTIVIEW_DB"
 database_name = "optiview_db"
 database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+migrations_dir = "../../migrations/d1"
 
 [[kv_namespaces]]
 binding = "AI_FINGERPRINTS"

@@ -2,7 +2,7 @@
 -- Migration 007: Add project_settings table
 
 CREATE TABLE IF NOT EXISTS project_settings (
-  project_id INTEGER PRIMARY KEY,
+  project_id TEXT PRIMARY KEY,
   retention_days_events INTEGER DEFAULT 180,
   retention_days_referrals INTEGER DEFAULT 365,
   plan_tier TEXT DEFAULT 'free',
