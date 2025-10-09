@@ -151,7 +151,9 @@ export default {
     // CORS headers for all responses
     const allowedOrigins = [
       'https://app.optiview.ai',
+      'https://optiview.ai',
       'https://geodude-app.pages.dev',
+      'https://geodude.pages.dev',
       'http://localhost:5173',
       'http://localhost:5174',
     ];
