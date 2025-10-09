@@ -3,3 +3,4 @@ node_modules
 .DS_Store
 dist
 .output
+.new_api_key_temp.txt
