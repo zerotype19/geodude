@@ -148,7 +148,14 @@ pnpm lint
 - **Project**: `geodude-app`
 - **Production Branch**: `main`
 - **Custom Domain**: `app.optiview.ai`
-- **Deploy**: Push to `main` auto-deploys
+- **Deploy**: 
+  ```bash
+  pnpm -C apps/app build
+  npx wrangler pages deploy apps/app/dist \
+    --project-name=geodude-app \
+    --branch=main \
+    --commit-dirty=true
+  ```
 
 ### **API Worker** (`packages/api-worker`)
 - **Platform**: Cloudflare Workers
