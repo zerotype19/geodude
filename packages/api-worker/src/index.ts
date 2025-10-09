@@ -7,6 +7,7 @@ import { runAudit } from './audit';
 import { extractOrganization } from './html';
 import { suggestSameAs } from './entity';
 import { fetchCitations } from './citations';
+import { createProject, createProperty, verifyProperty } from './onboarding';
 
 interface Env {
   DB: D1Database;
@@ -121,6 +122,177 @@ export default {
       return new Response('ok', {
         headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
       });
+    }
+
+    // POST /v1/projects - Create new project (open for now)
+    if (path === '/v1/projects' && request.method === 'POST') {
+      try {
+        const body = await request.json<{ name: string; owner_email?: string }>();
+        
+        if (!body.name || body.name.trim().length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'Bad Request', message: 'name is required' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const project = await createProject(env, body.name, body.owner_email);
+
+        return new Response(
+          JSON.stringify(project),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to create project',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // POST /v1/properties - Create new property (requires auth)
+    if (path === '/v1/properties' && request.method === 'POST') {
+      const apiKey = request.headers.get('x-api-key');
+      const authResult = await validateApiKey(apiKey, env);
+
+      if (!authResult.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      try {
+        const body = await request.json<{ project_id: string; domain: string }>();
+        
+        if (!body.project_id || !body.domain) {
+          return new Response(
+            JSON.stringify({ error: 'Bad Request', message: 'project_id and domain are required' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Verify project belongs to this API key
+        const project = await env.DB.prepare(
+          'SELECT id FROM projects WHERE id = ? AND api_key = ?'
+        ).bind(body.project_id, apiKey).first();
+
+        if (!project) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden', message: 'Project not found or access denied' }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const property = await createProperty(env, body.project_id, body.domain);
+
+        return new Response(
+          JSON.stringify(property),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to create property',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // POST /v1/properties/:id/verify - Verify property ownership (requires auth)
+    if (path.match(/^\/v1\/properties\/[^/]+\/verify$/) && request.method === 'POST') {
+      const propertyId = path.split('/')[3];
+      const apiKey = request.headers.get('x-api-key');
+      const authResult = await validateApiKey(apiKey, env);
+
+      if (!authResult.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      try {
+        const body = await request.json<{ method: 'dns' | 'html' }>();
+        
+        if (!body.method || (body.method !== 'dns' && body.method !== 'html')) {
+          return new Response(
+            JSON.stringify({ error: 'Bad Request', message: 'method must be "dns" or "html"' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Verify property belongs to a project owned by this API key
+        const property = await env.DB.prepare(
+          `SELECT p.id FROM properties p
+           JOIN projects pr ON p.project_id = pr.id
+           WHERE p.id = ? AND pr.api_key = ?`
+        ).bind(propertyId, apiKey).first();
+
+        if (!property) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden', message: 'Property not found or access denied' }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const result = await verifyProperty(env, propertyId, body.method);
+
+        return new Response(
+          JSON.stringify(result),
+          {
+            status: result.verified ? 200 : 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Verification failed',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
     }
 
     // POST /v1/audits/start - Start a new audit (requires auth)
