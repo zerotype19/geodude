@@ -6,6 +6,7 @@ compatibility_date = "2024-11-20"
 binding = "DB"
 database_name = "optiview_db"
 database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+migrations_dir = "../../db/migrations"
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
@@ -18,6 +19,7 @@ AUDIT_DAILY_LIMIT = "10"
 HASH_SALT = "prod_salt_6bd61859686eebd3e0caa31f2192ac83"
 BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 CITATIONS_MAX_PER_QUERY = "5"
+CITATIONS_DAILY_BUDGET = "200"
 FROM_EMAIL = "Optiview <no-reply@optiview.ai>"
 
 # Secrets (set via wrangler secret put):

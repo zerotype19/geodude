@@ -10,6 +10,7 @@ interface Env {
   BRAVE_SEARCH?: string;
   BRAVE_SEARCH_ENDPOINT?: string;
   CITATIONS_MAX_PER_QUERY?: string;
+  CITATIONS_DAILY_BUDGET?: string;
 }
 
 export interface Citation {
@@ -24,7 +25,8 @@ export async function fetchCitations(
   env: Env,
   auditId: string,
   domain: string,
-  brand?: string
+  brand?: string,
+  budgetCheck?: () => Promise<boolean>
 ): Promise<Citation[]> {
   // Check if we have any citations stored for this audit
   const existing = await env.DB.prepare(
@@ -37,6 +39,15 @@ export async function fetchCitations(
   // If we have citations, return them
   if (existing.results && existing.results.length > 0) {
     return existing.results;
+  }
+
+  // Check budget before fetching (optional)
+  if (budgetCheck) {
+    const budgetOk = await budgetCheck();
+    if (!budgetOk) {
+      console.warn(`Citations budget exceeded for audit ${auditId}, skipping fetch`);
+      return [];
+    }
   }
 
   // Otherwise, try to fetch from Brave (best-effort, ignore errors)

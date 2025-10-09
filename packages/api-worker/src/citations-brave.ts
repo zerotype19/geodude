@@ -4,6 +4,7 @@
  */
 
 interface Env {
+  DB: D1Database;
   BRAVE_SEARCH?: string;
   BRAVE_SEARCH_ENDPOINT?: string;
 }
@@ -66,7 +67,7 @@ function dedupe<T>(arr: T[], key: (x: T) => string): T[] {
 }
 
 /**
- * Fetch citations from Brave Search API
+ * Fetch citations from Brave Search API with 24h cache
  */
 export async function fetchCitationsBrave(
   env: Env,
@@ -83,6 +84,8 @@ export async function fetchCitationsBrave(
 
   const root = etld1(domain);
   const brandName = brand || domain.replace(/^www\./, '').split('.')[0];
+  const now = Math.floor(Date.now() / 1000);
+  const TTL = 24 * 3600; // 24 hours
   
   const queries = [
     `${brandName} site:${root}`,
@@ -94,22 +97,55 @@ export async function fetchCitationsBrave(
 
   for (const query of queries) {
     try {
-      const url = `${endpoint}?q=${encodeURIComponent(query)}&count=10`;
-      const response = await fetch(url, {
-        headers: {
-          'X-Subscription-Token': apiKey,
-          'Accept': 'application/json',
-        },
-      });
+      // 1) Check cache first
+      const cached = await env.DB.prepare(
+        `SELECT url, title, cached_at 
+         FROM citations_cache 
+         WHERE domain = ? AND query = ? AND cached_at > ?`
+      ).bind(root, query, now - TTL).all<{ url: string; title: string | null; cached_at: number }>();
 
-      if (!response.ok) {
-        console.error(`Brave search failed for "${query}": ${response.status}`);
-        continue;
+      let items: BraveResult[] = [];
+
+      if (cached.results && cached.results.length > 0) {
+        // Use cached results
+        items = cached.results.map(r => ({ 
+          title: r.title || '', 
+          url: r.url 
+        }));
+        console.log(`Brave cache hit: "${query}" (${items.length} results)`);
+      } else {
+        // 2) Fetch from Brave API and cache
+        const url = `${endpoint}?q=${encodeURIComponent(query)}&count=10`;
+        const response = await fetch(url, {
+          headers: {
+            'X-Subscription-Token': apiKey,
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          console.error(`Brave search failed for "${query}": ${response.status}`);
+          continue;
+        }
+
+        const data: BraveSearchResponse = await response.json();
+        items = data?.web?.results || [];
+
+        // Cache all results (even non-matching ones for better cache coverage)
+        for (const item of items) {
+          await env.DB.prepare(
+            `INSERT OR REPLACE INTO citations_cache (domain, query, url, title, cached_at) 
+             VALUES (?, ?, ?, ?, ?)`
+          ).bind(root, query, item.url, item.title || null, now).run();
+        }
+
+        console.log(`Brave API call: "${query}" (${items.length} results cached)`);
+
+        // Politeness delay after API call
+        await new Promise((resolve) => setTimeout(resolve, 250));
       }
 
-      const data: BraveSearchResponse = await response.json();
-      const items = data?.web?.results || [];
-
+      // Filter for matching domain
       for (const item of items) {
         const hostname = hostOf(item.url);
         if (!hostname) continue;
@@ -121,13 +157,10 @@ export async function fetchCitationsBrave(
             query,
             title: item.title,
             url: item.url,
-            cited_at: Math.floor(Date.now() / 1000),
+            cited_at: now,
           });
         }
       }
-
-      // Politeness delay between queries
-      await new Promise((resolve) => setTimeout(resolve, 250));
     } catch (error) {
       console.error(`Brave search error for "${query}":`, error);
       // Continue with next query

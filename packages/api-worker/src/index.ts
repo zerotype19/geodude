@@ -19,6 +19,7 @@ interface Env {
   BRAVE_SEARCH?: string;
   BRAVE_SEARCH_ENDPOINT?: string;
   CITATIONS_MAX_PER_QUERY?: string;
+  CITATIONS_DAILY_BUDGET?: string;
   RESEND_KEY?: string;
   FROM_EMAIL?: string;
 }
@@ -59,6 +60,28 @@ async function checkRateLimit(projectId: string, env: Env): Promise<{ allowed: b
   });
 
   return { allowed: true, count: count + 1, limit };
+}
+
+// Helper: Check citations budget (prevent excessive API calls)
+async function checkCitationsBudget(env: Env): Promise<boolean> {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const key = `citations_budget:${today}`;
+  
+  const currentCount = await env.RATE_LIMIT_KV.get(key);
+  const used = currentCount ? parseInt(currentCount) : 0;
+  const budget = parseInt(env.CITATIONS_DAILY_BUDGET || '200');
+
+  if (used >= budget) {
+    console.warn(`Citations daily budget exceeded: ${used}/${budget}`);
+    return false;
+  }
+
+  // Increment counter
+  await env.RATE_LIMIT_KV.put(key, (used + 1).toString(), {
+    expirationTtl: 86400 * 2, // 2 days
+  });
+
+  return true;
 }
 
 export default {
@@ -499,12 +522,13 @@ export default {
           }
         }
 
-        // Get citations (Bing integration)
+        // Get citations (Brave integration with budget check)
         const citations = await fetchCitations(
           env, 
           auditId, 
           property?.domain || '',
-          property?.domain?.replace(/^www\./, '').split('.')[0] // brand/slug
+          property?.domain?.replace(/^www\./, '').split('.')[0], // brand/slug
+          () => checkCitationsBudget(env) // budget guard
         );
 
         // Transform scores from flat columns to nested object
