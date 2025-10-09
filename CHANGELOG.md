@@ -1,174 +1,173 @@
 # Changelog
 
-All notable changes to the Geodude project will be documented in this file.
+All notable changes to Optiview will be documented in this file.
 
-## [0.9.0-mvp] - 2025-10-09
-
-### 🎉 MVP Release - Complete Rebuild
-
-Complete project rebuild with all core features operational.
-
-### M0 - Scaffolding
-- Monorepo structure with pnpm + TurboRepo
-- Workspace configuration (apps/, packages/, db/)
-- Build system with parallel execution
-
-### M1 - Marketing Live
-- Static site deployed to optiview.ai (Cloudflare Pages)
-- robots.txt with AI crawler allowlist (GPTBot, ClaudeBot, PerplexityBot, CCBot, etc.)
-- sitemap.xml with structured URLs
-- JSON-LD structured data (Organization + FAQ schemas)
-- Security headers (_headers)
-
-### M2 - API Heartbeat
-- API worker deployed to api.optiview.ai
-- `/health` endpoint (public)
-- D1 database connected (6 tables)
-- Legacy endpoint deprecation (410 with Deprecation/Sunset headers)
-- Migration tracking system (db/MIGRATIONS.md)
-
-### M3 - Collector Online
-- Collector worker deployed
-- `/px` endpoint - 1x1 GIF tracking
-- Bot classification (9 bot types via User-Agent regex)
-- IP hashing (SHA-256, privacy-first, no raw IPs stored)
-- Hit logging to D1
-
-### M4 - Audit v1
-- Complete audit engine
-- Robots.txt analysis
-- Sitemap parsing
-- Page crawling (max 30, 1 RPS rate limit)
-- HTML parsing (title, H1, JSON-LD, FAQ detection)
-- 4-factor scoring model:
-  - Crawlability (40%)
-  - Structured Data (30%)
-  - Answerability (20%)
-  - Trust (10%)
-- Issue detection (critical/warning/info severity levels)
-- Audit persistence (audits, audit_pages, audit_issues tables)
-
-### M5 - Dashboard Shell
-- Vite + React + TypeScript dashboard (apps/app)
-- Tailwind CSS styling
-- Audit UI components:
-  - Property input form
-  - Circular score gauges (Overall, Crawlability, Structured, Answerability, Trust)
-  - Issues table (severity badges, type, message, page URL)
-  - Pages table (URL, status, title, JSON-LD, FAQ, load time)
-- Environment: VITE_API_BASE=https://api.optiview.ai
-- Build output: dist/ (149KB JS, gzipped: 47KB)
-
-### M6 - Docs Hub
-- 3 documentation pages:
-  - `/docs/audit.html` - Audit checks explained
-  - `/docs/bots.html` - AI bots tracked
-  - `/docs/security.html` - Privacy & security policy
-- FAQ JSON-LD schema on all docs (dogfooding)
-- Sitemap updated with all docs
-- Home page footer links
-- SEO optimization
-
-### M7 - Ops Polish
-- **Authentication**:
-  - x-api-key header required for /v1/audits/start
-  - D1-backed API key validation
-  - Property ownership verification
-  - 401 Unauthorized for missing/invalid keys
-- **Rate Limiting**:
-  - KV-backed daily limits per project
-  - Default: 10 audits/day (configurable via AUDIT_DAILY_LIMIT)
-  - 429 Too Many Requests with X-RateLimit headers
-  - Counter key: rl:{project_id}:{YYYY-MM-DD}
-  - 2-day TTL on counters
-- **Cron Re-Audits**:
-  - Weekly schedule (Mondays 6am UTC: `0 6 * * 1`)
-  - Audits all verified properties
-  - 1 RPS throttle
-  - Console logging for monitoring
-  - Error handling per property
-
-### Infrastructure
-- Cloudflare Workers (2 deployed)
-- Cloudflare Pages (1 deployed, 1 ready)
-- D1 Database (optiview_db, 6 tables)
-- KV Storage (RATE_LIMIT_KV)
-- Migrations: 2 applied (0001_init, 0002_seed)
-
-### Database Schema
-- `projects` - Project management
-- `properties` - Domain tracking
-- `hits` - Traffic/bot events
-- `audits` - Audit orchestration
-- `audit_pages` - Page-level results
-- `audit_issues` - Issues discovered
-
-### Documentation
-- README.md - Project overview
-- SUMMARY.md - Complete work summary
-- DEPLOYMENT.md - Deployment guide
-- STATUS.md - Current status
-- PROGRESS_CHECK.md - M0-M4 verification
-- VALIDATION_REPORT.md - M0-M4 validation
-- M5-M7_COMPLETE.md - M5-M7 completion report
-- QA_REPORT.md - Final QA results
-- db/MIGRATIONS.md - Migration tracking
-- CHANGELOG.md - This file
-
-### Testing
-- All smoke tests passing ✅
-- Auth: 401 without key, 200 with valid key ✅
-- Rate limit: 429 after limit exceeded ✅
-- Bot detection: GPTBot confirmed ✅
-- Audit score: 0.99/1.0 (optiview.ai) ✅
-
-### Guardrails Maintained
-- AUDIT_MAX_PAGES = 30 ✅
-- 1 RPS crawl throttle ✅
-- No background queues (cron only) ✅
-- Simple x-api-key auth (no OAuth yet) ✅
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [v0.15.0] - 2025-10-09
 
-### Planned - M8 (Dashboard Deployment)
-- Deploy apps/app to app.optiview.ai
-- Shareable audit links (/a/:id)
-- API key input in UI (localStorage)
+### Added
+- **Email Reports**: Beautiful HTML email reports with weekly AI Index Readiness summaries
+  - Responsive email template with gradient header
+  - Score delta from previous audit ("+5 from last week")
+  - Score breakdown bars (Crawlability, Structured Data, Answerability, Trust)
+  - Top 3 issues by severity with badges
+  - Citations count callout
+  - Top 3 AI bot activity (last 7 days with hit counts)
+  - CTA button to full audit report
+- **Manual Email Endpoint**: `POST /v1/audits/:id/email` for testing
+- **Cron Ready**: Monday 06:00 UTC scheduled email reports
+- **Resend Integration**: Official email API with graceful degradation
 
-### Planned - M9 (Citations Lite)
-- Perplexity-first citation tracking
-- New table: citations
-- UI: Citations tab
+### Technical
+- `packages/api-worker/src/email.ts` - 500+ line HTML template
+- `packages/api-worker/src/index.ts` - Email endpoint with full data assembly
+- FROM_EMAIL configured in wrangler.toml
 
-### Planned - M10 (Entity Graph)
-- Organization.sameAs detection
-- Recommendation generator
-- JSON-LD snippet suggestions
+---
+
+## [v0.14.0] - 2025-10-09
+
+### Added
+- **Real Citations**: Bing Web Search API integration for citation detection
+  - 3 query variations per domain (site:, company, reviews)
+  - Smart filtering (eTLD+1 matching, target domain only)
+  - Deduplication by URL
+  - Configurable limit (5 citations per query)
+  - Lazy fetch on first audit view
+  - Store in D1 citations table
+- **Citations Endpoint**: `GET /v1/audits/:id/citations` (read-only)
+- **Enhanced UI**: Citations tab with query grouping
+- **TOS Compliance**: 1200ms timeouts, 350ms delays, official Bing API
+
+### Changed
+- Citations tab now displays real data from Bing
+- Citations load automatically when viewing audit
+
+### Technical
+- `packages/api-worker/src/citations-bing.ts` - Bing API client
+- `packages/api-worker/src/citations.ts` - Smart fetch + cache logic
+- `apps/app/src/components/Citations.tsx` - Lazy load + grouped display
+- BING_SEARCH_ENDPOINT and CITATIONS_MAX_PER_QUERY configured
+
+---
+
+## [v0.13.0] - 2025-10-09
+
+### Added
+- **Multi-Project Onboarding**: Complete self-service onboarding flow
+  - 3-step wizard at `/onboard`
+  - Create project → Auto-generate API key
+  - Add domain → Get verification instructions (DNS TXT or HTML)
+  - Verify ownership → Run first audit
+- **Project API**: `POST /v1/projects` (create project with API key)
+- **Property API**: `POST /v1/properties` (add domain with verification)
+- **Verification API**: `POST /v1/properties/:id/verify` (DNS TXT or HTML file)
+- **ULID-based IDs**: `prj_*`, `prop_*` for new entities
+- **DNS over HTTPS**: Cloudflare 1.1.1.1 JSON API for domain verification
+
+### Changed
+- Projects table: added `owner_email` and `api_key` columns
+- Properties table: added `verify_method`, `verify_token`, `verified` columns
+- Onboarding wizard integrated into dashboard navigation
+
+### Technical
+- `packages/api-worker/src/onboarding.ts` - Project/property creation + verification
+- `apps/app/src/routes/Onboard.tsx` - 3-step wizard UI
+- D1 migration: `db/migrations/0004_onboarding.sql`
+
+---
+
+## [v0.12.0] - 2025-10-08
+
+### Added
+- **Citations Infrastructure**: D1 table and API stub for citation tracking
+- **Citations Tab**: Empty state in dashboard for future citation data
+- D1 migration: `db/migrations/0003_citations.sql`
+
+---
+
+## [v0.11.0] - 2025-10-08
+
+### Added
+- **Entity Graph Recommendations**: sameAs URL suggestions for Organization schema
+  - Detects missing sameAs properties in JSON-LD
+  - Suggests 3-5 authoritative URLs (Wikipedia, LinkedIn, Crunchbase, etc.)
+  - Copy-paste JSON-LD snippet
+  - "Mark as applied" toggle (localStorage)
+- **Organization Detection**: Extract org name from JSON-LD or H1
+
+### Technical
+- `packages/api-worker/src/entity.ts` - Entity graph logic
+- `packages/api-worker/src/html.ts` - Organization extraction
+- `apps/app/src/components/EntityRecommendations.tsx` - UI component
+
+---
+
+## [v0.10.0] - 2025-10-08
+
+### Added
+- **Dashboard**: React dashboard at `https://app.optiview.ai`
+  - Run new audits with property_id
+  - View audit results (scores, issues, pages)
+  - Tab navigation (Overview, Issues, Pages, Entity, Citations)
+- **Public Share Links**: `/a/:id` routes for shareable audit results
+- **API Client**: `apps/app/src/services/api.ts` with typed endpoints
+- **Score Cards**: Visual score display with color coding
+- **Issues Table**: Sortable table with severity badges
+- **Pages Table**: Crawled pages with title and status
+- **API Key Hook**: `useApiKey()` for localStorage persistence
+
+### Changed
+- Vite + React + TypeScript setup for dashboard
+- React Router for client-side routing
+- Security headers (`_headers`) and SPA fallback (`_redirects`)
+
+### Technical
+- `apps/app/` - Complete dashboard application
+- Deployed to Cloudflare Pages (production branch)
+- Custom domain: `app.optiview.ai`
+
+---
+
+## [v0.9.0] - 2025-10-07
+
+### Added
+- **Production Baseline**: Initial stable release
+- API Worker with audit engine
+- Collector Worker for 1x1 GIF tracking
+- D1 Database with full schema
+- Rate limiting (10 audits/day per project)
+- Cron jobs (Monday 06:00 UTC)
+
+### Technical
+- Cloudflare Workers + Pages + D1 + KV
+- Custom domains: `api.optiview.ai`, `collector.optiview.ai`
+- Security: API key auth, CORS, rate limits
 
 ---
 
 ## Release Notes
 
-### v0.9.0-mvp Summary
-**Complete rebuild** of Geodude AI audit platform with full feature parity and production-ready infrastructure.
+### Beta Roadmap Complete ✅
+All planned beta features (v0.13-v0.15) have been delivered:
+- Self-service onboarding (no SQL required)
+- Real citations from Bing Web Search
+- Beautiful weekly email reports
+- Entity graph recommendations
+- Public share links
 
-**Key Achievements**:
-- 🚀 Production deployment ready
-- 🔐 Authentication & rate limiting
-- 📊 Audit score: 0.99/1.0
-- 🤖 Bot tracking (9 types)
-- 📚 Documentation hub (3 pages)
-- 🎨 Dashboard UI (ready to deploy)
-- ⏰ Automated re-audits (cron)
+### Setup Required
+Before full production use:
+1. **Bing Search API**: Set `BING_SEARCH_KEY` secret
+2. **Resend**: Set `RESEND_API_KEY` secret and verify domain
+3. **Owner Emails**: Configure `owner_email` on projects for email reports
 
-**Tech Stack**:
-- Cloudflare Workers (edge compute)
-- D1 Database (SQLite at edge)
-- KV Storage (rate limiting)
-- Cloudflare Pages (static hosting)
-- React + TypeScript + Tailwind (dashboard)
+See `V0_14_V0_15_QA_GUIDE.md` for detailed setup and QA steps.
 
-**Status**: ✅ Production Ready
+---
 
+**Next**: v0.16.0+ (TBD after beta feedback)
