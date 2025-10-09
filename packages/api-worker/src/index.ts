@@ -16,8 +16,8 @@ interface Env {
   AUDIT_MAX_PAGES: string;
   AUDIT_DAILY_LIMIT: string;
   HASH_SALT: string;
-  BING_SEARCH_KEY?: string;
-  BING_SEARCH_ENDPOINT?: string;
+  BRAVE_SEARCH?: string;
+  BRAVE_SEARCH_ENDPOINT?: string;
   CITATIONS_MAX_PER_QUERY?: string;
   RESEND_KEY?: string;
   FROM_EMAIL?: string;

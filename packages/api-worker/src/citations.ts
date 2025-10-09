@@ -3,12 +3,12 @@
  * Track where domain appears in AI answer sources
  */
 
-import { fetchCitationsBing, type Citation as BingCitation } from './citations-bing';
+import { fetchCitationsBrave } from './citations-brave';
 
 interface Env {
   DB: D1Database;
-  BING_SEARCH_KEY?: string;
-  BING_SEARCH_ENDPOINT?: string;
+  BRAVE_SEARCH?: string;
+  BRAVE_SEARCH_ENDPOINT?: string;
   CITATIONS_MAX_PER_QUERY?: string;
 }
 
@@ -39,21 +39,21 @@ export async function fetchCitations(
     return existing.results;
   }
 
-  // Otherwise, try to fetch from Bing (best-effort, ignore errors)
+  // Otherwise, try to fetch from Brave (best-effort, ignore errors)
   try {
-    const bingCitations = await fetchCitationsBing(env, domain, brand);
+    const braveCitations = await fetchCitationsBrave(env, domain, brand);
     
     // Store citations in database
-    for (const citation of bingCitations) {
+    for (const citation of braveCitations) {
       await storeCitation(env, auditId, citation);
     }
     
     // Log result
-    console.log(`citations {audit:${auditId}, found:${bingCitations.length}}`);
+    console.log(`citations {audit:${auditId}, found:${braveCitations.length}}`);
     
-    return bingCitations;
+    return braveCitations;
   } catch (error) {
-    console.warn('Failed to fetch Bing citations:', error);
+    console.warn('Failed to fetch Brave citations:', error);
     return [];
   }
 }

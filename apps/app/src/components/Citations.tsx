@@ -53,10 +53,12 @@ export default function Citations({ auditId, citations: initialCitations }: Prop
     <div>
       <p style={{ marginTop: 0, opacity: 0.9, fontSize: 14 }}>
         Found {citations.length} citation{citations.length !== 1 ? 's' : ''} 
-        where your domain appears in Bing search results:
+        where your domain appears in search results:
       </p>
       
-      {Object.entries(byQuery).map(([query, results]) => (
+      {Object.entries(byQuery).map(([query, results]) => {
+        const engine = results[0]?.engine || 'search';
+        return (
         <div key={query} style={{ marginBottom: 24 }}>
           <h4 style={{ 
             margin: '12px 0 8px 0', 
@@ -66,7 +68,7 @@ export default function Citations({ auditId, citations: initialCitations }: Prop
             alignItems: 'center',
             gap: 8
           }}>
-            <span className="pill info">Bing</span>
+            <span className="pill info" style={{ textTransform: 'capitalize' }}>{engine}</span>
             Query: "{query}"
           </h4>
           
@@ -109,7 +111,7 @@ export default function Citations({ auditId, citations: initialCitations }: Prop
             })}
           </div>
         </div>
-      ))}
+      )})}
     </div>
   );
 }
