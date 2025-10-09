@@ -4,6 +4,7 @@ import { startAudit, getAudit, type Audit } from "../services/api";
 import ScoreCard from "../components/ScoreCard";
 import IssuesTable from "../components/IssuesTable";
 import PagesTable from "../components/PagesTable";
+import EntityRecommendations from "../components/EntityRecommendations";
 
 export default function Dashboard() {
   const { apiKey, save, clear } = useApiKey();
@@ -82,6 +83,14 @@ export default function Dashboard() {
             <ScoreCard title="Answerability" value={audit.scores.answerability}/>
             <ScoreCard title="Trust" value={audit.scores.trust}/>
           </div>
+
+          {audit.entity_recommendations && (
+            <EntityRecommendations
+              auditId={audit.id}
+              orgName={audit.domain || 'Organization'}
+              recommendations={audit.entity_recommendations}
+            />
+          )}
 
           <div className="card">
             <h3 style={{marginTop:0}}>Issues</h3>

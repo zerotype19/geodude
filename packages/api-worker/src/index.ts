@@ -4,6 +4,8 @@
  */
 
 import { runAudit } from './audit';
+import { extractOrganization } from './html';
+import { suggestSameAs } from './entity';
 
 interface Env {
   DB: D1Database;
@@ -252,12 +254,51 @@ export default {
            ORDER BY severity DESC, page_url`
         ).bind(auditId).all();
 
+        // Get property domain for entity recommendations
+        const property = await env.DB.prepare(
+          'SELECT domain FROM properties WHERE id = ?'
+        ).bind(audit.property_id).first<{ domain: string }>();
+
+        // Check for entity recommendations (Organization sameAs)
+        let entity_recommendations = null;
+        if (property && pages.results && pages.results.length > 0) {
+          // Get the first page's JSON-LD (usually homepage)
+          const firstPage = pages.results[0] as any;
+          if (firstPage.jsonld_types) {
+            // Re-fetch the page HTML to get JSON-LD blocks
+            // For now, check if Organization exists in issues
+            const orgIssue = (issues.results as any[]).find(
+              (i: any) => i.details && i.details.includes('entity_graph')
+            );
+
+            if (orgIssue) {
+              // Missing sameAs detected
+              const suggestions = suggestSameAs({
+                domain: property.domain,
+                orgName: property.domain.replace(/^www\./, '').split('.')[0],
+              });
+
+              entity_recommendations = {
+                sameAs_missing: true,
+                suggestions: suggestions.suggestions,
+                jsonld_snippet: suggestions.jsonld_snippet,
+              };
+            }
+          }
+        }
+
+        const response: any = {
+          ...audit,
+          pages: pages.results,
+          issues: issues.results,
+        };
+
+        if (entity_recommendations) {
+          response.entity_recommendations = entity_recommendations;
+        }
+
         return new Response(
-          JSON.stringify({
-            ...audit,
-            pages: pages.results,
-            issues: issues.results,
-          }),
+          JSON.stringify(response),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }

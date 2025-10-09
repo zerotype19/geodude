@@ -24,6 +24,12 @@ export type Scores = {
   trust: number 
 };
 
+export type EntityRecommendations = {
+  sameAs_missing: boolean;
+  suggestions: string[];
+  jsonld_snippet: string;
+};
+
 export type Audit = { 
   id: string; 
   property_id: string; 
@@ -32,7 +38,8 @@ export type Audit = {
   issues: AuditIssue[]; 
   pages: AuditPage[]; 
   started_at: number; 
-  finished_at?: number 
+  finished_at?: number;
+  entity_recommendations?: EntityRecommendations;
 };
 
 export async function startAudit(property_id: string, apiKey: string): Promise<{ id: string }> {
