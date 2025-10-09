@@ -19,6 +19,8 @@ interface Env {
   BING_SEARCH_KEY?: string;
   BING_SEARCH_ENDPOINT?: string;
   CITATIONS_MAX_PER_QUERY?: string;
+  RESEND_API_KEY?: string;
+  FROM_EMAIL?: string;
 }
 
 // Helper: Validate API key
@@ -546,6 +548,127 @@ export default {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
+        );
+      }
+    }
+
+    // POST /v1/audits/:id/email - Send manual email report (requires auth)
+    if (path.match(/^\/v1\/audits\/[^/]+\/email$/) && request.method === 'POST') {
+      const auditId = path.split('/')[3];
+      const apiKey = request.headers.get('x-api-key');
+      const authResult = await validateApiKey(apiKey, env);
+
+      if (!authResult.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        // Fetch audit
+        const audit = await env.DB.prepare(
+          'SELECT * FROM audits WHERE id = ?'
+        ).bind(auditId).first<any>();
+
+        if (!audit) {
+          return new Response(
+            JSON.stringify({ error: 'Not Found', message: 'Audit not found' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Fetch property
+        const property = await env.DB.prepare(
+          'SELECT * FROM properties WHERE id = ?'
+        ).bind(audit.property_id).first<any>();
+
+        // Fetch project
+        const project = await env.DB.prepare(
+          'SELECT * FROM projects WHERE id = ?'
+        ).bind(property?.project_id || authResult.projectId).first<any>();
+
+        // Verify project access
+        if (!project || project.api_key !== apiKey) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden', message: 'Access denied' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Fetch previous audit for delta
+        const prevAudit = await env.DB.prepare(
+          `SELECT * FROM audits 
+           WHERE property_id = ? AND created_at < ? 
+           ORDER BY created_at DESC 
+           LIMIT 1`
+        ).bind(audit.property_id, audit.created_at).first<any>();
+
+        // Fetch top 3 issues
+        const topIssues = await env.DB.prepare(
+          `SELECT severity, message, page_url 
+           FROM audit_issues 
+           WHERE audit_id = ? 
+           ORDER BY 
+             CASE severity 
+               WHEN 'critical' THEN 1 
+               WHEN 'high' THEN 2 
+               WHEN 'medium' THEN 3 
+               ELSE 4 
+             END 
+           LIMIT 3`
+        ).bind(auditId).all<any>();
+
+        // Fetch bot activity (last 7 days)
+        const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
+        const topBots = await env.DB.prepare(
+          `SELECT bot_name, COUNT(*) as hits 
+           FROM hits 
+           WHERE property_id = ? AND timestamp >= ? AND bot_name IS NOT NULL 
+           GROUP BY bot_name 
+           ORDER BY hits DESC 
+           LIMIT 3`
+        ).bind(audit.property_id, sevenDaysAgo).all<any>();
+
+        // Get citations count
+        const citationsResult = await env.DB.prepare(
+          'SELECT COUNT(*) as count FROM citations WHERE audit_id = ?'
+        ).bind(auditId).first<{ count: number }>();
+
+        // Import and send email
+        const { sendWeeklyReport } = await import('./email');
+        const emailResult = await sendWeeklyReport(env, {
+          project,
+          property,
+          audit,
+          prevAudit: prevAudit || undefined,
+          topIssues: topIssues.results || [],
+          topBots: topBots.results || [],
+          citationsCount: citationsResult?.count || 0,
+        });
+
+        if (emailResult.error) {
+          return new Response(
+            JSON.stringify({ error: emailResult.error }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            messageId: emailResult.messageId,
+            sentTo: project.owner_email 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to send email',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }

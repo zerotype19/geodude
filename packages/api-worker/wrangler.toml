@@ -18,9 +18,11 @@ AUDIT_DAILY_LIMIT = "10"
 HASH_SALT = "prod_salt_6bd61859686eebd3e0caa31f2192ac83"
 BING_SEARCH_ENDPOINT = "https://api.bing.microsoft.com/v7.0/search"
 CITATIONS_MAX_PER_QUERY = "5"
+FROM_EMAIL = "Optiview <no-reply@optiview.ai>"
 
-# Note: BING_SEARCH_KEY should be set as a secret:
-# wrangler secret put BING_SEARCH_KEY
+# Secrets (set via wrangler secret put):
+# - BING_SEARCH_KEY
+# - RESEND_API_KEY
 
 [triggers]
 crons = ["0 6 * * 1"]
