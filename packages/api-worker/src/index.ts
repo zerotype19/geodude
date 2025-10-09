@@ -6,6 +6,7 @@
 import { runAudit } from './audit';
 import { extractOrganization } from './html';
 import { suggestSameAs } from './entity';
+import { fetchCitations } from './citations';
 
 interface Env {
   DB: D1Database;
@@ -287,10 +288,14 @@ export default {
           }
         }
 
+        // Get citations (stub for now)
+        const citations = await fetchCitations(env, auditId, property?.domain || '');
+
         const response: any = {
           ...audit,
           pages: pages.results,
           issues: issues.results,
+          citations: citations,
         };
 
         if (entity_recommendations) {
@@ -307,6 +312,33 @@ export default {
         return new Response(
           JSON.stringify({
             error: 'Failed to fetch audit',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // GET /v1/audits/:id/citations - Get citations for audit
+    if (path.match(/^\/v1\/audits\/[^/]+\/citations$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+
+      try {
+        const citations = await fetchCitations(env, auditId, '');
+        
+        return new Response(
+          JSON.stringify({ items: citations }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to fetch citations',
             message: error instanceof Error ? error.message : String(error),
           }),
           {

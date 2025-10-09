@@ -30,6 +30,14 @@ export type EntityRecommendations = {
   jsonld_snippet: string;
 };
 
+export type Citation = {
+  engine: string;
+  query: string;
+  url: string;
+  title: string | null;
+  cited_at: number;
+};
+
 export type Audit = { 
   id: string; 
   property_id: string; 
@@ -40,6 +48,7 @@ export type Audit = {
   started_at: number; 
   finished_at?: number;
   entity_recommendations?: EntityRecommendations;
+  citations?: Citation[];
 };
 
 export async function startAudit(property_id: string, apiKey: string): Promise<{ id: string }> {

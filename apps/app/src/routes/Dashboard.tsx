@@ -5,6 +5,7 @@ import ScoreCard from "../components/ScoreCard";
 import IssuesTable from "../components/IssuesTable";
 import PagesTable from "../components/PagesTable";
 import EntityRecommendations from "../components/EntityRecommendations";
+import Citations from "../components/Citations";
 
 export default function Dashboard() {
   const { apiKey, save, clear } = useApiKey();
@@ -12,6 +13,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [audit, setAudit] = useState<Audit | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations'>('scores');
 
   async function runAudit() {
     setError(null); 
@@ -92,14 +94,51 @@ export default function Dashboard() {
             />
           )}
 
-          <div className="card">
-            <h3 style={{marginTop:0}}>Issues</h3>
-            <IssuesTable issues={audit.issues || []}/>
+          <div style={{display:'flex', gap:12, marginTop:16, marginBottom:8}}>
+            {(['scores', 'issues', 'pages', 'citations'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '8px 16px',
+                  background: activeTab === tab ? '#3b82f6' : '#1e293b',
+                  border: 'none',
+                  color: activeTab === tab ? 'white' : '#94a3b8',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 14
+                }}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
           </div>
 
           <div className="card">
-            <h3 style={{marginTop:0}}>Pages</h3>
-            <PagesTable pages={audit.pages || []}/>
+            {activeTab === 'scores' && (
+              <div>
+                <h3 style={{marginTop:0}}>Score Breakdown</h3>
+                <p style={{opacity:0.8}}>Overall score: {Math.round((audit.scores.total || 0) * 100)}%</p>
+              </div>
+            )}
+            {activeTab === 'issues' && (
+              <>
+                <h3 style={{marginTop:0}}>Issues</h3>
+                <IssuesTable issues={audit.issues || []}/>
+              </>
+            )}
+            {activeTab === 'pages' && (
+              <>
+                <h3 style={{marginTop:0}}>Pages</h3>
+                <PagesTable pages={audit.pages || []}/>
+              </>
+            )}
+            {activeTab === 'citations' && (
+              <>
+                <h3 style={{marginTop:0}}>Citations</h3>
+                <Citations citations={audit.citations || []}/>
+              </>
+            )}
           </div>
         </>
       )}
