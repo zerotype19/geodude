@@ -1,290 +1,274 @@
-# Go-Live Checklist
+# 🚀 Go-Live Checklist
 
-**Target**: Production deployment of Geodude v0.9.0-mvp  
-**Date**: 2025-10-09
+## Status: In Progress
 
----
-
-## ☐ DNS Configuration
-
-### Collector Domain
-- [ ] Add CNAME record: `collector.optiview.ai` → `geodude-collector.workers.dev`
-- [ ] Enable Cloudflare proxy (orange cloud)
-- [ ] Test: `curl -I https://collector.optiview.ai/px?prop_id=prop_demo`
-- [ ] Verify: Should return 200 with content-type: image/gif
-
-### Dashboard Domain (if deploying now)
-- [ ] Create Cloudflare Pages project for `apps/app`
-- [ ] Set build output directory: `apps/app/dist`
-- [ ] Add custom domain: `app.optiview.ai`
-- [ ] Test: `curl -I https://app.optiview.ai/`
-- [ ] Verify: Should return 200 with React app
+### ✅ Completed (Automated)
+- [x] Status page deployed to Cloudflare Pages
+- [x] Noindex protection added (meta + headers)
+- [x] Cache control configured (no-store)
+- [x] All workflows using single pnpm version source
+- [x] CI smoke tests (citations + status)
+- [x] R2 backups configured (nightly 03:00 UTC)
+- [x] Cache warming configured (after Monday audits)
+- [x] Admin metrics endpoint created
+- [x] Comprehensive documentation written
 
 ---
 
-## ☐ API Key Rotation
+## 🔧 Manual Steps Required (5-10 minutes)
 
-### Rotate from dev_key to production key
-
-**Generate new key** (use ULID or similar):
+### Step 1: Set Admin Authentication ⚠️ REQUIRED
 ```bash
-# Example: prj_live_01JB2K3M4N5P6Q7R8S9T0V
-NEW_KEY="prj_live_$(openssl rand -hex 12)"
-echo $NEW_KEY
+cd packages/api-worker
+echo "ops:YOUR_STRONG_PASSWORD_HERE" | npx wrangler secret put ADMIN_BASIC_AUTH
 ```
 
-**Update D1**:
+**Replace `YOUR_STRONG_PASSWORD_HERE` with a strong password!**
+
+Format: `username:password` (e.g., `ops:P@ssw0rd123!`)
+
+---
+
+### Step 2: Test All Monitoring Endpoints ⚠️ REQUIRED
+
+After setting admin auth, test:
+
 ```bash
-wrangler d1 execute optiview_db --remote \
-  --command "UPDATE projects SET api_key='$NEW_KEY' WHERE id='prj_demo';"
+# 1. Status endpoint (public)
+curl -s https://api.optiview.ai/status | jq
+
+# Expected: {"status":"ok", "latest_audit":{...}, "citations_budget":{...}}
+
+# 2. Budget endpoint (public)
+curl -s https://api.optiview.ai/v1/citations/budget | jq
+
+# Expected: {"used":X, "remaining":Y, "max":200, "date":"YYYY-MM-DD"}
+
+# 3. Metrics endpoint (requires auth)
+curl -s -u ops:YOUR_PASSWORD https://api.optiview.ai/v1/admin/metrics | jq
+
+# Expected: {"audits_7d":X, "avg_score_7d":"0.XXX", "domains_7d":Y, "timestamp":"..."}
 ```
 
-**Store securely**:
-- [ ] Save to password manager (1Password, LastPass, etc.)
-- [ ] Share with authorized team members only
-- [ ] Update dashboard env if deployed
+**✅ Pass Criteria**:
+- All 3 endpoints return valid JSON
+- Status endpoint shows `"status":"ok"`
+- Metrics endpoint works with auth (401 without)
 
-**Test**:
+---
+
+### Step 3: Verify R2 Backups 📦
+
+Check if backups are present (may be empty if not yet 03:00 UTC):
+
 ```bash
-curl -X POST https://api.optiview.ai/v1/audits/start \
+npx wrangler r2 object list geodude-backups --prefix backups/$(date -u +%F)/
+```
+
+**Expected**:
+- 4 files: `audits.jsonl`, `audit_pages.jsonl`, `audit_issues.jsonl`, `citations.jsonl`
+- OR empty if backup hasn't run yet (first run at 03:00 UTC)
+
+**Note**: First backup will appear after 03:00 UTC tomorrow.
+
+---
+
+### Step 4: Test Fresh Audit & Citations 🧪
+
+```bash
+# Start new audit
+AID=$(curl -s -X POST https://api.optiview.ai/v1/audits/start \
+  -H "x-api-key: prj_live_8c5e1556810d52f8d5e8b179" \
   -H "content-type: application/json" \
-  -H "x-api-key: $NEW_KEY" \
-  -d '{"property_id":"prop_demo"}'
+  -d '{"property_id":"prop_demo"}' | jq -r '.id')
+
+echo "Audit ID: $AID"
+
+# Check citations
+curl -s https://api.optiview.ai/v1/audits/$AID/citations | jq
+
+# Open in browser
+echo "Share link: https://app.optiview.ai/a/$AID"
 ```
+
+**✅ Pass Criteria**:
+- Audit completes (status: "completed")
+- Citations endpoint returns `{"items":[...]}`
+- Share link loads with Citations tab
+- Citations load instantly (if cached) or within 1-2 seconds
 
 ---
 
-## ☐ Rate Limit Configuration
-
-- [x] Default set to 10 audits/day (AUDIT_DAILY_LIMIT=10)
-- [ ] Confirm this is appropriate for launch
-- [ ] Optional: Increase for beta users if needed
-- [ ] Monitor KV usage (should be minimal)
-
-**To adjust**:
-```bash
-# In packages/api-worker/wrangler.toml
-[vars]
-AUDIT_DAILY_LIMIT = "10"  # Change as needed
-```
-
----
-
-## ☐ Cron Verification
-
-- [x] Schedule: Mondays 6am UTC (`0 6 * * 1`)
-- [x] Max pages: 30 (AUDIT_MAX_PAGES)
-- [ ] Verify cron trigger in Cloudflare dashboard
-- [ ] Check logs after first Monday run
-
-**View logs**:
-```bash
-wrangler tail geodude-api --format=pretty
-```
-
-**Expected log output** (after Monday 6am UTC):
-```
-Cron audit started at 2025-10-XX 06:00:00
-Found N verified properties to audit
-Cron audit started: prop_demo (optiview.ai)
-Cron audit completed: prop_demo → aud_xxxxx
-Cron audit batch completed
-```
-
----
-
-## ☐ Self-Audit & Dogfooding
-
-### Run audit on optiview.ai
-```bash
-curl -X POST https://api.optiview.ai/v1/audits/start \
-  -H "content-type: application/json" \
-  -H "x-api-key: $API_KEY" \
-  -d '{"property_id":"prop_demo"}' | jq
-```
-
-- [ ] Review score (target: 0.95+)
-- [ ] Check issues (should be minimal)
-- [ ] Fix any High/Critical issues found
-- [ ] Re-run audit to verify improvements
-
-**Current score**: 0.99/1.0 ✅
-**Issues**: 1 warning (thin content on homepage)
-
-### Optional fixes:
-- [ ] Add more content to homepage (increase word count)
-- [ ] Ensure all 3 docs pages have sufficient content
-- [ ] Verify FAQ schema on all pages
-
----
-
-## ☐ Documentation Links
-
-- [x] Footer links on homepage
-  - [x] /docs/audit.html
-  - [x] /docs/bots.html
-  - [x] /docs/security.html
-- [x] Sitemap includes all docs
-- [x] robots.txt references sitemap
-
-**Test**:
-```bash
-curl -s https://optiview.ai/ | grep -o 'href="/docs/[^"]*"'
-curl -s https://optiview.ai/sitemap.xml | grep -o '<loc>[^<]*</loc>'
-```
-
----
-
-## ☐ Security Checklist
-
-### Headers
-- [x] X-Content-Type-Options: nosniff
-- [x] X-Frame-Options: DENY (or SAMEORIGIN)
-- [x] Referrer-Policy: strict-origin-when-cross-origin
-- [x] CORS configured correctly
-
-**Verify**:
-```bash
-curl -I https://optiview.ai/ | grep -E "X-|Referrer"
-curl -I https://api.optiview.ai/health | grep -E "Access-Control"
-```
-
-### API Security
-- [x] x-api-key required for audit endpoints
-- [x] 401 Unauthorized without key
-- [x] Rate limiting enforced (429 on exceed)
-- [ ] Consider adding IP-based rate limiting (future)
-
-### Privacy
-- [x] IP hashing (SHA-256, no raw IPs)
-- [x] No tracking cookies
-- [x] Minimal data collection
-- [x] GDPR-compliant (privacy-first design)
-
----
-
-## ☐ Monitoring Setup
-
-### Cloudflare Dashboard
-- [ ] Bookmark Workers analytics
-- [ ] Set up email alerts for errors
-- [ ] Monitor D1 usage
-- [ ] Monitor KV usage
-
-### Weekly Check (SQL)
-```bash
-wrangler d1 execute optiview_db --remote --command \
-  "SELECT DATE(created_at) d, bot_type, COUNT(*) c 
-   FROM hits 
-   GROUP BY d, bot_type 
-   ORDER BY d DESC, c DESC 
-   LIMIT 50;"
-```
-
-### Audit Failures
-- [ ] Check for audits with status='error'
-- [ ] Monitor audit duration (should be < 90s)
+### Step 5: Verify Status Page 🖥️
 
 ```bash
-wrangler d1 execute optiview_db --remote --command \
-  "SELECT id, property_id, status, error, started_at, completed_at 
-   FROM audits 
-   WHERE status != 'completed' 
-   ORDER BY started_at DESC 
-   LIMIT 10;"
+# Open status page
+open https://c6b5ecd3.geodude.pages.dev/status.html
+# Or: https://optiview.ai/status.html (once DNS is live)
+```
+
+**✅ Pass Criteria**:
+- Page loads with gradient background
+- Shows "All Systems Operational" (green badge)
+- Displays latest audit timestamp
+- Shows budget bar (green = good)
+- Auto-refreshes every 30 seconds
+
+**Privacy Check**:
+- View page source: `<meta name="robots" content="noindex,nofollow">`
+- Check response headers: `X-Robots-Tag: noindex, nofollow`
+
+---
+
+### Step 6: Verify CI is Green ✅
+
+Check GitHub Actions:
+```bash
+open https://github.com/zerotype19/geodude/actions
+```
+
+**✅ Pass Criteria**:
+- Latest workflow run shows green checkmark
+- "API smoke - citations shape" passes
+- "API smoke - status" passes
+- No failed builds
+
+---
+
+## 📋 Final Go-Live Checklist
+
+### Core Functionality
+- [ ] Admin auth set (`ADMIN_BASIC_AUTH` secret)
+- [ ] Status endpoint returns `"ok"`
+- [ ] Budget endpoint returns valid data
+- [ ] Metrics endpoint works with auth
+- [ ] Fresh audit completes successfully
+- [ ] Citations tab loads (populated or graceful empty state)
+- [ ] Share links work publicly
+
+### Monitoring & Operations
+- [ ] Status page accessible and auto-refreshing
+- [ ] R2 backups configured (will run at 03:00 UTC)
+- [ ] Cache warming configured (runs after Monday audits)
+- [ ] CI smoke tests passing
+- [ ] All secrets set:
+  - [ ] `BRAVE_SEARCH`
+  - [ ] `RESEND_KEY`
+  - [ ] `ADMIN_BASIC_AUTH`
+
+### Documentation
+- [ ] Team trained on daily status check
+- [ ] `SETUP_COMPLETE.md` reviewed
+- [ ] `docs/week-1-ops-plan.md` bookmarked
+- [ ] `docs/ops-runbook.md` accessible
+
+### Optional (Can Do Later)
+- [ ] Alerts configured (budget < 20)
+- [ ] Weekly metrics review scheduled
+- [ ] Per-project budget limits
+- [ ] "Send Report" button in dashboard
+- [ ] Admin dashboard UI at `/admin`
+
+---
+
+## 🎯 Success Criteria (End of Day 1)
+
+### Availability
+- ✅ All endpoints responding
+- ✅ Status page live and updating
+- ✅ No errors in worker logs
+
+### Performance
+- ✅ Citations cache working (check logs for "cache hit")
+- ✅ API responses < 500ms
+- ✅ Share links load < 2 seconds
+
+### Reliability
+- ✅ Budget > 150 remaining
+- ✅ All cron jobs configured
+- ✅ CI pipeline green
+
+---
+
+## 📊 Post-Launch Monitoring (First 24 Hours)
+
+### Hour 1
+```bash
+# Check status every 15 minutes
+watch -n 900 'curl -s https://api.optiview.ai/status | jq'
+```
+
+### Hour 4
+```bash
+# Verify budget consumption
+curl -s https://api.optiview.ai/v1/citations/budget | jq
+# Expected: used < 10 (light usage)
+```
+
+### Hour 24
+```bash
+# Check for backup after 03:00 UTC
+npx wrangler r2 object list geodude-backups --prefix backups/$(date -u +%F)/
+# Expected: 4 files present
 ```
 
 ---
 
-## ☐ Customer Onboarding (Ready)
+## 🚨 Rollback Procedures
 
-### Email Template
-```
-Subject: Welcome to Optiview - Your API Key
+### If Status Endpoint Fails
+```bash
+# Check worker logs
+npx wrangler tail geodude-api --format=json | jq -r 'select(.out).out'
 
-Hi [Name],
-
-Welcome to Optiview! Here's your API key to get started:
-
-API Key: [REDACTED - from password manager]
-
-Quick Start:
-1. Visit https://app.optiview.ai
-2. Paste your API key
-3. Enter your domain
-4. Click "Run Audit"
-5. Review scores and fix suggested issues
-
-Optional: Install 1px tracking beacon to see AI bot visits.
-
-Docs: https://optiview.ai/docs/audit.html
-
-Questions? Reply to this email.
-
-Thanks,
-The Optiview Team
+# Redeploy if needed
+cd packages/api-worker && pnpm deploy
 ```
 
-### Demo Script (3 minutes)
-1. **Show robots.txt**: https://optiview.ai/robots.txt
-   - "See how we allow AI bots? GPTBot, ClaudeBot, etc."
-   
-2. **Run audit**: https://app.optiview.ai
-   - Input API key
-   - Run audit
-   - Watch scores appear
-   - Show issues table
-   
-3. **Show docs with FAQ**: https://optiview.ai/docs/audit.html
-   - "We dogfood our own product - FAQ schema here"
-   - Re-run audit → scores improve
-   
-4. **Optional - Bot tracking**:
-   ```bash
-   curl -H "User-Agent: GPTBot" \
-     "https://collector.optiview.ai/px?prop_id=prop_demo"
-   ```
-   - Show DB row appears with bot_type="GPTBot"
+### If Budget Exhausts Unexpectedly
+```bash
+# Increase budget immediately
+# Edit packages/api-worker/wrangler.toml
+CITATIONS_DAILY_BUDGET = "400"
+
+# Redeploy
+pnpm -C packages/api-worker deploy
+```
+
+### If Backup Fails
+```bash
+# Check R2 binding
+npx wrangler r2 bucket list | grep geodude-backups
+
+# Check cron logs
+npx wrangler tail geodude-api | grep -i backup
+
+# Manual backup if needed
+npx wrangler d1 export optiview_db --remote --output=manual_backup.sql
+```
 
 ---
 
-## ☐ Pre-Launch Final Checks
+## 📞 Support Contacts
 
-- [ ] All DNS records configured
-- [ ] API key rotated and stored securely
-- [ ] Rate limits appropriate
-- [ ] Cron schedule verified
-- [ ] Self-audit score ≥ 0.95
-- [ ] All docs links working
-- [ ] Security headers present
-- [ ] Monitoring dashboard bookmarked
-- [ ] Customer onboarding email ready
-- [ ] Demo script tested
+### Cloudflare Issues
+- Dashboard: https://dash.cloudflare.com
+- Status: https://www.cloudflarestatus.com
 
----
+### Brave Search Issues
+- Dashboard: https://brave.com/search/api/
+- Support: api-support@brave.com
 
-## ☐ Launch Day
-
-- [ ] Deploy dashboard to app.optiview.ai (if not already)
-- [ ] Send announcement (if applicable)
-- [ ] Monitor logs for first few hours
-- [ ] Check for any 500 errors
-- [ ] Verify first customer audit runs successfully
-- [ ] Monitor rate limit usage
+### Resend Issues
+- Dashboard: https://resend.com/dashboard
+- Status: https://resend.com/status
 
 ---
 
-## Post-Launch (Week 1)
+## ✨ You're Almost There!
 
-- [ ] Check Monday cron execution
-- [ ] Review bot tracking data
-- [ ] Monitor audit success rate
-- [ ] Gather initial customer feedback
-- [ ] Fix any bugs discovered
-- [ ] Plan M8-M10 implementation
+**Remaining**: Just set `ADMIN_BASIC_AUTH` → Test endpoints → You're live! 🚀
 
----
+All systems are **deployed**, **configured**, and **ready**. 
 
-**Status**: Ready for production ✅  
-**Next**: Complete DNS setup and rotate API key
-
+**Last mile**: 5 minutes of manual verification, then you're **production-ready**! 💪
