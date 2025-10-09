@@ -163,7 +163,12 @@ export default {
         }),
         {
           status: 410,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Deprecation': 'true',
+            'Sunset': 'Thu, 01 Oct 2025 00:00:00 GMT',
+          },
         }
       );
     }
