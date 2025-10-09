@@ -1,28 +1,20 @@
 import { useEffect, useState } from "react";
 
-type Metrics = {
-  audits_7d: number;
-  avg_score_7d: string | number;
-  domains_7d: number;
-  timestamp?: string;
-  citations_budget?: { used: number; remaining: number; max: number; date: string };
-};
-
 export default function Admin() {
-  const [data, setData] = useState<Metrics | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
-    setErr(null);
+    setError(null);
     try {
-      const r = await fetch("/admin/api/metrics", { headers: { accept: "application/json" } });
-      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-      const j: Metrics = await r.json();
-      setData(j);
+      const res = await fetch("/admin/api/metrics");
+      if (!res.ok) throw new Error(`${res.statusText}`);
+      const json = await res.json();
+      setData(json);
     } catch (e: any) {
-      setErr(e.message ?? "Failed to load");
+      setError(e.message);
     } finally {
       setLoading(false);
     }
@@ -30,104 +22,98 @@ export default function Admin() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 30_000); // refresh every 30s
+    const id = setInterval(load, 30000);
     return () => clearInterval(id);
   }, []);
 
-  const pct = (n: number) => `${Math.round(n * 100)}%`;
-  const avg = (v: any) => {
-    const n = typeof v === "string" ? parseFloat(v) : Number(v);
-    if (isFinite(n)) return pct(n);
-    return v ?? "—";
-  };
+  const pct = (v: any) =>
+    `${Math.round((typeof v === "string" ? parseFloat(v) : v) * 100)}%`;
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Optiview Admin</h1>
-          <p className="text-sm text-gray-500 mt-1">Live operational metrics. Auto-refreshes every 30s.</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={load}
-            disabled={loading}
-            className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Loading..." : "Refresh"}
-          </button>
-          <a
-            href="/admin/logout"
-            className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
-          >
-            Logout
-          </a>
-        </div>
-      </div>
-
-      {err && (
-        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-700 mb-6">
-          <strong>Error:</strong> {err}
-        </div>
-      )}
-
-      {data && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Card title="Audits (7d)" value={data.audits_7d} />
-            <Card title="Avg. Score (7d)" value={avg(data.avg_score_7d)} />
-            <Card title="Domains (7d)" value={data.domains_7d} />
+    <div className="min-h-screen bg-gray-950 text-gray-50 px-6 py-10">
+      <div className="max-w-5xl mx-auto space-y-8">
+        <header className="flex items-center justify-between">
+          <h1 className="text-3xl font-semibold">Optiview — Admin Dashboard</h1>
+          <div className="space-x-3">
+            <button
+              onClick={load}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm"
+            >
+              Refresh
+            </button>
+            <a
+              href="/admin/logout"
+              className="text-sm text-gray-400 hover:text-gray-200"
+            >
+              Logout
+            </a>
           </div>
+        </header>
 
-          {data.citations_budget && (
-            <div className="rounded-xl border p-6 mb-6">
-              <h2 className="font-medium mb-3">Citations Budget (Today)</h2>
-              <div className="mb-2 text-sm text-gray-600">
-                {data.citations_budget.used}/{data.citations_budget.max} used — remaining{" "}
-                {data.citations_budget.remaining}
+        <p className="text-gray-400 text-sm">
+          Live operational metrics. Auto-refresh every 30 s.
+        </p>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-400 text-red-300 p-4 rounded-lg">
+            Error: {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="text-gray-400">Loading…</div>
+        ) : (
+          data && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <StatCard title="Audits (7d)" value={data.audits_7d} />
+                <StatCard title="Avg. Score (7d)" value={pct(data.avg_score_7d)} />
+                <StatCard title="Domains (7d)" value={data.domains_7d} />
               </div>
-              <div className="w-full h-2 rounded bg-gray-200 overflow-hidden">
-                <div
-                  className={`h-2 ${
-                    data.citations_budget.remaining < 20
-                      ? "bg-red-500"
-                      : data.citations_budget.remaining < 50
-                      ? "bg-yellow-500"
-                      : "bg-emerald-500"
-                  }`}
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (data.citations_budget.used / Math.max(1, data.citations_budget.max)) * 100
-                    ).toFixed(2)}%`,
-                  }}
-                />
-              </div>
-              <div className="mt-2 text-xs text-gray-500">as of {data.citations_budget.date}</div>
-            </div>
-          )}
 
-          {data.timestamp && (
-            <div className="text-xs text-gray-400">Last updated: {new Date(data.timestamp).toLocaleString()}</div>
-          )}
-        </>
-      )}
+              {data.citations_budget && (
+                <div className="mt-6 bg-gray-900 p-6 rounded-xl border border-gray-800">
+                  <h2 className="font-medium text-gray-300 mb-3">
+                    Citations Budget
+                  </h2>
+                  <div className="text-sm text-gray-400 mb-2">
+                    {data.citations_budget.used}/{data.citations_budget.max} used —{" "}
+                    {data.citations_budget.remaining} remaining
+                  </div>
+                  <div className="w-full h-2 bg-gray-800 rounded">
+                    <div
+                      className={`h-2 rounded bg-emerald-500`}
+                      style={{
+                        width: `${
+                          (data.citations_budget.used / data.citations_budget.max) *
+                          100
+                        }%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
 
-      {loading && !data && (
-        <div className="rounded-xl border p-6 text-center text-gray-500">
-          Loading metrics...
-        </div>
-      )}
+              <footer className="mt-10 text-xs text-gray-500">
+                Last updated:{" "}
+                {new Date(data.timestamp).toLocaleString(undefined, {
+                  dateStyle: "short",
+                  timeStyle: "medium",
+                })}
+              </footer>
+            </>
+          )
+        )}
+      </div>
     </div>
   );
 }
 
-function Card({ title, value }: { title: string; value: any }) {
+function StatCard({ title, value }: { title: string; value: any }) {
   return (
-    <div className="rounded-xl border p-6 hover:border-gray-300 transition-colors">
-      <div className="text-sm text-gray-500">{title}</div>
-      <div className="mt-2 text-3xl font-semibold">{value ?? "—"}</div>
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+      <div className="text-gray-400 text-sm">{title}</div>
+      <div className="text-2xl font-semibold text-white mt-2">{value ?? "—"}</div>
     </div>
   );
 }
-
