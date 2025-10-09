@@ -12,6 +12,10 @@ migrations_dir = "../../db/migrations"
 binding = "RATE_LIMIT_KV"
 id = "29edf1f05bde42c09b7afa8e128b7066"
 
+[[r2_buckets]]
+binding = "R2_BACKUPS"
+bucket_name = "geodude-backups"
+
 [vars]
 USER_AGENT = "OptiviewAuditBot/1.0 (+https://www.optiview.ai)"
 AUDIT_MAX_PAGES = "30"
@@ -27,5 +31,5 @@ FROM_EMAIL = "Optiview <no-reply@optiview.ai>"
 # - RESEND_KEY (already set in Cloudflare)
 
 [triggers]
-crons = ["0 6 * * 1"]
+crons = ["0 6 * * 1", "0 3 * * *"]
 

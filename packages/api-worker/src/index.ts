@@ -8,10 +8,13 @@ import { extractOrganization } from './html';
 import { suggestSameAs } from './entity';
 import { fetchCitations } from './citations';
 import { createProject, createProperty, verifyProperty } from './onboarding';
+import { backupToR2 } from './backup';
+import { warmCitations } from './citations-warm';
 
 interface Env {
   DB: D1Database;
   RATE_LIMIT_KV: KVNamespace;
+  R2_BACKUPS: R2Bucket;
   USER_AGENT: string;
   AUDIT_MAX_PAGES: string;
   AUDIT_DAILY_LIMIT: string;
@@ -22,6 +25,7 @@ interface Env {
   CITATIONS_DAILY_BUDGET?: string;
   RESEND_KEY?: string;
   FROM_EMAIL?: string;
+  ADMIN_BASIC_AUTH?: string;
 }
 
 // Helper: Validate API key
@@ -86,6 +90,21 @@ async function checkCitationsBudget(env: Env): Promise<boolean> {
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    const hour = new Date().getUTCHours();
+    
+    // 03:00 UTC - Nightly backup
+    if (hour === 3) {
+      console.log('Nightly backup started at', new Date().toISOString());
+      try {
+        await backupToR2(env);
+        console.log('Nightly backup completed');
+      } catch (error) {
+        console.error('Nightly backup failed:', error);
+      }
+      return;
+    }
+    
+    // 06:00 UTC Monday - Weekly audits
     console.log('Cron audit started at', new Date().toISOString());
 
     // Get all verified properties
@@ -115,6 +134,14 @@ export default {
     }
 
     console.log('Cron audit batch completed');
+    
+    // Warm citations cache after audits
+    try {
+      console.log('Warming citations cache...');
+      await warmCitations(env);
+    } catch (error) {
+      console.error('Citations warming failed:', error);
+    }
   },
 
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -172,6 +199,62 @@ export default {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
+    }
+
+    // GET /v1/admin/metrics - Admin metrics (requires Basic Auth)
+    if (path === '/v1/admin/metrics' && request.method === 'GET') {
+      const auth = request.headers.get('authorization') || '';
+      const ok = auth.startsWith('Basic ') &&
+        atob(auth.slice(6)) === (env.ADMIN_BASIC_AUTH || '');
+      
+      if (!ok) {
+        return new Response('Unauthorized', {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'WWW-Authenticate': 'Basic realm="Admin Metrics"',
+          },
+        });
+      }
+
+      try {
+        const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 3600;
+        
+        const audits7 = await env.DB.prepare(
+          'SELECT COUNT(*) as c FROM audits WHERE started_at >= ?'
+        ).bind(new Date(sevenDaysAgo * 1000).toISOString()).first<{ c: number }>();
+        
+        const avgScore7 = await env.DB.prepare(
+          'SELECT AVG(score_overall) as a FROM audits WHERE started_at >= ? AND score_overall IS NOT NULL'
+        ).bind(new Date(sevenDaysAgo * 1000).toISOString()).first<{ a: number }>();
+        
+        const domains7 = await env.DB.prepare(
+          'SELECT COUNT(DISTINCT property_id) as d FROM audits WHERE started_at >= ?'
+        ).bind(new Date(sevenDaysAgo * 1000).toISOString()).first<{ d: number }>();
+
+        return new Response(
+          JSON.stringify({
+            audits_7d: audits7?.c ?? 0,
+            avg_score_7d: Number(avgScore7?.a ?? 0).toFixed(3),
+            domains_7d: domains7?.d ?? 0,
+            timestamp: new Date().toISOString(),
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to fetch metrics',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
     }
 
     // GET /status - System status page (public for monitoring)
