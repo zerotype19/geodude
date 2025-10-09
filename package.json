@@ -1,0 +1,16 @@
+{
+  "name": "geodude",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "deploy": "turbo run deploy",
+    "migrate:local": "wrangler d1 migrations apply optiview_db --local --file db/migrations/0001_init.sql && wrangler d1 migrations apply optiview_db --local --file db/migrations/0002_seed.sql",
+    "migrate": "wrangler d1 migrations apply optiview_db"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}
+

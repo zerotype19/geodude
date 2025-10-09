@@ -1,28 +1,5 @@
-# Dependencies
-node_modules/
-.pnpm-store/
-
-# Build outputs
-dist/
-build/
-.wrangler/
-
-# Environment files
-.dev.vars
-.env
-.env.local
-
-# Logs
-*.log
-logs/
-
-# OS files
+node_modules
+.wrangler
 .DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+dist
+.output

@@ -1,0 +1,9 @@
+{
+  "name": "@geodude/web",
+  "private": true,
+  "scripts": {
+    "build": "echo static",
+    "deploy": "echo deploy-via-pages"
+  }
+}
+
