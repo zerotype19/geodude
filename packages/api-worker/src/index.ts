@@ -4,6 +4,10 @@
  */
 
 import { runAudit } from './audit';
+import { extractOrganization } from './html';
+import { suggestSameAs } from './entity';
+import { fetchCitations } from './citations';
+import { createProject, createProperty, verifyProperty } from './onboarding';
 
 interface Env {
   DB: D1Database;
@@ -12,6 +16,11 @@ interface Env {
   AUDIT_MAX_PAGES: string;
   AUDIT_DAILY_LIMIT: string;
   HASH_SALT: string;
+  BING_SEARCH_KEY?: string;
+  BING_SEARCH_ENDPOINT?: string;
+  CITATIONS_MAX_PER_QUERY?: string;
+  RESEND_API_KEY?: string;
+  FROM_EMAIL?: string;
 }
 
 // Helper: Validate API key
@@ -90,8 +99,20 @@ export default {
     const path = url.pathname;
 
     // CORS headers for all responses
+    const allowedOrigins = [
+      'https://app.optiview.ai',
+      'https://geodude-app.pages.dev',
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ];
+    
+    const origin = request.headers.get('Origin');
+    const allowOrigin = allowedOrigins.some(allowed => 
+      origin?.includes(allowed.replace('https://', '').replace('http://', ''))
+    ) ? origin : allowedOrigins[0];
+    
     const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': allowOrigin || '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
     };
@@ -106,6 +127,177 @@ export default {
       return new Response('ok', {
         headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
       });
+    }
+
+    // POST /v1/projects - Create new project (open for now)
+    if (path === '/v1/projects' && request.method === 'POST') {
+      try {
+        const body = await request.json<{ name: string; owner_email?: string }>();
+        
+        if (!body.name || body.name.trim().length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'Bad Request', message: 'name is required' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const project = await createProject(env, body.name, body.owner_email);
+
+        return new Response(
+          JSON.stringify(project),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to create project',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // POST /v1/properties - Create new property (requires auth)
+    if (path === '/v1/properties' && request.method === 'POST') {
+      const apiKey = request.headers.get('x-api-key');
+      const authResult = await validateApiKey(apiKey, env);
+
+      if (!authResult.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      try {
+        const body = await request.json<{ project_id: string; domain: string }>();
+        
+        if (!body.project_id || !body.domain) {
+          return new Response(
+            JSON.stringify({ error: 'Bad Request', message: 'project_id and domain are required' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Verify project belongs to this API key
+        const project = await env.DB.prepare(
+          'SELECT id FROM projects WHERE id = ? AND api_key = ?'
+        ).bind(body.project_id, apiKey).first();
+
+        if (!project) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden', message: 'Project not found or access denied' }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const property = await createProperty(env, body.project_id, body.domain);
+
+        return new Response(
+          JSON.stringify(property),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to create property',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // POST /v1/properties/:id/verify - Verify property ownership (requires auth)
+    if (path.match(/^\/v1\/properties\/[^/]+\/verify$/) && request.method === 'POST') {
+      const propertyId = path.split('/')[3];
+      const apiKey = request.headers.get('x-api-key');
+      const authResult = await validateApiKey(apiKey, env);
+
+      if (!authResult.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      try {
+        const body = await request.json<{ method: 'dns' | 'html' }>();
+        
+        if (!body.method || (body.method !== 'dns' && body.method !== 'html')) {
+          return new Response(
+            JSON.stringify({ error: 'Bad Request', message: 'method must be "dns" or "html"' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Verify property belongs to a project owned by this API key
+        const property = await env.DB.prepare(
+          `SELECT p.id FROM properties p
+           JOIN projects pr ON p.project_id = pr.id
+           WHERE p.id = ? AND pr.api_key = ?`
+        ).bind(propertyId, apiKey).first();
+
+        if (!property) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden', message: 'Property not found or access denied' }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const result = await verifyProperty(env, propertyId, body.method);
+
+        return new Response(
+          JSON.stringify(result),
+          {
+            status: result.verified ? 200 : 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Verification failed',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
     }
 
     // POST /v1/audits/start - Start a new audit (requires auth)
@@ -252,12 +444,60 @@ export default {
            ORDER BY severity DESC, page_url`
         ).bind(auditId).all();
 
+        // Get property domain for entity recommendations
+        const property = await env.DB.prepare(
+          'SELECT domain FROM properties WHERE id = ?'
+        ).bind(audit.property_id).first<{ domain: string }>();
+
+        // Check for entity recommendations (Organization sameAs)
+        let entity_recommendations = null;
+        if (property && pages.results && pages.results.length > 0) {
+          // Get the first page's JSON-LD (usually homepage)
+          const firstPage = pages.results[0] as any;
+          if (firstPage.jsonld_types) {
+            // Re-fetch the page HTML to get JSON-LD blocks
+            // For now, check if Organization exists in issues
+            const orgIssue = (issues.results as any[]).find(
+              (i: any) => i.details && i.details.includes('entity_graph')
+            );
+
+            if (orgIssue) {
+              // Missing sameAs detected
+              const suggestions = suggestSameAs({
+                domain: property.domain,
+                orgName: property.domain.replace(/^www\./, '').split('.')[0],
+              });
+
+              entity_recommendations = {
+                sameAs_missing: true,
+                suggestions: suggestions.suggestions,
+                jsonld_snippet: suggestions.jsonld_snippet,
+              };
+            }
+          }
+        }
+
+        // Get citations (Bing integration)
+        const citations = await fetchCitations(
+          env, 
+          auditId, 
+          property?.domain || '',
+          property?.domain?.replace(/^www\./, '').split('.')[0] // brand/slug
+        );
+
+        const response: any = {
+          ...audit,
+          pages: pages.results,
+          issues: issues.results,
+          citations: citations,
+        };
+
+        if (entity_recommendations) {
+          response.entity_recommendations = entity_recommendations;
+        }
+
         return new Response(
-          JSON.stringify({
-            ...audit,
-            pages: pages.results,
-            issues: issues.results,
-          }),
+          JSON.stringify(response),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
@@ -272,6 +512,163 @@ export default {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
+        );
+      }
+    }
+
+    // GET /v1/audits/:id/citations - Get citations for audit (read-only from table)
+    if (path.match(/^\/v1\/audits\/[^/]+\/citations$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+
+      try {
+        // Read from database only (no fetch)
+        const result = await env.DB.prepare(
+          `SELECT engine, query, url, title, cited_at
+           FROM citations
+           WHERE audit_id = ?
+           ORDER BY cited_at DESC
+           LIMIT 10`
+        ).bind(auditId).all();
+        
+        const citations = result.results || [];
+        
+        return new Response(
+          JSON.stringify({ items: citations }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to fetch citations',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // POST /v1/audits/:id/email - Send manual email report (requires auth)
+    if (path.match(/^\/v1\/audits\/[^/]+\/email$/) && request.method === 'POST') {
+      const auditId = path.split('/')[3];
+      const apiKey = request.headers.get('x-api-key');
+      const authResult = await validateApiKey(apiKey, env);
+
+      if (!authResult.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        // Fetch audit
+        const audit = await env.DB.prepare(
+          'SELECT * FROM audits WHERE id = ?'
+        ).bind(auditId).first<any>();
+
+        if (!audit) {
+          return new Response(
+            JSON.stringify({ error: 'Not Found', message: 'Audit not found' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Fetch property
+        const property = await env.DB.prepare(
+          'SELECT * FROM properties WHERE id = ?'
+        ).bind(audit.property_id).first<any>();
+
+        // Fetch project
+        const project = await env.DB.prepare(
+          'SELECT * FROM projects WHERE id = ?'
+        ).bind(property?.project_id || authResult.projectId).first<any>();
+
+        // Verify project access
+        if (!project || project.api_key !== apiKey) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden', message: 'Access denied' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Fetch previous audit for delta
+        const prevAudit = await env.DB.prepare(
+          `SELECT * FROM audits 
+           WHERE property_id = ? AND created_at < ? 
+           ORDER BY created_at DESC 
+           LIMIT 1`
+        ).bind(audit.property_id, audit.created_at).first<any>();
+
+        // Fetch top 3 issues
+        const topIssues = await env.DB.prepare(
+          `SELECT severity, message, page_url 
+           FROM audit_issues 
+           WHERE audit_id = ? 
+           ORDER BY 
+             CASE severity 
+               WHEN 'critical' THEN 1 
+               WHEN 'high' THEN 2 
+               WHEN 'medium' THEN 3 
+               ELSE 4 
+             END 
+           LIMIT 3`
+        ).bind(auditId).all<any>();
+
+        // Fetch bot activity (last 7 days)
+        const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
+        const topBots = await env.DB.prepare(
+          `SELECT bot_name, COUNT(*) as hits 
+           FROM hits 
+           WHERE property_id = ? AND timestamp >= ? AND bot_name IS NOT NULL 
+           GROUP BY bot_name 
+           ORDER BY hits DESC 
+           LIMIT 3`
+        ).bind(audit.property_id, sevenDaysAgo).all<any>();
+
+        // Get citations count
+        const citationsResult = await env.DB.prepare(
+          'SELECT COUNT(*) as count FROM citations WHERE audit_id = ?'
+        ).bind(auditId).first<{ count: number }>();
+
+        // Import and send email
+        const { sendWeeklyReport } = await import('./email');
+        const emailResult = await sendWeeklyReport(env, {
+          project,
+          property,
+          audit,
+          prevAudit: prevAudit || undefined,
+          topIssues: topIssues.results || [],
+          topBots: topBots.results || [],
+          citationsCount: citationsResult?.count || 0,
+        });
+
+        if (emailResult.error) {
+          return new Response(
+            JSON.stringify({ error: emailResult.error }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            messageId: emailResult.messageId,
+            sentTo: project.owner_email 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to send email',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }

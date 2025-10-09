@@ -1,14 +1,24 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Optiview Dashboard</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Optiview Dashboard</title>
+  <style>
+    body{font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; padding:24px; background:#0b0b0c; color:#f3f4f6}
+    a{color:#93c5fd}
+    .card{background:#141518; border:1px solid #1f2937; border-radius:16px; padding:16px; margin:12px 0}
+    .row{display:flex; gap:12px; flex-wrap:wrap}
+    .pill{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px}
+    .pill.high{background:#7f1d1d} .pill.warn{background:#78350f} .pill.info{background:#1e3a8a}
+    input,button{border-radius:10px; padding:10px 12px; border:1px solid #334155; background:#0f1115; color:#e5e7eb}
+    button{cursor:pointer}
+    table{width:100%; border-collapse:collapse}
+    th,td{padding:8px; border-bottom:1px solid #1f2937; text-align:left; font-size:14px}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
 </html>
-

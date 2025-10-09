@@ -1,0 +1,37 @@
+name: Deploy Dashboard
+
+on:
+  push:
+    branches:
+      - v0.10.0-dashboard
+      - main
+    paths:
+      - 'apps/app/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9.0.0
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - run: pnpm install
+      
+      - run: cd apps/app && pnpm build
+      
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: geodude-app
+          directory: apps/app/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
