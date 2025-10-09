@@ -1,6 +1,0 @@
--- This file is purely for operator sanity checks; it won't change data.
--- After deploy, run these commands manually and paste results:
---   PRAGMA foreign_key_check;
---   PRAGMA table_info('properties');
---   PRAGMA table_info('content_assets');
---   PRAGMA table_info('api_key');

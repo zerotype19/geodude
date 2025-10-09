@@ -1,8 +1,28 @@
-node_modules
-dist
-.vscode/.react*
-.env*
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.wrangler/
+
+# Environment files
 .dev.vars
-*.local
-.playwright-cache
-.wrangler/state/
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

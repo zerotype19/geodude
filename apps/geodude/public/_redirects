@@ -1,4 +1,0 @@
-# SPA fallback: rewrite to index.html (no redirect)
-# Cloudflare Pages treats "200" here as a rewrite, NOT a redirect.
-# Keep this as the LAST rule.
-/*   /index.html   200
