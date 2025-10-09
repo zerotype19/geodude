@@ -2,6 +2,7 @@ import { Routes, Route, Link } from "react-router-dom";
 import Dashboard from "./routes/Dashboard";
 import PublicAudit from "./routes/PublicAudit";
 import Onboard from "./routes/Onboard";
+import Admin from "./pages/Admin";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard/>} />
         <Route path="/onboard" element={<Onboard/>} />
+        <Route path="/admin" element={<Admin/>} />
         <Route path="/a/:id" element={<PublicAudit/>} />
       </Routes>
       <footer style={{marginTop:24, opacity:.7}}>
