@@ -18,4 +18,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -C apps/app build
       - run: pnpm -C packages/api-worker build || true
+      
+      - name: API smoke - citations shape
+        run: |
+          # Test that citations endpoint returns {items:[]} shape
+          RESPONSE=$(curl -s https://api.optiview.ai/v1/audits/aud_1760034537103_bx07fbfu2/citations)
+          echo "$RESPONSE" | jq -e 'has("items")' || (echo "❌ Citations endpoint missing 'items' key" && exit 1)
+          echo "✅ Citations endpoint returns correct shape"
 

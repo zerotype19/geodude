@@ -152,6 +152,78 @@ export default {
       });
     }
 
+    // GET /v1/citations/budget - Check daily citations budget (public for monitoring)
+    if (path === '/v1/citations/budget' && request.method === 'GET') {
+      const today = new Date().toISOString().split('T')[0];
+      const key = `citations_budget:${today}`;
+      
+      const currentCount = await env.RATE_LIMIT_KV.get(key);
+      const used = currentCount ? parseInt(currentCount) : 0;
+      const max = parseInt(env.CITATIONS_DAILY_BUDGET || '200');
+      
+      return new Response(
+        JSON.stringify({
+          used,
+          remaining: Math.max(0, max - used),
+          max,
+          date: today,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // GET /status - System status page (public for monitoring)
+    if (path === '/status' && request.method === 'GET') {
+      try {
+        // Get latest audit
+        const latestAudit = await env.DB.prepare(
+          `SELECT id, status, completed_at 
+           FROM audits 
+           WHERE status = 'completed' 
+           ORDER BY completed_at DESC 
+           LIMIT 1`
+        ).first<{ id: string; status: string; completed_at: string }>();
+
+        // Get citations budget
+        const today = new Date().toISOString().split('T')[0];
+        const budgetKey = `citations_budget:${today}`;
+        const budgetUsed = parseInt((await env.RATE_LIMIT_KV.get(budgetKey)) || '0');
+        const budgetMax = parseInt(env.CITATIONS_DAILY_BUDGET || '200');
+
+        return new Response(
+          JSON.stringify({
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            latest_audit: latestAudit ? {
+              id: latestAudit.id,
+              completed_at: latestAudit.completed_at,
+            } : null,
+            citations_budget: {
+              used: budgetUsed,
+              remaining: Math.max(0, budgetMax - budgetUsed),
+              max: budgetMax,
+            },
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            status: 'error',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
     // POST /v1/projects - Create new project (open for now)
     if (path === '/v1/projects' && request.method === 'POST') {
       try {
