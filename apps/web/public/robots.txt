@@ -23,5 +23,5 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://www.optiview.ai/sitemap.xml
+Sitemap: https://optiview.ai/sitemap.xml
 
