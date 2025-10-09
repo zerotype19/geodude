@@ -15,7 +15,7 @@ id = "29edf1f05bde42c09b7afa8e128b7066"
 USER_AGENT = "OptiviewAuditBot/1.0 (+https://www.optiview.ai)"
 AUDIT_MAX_PAGES = "30"
 AUDIT_DAILY_LIMIT = "10"
-HASH_SALT = "change_me"
+HASH_SALT = "prod_salt_6bd61859686eebd3e0caa31f2192ac83"
 
 [triggers]
 crons = ["0 6 * * 1"]

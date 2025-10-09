@@ -8,5 +8,5 @@ database_name = "optiview_db"
 database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
 
 [vars]
-HASH_SALT = "change_me"
+HASH_SALT = "prod_salt_6bd61859686eebd3e0caa31f2192ac83"
 
