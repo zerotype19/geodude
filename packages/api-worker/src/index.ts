@@ -93,8 +93,20 @@ export default {
     const path = url.pathname;
 
     // CORS headers for all responses
+    const allowedOrigins = [
+      'https://app.optiview.ai',
+      'https://geodude-app.pages.dev',
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ];
+    
+    const origin = request.headers.get('Origin');
+    const allowOrigin = allowedOrigins.some(allowed => 
+      origin?.includes(allowed.replace('https://', '').replace('http://', ''))
+    ) ? origin : allowedOrigins[0];
+    
     const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': allowOrigin || '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
     };
