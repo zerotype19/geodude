@@ -1,10 +1,23 @@
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Dashboard from "./routes/Dashboard";
 import PublicAudit from "./routes/PublicAudit";
 import Onboard from "./routes/Onboard";
 import Admin from "./pages/Admin";
 
 export default function App() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
+
+  // Admin route renders without wrapper (full-screen dark theme)
+  if (isAdminRoute) {
+    return (
+      <Routes>
+        <Route path="/admin" element={<Admin/>} />
+      </Routes>
+    );
+  }
+
+  // All other routes get the standard wrapper
   return (
     <>
       <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
@@ -17,7 +30,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard/>} />
         <Route path="/onboard" element={<Onboard/>} />
-        <Route path="/admin" element={<Admin/>} />
         <Route path="/a/:id" element={<PublicAudit/>} />
       </Routes>
       <footer style={{marginTop:24, opacity:.7}}>
