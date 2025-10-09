@@ -19,7 +19,7 @@ interface Env {
   BING_SEARCH_KEY?: string;
   BING_SEARCH_ENDPOINT?: string;
   CITATIONS_MAX_PER_QUERY?: string;
-  RESEND_API_KEY?: string;
+  RESEND_KEY?: string;
   FROM_EMAIL?: string;
 }
 

@@ -4,7 +4,7 @@
  */
 
 interface Env {
-  RESEND_API_KEY?: string;
+  RESEND_KEY?: string;
   FROM_EMAIL?: string;
 }
 
@@ -66,7 +66,7 @@ export async function sendWeeklyReport(
   }
 
   // Skip if no Resend API key
-  if (!env.RESEND_API_KEY || !env.FROM_EMAIL) {
+  if (!env.RESEND_KEY || !env.FROM_EMAIL) {
     return { error: 'Resend not configured' };
   }
 
@@ -340,7 +340,7 @@ export async function sendWeeklyReport(
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+        'Authorization': `Bearer ${env.RESEND_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

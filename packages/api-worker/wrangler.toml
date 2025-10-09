@@ -22,7 +22,7 @@ FROM_EMAIL = "Optiview <no-reply@optiview.ai>"
 
 # Secrets (set via wrangler secret put):
 # - BING_SEARCH_KEY
-# - RESEND_API_KEY
+# - RESEND_KEY
 
 [triggers]
 crons = ["0 6 * * 1"]
