@@ -440,8 +440,44 @@ export default {
       }
     }
 
+    // GET /v1/audits/:id/citations - Get citations for audit (read-only from table)
+    if (path.match(/^\/v1\/audits\/[^/]+\/citations$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+
+      try {
+        // Read from database only (no fetch)
+        const result = await env.DB.prepare(
+          `SELECT engine, query, url, title, cited_at
+           FROM citations
+           WHERE audit_id = ?
+           ORDER BY cited_at DESC
+           LIMIT 50`
+        ).bind(auditId).all();
+        
+        const citations = result.results || [];
+        
+        return new Response(
+          JSON.stringify({ items: citations }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to fetch citations',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
     // GET /v1/audits/:id - Get audit details (public for now, could add auth later)
-    if (path.startsWith('/v1/audits/') && request.method === 'GET') {
+    if (path.match(/^\/v1\/audits\/[^/]+$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
 
       if (!auditId) {
@@ -571,42 +607,6 @@ export default {
         return new Response(
           JSON.stringify({
             error: 'Failed to fetch audit',
-            message: error instanceof Error ? error.message : String(error),
-          }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-    }
-
-    // GET /v1/audits/:id/citations - Get citations for audit (read-only from table)
-    if (path.match(/^\/v1\/audits\/[^/]+\/citations$/) && request.method === 'GET') {
-      const auditId = path.split('/')[3];
-
-      try {
-        // Read from database only (no fetch)
-        const result = await env.DB.prepare(
-          `SELECT engine, query, url, title, cited_at
-           FROM citations
-           WHERE audit_id = ?
-           ORDER BY cited_at DESC
-           LIMIT 10`
-        ).bind(auditId).all();
-        
-        const citations = result.results || [];
-        
-        return new Response(
-          JSON.stringify({ items: citations }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      } catch (error) {
-        return new Response(
-          JSON.stringify({
-            error: 'Failed to fetch citations',
             message: error instanceof Error ? error.message : String(error),
           }),
           {
