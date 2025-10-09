@@ -3,7 +3,7 @@
  * Orchestrates website audits: robots.txt, sitemap, crawling, scoring
  */
 
-import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords } from './html';
+import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractOrganization } from './html';
 import { calculateScores } from './score';
 
 interface Env {
@@ -160,6 +160,24 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
           const jsonLdBlocks = extractJSONLD(html);
           const hasFaq = detectFAQ(html);
           const wordCount = countWords(html);
+
+          // Check for Organization sameAs (only on homepage)
+          if (pageUrl === baseUrl || pageUrl === `${baseUrl}/`) {
+            const orgData = extractOrganization(jsonLdBlocks);
+            if (orgData.hasOrg && !orgData.sameAs) {
+              issues.push({
+                page_url: pageUrl,
+                issue_type: 'structured_data',
+                severity: 'warning',
+                message: 'Organization schema missing sameAs links for entity verification',
+                details: JSON.stringify({
+                  recommendation: 'Add sameAs property to link to authoritative profiles',
+                  entity: orgData.name,
+                  category: 'entity_graph'
+                }),
+              });
+            }
+          }
 
           pages.push({
             url: pageUrl,

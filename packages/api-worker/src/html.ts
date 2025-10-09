@@ -97,3 +97,33 @@ export function hasValidOpenGraph(html: string): boolean {
   return ogTitle && ogDescription && ogImage;
 }
 
+export interface OrganizationData {
+  hasOrg: boolean;
+  name?: string;
+  url?: string;
+  sameAs?: string[];
+}
+
+export function extractOrganization(jsonLdBlocks: any[]): OrganizationData {
+  // Find Organization schema
+  const org = jsonLdBlocks.find((block) => block['@type'] === 'Organization');
+
+  if (!org) {
+    return { hasOrg: false };
+  }
+
+  // Extract sameAs array
+  const sameAs = org.sameAs
+    ? Array.isArray(org.sameAs)
+      ? org.sameAs
+      : [org.sameAs]
+    : [];
+
+  return {
+    hasOrg: true,
+    name: org.name || undefined,
+    url: org.url || undefined,
+    sameAs: sameAs.length > 0 ? sameAs : undefined,
+  };
+}
+
