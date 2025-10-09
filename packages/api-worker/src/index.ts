@@ -378,7 +378,29 @@ export default {
            FROM audits WHERE id = ?`
         ).bind(auditId).first();
 
-        return new Response(JSON.stringify(audit), {
+        // Transform scores for consistency with GET endpoint
+        const scores = audit.score_overall !== null ? {
+          total: audit.score_overall,
+          crawlability: audit.score_crawlability,
+          structured: audit.score_structured,
+          answerability: audit.score_answerability,
+          trust: audit.score_trust,
+        } : null;
+
+        const response = {
+          id: audit.id,
+          property_id: audit.property_id,
+          status: audit.status,
+          scores: scores,
+          pages_crawled: audit.pages_crawled,
+          pages_total: audit.pages_total,
+          issues_count: audit.issues_count,
+          started_at: audit.started_at,
+          completed_at: audit.completed_at,
+          error: audit.error,
+        };
+
+        return new Response(JSON.stringify(response), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       } catch (error) {
@@ -485,8 +507,27 @@ export default {
           property?.domain?.replace(/^www\./, '').split('.')[0] // brand/slug
         );
 
+        // Transform scores from flat columns to nested object
+        const scores = audit.score_overall !== null ? {
+          total: audit.score_overall,
+          crawlability: audit.score_crawlability,
+          structured: audit.score_structured,
+          answerability: audit.score_answerability,
+          trust: audit.score_trust,
+        } : null;
+
         const response: any = {
-          ...audit,
+          id: audit.id,
+          property_id: audit.property_id,
+          status: audit.status,
+          domain: property?.domain || null,
+          scores: scores,
+          pages_crawled: audit.pages_crawled,
+          pages_total: audit.pages_total,
+          issues_count: audit.issues_count,
+          started_at: audit.started_at,
+          completed_at: audit.completed_at,
+          error: audit.error,
           pages: pages.results,
           issues: issues.results,
           citations: citations,
