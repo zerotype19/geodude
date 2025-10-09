@@ -1,12 +1,14 @@
 name: Deploy Dashboard
 
 on:
-  push:
-    branches:
-      - v0.10.0-dashboard
-      - main
-    paths:
-      - 'apps/app/**'
+  workflow_dispatch:  # Manual trigger only
+  # Disabled auto-deploy since we're using manual wrangler pages deploy
+  # push:
+  #   branches:
+  #     - v0.10.0-dashboard
+  #     - main
+  #   paths:
+  #     - 'apps/app/**'
 
 jobs:
   deploy:
