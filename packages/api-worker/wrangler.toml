@@ -1,6 +1,7 @@
 name = "geodude-api"
 main = "src/index.ts"
 compatibility_date = "2024-11-20"
+compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
@@ -25,6 +26,12 @@ BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 CITATIONS_MAX_PER_QUERY = "5"
 CITATIONS_DAILY_BUDGET = "200"
 FROM_EMAIL = "Optiview <no-reply@optiview.ai>"
+RENDER_MODE = "browser"
+RENDER_TIMEOUT_MS = "8000"
+RENDER_MAX_PAGES = "30"
+
+[browser]
+binding = "BROWSER"
 
 # Secrets (set via wrangler secret put):
 # - BRAVE_SEARCH (already set in Cloudflare)

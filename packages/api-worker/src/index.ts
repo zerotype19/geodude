@@ -652,7 +652,7 @@ export default {
         // 1) Find the exact page row
         const pageRow = await env.DB.prepare(
           `SELECT url, status_code as status, title, h1 as has_h1, word_count, 
-                  has_json_ld as json_ld_count, has_faq as faq_present
+                  rendered_words, snippet, has_json_ld as json_ld_count, has_faq as faq_present
            FROM audit_pages
            WHERE audit_id = ? AND (url = ? OR url LIKE '%' || ?)
            ORDER BY (url = ?) DESC
@@ -681,11 +681,11 @@ export default {
              issue_type ASC`
         ).bind(auditId, pageRow.url).all();
 
-        // 3) Lightweight page score breakdown
+        // 3) Lightweight page score breakdown (use rendered_words)
         const scoreHints = {
           has_h1: !!pageRow.has_h1,
           has_json_ld: (pageRow.json_ld_count ?? 0) > 0,
-          word_ok: (pageRow.word_count ?? 0) >= 120,
+          word_ok: (pageRow.rendered_words ?? pageRow.word_count ?? 0) >= 120,
           faq_ok: !!pageRow.faq_present,
         };
 
@@ -706,7 +706,8 @@ export default {
               url: pageRow.url,
               title: pageRow.title,
               status: pageRow.status,
-              word_count: pageRow.word_count,
+              word_count: pageRow.rendered_words ?? pageRow.word_count,
+              snippet: pageRow.snippet,
               has_h1: !!pageRow.has_h1,
               json_ld_count: pageRow.json_ld_count ?? 0,
               faq_present: !!pageRow.faq_present,
@@ -764,7 +765,7 @@ export default {
         // Get pages
         const pages = await env.DB.prepare(
           `SELECT url, status_code, title, h1, has_json_ld, has_faq, 
-                  word_count, load_time_ms, error
+                  word_count, rendered_words, snippet, load_time_ms, error
            FROM audit_pages WHERE audit_id = ?
            ORDER BY url`
         ).bind(auditId).all();

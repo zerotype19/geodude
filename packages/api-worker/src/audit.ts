@@ -5,6 +5,7 @@
 
 import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractOrganization } from './html';
 import { calculateScores } from './score';
+import { renderPage } from './render';
 
 interface Env {
   DB: D1Database;
@@ -51,6 +52,8 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
     has_json_ld: boolean;
     has_faq: boolean;
     word_count: number;
+    rendered_words: number;
+    snippet: string | null;
     load_time_ms: number;
     error: string | null;
   }> = [];
@@ -146,20 +149,21 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
 
       try {
         const pageStart = Date.now();
-        const pageResponse = await fetch(pageUrl, {
-          headers: { 'User-Agent': env.USER_AGENT },
-          redirect: 'follow',
-        });
+        
+        // Use renderPage for accurate content extraction
+        const rendered = await renderPage(env, pageUrl, env.USER_AGENT);
         const pageTime = Date.now() - pageStart;
 
-        if (pageResponse.status === 200) {
-          const html = await pageResponse.text();
-          
+        if (rendered.status === 200 || rendered.status === 0) {
+          const html = rendered.html;
           const title = extractTitle(html);
           const h1 = extractH1(html);
           const jsonLdBlocks = extractJSONLD(html);
           const hasFaq = detectFAQ(html);
-          const wordCount = countWords(html);
+          
+          // Use rendered word count (more accurate)
+          const wordCount = rendered.words;
+          const snippet = rendered.snippet;
 
           // Check for Organization sameAs (only on homepage)
           if (pageUrl === baseUrl || pageUrl === `${baseUrl}/`) {
@@ -181,12 +185,14 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
 
           pages.push({
             url: pageUrl,
-            status_code: pageResponse.status,
+            status_code: rendered.status || 200,
             title,
             h1,
             has_json_ld: jsonLdBlocks.length > 0,
             has_faq: hasFaq,
             word_count: wordCount,
+            rendered_words: wordCount,
+            snippet,
             load_time_ms: pageTime,
             error: null,
           });
@@ -201,7 +207,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
             });
           }
 
-          if (!h1) {
+          if (!h1 || !rendered.hasH1) {
             issues.push({
               page_url: pageUrl,
               issue_type: 'missing_h1',
@@ -210,7 +216,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
             });
           }
 
-          if (jsonLdBlocks.length === 0) {
+          if (jsonLdBlocks.length === 0 || rendered.jsonLdCount === 0) {
             issues.push({
               page_url: pageUrl,
               issue_type: 'missing_structured_data',
@@ -219,32 +225,36 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
             });
           }
 
-          if (wordCount < 100) {
+          // Raise threshold to 120 words to reduce false positives
+          if (wordCount < 120) {
             issues.push({
               page_url: pageUrl,
               issue_type: 'thin_content',
               severity: 'warning',
               message: `Thin content: only ${wordCount} words`,
+              details: JSON.stringify({ words: wordCount, snippet }),
             });
           }
         } else {
           pages.push({
             url: pageUrl,
-            status_code: pageResponse.status,
+            status_code: rendered.status,
             title: null,
             h1: null,
             has_json_ld: false,
             has_faq: false,
             word_count: 0,
+            rendered_words: 0,
+            snippet: null,
             load_time_ms: pageTime,
-            error: `HTTP ${pageResponse.status}`,
+            error: `HTTP ${rendered.status}`,
           });
 
           issues.push({
             page_url: pageUrl,
             issue_type: 'page_error',
             severity: 'critical',
-            message: `Page returned HTTP ${pageResponse.status}`,
+            message: `Page returned HTTP ${rendered.status}`,
           });
         }
       } catch (error) {
@@ -256,6 +266,8 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
           has_json_ld: false,
           has_faq: false,
           word_count: 0,
+          rendered_words: 0,
+          snippet: null,
           load_time_ms: 0,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -303,8 +315,8 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
     for (const page of pages) {
       await env.DB.prepare(
         `INSERT INTO audit_pages 
-         (audit_id, url, status_code, title, h1, has_json_ld, has_faq, word_count, load_time_ms, error)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (audit_id, url, status_code, title, h1, has_json_ld, has_faq, word_count, rendered_words, snippet, load_time_ms, error)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         auditId,
         page.url,
@@ -314,6 +326,8 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
         page.has_json_ld ? 1 : 0,
         page.has_faq ? 1 : 0,
         page.word_count,
+        page.rendered_words,
+        page.snippet,
         page.load_time_ms,
         page.error
       ).run();
