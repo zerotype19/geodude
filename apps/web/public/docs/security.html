@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security & Privacy - Optiview</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 { color: #1a1a1a; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
+        h2 { color: #2563eb; margin-top: 30px; }
+        .feature { background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .feature h3 { margin-top: 0; color: #1f2937; }
+        code { background: #e5e7eb; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+        a { color: #3b82f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; }
+        .highlight { background: #dbeafe; padding: 15px; border-left: 4px solid #3b82f6; margin: 20px 0; }
+    </style>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How does Optiview protect visitor privacy?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Optiview uses IP hashing with SHA-256 to anonymize visitor data. We never store raw IP addresses, cookies, or device fingerprints. All data is encrypted in transit and stored securely in Cloudflare D1 databases."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Optiview comply with GDPR and privacy laws?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Optiview is designed with privacy-first principles. We hash all IP addresses, do not use tracking cookies, and store minimal data necessary for analytics. Our infrastructure runs on Cloudflare's GDPR-compliant edge network."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does Optiview audit respect robots.txt?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Optiview's audit bot (OptiviewAuditBot) strictly obeys robots.txt Disallow rules. We crawl at a maximum rate of 1 request per second and identify ourselves with a clear User-Agent header."
+          }
+        }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <h1>Security & Privacy</h1>
+    <p>Optiview is built with privacy-first principles and respects web standards. Here's how we protect your data and your visitors' privacy.</p>
+
+    <div class="highlight">
+        <strong>🔒 Core Principle:</strong> We believe in transparent, ethical web analytics that respects user privacy while providing valuable insights.
+    </div>
+
+    <h2>Privacy Features</h2>
+
+    <div class="feature">
+        <h3>🔐 IP Hashing (No Raw IPs Stored)</h3>
+        <p>All visitor IP addresses are hashed using SHA-256 with a private salt before storage. We <strong>never</strong> store raw IP addresses in our database.</p>
+        <p><strong>Technical Details:</strong></p>
+        <ul>
+            <li>Algorithm: SHA-256</li>
+            <li>Salt: Unique per deployment (stored in env var <code>HASH_SALT</code>)</li>
+            <li>Result: 64-character hexadecimal hash</li>
+            <li>Reversibility: Impossible (one-way cryptographic hash)</li>
+        </ul>
+        <p><strong>Example:</strong> IP <code>192.0.2.1</code> → <code>718386a757d2df6ec55edd0cc092de1451c3f26063e8c2f482dd305a2bc793ff</code></p>
+    </div>
+
+    <div class="feature">
+        <h3>🍪 No Tracking Cookies</h3>
+        <p>Optiview does <strong>not</strong> set any cookies on your visitors' browsers. Our 1x1 pixel tracker uses server-side detection only.</p>
+        <ul>
+            <li>No first-party cookies</li>
+            <li>No third-party cookies</li>
+            <li>No local storage</li>
+            <li>No device fingerprinting</li>
+        </ul>
+    </div>
+
+    <div class="feature">
+        <h3>📊 Minimal Data Collection</h3>
+        <p>We only collect what's necessary for bot analytics:</p>
+        <ul>
+            <li><strong>IP Hash:</strong> SHA-256 hash for deduplication</li>
+            <li><strong>User-Agent:</strong> To classify bots (GPTBot, ClaudeBot, etc.)</li>
+            <li><strong>Referrer:</strong> HTTP Referer header (if present)</li>
+            <li><strong>Page URL:</strong> The page being tracked</li>
+            <li><strong>Timestamp:</strong> When the visit occurred</li>
+        </ul>
+        <p><strong>We DO NOT collect:</strong></p>
+        <ul>
+            <li>Names, emails, or any PII</li>
+            <li>Session IDs or tracking cookies</li>
+            <li>Device fingerprints or canvas hashes</li>
+            <li>Precise geolocation data</li>
+        </ul>
+    </div>
+
+    <div class="feature">
+        <h3>🔒 Encryption & Security</h3>
+        <p><strong>In Transit:</strong></p>
+        <ul>
+            <li>All API requests use HTTPS/TLS 1.3</li>
+            <li>HTTP/2 or HTTP/3 (QUIC) where supported</li>
+            <li>Security headers (HSTS, CSP, X-Content-Type-Options)</li>
+        </ul>
+        <p><strong>At Rest:</strong></p>
+        <ul>
+            <li>Data stored in Cloudflare D1 (SQLite at edge)</li>
+            <li>Encrypted at rest by Cloudflare infrastructure</li>
+            <li>Distributed globally for performance and resilience</li>
+        </ul>
+    </div>
+
+    <h2>Audit Bot Behavior</h2>
+
+    <div class="feature">
+        <h3>🤖 Respectful Crawling</h3>
+        <p>Our audit bot (<code>OptiviewAuditBot/1.0</code>) follows web standards and best practices:</p>
+        <ul>
+            <li><strong>Rate Limit:</strong> Maximum 1 request per second (1 RPS)</li>
+            <li><strong>robots.txt Compliance:</strong> We obey all Disallow rules</li>
+            <li><strong>User-Agent Identification:</strong> Clear, identifiable User-Agent header</li>
+            <li><strong>Page Limit:</strong> Maximum 30 pages per audit</li>
+        </ul>
+        <p><strong>User-Agent:</strong></p>
+        <pre>OptiviewAuditBot/1.0 (+https://www.optiview.ai)</pre>
+        <p>To block our audit bot, add to your robots.txt:</p>
+        <pre>User-agent: OptiviewAuditBot
+Disallow: /</pre>
+    </div>
+
+    <h2>Data Retention</h2>
+    <p>Optiview retains analytics data for operational purposes:</p>
+    <ul>
+        <li><strong>Hit Logs:</strong> Retained indefinitely (IP hashed, no PII)</li>
+        <li><strong>Audit Results:</strong> Retained indefinitely for historical comparison</li>
+        <li><strong>No Deletion Required:</strong> Since we don't store PII, there's no personal data to delete</li>
+    </ul>
+
+    <h2>GDPR & Privacy Law Compliance</h2>
+    <div class="highlight">
+        <p><strong>✅ Privacy-First Design:</strong></p>
+        <ul>
+            <li>IP hashing eliminates personal data at source</li>
+            <li>No cookies = no consent banner needed</li>
+            <li>Minimal data collection (only what's necessary)</li>
+            <li>Transparent about data usage (this page)</li>
+            <li>Cloudflare infrastructure (GDPR-compliant, EU data residency available)</li>
+        </ul>
+    </div>
+
+    <h2>Infrastructure Security</h2>
+    <p>Optiview runs on Cloudflare's global edge network:</p>
+    <ul>
+        <li><strong>Workers:</strong> V8 isolates (sandboxed, secure execution)</li>
+        <li><strong>D1 Database:</strong> SQLite at edge with automatic replication</li>
+        <li><strong>DDoS Protection:</strong> Built-in via Cloudflare</li>
+        <li><strong>Zero Trust:</strong> No origin servers to compromise</li>
+        <li><strong>Auto-scaling:</strong> Handles traffic spikes automatically</li>
+    </ul>
+
+    <h2>Security Headers</h2>
+    <p>All Optiview pages include security headers:</p>
+    <ul>
+        <li><code>X-Content-Type-Options: nosniff</code></li>
+        <li><code>X-Frame-Options: DENY</code></li>
+        <li><code>X-XSS-Protection: 1; mode=block</code></li>
+        <li><code>Referrer-Policy: strict-origin-when-cross-origin</code></li>
+        <li><code>Content-Security-Policy</code> (where applicable)</li>
+    </ul>
+
+    <h2>Contact & Transparency</h2>
+    <p>Questions about security or privacy? We're committed to transparency:</p>
+    <ul>
+        <li><strong>Open Source:</strong> Core audit logic is open for review</li>
+        <li><strong>Documentation:</strong> This page explains exactly what we collect</li>
+        <li><strong>No Hidden Tracking:</strong> What you see is what you get</li>
+    </ul>
+
+    <footer>
+        <p><a href="/">← Back to Optiview Home</a></p>
+        <p>See also: <a href="/docs/audit.html">Audit Checks</a> | <a href="/docs/bots.html">AI Bots</a></p>
+        <p><small>Last updated: October 2025</small></p>
+    </footer>
+</body>
+</html>
+

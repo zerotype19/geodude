@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Bots We Track - Optiview</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 { color: #1a1a1a; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
+        h2 { color: #2563eb; margin-top: 30px; }
+        .bot-card { background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #3b82f6; }
+        .bot-card h3 { margin-top: 0; color: #1f2937; }
+        .bot-ua { background: #e5e7eb; padding: 5px 10px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+        a { color: #3b82f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th { background: #f3f4f6; font-weight: 600; }
+    </style>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Which AI bots does Optiview track?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Optiview tracks major AI crawlers including GPTBot (OpenAI/ChatGPT), ClaudeBot (Anthropic), PerplexityBot (Perplexity AI), CCBot (Common Crawl), Google-Extended, and Bytespider (ByteDance/TikTok). We identify these bots via User-Agent patterns."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How should I configure robots.txt for AI bots?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "To allow AI bots, add specific User-agent entries in robots.txt with Allow: / directives. For example: 'User-agent: GPTBot', followed by 'Allow: /'. This ensures AI crawlers can access your content for training and search."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Optiview store bot visit data?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Optiview logs bot visits in a privacy-first manner. We store hashed IP addresses (SHA-256), User-Agent strings, and visit timestamps. No personally identifiable information (PII) is retained."
+          }
+        }
+      ]
+    }
+    </script>
+</head>
+<body>
+    <h1>AI Bots We Track</h1>
+    <p>Optiview monitors and analyzes visits from major AI crawlers to help you understand how AI systems interact with your content.</p>
+
+    <h2>Supported AI Bots</h2>
+
+    <div class="bot-card">
+        <h3>🤖 GPTBot (OpenAI / ChatGPT)</h3>
+        <p><strong>Organization:</strong> OpenAI</p>
+        <p><strong>Purpose:</strong> Crawls web content to train GPT models (ChatGPT, GPT-4, etc.)</p>
+        <p><strong>User-Agent Pattern:</strong> <span class="bot-ua">GPTBot</span></p>
+        <p><strong>robots.txt Entry:</strong></p>
+        <pre>User-agent: GPTBot
+Allow: /</pre>
+    </div>
+
+    <div class="bot-card">
+        <h3>🧠 ClaudeBot (Anthropic)</h3>
+        <p><strong>Organization:</strong> Anthropic</p>
+        <p><strong>Purpose:</strong> Gathers data for Claude AI training</p>
+        <p><strong>User-Agent Patterns:</strong> <span class="bot-ua">ClaudeBot</span> or <span class="bot-ua">Claude-Web</span></p>
+        <p><strong>robots.txt Entry:</strong></p>
+        <pre>User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /</pre>
+    </div>
+
+    <div class="bot-card">
+        <h3>🔍 PerplexityBot (Perplexity AI)</h3>
+        <p><strong>Organization:</strong> Perplexity AI</p>
+        <p><strong>Purpose:</strong> Indexes content for Perplexity's answer engine</p>
+        <p><strong>User-Agent Pattern:</strong> <span class="bot-ua">PerplexityBot</span></p>
+        <p><strong>robots.txt Entry:</strong></p>
+        <pre>User-agent: PerplexityBot
+Allow: /</pre>
+    </div>
+
+    <div class="bot-card">
+        <h3>🌐 CCBot (Common Crawl)</h3>
+        <p><strong>Organization:</strong> Common Crawl Foundation</p>
+        <p><strong>Purpose:</strong> Builds open web corpus used by many AI companies</p>
+        <p><strong>User-Agent Pattern:</strong> <span class="bot-ua">CCBot</span></p>
+        <p><strong>robots.txt Entry:</strong></p>
+        <pre>User-agent: CCBot
+Allow: /</pre>
+    </div>
+
+    <div class="bot-card">
+        <h3>🔎 Google-Extended</h3>
+        <p><strong>Organization:</strong> Google</p>
+        <p><strong>Purpose:</strong> Crawls content for Bard and other Google AI products (separate from Googlebot)</p>
+        <p><strong>User-Agent Pattern:</strong> <span class="bot-ua">Google-Extended</span></p>
+        <p><strong>robots.txt Entry:</strong></p>
+        <pre>User-agent: Google-Extended
+Allow: /</pre>
+    </div>
+
+    <div class="bot-card">
+        <h3>🕷️ Bytespider (ByteDance / TikTok)</h3>
+        <p><strong>Organization:</strong> ByteDance</p>
+        <p><strong>Purpose:</strong> Powers ByteDance's AI and search products</p>
+        <p><strong>User-Agent Pattern:</strong> <span class="bot-ua">Bytespider</span></p>
+        <p><strong>robots.txt Entry:</strong></p>
+        <pre>User-agent: Bytespider
+Allow: /</pre>
+    </div>
+
+    <h2>Bot Detection & Privacy</h2>
+    <p>Optiview identifies AI bots using User-Agent pattern matching. When a bot visits your site:</p>
+    <ul>
+        <li><strong>IP Hashing:</strong> We hash visitor IPs with SHA-256 (no raw IPs stored)</li>
+        <li><strong>User-Agent Logging:</strong> Full User-Agent string is recorded for classification</li>
+        <li><strong>Visit Timestamp:</strong> Date/time of the visit is logged</li>
+        <li><strong>Referrer:</strong> HTTP Referer header is captured if present</li>
+        <li><strong>No PII:</strong> We do not store cookies, device IDs, or other personal identifiers</li>
+    </ul>
+
+    <h2>Bot Classification Table</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Bot Name</th>
+                <th>Organization</th>
+                <th>User-Agent Pattern</th>
+                <th>Tracked</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>GPTBot</td>
+                <td>OpenAI</td>
+                <td><code>/GPTBot/i</code></td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>ChatGPT-User</td>
+                <td>OpenAI</td>
+                <td><code>/ChatGPT-User/i</code></td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>ClaudeBot</td>
+                <td>Anthropic</td>
+                <td><code>/ClaudeBot|Claude-Web/i</code></td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>PerplexityBot</td>
+                <td>Perplexity AI</td>
+                <td><code>/PerplexityBot/i</code></td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>CCBot</td>
+                <td>Common Crawl</td>
+                <td><code>/CCBot/i</code></td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>Google-Extended</td>
+                <td>Google</td>
+                <td><code>/Google-Extended/i</code></td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>Bytespider</td>
+                <td>ByteDance</td>
+                <td><code>/Bytespider/i</code></td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>Googlebot</td>
+                <td>Google</td>
+                <td><code>/Googlebot/i</code></td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>Bingbot</td>
+                <td>Microsoft</td>
+                <td><code>/bingbot/i</code></td>
+                <td>✅</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Blocking AI Bots</h2>
+    <p>If you want to block specific AI bots, use <code>Disallow</code> in robots.txt:</p>
+    <pre>User-agent: GPTBot
+Disallow: /</pre>
+    <p><strong>Note:</strong> Blocking AI bots may reduce your content's visibility in AI-powered search and answer engines.</p>
+
+    <footer>
+        <p><a href="/">← Back to Optiview Home</a></p>
+        <p>See also: <a href="/docs/audit.html">Audit Checks</a> | <a href="/docs/security.html">Security & Privacy</a></p>
+    </footer>
+</body>
+</html>
+
