@@ -7,8 +7,16 @@ binding = "DB"
 database_name = "optiview_db"
 database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
 
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "29edf1f05bde42c09b7afa8e128b7066"
+
 [vars]
 USER_AGENT = "OptiviewAuditBot/1.0 (+https://www.optiview.ai)"
 AUDIT_MAX_PAGES = "30"
+AUDIT_DAILY_LIMIT = "10"
 HASH_SALT = "change_me"
+
+[triggers]
+crons = ["0 6 * * 1"]
 

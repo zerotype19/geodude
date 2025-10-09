@@ -7,12 +7,84 @@ import { runAudit } from './audit';
 
 interface Env {
   DB: D1Database;
+  RATE_LIMIT_KV: KVNamespace;
   USER_AGENT: string;
   AUDIT_MAX_PAGES: string;
+  AUDIT_DAILY_LIMIT: string;
   HASH_SALT: string;
 }
 
+// Helper: Validate API key
+async function validateApiKey(apiKey: string | null, env: Env): Promise<{ valid: boolean; projectId?: string }> {
+  if (!apiKey) {
+    return { valid: false };
+  }
+
+  const project = await env.DB.prepare(
+    'SELECT id FROM projects WHERE api_key = ?'
+  ).bind(apiKey).first<{ id: string }>();
+
+  if (!project) {
+    return { valid: false };
+  }
+
+  return { valid: true, projectId: project.id };
+}
+
+// Helper: Check rate limit
+async function checkRateLimit(projectId: string, env: Env): Promise<{ allowed: boolean; count: number; limit: number }> {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const key = `rl:${projectId}:${today}`;
+  
+  const currentCount = await env.RATE_LIMIT_KV.get(key);
+  const count = currentCount ? parseInt(currentCount) : 0;
+  const limit = parseInt(env.AUDIT_DAILY_LIMIT || '10');
+
+  if (count >= limit) {
+    return { allowed: false, count, limit };
+  }
+
+  // Increment counter
+  await env.RATE_LIMIT_KV.put(key, (count + 1).toString(), {
+    expirationTtl: 86400 * 2, // 2 days
+  });
+
+  return { allowed: true, count: count + 1, limit };
+}
+
 export default {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    console.log('Cron audit started at', new Date().toISOString());
+
+    // Get all verified properties
+    const properties = await env.DB.prepare(
+      'SELECT id, project_id, domain FROM properties WHERE verified = 1'
+    ).all<{ id: string; project_id: string; domain: string }>();
+
+    if (!properties.results || properties.results.length === 0) {
+      console.log('No verified properties to audit');
+      return;
+    }
+
+    console.log(`Found ${properties.results.length} verified properties to audit`);
+
+    // Run audits sequentially with 1 RPS throttle
+    for (const property of properties.results) {
+      try {
+        console.log(`Cron audit started: ${property.id} (${property.domain})`);
+        const auditId = await runAudit(property.id, env);
+        console.log(`Cron audit completed: ${property.id} → ${auditId}`);
+        
+        // 1 second delay between audits (1 RPS)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`Cron audit failed for ${property.id}:`, error);
+      }
+    }
+
+    console.log('Cron audit batch completed');
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -21,7 +93,7 @@ export default {
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
     };
 
     // Handle OPTIONS preflight
@@ -29,15 +101,52 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Health check endpoint
+    // Health check endpoint (public)
     if (path === '/health') {
       return new Response('ok', {
         headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
       });
     }
 
-    // POST /v1/audits/start - Start a new audit
+    // POST /v1/audits/start - Start a new audit (requires auth)
     if (path === '/v1/audits/start' && request.method === 'POST') {
+      // Check API key
+      const apiKey = request.headers.get('x-api-key');
+      const authResult = await validateApiKey(apiKey, env);
+
+      if (!authResult.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Check rate limit
+      const rateLimit = await checkRateLimit(authResult.projectId!, env);
+      
+      if (!rateLimit.allowed) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Rate limit exceeded', 
+            message: `Daily limit of ${rateLimit.limit} audits reached. Current count: ${rateLimit.count}`,
+            retry_after: '24 hours'
+          }),
+          {
+            status: 429,
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'X-RateLimit-Limit': rateLimit.limit.toString(),
+              'X-RateLimit-Remaining': '0',
+              'Retry-After': '86400',
+            },
+          }
+        );
+      }
+
       try {
         const body = await request.json() as { property_id: string };
         
@@ -46,6 +155,21 @@ export default {
             JSON.stringify({ error: 'property_id is required' }),
             {
               status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Verify property belongs to this project
+        const property = await env.DB.prepare(
+          'SELECT id FROM properties WHERE id = ? AND project_id = ?'
+        ).bind(body.property_id, authResult.projectId).first();
+
+        if (!property) {
+          return new Response(
+            JSON.stringify({ error: 'Property not found or access denied' }),
+            {
+              status: 404,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             }
           );
@@ -79,7 +203,7 @@ export default {
       }
     }
 
-    // GET /v1/audits/:id - Get audit details
+    // GET /v1/audits/:id - Get audit details (public for now, could add auth later)
     if (path.startsWith('/v1/audits/') && request.method === 'GET') {
       const auditId = path.split('/')[3];
 
