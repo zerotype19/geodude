@@ -123,3 +123,10 @@ export async function verifyProperty(propertyId: string, method: "dns" | "html",
   return res.json(); // { verified: boolean, error?: string }
 }
 
+// v0.14 Citations API
+export async function getCitations(auditId: string): Promise<{ items: Citation[] }> {
+  const res = await fetch(`${API_BASE}/v1/audits/${auditId}/citations`);
+  if (!res.ok) return { items: [] };
+  return res.json();
+}
+

@@ -86,7 +86,7 @@ export default function PublicAudit() {
         {activeTab === 'citations' && (
           <>
             <h3 style={{marginTop:0}}>Citations</h3>
-            <Citations citations={audit.citations || []}/>
+            <Citations auditId={id!} citations={audit.citations}/>
           </>
         )}
       </div>

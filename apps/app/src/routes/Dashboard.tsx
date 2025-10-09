@@ -136,7 +136,7 @@ export default function Dashboard() {
             {activeTab === 'citations' && (
               <>
                 <h3 style={{marginTop:0}}>Citations</h3>
-                <Citations citations={audit.citations || []}/>
+                <Citations auditId={audit.id} citations={audit.citations}/>
               </>
             )}
           </div>

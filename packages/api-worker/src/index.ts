@@ -16,6 +16,9 @@ interface Env {
   AUDIT_MAX_PAGES: string;
   AUDIT_DAILY_LIMIT: string;
   HASH_SALT: string;
+  BING_SEARCH_KEY?: string;
+  BING_SEARCH_ENDPOINT?: string;
+  CITATIONS_MAX_PER_QUERY?: string;
 }
 
 // Helper: Validate API key
@@ -472,8 +475,13 @@ export default {
           }
         }
 
-        // Get citations (stub for now)
-        const citations = await fetchCitations(env, auditId, property?.domain || '');
+        // Get citations (Bing integration)
+        const citations = await fetchCitations(
+          env, 
+          auditId, 
+          property?.domain || '',
+          property?.domain?.replace(/^www\./, '').split('.')[0] // brand/slug
+        );
 
         const response: any = {
           ...audit,
@@ -506,12 +514,21 @@ export default {
       }
     }
 
-    // GET /v1/audits/:id/citations - Get citations for audit
+    // GET /v1/audits/:id/citations - Get citations for audit (read-only from table)
     if (path.match(/^\/v1\/audits\/[^/]+\/citations$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
 
       try {
-        const citations = await fetchCitations(env, auditId, '');
+        // Read from database only (no fetch)
+        const result = await env.DB.prepare(
+          `SELECT engine, query, url, title, cited_at
+           FROM citations
+           WHERE audit_id = ?
+           ORDER BY cited_at DESC
+           LIMIT 10`
+        ).bind(auditId).all();
+        
+        const citations = result.results || [];
         
         return new Response(
           JSON.stringify({ items: citations }),
