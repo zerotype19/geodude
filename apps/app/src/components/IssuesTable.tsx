@@ -1,4 +1,6 @@
+import { Link, useLocation } from "react-router-dom";
 import type { AuditIssue } from "../services/api";
+import { b64u } from "../services/api";
 
 function badge(sev: string) {
   const s = sev.toLowerCase();
@@ -22,6 +24,10 @@ function formatUrl(url?: string) {
 }
 
 export default function IssuesTable({ issues }: { issues: AuditIssue[] }) {
+  const location = useLocation();
+  // Extract audit ID from path: /a/:auditId or /a/:auditId/p/:encoded
+  const auditId = location.pathname.split('/')[2] || '';
+
   if (!issues?.length) return <div>No issues 🎉</div>;
   
   return (
@@ -41,16 +47,14 @@ export default function IssuesTable({ issues }: { issues: AuditIssue[] }) {
             <td style={{ textTransform: "capitalize" }}>{i.category}</td>
             <td>{i.message}</td>
             <td style={{ fontSize: "12px", wordBreak: "break-all" }}>
-              {i.url ? (
-                <a 
-                  href={i.url} 
-                  target="_blank" 
-                  rel="noreferrer"
+              {i.url && auditId ? (
+                <Link
+                  to={`/a/${auditId}/p/${b64u.enc(i.url)}`}
                   title={i.url}
                   style={{ color: "#667eea" }}
                 >
                   {formatUrl(i.url)}
-                </a>
+                </Link>
               ) : (
                 <span style={{ color: "#999" }}>—</span>
               )}

@@ -1,6 +1,21 @@
+import { Link, useLocation } from "react-router-dom";
 import type { AuditPage } from "../services/api";
+import { b64u } from "../services/api";
+
+function formatUrl(url: string) {
+  try {
+    const u = new URL(url);
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return url;
+  }
+}
 
 export default function PagesTable({ pages }: { pages: AuditPage[] }) {
+  const location = useLocation();
+  // Extract audit ID from path: /a/:auditId
+  const auditId = location.pathname.split('/')[2] || '';
+
   if (!pages?.length) return <div>No pages captured.</div>;
   
   return (
@@ -23,7 +38,17 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
               textOverflow: "ellipsis", 
               whiteSpace: "nowrap"
             }}>
-              <a href={p.url} target="_blank" rel="noreferrer">{p.url}</a>
+              {auditId ? (
+                <Link
+                  to={`/a/${auditId}/p/${b64u.enc(p.url)}`}
+                  title={p.url}
+                  style={{ color: "#667eea" }}
+                >
+                  {formatUrl(p.url)}
+                </Link>
+              ) : (
+                <a href={p.url} target="_blank" rel="noreferrer">{formatUrl(p.url)}</a>
+              )}
             </td>
             <td>{p.http_status ?? "-"}</td>
             <td>{p.title ?? "-"}</td>

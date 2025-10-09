@@ -3,6 +3,7 @@ import Dashboard from "./routes/Dashboard";
 import PublicAudit from "./routes/PublicAudit";
 import Onboard from "./routes/Onboard";
 import Admin from "./pages/Admin";
+import PageReport from "./pages/PageReport";
 
 export default function App() {
   const location = useLocation();
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/" element={<Dashboard/>} />
         <Route path="/onboard" element={<Onboard/>} />
         <Route path="/a/:id" element={<PublicAudit/>} />
+        <Route path="/a/:auditId/p/:encoded" element={<PageReport/>} />
       </Routes>
       <footer style={{marginTop:24, opacity:.7}}>
         <a href="https://optiview.ai">optiview.ai</a> • <a href="https://optiview.ai/docs/audit.html">docs</a>

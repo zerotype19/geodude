@@ -633,6 +633,100 @@ export default {
       }
     }
 
+    // GET /v1/audits/:id/page - Get page-level report
+    if (path.match(/^\/v1\/audits\/[^/]+\/page$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+      const rawU = url.searchParams.get('u') ?? '';
+      
+      if (!rawU) {
+        return new Response(
+          JSON.stringify({ error: 'Missing u query (path or absolute URL)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        // Normalize: allow path or absolute URL
+        const normalized = rawU.startsWith('http') ? rawU : rawU;
+
+        // 1) Find the exact page row
+        const pageRow = await env.DB.prepare(
+          `SELECT url, status_code as status, title, h1 as has_h1, word_count, 
+                  has_json_ld as json_ld_count, has_faq as faq_present
+           FROM audit_pages
+           WHERE audit_id = ? AND (url = ? OR url LIKE '%' || ?)
+           ORDER BY (url = ?) DESC
+           LIMIT 1`
+        ).bind(auditId, normalized, normalized, normalized).first();
+
+        if (!pageRow) {
+          return new Response(
+            JSON.stringify({ error: 'Page not found for this audit' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // 2) Issues for that page
+        const pageIssues = await env.DB.prepare(
+          `SELECT issue_type, severity, message, page_url, details
+           FROM audit_issues
+           WHERE audit_id = ? AND page_url = ?
+           ORDER BY
+             CASE severity 
+               WHEN 'critical' THEN 3 
+               WHEN 'high' THEN 2 
+               WHEN 'warning' THEN 1 
+               ELSE 0 
+             END DESC,
+             issue_type ASC`
+        ).bind(auditId, pageRow.url).all();
+
+        // 3) Lightweight page score breakdown
+        const scoreHints = {
+          has_h1: !!pageRow.has_h1,
+          has_json_ld: (pageRow.json_ld_count ?? 0) > 0,
+          word_ok: (pageRow.word_count ?? 0) >= 120,
+          faq_ok: !!pageRow.faq_present,
+        };
+
+        // Transform issues to frontend shape
+        const issues = (pageIssues.results as any[]).map((r: any) => ({
+          category: (r.issue_type || '').split('_')[0] || 'general',
+          code: r.issue_type,
+          severity: r.severity,
+          message: r.message,
+          url: r.page_url,
+          details: r.details,
+        }));
+
+        return new Response(
+          JSON.stringify({
+            audit_id: auditId,
+            page: {
+              url: pageRow.url,
+              title: pageRow.title,
+              status: pageRow.status,
+              word_count: pageRow.word_count,
+              has_h1: !!pageRow.has_h1,
+              json_ld_count: pageRow.json_ld_count ?? 0,
+              faq_present: !!pageRow.faq_present,
+              score_hints: scoreHints,
+            },
+            issues,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to fetch page details',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // GET /v1/audits/:id - Get audit details (public for now, could add auth later)
     if (path.match(/^\/v1\/audits\/[^/]+$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];

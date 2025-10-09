@@ -130,3 +130,40 @@ export async function getCitations(auditId: string): Promise<{ items: Citation[]
   return res.json();
 }
 
+// Page-level report API
+export async function getAuditPage(auditId: string, decodedUrlOrPath: string) {
+  const u = encodeURIComponent(decodedUrlOrPath);
+  const res = await fetch(`${API_BASE}/v1/audits/${auditId}/page?u=${u}`);
+  if (!res.ok) throw new Error(`getAuditPage failed: ${res.status}`);
+  return res.json() as Promise<{
+    audit_id: string;
+    page: {
+      url: string;
+      title?: string;
+      status?: number;
+      word_count?: number;
+      has_h1?: boolean;
+      json_ld_count?: number;
+      faq_present?: boolean;
+      score_hints: {
+        has_h1: boolean;
+        has_json_ld: boolean;
+        word_ok: boolean;
+        faq_ok: boolean;
+      };
+    };
+    issues: AuditIssue[];
+  }>;
+}
+
+// Base64 URL-safe encoding/decoding helpers
+export const b64u = {
+  enc: (s: string) =>
+    btoa(unescape(encodeURIComponent(s)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, ''),
+  dec: (s: string) =>
+    decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))),
+};
+
