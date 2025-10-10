@@ -23,7 +23,7 @@ binding = "BROWSER"
 
 [vars]
 OPENAI_API_BASE = "https://api.openai.com/v1"
-OPENAI_MODEL = "gpt-4o"
+OPENAI_MODEL = "gpt-4.5-turbo"
 
 # Secrets (set via wrangler secret put):
 # - OPENAI_API_KEY
