@@ -480,6 +480,108 @@ export default {
       }
     }
 
+    // POST /v1/audits/:id/rerun - Re-run an existing audit
+    if (path.match(/^\/v1\/audits\/[^/]+\/rerun$/) && request.method === 'POST') {
+      const auditId = path.split('/')[3];
+
+      // Check API key
+      const apiKey = request.headers.get('x-api-key');
+      const authResult = await validateApiKey(apiKey, env);
+
+      if (!authResult.valid) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Fetch original audit and verify ownership
+      const originalAudit = await env.DB.prepare(
+        `SELECT a.id, a.property_id, p.project_id, p.domain
+         FROM audits a
+         JOIN properties p ON p.id = a.property_id
+         WHERE a.id = ?`
+      ).bind(auditId).first();
+
+      if (!originalAudit) {
+        return new Response(
+          JSON.stringify({ error: 'Audit not found' }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (originalAudit.project_id !== authResult.projectId) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden', message: 'You do not own this audit' }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Check rate limit
+      const rateLimit = await checkRateLimit(authResult.projectId!, env);
+      
+      if (!rateLimit.allowed) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Rate limit exceeded', 
+            message: `Daily limit of ${rateLimit.limit} audits reached. Current count: ${rateLimit.count}`,
+            retry_after: '24 hours'
+          }),
+          {
+            status: 429,
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'X-RateLimit-Limit': rateLimit.limit.toString(),
+              'X-RateLimit-Remaining': '0',
+              'Retry-After': '86400',
+            },
+          }
+        );
+      }
+
+      try {
+        // Start new audit for same property
+        const newAuditId = await runAudit(originalAudit.property_id, env);
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            id: newAuditId,
+            rerun_of: auditId,
+            property_id: originalAudit.property_id,
+            domain: originalAudit.domain,
+            url: `https://app.optiview.ai/a/${newAuditId}`,
+          }),
+          {
+            status: 201,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error: any) {
+        console.error('Re-run audit failed:', error);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Audit failed', 
+            message: error?.message || 'Unknown error' 
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
     // POST /v1/audits/start - Start a new audit (requires auth)
     if (path === '/v1/audits/start' && request.method === 'POST') {
       // Check API key

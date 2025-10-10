@@ -74,6 +74,22 @@ export async function getAudit(id: string): Promise<Audit> {
   return res.json();
 }
 
+export async function rerunAudit(auditId: string): Promise<{ id: string; url: string }> {
+  const apiKey = localStorage.getItem('ov_api_key') || '';
+  const res = await fetch(`${API_BASE}/v1/audits/${auditId}/rerun`, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'content-type': 'application/json',
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Re-run failed' }));
+    throw new Error(err.error || err.message || `Re-run failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 // v0.13 Onboarding API
 export type ProjectCreate = { name: string; owner_email: string };
 export type Project = { 
