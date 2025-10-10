@@ -493,7 +493,7 @@ export default function PageReport() {
                     🤖 AI Content Generation
                   </div>
                   <div style={{ fontSize: 14, color: '#64748b' }}>
-                    Let GPT-4o analyze this page and suggest ready-to-paste Schema.org JSON-LD + content improvements
+                    Let GPT-4.5-turbo analyze this page and suggest ready-to-paste Schema.org JSON-LD + content improvements
                   </div>
                 </div>
                 <button
