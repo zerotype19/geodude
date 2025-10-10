@@ -35,7 +35,13 @@ export default function Dashboard() {
     try {
       const stored = localStorage.getItem('recentAudits');
       if (stored) {
-        setRecentAudits(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setRecentAudits(parsed);
+      } else {
+        // Pre-populate with a known test audit for convenience
+        const defaultAudits = ['aud_1760106208554_tfmderif4'];
+        setRecentAudits(defaultAudits);
+        localStorage.setItem('recentAudits', JSON.stringify(defaultAudits));
       }
     } catch {
       setRecentAudits([]);
@@ -203,9 +209,9 @@ export default function Dashboard() {
       />
 
       {/* Recent Audits */}
-      {recentAudits.length > 0 && (
-        <div className="card" style={{ marginTop: 24 }}>
-          <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Recent Audits</h2>
+      <div className="card" style={{ marginTop: 24 }}>
+        <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Recent Audits</h2>
+        {recentAudits.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {recentAudits.map((auditId) => (
               <Link
@@ -241,8 +247,12 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>
+            No recent audits. Run an audit above to see it appear here.
+          </p>
+        )}
+      </div>
 
       {audit && (
         <>
