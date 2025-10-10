@@ -350,7 +350,7 @@ export default function PublicAudit() {
         />
       )}
 
-      <div style={{display:'flex', gap:12, marginTop:16, marginBottom:8}}>
+      <div style={{display:'flex', gap:4, marginTop:16, borderBottom: '1px solid #e2e8f0'}}>
         {(['scores', 'issues', 'pages', 'citations'] as const).map(tab => (
           <button
             key={tab}
@@ -359,15 +359,7 @@ export default function PublicAudit() {
               params.set('tab', tab);
               navigate(`${location.pathname}?${params.toString()}`, { replace: false });
             }}
-            style={{
-              padding: '8px 16px',
-              background: activeTab === tab ? '#3b82f6' : '#1e293b',
-              border: 'none',
-              color: activeTab === tab ? 'white' : '#94a3b8',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontSize: 14
-            }}
+            className={`tab-button ${activeTab === tab ? 'active' : ''}`}
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>

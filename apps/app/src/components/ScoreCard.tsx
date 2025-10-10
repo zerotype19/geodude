@@ -4,8 +4,8 @@ export default function ScoreCard({ title, value }: { title: string; value: numb
   
   return (
     <div className="card" style={{minWidth:180}}>
-      <div style={{opacity:.8, fontSize:13}}>{title}</div>
-      <div style={{fontSize:32, fontWeight:700}}>
+      <div style={{color: '#64748b', fontSize:13, marginBottom: 8}}>{title}</div>
+      <div style={{fontSize:32, fontWeight:700, color: '#1e293b'}}>
         {pct}<span style={{fontSize:18}}>%</span>
       </div>
     </div>

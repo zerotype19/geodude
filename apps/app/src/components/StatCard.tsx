@@ -8,20 +8,26 @@ type StatCardProps = {
 };
 
 export function StatCard({ label, value, sub, tone = "neutral" }: StatCardProps) {
-  const ring = {
-    good: "ring-green-500/40",
-    warn: "ring-yellow-500/40",
-    bad: "ring-red-500/40",
-    neutral: "ring-white/10",
+  const borderColor = {
+    good: "#10b981",
+    warn: "#f59e0b",
+    bad: "#ef4444",
+    neutral: "#e2e8f0",
   }[tone];
 
   return (
-    <div className={`rounded-2xl ring-1 ${ring} bg-white/5 p-4 md:p-5`}>
-      <div className="text-sm text-white/60">{label}</div>
-      <div className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight">
+    <div style={{
+      background: 'white',
+      border: `2px solid ${borderColor}`,
+      borderRadius: 12,
+      padding: 20,
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+    }}>
+      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: '#1e293b' }}>
         {value ?? "—"}
       </div>
-      {sub ? <div className="mt-1 text-xs text-white/40">{sub}</div> : null}
+      {sub ? <div style={{ marginTop: 8, fontSize: 12, color: '#94a3b8' }}>{sub}</div> : null}
     </div>
   );
 }

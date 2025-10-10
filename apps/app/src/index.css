@@ -30,3 +30,96 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Card component - white background with border */
+.card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  color: #1e293b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Pill/badge component */
+.pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.pill.high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.pill.warn {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+.pill.info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* Table styling */
+table {
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+table thead {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+table td {
+  padding: 12px 16px;
+  border-top: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* Tab buttons */
+button {
+  font-family: inherit;
+}
+
+.tab-button {
+  padding: 10px 20px;
+  background: white;
+  color: #64748b;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  color: #3b82f6;
+}
+
+.tab-button.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+

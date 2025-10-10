@@ -250,14 +250,14 @@ export default function Citations({ auditId }: Props) {
         <div style={{ 
           marginBottom: 16, 
           padding: '8px 12px', 
-          background: '#2a2b2e', 
+          background: 'white', 
           borderRadius: 6,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          border: '1px solid #3a3b3e'
+          border: '1px solid #e2e8f0'
         }}>
-          <span style={{ fontSize: 14 }}>
+          <span style={{ fontSize: 14, color: '#334155' }}>
             Filtered to page: <strong>{pathFilter}</strong>
           </span>
           <button
@@ -266,9 +266,9 @@ export default function Citations({ auditId }: Props) {
               padding: '4px 8px',
               fontSize: 12,
               cursor: 'pointer',
-              background: '#1a1b1e',
-              color: 'white',
-              border: '1px solid #3a3b3e',
+              background: '#f8fafc',
+              color: '#475569',
+              border: '1px solid #cbd5e1',
               borderRadius: 4
             }}
           >
@@ -278,7 +278,7 @@ export default function Citations({ auditId }: Props) {
       )}
 
       {/* Results summary */}
-      <p style={{ marginTop: 0, marginBottom: 16, opacity: 0.7, fontSize: 14 }}>
+      <p style={{ marginTop: 0, marginBottom: 16, color: '#64748b', fontSize: 14 }}>
         {citations.length === 0 ? (
           typeFilter ? (
             `No ${typeFilter} citations found${pathFilter ? ` for ${pathFilter}` : ''}.`
@@ -302,10 +302,11 @@ export default function Citations({ auditId }: Props) {
           <h4 style={{ 
             margin: '12px 0 8px 0', 
             fontSize: 14, 
-            opacity: 0.8,
+            color: '#475569',
             display: 'flex',
             alignItems: 'center',
-            gap: 8
+            gap: 8,
+            fontWeight: 500
           }}>
             <span className="pill info" style={{ textTransform: 'capitalize' }}>{engine}</span>
             Query: "{query}"
@@ -328,13 +329,14 @@ export default function Citations({ auditId }: Props) {
                   key={idx} 
                   style={{ 
                     padding: 12, 
-                    background: '#1a1b1e', 
+                    background: 'white', 
                     borderRadius: 8,
                     marginBottom: 8,
-                    border: '1px solid #2a2b2e',
+                    border: '1px solid #e2e8f0',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'start'
+                    alignItems: 'start',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
                   }}
                 >
                   <div style={{ flex: 1 }}>
@@ -346,14 +348,14 @@ export default function Citations({ auditId }: Props) {
                         fontWeight: 500, 
                         fontSize: 15,
                         textDecoration: 'none',
-                        color: '#93c5fd'
+                        color: '#3b82f6'
                       }}
                     >
                       {citation.title || citation.url}
                     </a>
                     <div style={{ 
                       fontSize: 12, 
-                      opacity: 0.6, 
+                      color: '#64748b', 
                       marginTop: 4
                     }}>
                       {urlObj.hostname}{urlObj.pathname !== '/' ? urlObj.pathname : ''}

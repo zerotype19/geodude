@@ -165,40 +165,20 @@ export default function PageReport() {
       
       {/* Tabs */}
       <div style={{ 
-        borderBottom: '1px solid #e5e7eb', 
+        borderBottom: '1px solid #e2e8f0', 
         marginBottom: 24,
         display: 'flex',
-        gap: 24
+        gap: 4
       }}>
         <button
           onClick={() => handleTabChange('overview')}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '12px 0',
-            cursor: 'pointer',
-            fontSize: 16,
-            fontWeight: 500,
-            color: activeTab === 'overview' ? '#667eea' : '#6b7280',
-            borderBottom: activeTab === 'overview' ? '2px solid #667eea' : 'none',
-            marginBottom: -1
-          }}
+          className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
         >
           Overview
         </button>
         <button
           onClick={() => handleTabChange('recommendations')}
-          style={{
-            background: 'none',
-            border: 'none',
-            padding: '12px 0',
-            cursor: 'pointer',
-            fontSize: 16,
-            fontWeight: 500,
-            color: activeTab === 'recommendations' ? '#667eea' : '#6b7280',
-            borderBottom: activeTab === 'recommendations' ? '2px solid #667eea' : 'none',
-            marginBottom: -1
-          }}
+          className={`tab-button ${activeTab === 'recommendations' ? 'active' : ''}`}
         >
           Recommendations
         </button>
