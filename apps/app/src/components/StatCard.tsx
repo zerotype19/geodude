@@ -8,26 +8,26 @@ type StatCardProps = {
 };
 
 export function StatCard({ label, value, sub, tone = "neutral" }: StatCardProps) {
-  const borderColor = {
-    good: "#10b981",
-    warn: "#f59e0b",
-    bad: "#ef4444",
-    neutral: "#e2e8f0",
+  const colors = {
+    good: { bg: "#d1fae5", text: "#065f46", border: "#10b981" },
+    warn: { bg: "#fef3c7", text: "#92400e", border: "#f59e0b" },
+    bad: { bg: "#fee2e2", text: "#991b1b", border: "#ef4444" },
+    neutral: { bg: "#f1f5f9", text: "#475569", border: "#cbd5e1" },
   }[tone];
 
   return (
     <div style={{
-      background: 'white',
-      border: `2px solid ${borderColor}`,
+      background: colors.bg,
+      border: `2px solid ${colors.border}`,
       borderRadius: 12,
       padding: 20,
-      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
     }}>
-      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: '#1e293b' }}>
+      <div style={{ fontSize: 13, color: colors.text, marginBottom: 8, opacity: 0.8, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 32, fontWeight: 700, color: colors.text }}>
         {value ?? "—"}
       </div>
-      {sub ? <div style={{ marginTop: 8, fontSize: 12, color: '#94a3b8' }}>{sub}</div> : null}
+      {sub ? <div style={{ marginTop: 8, fontSize: 12, color: colors.text, opacity: 0.7 }}>{sub}</div> : null}
     </div>
   );
 }

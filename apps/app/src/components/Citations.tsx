@@ -133,115 +133,68 @@ export default function Citations({ auditId }: Props) {
 
   return (
     <div>
-      {/* Count chips - STABLE (never change when filtering) */}
-      <div style={{ 
-        display: 'flex', 
-        gap: 12, 
-        marginBottom: 16,
-        flexWrap: 'wrap'
-      }}>
-        <div className="pill info" style={{ fontSize: 13 }}>
-          Total: {totalCitations}
-        </div>
-        <div 
-          className="pill" 
-          style={{ 
-            background: fullCounts.AEO > 0 ? '#8b5cf6' : '#374151', 
-            fontSize: 13 
-          }}
-        >
-          AEO: {fullCounts.AEO}
-        </div>
-        <div 
-          className="pill" 
-          style={{ 
-            background: fullCounts.GEO > 0 ? '#3b82f6' : '#374151', 
-            fontSize: 13 
-          }}
-        >
-          GEO: {fullCounts.GEO}
-        </div>
-        <div 
-          className="pill" 
-          style={{ 
-            background: fullCounts.Organic > 0 ? '#10b981' : '#374151', 
-            fontSize: 13 
-          }}
-        >
-          Organic: {fullCounts.Organic}
-        </div>
-      </div>
-
-      {/* Filter pills */}
+      {/* Combined clickable filter pills with counts */}
       <div style={{ 
         display: 'flex', 
         gap: 8, 
-        marginBottom: 16,
+        marginBottom: 20,
         flexWrap: 'wrap'
       }}>
         <button
           onClick={() => handleTypeFilter(null)}
+          className="pill"
           style={{
-            padding: '6px 12px',
-            fontSize: 13,
-            fontWeight: typeFilter === null ? 600 : 400,
             cursor: 'pointer',
-            background: typeFilter === null ? '#667eea' : '#2a2b2e',
-            color: 'white',
-            border: typeFilter === null ? '1px solid #667eea' : '1px solid #3a3b3e',
-            borderRadius: 6,
+            background: typeFilter === null ? '#667eea' : '#e2e8f0',
+            color: typeFilter === null ? 'white' : '#64748b',
+            border: 'none',
+            fontWeight: typeFilter === null ? 600 : 500,
             transition: 'all 0.2s'
           }}
         >
-          All
+          All ({totalCitations})
         </button>
         <button
           onClick={() => handleTypeFilter('AEO')}
+          className="pill"
           style={{
-            padding: '6px 12px',
-            fontSize: 13,
-            fontWeight: typeFilter === 'AEO' ? 600 : 400,
             cursor: 'pointer',
-            background: typeFilter === 'AEO' ? '#8b5cf6' : '#2a2b2e',
-            color: 'white',
-            border: typeFilter === 'AEO' ? '1px solid #8b5cf6' : '1px solid #3a3b3e',
-            borderRadius: 6,
+            background: typeFilter === 'AEO' ? '#8b5cf6' : '#f3e8ff',
+            color: typeFilter === 'AEO' ? 'white' : '#6b21a8',
+            border: 'none',
+            fontWeight: typeFilter === 'AEO' ? 600 : 500,
             transition: 'all 0.2s'
           }}
         >
-          AEO
+          AEO ({fullCounts.AEO})
         </button>
         <button
           onClick={() => handleTypeFilter('GEO')}
+          className="pill"
           style={{
-            padding: '6px 12px',
-            fontSize: 13,
-            fontWeight: typeFilter === 'GEO' ? 600 : 400,
             cursor: 'pointer',
-            background: typeFilter === 'GEO' ? '#3b82f6' : '#2a2b2e',
-            color: 'white',
-            border: typeFilter === 'GEO' ? '1px solid #3b82f6' : '1px solid #3a3b3e',
-            borderRadius: 6,
+            background: typeFilter === 'GEO' ? '#3b82f6' : '#dbeafe',
+            color: typeFilter === 'GEO' ? 'white' : '#1e40af',
+            border: 'none',
+            fontWeight: typeFilter === 'GEO' ? 600 : 500,
             transition: 'all 0.2s'
           }}
         >
-          GEO
+          GEO ({fullCounts.GEO})
         </button>
         <button
           onClick={() => handleTypeFilter('Organic')}
+          className="pill"
           style={{
-            padding: '6px 12px',
-            fontSize: 13,
-            fontWeight: typeFilter === 'Organic' ? 600 : 400,
             cursor: 'pointer',
-            background: typeFilter === 'Organic' ? '#10b981' : '#2a2b2e',
-            color: 'white',
-            border: typeFilter === 'Organic' ? '1px solid #10b981' : '1px solid #3a3b3e',
-            borderRadius: 6,
+            background: typeFilter === 'Organic' ? '#10b981' : '#d1fae5',
+            color: typeFilter === 'Organic' ? 'white' : '#065f46',
+            border: 'none',
+            fontWeight: typeFilter === 'Organic' ? 600 : 500,
             transition: 'all 0.2s'
           }}
         >
-          Organic
+          Organic ({fullCounts.Organic})
         </button>
       </div>
 

@@ -350,7 +350,7 @@ export default function PublicAudit() {
         />
       )}
 
-      <div style={{display:'flex', gap:4, marginTop:16, borderBottom: '1px solid #e2e8f0'}}>
+      <div className="tabs-container" style={{marginTop: 24}}>
         {(['scores', 'issues', 'pages', 'citations'] as const).map(tab => (
           <button
             key={tab}
@@ -366,30 +366,21 @@ export default function PublicAudit() {
         ))}
       </div>
 
-      <div className="card">
+      <div className="tab-content">
         {activeTab === 'scores' && (
           <div>
             <h3 style={{marginTop:0}}>Score Breakdown</h3>
-            <p style={{opacity:0.8}}>Overall score: {Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</p>
+            <p style={{color: '#64748b'}}>Overall score: {Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</p>
           </div>
         )}
         {activeTab === 'issues' && (
-          <>
-            <h3 style={{marginTop:0}}>Issues</h3>
-            <IssuesTable issues={audit.issues || []}/>
-          </>
+          <IssuesTable issues={audit.issues || []}/>
         )}
         {activeTab === 'pages' && (
-          <>
-            <h3 style={{marginTop:0}}>Pages</h3>
-            <PagesTable pages={audit.pages || []}/>
-          </>
+          <PagesTable pages={audit.pages || []} auditId={id}/>
         )}
         {activeTab === 'citations' && (
-          <>
-            <h3 style={{marginTop:0}}>Citations</h3>
-            <Citations auditId={id!} citations={audit.citations}/>
-          </>
+          <Citations auditId={id!} citations={audit.citations}/>
         )}
       </div>
     </>

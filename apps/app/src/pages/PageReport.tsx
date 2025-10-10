@@ -164,12 +164,7 @@ export default function PageReport() {
       </div>
       
       {/* Tabs */}
-      <div style={{ 
-        borderBottom: '1px solid #e2e8f0', 
-        marginBottom: 24,
-        display: 'flex',
-        gap: 4
-      }}>
+      <div className="tabs-container" style={{ marginTop: 16 }}>
         <button
           onClick={() => handleTabChange('overview')}
           className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
@@ -221,13 +216,7 @@ export default function PageReport() {
       </div>
 
       {activeTab === 'overview' && (
-        <div style={{ 
-          background: 'white',
-          color: '#1e293b', 
-          padding: '24px', 
-          borderRadius: 12,
-          marginTop: 16
-        }}>
+        <div className="tab-content">
           <h2 style={{ margin: '0 0 16px', fontSize: '24px', color: '#1e293b' }}>
             Issues on this page ({data.issues.length})
           </h2>
@@ -342,13 +331,7 @@ export default function PageReport() {
       )}
       
       {activeTab === 'recommendations' && (
-        <div style={{ 
-          background: 'white',
-          color: '#1e293b', 
-          padding: '24px', 
-          borderRadius: 12,
-          marginTop: 16
-        }}>
+        <div className="tab-content">
           {recsLoading && (
             <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
               Loading recommendations...
