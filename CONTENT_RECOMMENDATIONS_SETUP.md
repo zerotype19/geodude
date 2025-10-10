@@ -63,21 +63,15 @@ npx wrangler queues create reco-queue
 
 ### 2. Set Secrets
 
-#### API Worker Secret
-```bash
-cd packages/api-worker
-npx wrangler secret put OPENAI_API_KEY --env production
-```
-
-**Paste your OpenAI API key when prompted.**
-
 #### Consumer Worker Secret
 ```bash
 cd packages/reco-consumer
-npx wrangler secret put OPENAI_API_KEY --env production
+npx wrangler secret put OPENAI_API_KEY
 ```
 
-**Use the same OpenAI API key.**
+**Paste your OpenAI API key when prompted** (use the same key already set in `geodude-api`).
+
+**Note:** The API worker (`geodude-api`) already has `OPENAI_API_KEY` configured as a secret, so you only need to add it to the consumer worker.
 
 ---
 

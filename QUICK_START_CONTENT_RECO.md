@@ -31,19 +31,16 @@ npx wrangler kv:namespace create RECO_CACHE
 npx wrangler queues create reco-queue
 ```
 
-### Step 2: Set Secrets
+### Step 2: Set Secret (Consumer Only)
 
 ```bash
-# API Worker
-cd packages/api-worker
+# Consumer Worker (API worker already has it)
+cd packages/reco-consumer
 npx wrangler secret put OPENAI_API_KEY
-# Paste your OpenAI API key
-
-# Consumer Worker
-cd ../reco-consumer
-npx wrangler secret put OPENAI_API_KEY
-# Paste the same key
+# Paste your OpenAI API key (same as geodude-api)
 ```
+
+**Note:** `geodude-api` already has `OPENAI_API_KEY` set, so you only need to add it to the consumer worker.
 
 ### Step 3: Run Migration
 
