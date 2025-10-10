@@ -306,7 +306,6 @@ async function recommendWithGPT4(
         items: {
           type: 'object',
           required: ['@context', '@type'],
-          additionalProperties: true,
         },
       },
       content_suggestions: {
@@ -347,16 +346,11 @@ async function recommendWithGPT4(
       model: env.OPENAI_MODEL,
       temperature: 0.25,
       response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'OptiviewReco',
-          schema: jsonSchema,
-          strict: true,
-        },
+        type: 'json_object',
       },
       messages: [
         { role: 'system', content: system },
-        { role: 'user', content: JSON.stringify(userMessage) },
+        { role: 'user', content: JSON.stringify(userMessage) + '\n\nRespond with valid JSON matching this structure: ' + JSON.stringify(jsonSchema) },
       ],
     }),
   });
