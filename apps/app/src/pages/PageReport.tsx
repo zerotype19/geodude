@@ -459,23 +459,24 @@ export default function PageReport() {
               {/* Suggested JSON-LD */}
               {recs.suggestedJsonLd.length > 0 && (
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ margin: '0 0 12px', fontSize: 18 }}>Suggested JSON-LD</h3>
+                  <h3 style={{ margin: '0 0 12px', fontSize: 18, color: '#1e293b', fontWeight: 600 }}>Suggested JSON-LD</h3>
                   {recs.suggestedJsonLd.map((suggestion, idx) => (
                     <div key={idx} style={{
                       marginBottom: 16,
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid #cbd5e1',
                       borderRadius: 8,
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                     }}>
                       <div style={{
                         padding: '12px 16px',
-                        background: '#f9fafb',
-                        borderBottom: '1px solid #e5e7eb',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #cbd5e1',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between'
                       }}>
-                        <strong>@type: {suggestion.type}</strong>
+                        <strong style={{ color: '#1e293b', fontSize: 14 }}>@type: {suggestion.type}</strong>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button
                             onClick={() => copyToClipboard(JSON.stringify(suggestion.json, null, 2), 'JSON-LD')}
@@ -510,12 +511,13 @@ export default function PageReport() {
                       <pre style={{
                         padding: 16,
                         margin: 0,
-                        background: '#1f2937',
-                        color: '#e5e7eb',
+                        background: '#0f172a',
+                        color: '#f1f5f9',
                         fontSize: 13,
                         lineHeight: 1.6,
                         overflow: 'auto',
-                        maxHeight: 400
+                        maxHeight: 400,
+                        fontFamily: 'Monaco, Consolas, "Courier New", monospace'
                       }}>
                         {JSON.stringify(suggestion.json, null, 2)}
                       </pre>
@@ -527,23 +529,24 @@ export default function PageReport() {
               {/* Copy Blocks */}
               {recs.copyBlocks.length > 0 && (
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ margin: '0 0 12px', fontSize: 18 }}>Content Suggestions</h3>
+                  <h3 style={{ margin: '0 0 12px', fontSize: 18, color: '#1e293b', fontWeight: 600 }}>Content Suggestions</h3>
                   {recs.copyBlocks.map((block, idx) => (
                     <div key={idx} style={{
                       marginBottom: 12,
                       border: '1px solid #e5e7eb',
                       borderRadius: 8,
-                      overflow: 'hidden'
+                      overflow: 'hidden',
+                      background: 'white'
                     }}>
                       <div style={{
                         padding: '12px 16px',
-                        background: '#f9fafb',
-                        borderBottom: '1px solid #e5e7eb',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #cbd5e1',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between'
                       }}>
-                        <strong>{block.label}</strong>
+                        <strong style={{ color: '#1e293b', fontSize: 14 }}>{block.label}</strong>
                         <button
                           onClick={() => copyToClipboard(block.content, block.label)}
                           style={{
@@ -563,7 +566,9 @@ export default function PageReport() {
                         padding: 16,
                         fontSize: 14,
                         lineHeight: 1.6,
-                        whiteSpace: 'pre-wrap'
+                        whiteSpace: 'pre-wrap',
+                        color: '#334155',
+                        background: '#fefefe'
                       }}>
                         {block.content}
                       </div>
