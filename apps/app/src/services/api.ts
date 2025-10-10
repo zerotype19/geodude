@@ -98,12 +98,29 @@ export type EntityRecommendations = {
   jsonld_snippet: string;
 };
 
+export type CitationType = 'AEO' | 'GEO' | 'Organic';
+
 export type Citation = {
   engine: string;
   query: string;
   url: string;
   title: string | null;
   cited_at: number;
+  type: CitationType;
+  pagePathname?: string | null;
+};
+
+export type CitationCounts = {
+  AEO: number;
+  GEO: number;
+  Organic: number;
+};
+
+export type CitationsSummary = {
+  total: number;
+  AEO: number;
+  GEO: number;
+  Organic: number;
 };
 
 export type Audit = { 
@@ -123,6 +140,7 @@ export type Audit = {
   finished_at?: number;
   entity_recommendations?: EntityRecommendations;
   citations?: Citation[];
+  citationsSummary?: CitationsSummary;
 };
 
 export async function startAudit(opts: {
@@ -295,6 +313,39 @@ export async function getPageRecommendations(
   );
   if (!res.ok) throw new Error(`getPageRecommendations failed: ${res.status}`);
   return res.json() as Promise<PageRecommendations>;
+}
+
+export type CitationsResponse = {
+  ok: boolean;
+  total: number;
+  counts: CitationCounts;
+  page: number;
+  pageSize: number;
+  items: Citation[];
+};
+
+export async function getAuditCitations(
+  auditId: string,
+  opts?: {
+    type?: CitationType;
+    path?: string;
+    page?: number;
+    pageSize?: number;
+  },
+  signal?: AbortSignal
+): Promise<CitationsResponse> {
+  const params = new URLSearchParams();
+  if (opts?.type) params.set('type', opts.type);
+  if (opts?.path) params.set('path', opts.path);
+  if (opts?.page) params.set('page', String(opts.page));
+  if (opts?.pageSize) params.set('pageSize', String(opts.pageSize));
+  
+  const queryString = params.toString();
+  const url = `${API_BASE}/v1/audits/${auditId}/citations${queryString ? '?' + queryString : ''}`;
+  
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`getAuditCitations failed: ${res.status}`);
+  return res.json() as Promise<CitationsResponse>;
 }
 
 // Base64 URL-safe encoding/decoding helpers

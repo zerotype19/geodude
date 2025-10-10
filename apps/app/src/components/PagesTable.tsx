@@ -93,7 +93,7 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
               <td style={{ textAlign: 'right' }} className="tabular-nums">
                 {(p.citationCount ?? 0) > 0 && auditId ? (
                   <Link
-                    to={`/a/${auditId}?tab=citations&filter=${encodeURIComponent(p.url)}`}
+                    to={`/a/${auditId}?tab=citations&path=${encodeURIComponent(formatUrl(p.url))}`}
                     style={{ color: '#667eea', textDecoration: 'underline', cursor: 'pointer' }}
                     title="View citations to this page"
                   >

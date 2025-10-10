@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { getAuditPage, getPageRecommendations, b64u, type PageRecommendations } from '../services/api';
+import { getAuditPage, getPageRecommendations, getAuditCitations, b64u, type PageRecommendations, type Citation } from '../services/api';
 import IssuesTable from '../components/IssuesTable';
 import { StatCard } from '../components/StatCard';
 
@@ -27,6 +27,10 @@ export default function PageReport() {
   const [recs, setRecs] = useState<PageRecommendations | null>(null);
   const [recsLoading, setRecsLoading] = useState(false);
   const [recsErr, setRecsErr] = useState<string | null>(null);
+  
+  const [citations, setCitations] = useState<Citation[]>([]);
+  const [citationsLoading, setCitationsLoading] = useState(false);
+  const [citationsTotal, setCitationsTotal] = useState(0);
 
   useEffect(() => {
     if (!target) {
@@ -41,6 +45,31 @@ export default function PageReport() {
       .then(setData)
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));
+  }, [auditId, target]);
+  
+  // Fetch citations for this page
+  useEffect(() => {
+    if (!auditId || !target) return;
+    
+    // Extract pathname from target URL
+    let pathname = '/';
+    try {
+      pathname = new URL(target).pathname.replace(/\/+$/, '') || '/';
+    } catch {
+      // If target is already a path, use as-is
+      pathname = target.replace(/\/+$/, '') || '/';
+    }
+    
+    setCitationsLoading(true);
+    getAuditCitations(auditId, { path: pathname, pageSize: 5 })
+      .then(res => {
+        setCitations(res.items);
+        setCitationsTotal(res.total);
+      })
+      .catch(err => {
+        console.error('Failed to load citations:', err);
+      })
+      .finally(() => setCitationsLoading(false));
   }, [auditId, target]);
   
   // Fetch recommendations when tab is active
@@ -221,6 +250,106 @@ export default function PageReport() {
           ) : (
             <div style={{ padding: '24px', textAlign: 'center', color: '#10b981' }}>
               No issues found on this page! 🎉
+            </div>
+          )}
+          
+          {/* Citations Panel */}
+          <h2 style={{ margin: '32px 0 16px', fontSize: '24px' }}>
+            Citations ({citationsTotal})
+          </h2>
+          {citationsLoading ? (
+            <div style={{ padding: '24px', textAlign: 'center', opacity: 0.6 }}>
+              Loading citations...
+            </div>
+          ) : citations.length > 0 ? (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                {citations.map((citation, idx) => {
+                  const urlObj = new URL(citation.url);
+                  
+                  // Type badge colors
+                  let typeBadgeStyle = { background: '#10b981', color: 'white' }; // Organic
+                  if (citation.type === 'AEO') {
+                    typeBadgeStyle = { background: '#8b5cf6', color: 'white' };
+                  } else if (citation.type === 'GEO') {
+                    typeBadgeStyle = { background: '#3b82f6', color: 'white' };
+                  }
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        padding: 12, 
+                        background: '#1a1b1e', 
+                        borderRadius: 8,
+                        marginBottom: 8,
+                        border: '1px solid #2a2b2e',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'start'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <a 
+                          href={citation.url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          style={{ 
+                            fontWeight: 500, 
+                            fontSize: 15,
+                            textDecoration: 'none',
+                            color: '#93c5fd'
+                          }}
+                        >
+                          {citation.title || citation.url}
+                        </a>
+                        <div style={{ 
+                          fontSize: 12, 
+                          opacity: 0.6, 
+                          marginTop: 4
+                        }}>
+                          {urlObj.hostname} • via {citation.engine}
+                        </div>
+                      </div>
+                      <span 
+                        className="pill" 
+                        style={{ 
+                          ...typeBadgeStyle,
+                          fontSize: 11,
+                          padding: '4px 8px',
+                          marginLeft: 12,
+                          flexShrink: 0
+                        }}
+                      >
+                        {citation.type}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {citationsTotal > 5 && (
+                <div style={{ textAlign: 'center', marginTop: 16 }}>
+                  <Link
+                    to={`/a/${auditId}?tab=citations&path=${encodeURIComponent(target.replace(/\/+$/, '') || '/')}`}
+                    style={{
+                      display: 'inline-block',
+                      padding: '10px 20px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      textDecoration: 'none',
+                      borderRadius: 8,
+                      fontSize: 14,
+                      fontWeight: 500,
+                    }}
+                  >
+                    View all {citationsTotal} citations for this page →
+                  </Link>
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ padding: '24px', textAlign: 'center', opacity: 0.6 }}>
+              No citations found for this page yet.
             </div>
           )}
         </>
