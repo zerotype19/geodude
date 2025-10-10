@@ -1401,6 +1401,9 @@ export default {
           baselineStatus: aiAccessRaw.baselineStatus,
         } : null;
         
+        // Parse AI flags
+        const aiFlags = audit.ai_flags_json ? JSON.parse(audit.ai_flags_json as string) : null;
+        
         // Build site metadata
         const site = {
           faqSchemaPresent: siteFaqSchemaPresent,
@@ -1409,6 +1412,7 @@ export default {
           sitemapUrl: property?.domain ? `https://${property.domain}/sitemap.xml` : null,
           aiBots,
           aiAccess,
+          flags: aiFlags,
         };
 
         // Transform scores from flat columns to nested object

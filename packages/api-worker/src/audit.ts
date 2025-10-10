@@ -190,6 +190,26 @@ export async function runAudit(
     console.log('AI access probe complete:', JSON.stringify(aiAccess).substring(0, 200));
     const blockedBotsProbe = aiAccess.results.filter(r => r.blocked);
     
+    // Compute flags for quick access
+    const aiBlockedBots = blockedBotsProbe.map(b => b.bot);
+    const robotsBlockedBots = Object.entries(crawlabilityData.aiBotsAllowed)
+      .filter(([bot, allowed]) => !allowed)
+      .map(([bot]) => bot);
+    const allBlockedBots = [...new Set([...aiBlockedBots, ...robotsBlockedBots])];
+    
+    const blockedBy = 
+      allBlockedBots.length === 0 ? null :
+      blockedBotsProbe.length > 0 && (blockedBotsProbe[0].cfRay || blockedBotsProbe[0].akamai) ? 'waf' :
+      robotsBlockedBots.length > 0 ? 'robots' :
+      'unknown';
+    
+    const aiFlags = {
+      aiBlocked: allBlockedBots.length > 0,
+      blockedBy,
+      blockedBots: allBlockedBots,
+      wafName: blockedBotsProbe[0]?.cfRay ? 'Cloudflare' : blockedBotsProbe[0]?.akamai ? 'Akamai' : null
+    };
+    
     // Add issues based on crawlability checks
     if (!crawlabilityData.robotsFound) {
       issues.push({
@@ -546,6 +566,7 @@ export async function runAudit(
            pages_total = ?,
            issues_count = ?,
            ai_access_json = ?,
+           ai_flags_json = ?,
            completed_at = datetime('now')
        WHERE id = ?`
     ).bind(
@@ -558,6 +579,7 @@ export async function runAudit(
       urlsToCrawl.length,
       issues.length,
       JSON.stringify(aiAccess),
+      JSON.stringify(aiFlags),
       auditId
     ).run();
     

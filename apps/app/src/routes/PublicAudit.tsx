@@ -196,6 +196,75 @@ export default function PublicAudit() {
         )}
       </div>
 
+      {/* Critical AI Bot Blocking Alert */}
+      {audit.site?.flags?.aiBlocked && (
+        <div style={{
+          background: '#fee2e2',
+          border: '2px solid #ef4444',
+          borderRadius: 8,
+          padding: 20,
+          marginBottom: 24,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
+            <div style={{ fontSize: 24 }}>⚠️</div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ margin: '0 0 8px', color: '#991b1b', fontSize: 18, fontWeight: 600 }}>
+                AI Crawlers Are Blocked
+              </h3>
+              <p style={{ margin: '0 0 12px', color: '#7f1d1d', fontSize: 14, lineHeight: 1.6 }}>
+                {audit.site.flags.blockedBy === 'robots'
+                  ? 'Your robots.txt is blocking AI bots. This prevents AI assistants from discovering and citing your content.'
+                  : audit.site.flags.blockedBy === 'waf'
+                    ? `Your ${audit.site.flags.wafName || 'CDN/WAF'} is blocking AI bots. This prevents AI assistants from accessing your content.`
+                    : 'AI bots cannot reach your site. This prevents AI assistants from discovering and citing your content.'}
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: '#991b1b', fontWeight: 500 }}>
+                  Blocked bots: {audit.site.flags.blockedBots.join(', ')}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <a
+                  href={`https://www.google.com/search?q=how+to+allow+${audit.site.flags.blockedBy === 'robots' ? 'AI+bots+in+robots.txt' : audit.site.flags.wafName + '+AI+bots'}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: '8px 16px',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: 6,
+                    textDecoration: 'none',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    display: 'inline-block',
+                  }}
+                >
+                  {audit.site.flags.blockedBy === 'robots' ? 'Fix robots.txt' : `Configure ${audit.site.flags.wafName || 'WAF'}`}
+                </a>
+                <a
+                  href={`/v1/debug/ai-access/${audit.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: '8px 16px',
+                    background: 'white',
+                    color: '#991b1b',
+                    border: '1px solid #fca5a5',
+                    borderRadius: 6,
+                    textDecoration: 'none',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    display: 'inline-block',
+                  }}
+                >
+                  View Debug Info
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="row">
         <ScoreCard title="Overall" value={audit.scores.total}/>
         

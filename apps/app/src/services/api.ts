@@ -81,6 +81,12 @@ export type SiteMeta = {
   sitemapUrl: string | null;
   aiBots: ScoresBreakdown['crawlability']['aiBots'];
   aiAccess?: AiAccess | null;
+  flags?: {
+    aiBlocked: boolean;
+    blockedBy: 'robots' | 'waf' | 'unknown' | null;
+    blockedBots: string[];
+    wafName?: string | null;
+  } | null;
 };
 
 export type Scores = { 
