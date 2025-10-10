@@ -1226,6 +1226,165 @@ export default {
       }
     }
 
+    // GET /v1/audits/:id/brave/queries - Get Brave AI query logs (Phase F+)
+    if (path.match(/^\/v1\/audits\/[^/]+\/brave\/queries$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+      
+      try {
+        const audit = await env.DB.prepare(
+          'SELECT brave_ai_json FROM audits WHERE id = ?'
+        ).bind(auditId).first<{ brave_ai_json: string | null }>();
+        
+        if (!audit) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Audit not found' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const braveData = audit.brave_ai_json ? JSON.parse(audit.brave_ai_json) : { queries: [] };
+        
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            queries: braveData.queries || []
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            error: 'Failed to fetch Brave AI queries',
+            message: error instanceof Error ? error.message : String(error)
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // POST /v1/audits/:id/brave/run-more - Run additional Brave AI queries (Phase F+)
+    if (path.match(/^\/v1\/audits\/[^/]+\/brave\/run-more$/) && request.method === 'POST') {
+      const auditId = path.split('/')[3];
+      
+      try {
+        const body = await request.json().catch(() => ({ add: 10 }));
+        const addCount = Math.max(1, Math.min(Number(body?.add ?? 10), Number(env.BRAVE_AI_HARD_CAP ?? 60)));
+        const extraTerms = Array.isArray(body?.extraTerms) 
+          ? body.extraTerms.map((t: any) => String(t).trim()).filter(Boolean)
+          : [];
+        
+        // Fetch audit and property data
+        const audit = await env.DB.prepare(
+          'SELECT audits.id, audits.property_id, audits.brave_ai_json, properties.domain, properties.display_name FROM audits JOIN properties ON audits.property_id = properties.id WHERE audits.id = ?'
+        ).bind(auditId).first<{
+          id: string;
+          property_id: string;
+          brave_ai_json: string | null;
+          domain: string;
+          display_name: string | null;
+        }>();
+        
+        if (!audit) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Audit not found' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Check if we have the Brave AI key
+        if (!env.BRAVE_SEARCH_AI) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Brave AI not configured' }),
+            { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Parse existing queries
+        const prevData = audit.brave_ai_json ? JSON.parse(audit.brave_ai_json) : { queries: [] };
+        const existingQueries = new Set((prevData.queries || []).map((q: any) => q.q));
+        
+        // Fetch pages for this audit
+        const pagesResult = await env.DB.prepare(
+          'SELECT url, h1, word_count FROM audit_pages WHERE audit_id = ?'
+        ).bind(auditId).all();
+        
+        const pages = (pagesResult.results || []).map((p: any) => ({
+          path: new URL(p.url).pathname || '/',
+          h1: p.h1 || null,
+          words: p.word_count || 0
+        }));
+        
+        // Generate smart queries
+        const brand = audit.display_name || audit.domain.replace(/^www\./, '').split('.')[0];
+        const { buildSmartQueries, runBraveAIQueries } = await import('./brave/ai');
+        
+        const smartQueries = buildSmartQueries({
+          brand,
+          domain: audit.domain,
+          pages,
+          extraTerms,
+          maxQueries: addCount,
+          hardCap: Number(env.BRAVE_AI_HARD_CAP ?? 60),
+          enableCompare: env.BRAVE_AI_ENABLE_COMPARE === 'true'
+        }).filter(q => !existingQueries.has(q)); // Avoid duplicates
+        
+        if (smartQueries.length === 0) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              added: 0,
+              totalQueries: prevData.queries.length,
+              message: 'No new queries generated (all duplicates)'
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Run the queries
+        const newLogs = await runBraveAIQueries(
+          env.BRAVE_SEARCH_AI,
+          smartQueries,
+          audit.domain,
+          {
+            timeoutMs: Number(env.BRAVE_TIMEOUT_MS ?? 7000),
+            concurrency: Number(env.BRAVE_CONCURRENCY ?? 2)
+          }
+        );
+        
+        // Merge with existing logs
+        const mergedData = {
+          ...prevData,
+          queries: (prevData.queries || []).concat(newLogs)
+        };
+        
+        // Save back to database
+        await env.DB.prepare(
+          'UPDATE audits SET brave_ai_json = ? WHERE id = ?'
+        ).bind(JSON.stringify(mergedData), auditId).run();
+        
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            added: newLogs.length,
+            totalQueries: mergedData.queries.length
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+        
+      } catch (error) {
+        console.error('Run-more Brave AI failed:', error);
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            error: 'Failed to run additional queries',
+            message: error instanceof Error ? error.message : String(error)
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // GET /v1/audits/:id - Get audit details (public for now, could add auth later)
     if (path.match(/^\/v1\/audits\/[^/]+$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
@@ -1451,15 +1610,14 @@ export default {
         // Parse AI flags
         const aiFlags = audit.ai_flags_json ? JSON.parse(audit.ai_flags_json as string) : null;
         
-        // Parse Brave AI results
+        // Parse Brave AI results (Phase F+ enhanced)
         let braveAI = null;
         if (audit.brave_ai_json) {
           try {
             const braveData = JSON.parse(audit.brave_ai_json as string);
             const queries = braveData.queries || [];
-            const allSources = queries.flatMap((q: any) => q.sources || []);
             
-            // Helper: extract pathname from URL
+            // Helper: extract pathname from domain paths
             const extractPathname = (urlStr: string): string => {
               try {
                 const u = new URL(urlStr);
@@ -1469,13 +1627,25 @@ export default {
               }
             };
             
-            const pagesCited = new Set(allSources.map((s: any) => extractPathname(s.url))).size;
+            // Aggregate all unique paths cited (from domainPaths)
+            const allDomainPaths = new Set<string>();
+            queries.forEach((q: any) => {
+              (q.domainPaths || []).forEach((path: string) => {
+                allDomainPaths.add(path);
+              });
+            });
+            
+            // Count by API type
+            const groundingCount = queries.filter((q: any) => q.api === 'grounding').length;
+            const summarizerCount = queries.filter((q: any) => q.api === 'summarizer').length;
             
             braveAI = {
-              totalQueries: queries.length,
-              totalSources: allSources.length,
-              pagesCited,
-              queries
+              queries: queries.length,
+              pagesCited: allDomainPaths.size,
+              byApi: {
+                grounding: groundingCount,
+                summarizer: summarizerCount
+              }
             };
           } catch (e) {
             console.error('Failed to parse brave_ai_json:', e);
@@ -1525,23 +1695,20 @@ export default {
           } catch (_) {}
         }
 
-        // Build Brave AI answer counts per page path
+        // Build Brave AI answer counts per page path (Phase F+ using domainPaths)
         const braveAnswersByPath = new Map<string, number>();
-        if (braveAI) {
-          const extractPathname = (urlStr: string): string => {
-            try {
-              const u = new URL(urlStr);
-              return u.pathname.replace(/\/+$/, '') || '/';
-            } catch {
-              return '/';
+        if (audit.brave_ai_json) {
+          try {
+            const braveData = JSON.parse(audit.brave_ai_json as string);
+            const queries = braveData.queries || [];
+            
+            for (const query of queries) {
+              for (const path of (query.domainPaths || [])) {
+                braveAnswersByPath.set(path, (braveAnswersByPath.get(path) || 0) + 1);
+              }
             }
-          };
-          
-          for (const query of braveAI.queries) {
-            for (const source of (query.sources || [])) {
-              const path = extractPathname(source.url);
-              braveAnswersByPath.set(path, (braveAnswersByPath.get(path) || 0) + 1);
-            }
+          } catch (e) {
+            console.error('Failed to parse brave_ai_json for page counts:', e);
           }
         }
 

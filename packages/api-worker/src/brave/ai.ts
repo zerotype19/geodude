@@ -1,185 +1,305 @@
 /**
- * Brave AI Answer Integration
- * Fetches AI-generated answers and citations from Brave Search AI APIs
+ * Brave AI Answer Integration (Phase F+ "Stunner")
+ * Smart query generation, detailed logging, and multi-mode support
  */
 
-export type BraveAIEvidence = {
-  query: string;
-  mode: 'grounding' | 'summarizer';
-  answerText?: string;
-  sources: { url: string; title?: string }[];
-  raw: any;
-};
+import { uniq, clamp, extractPathname, pLimit } from '../util';
 
-/**
- * Extract pathname from URL for citation matching
- */
-function extractPathname(urlString: string): string {
-  try {
-    const url = new URL(urlString);
-    return url.pathname.replace(/\/+$/, '') || '/';
-  } catch {
-    return '/';
-  }
+export type BraveMode = 'grounding' | 'summarizer';
+export type Provider = 'brave';
+
+export interface BraveQueryLog {
+  provider: Provider;
+  api: BraveMode;
+  q: string;
+  ts: number;
+  ok: boolean;
+  status?: number;
+  durationMs?: number;
+  sourcesTotal?: number;
+  domainSources?: number;
+  domainPaths?: string[];
+  error?: string | null;
 }
 
-/**
- * Fetch Brave AI Grounding API results
- * Returns AI answer with source URLs that grounded the response
- */
-export async function fetchGrounding(
-  apiKey: string, 
-  query: string,
-  timeout: number = 7000
-): Promise<BraveAIEvidence> {
-  const url = `https://api.search.brave.com/res/v1/ai/grounding?q=${encodeURIComponent(query)}`;
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const resp = await fetch(url, {
-      headers: { 
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
-        'X-Subscription-Token': apiKey
-      },
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!resp.ok) {
-      throw new Error(`Brave Grounding API error: ${resp.status}`);
-    }
-    
-    const j = await resp.json() as any;
-    const sources = (j.sources || []).map((s: any) => ({ 
-      url: s.url, 
-      title: s.title || s.name
-    }));
-    
-    return {
-      query,
-      mode: 'grounding',
-      answerText: j.answer,
-      sources,
-      raw: j
-    };
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    console.error(`Brave Grounding failed for "${query}":`, error.message);
-    return {
-      query,
-      mode: 'grounding',
-      sources: [],
-      raw: { error: error.message }
-    };
-  }
+export interface PageData {
+  path: string;
+  h1?: string | null;
+  words?: number;
 }
 
+export interface SmartQueryOpts {
+  brand: string;
+  domain: string;
+  pages: PageData[];
+  extraTerms?: string[];
+  maxQueries: number;
+  hardCap: number;
+  enableCompare?: boolean;
+}
+
+// Medical/healthcare specific terms (common for health products)
+const MEDICAL_TERMS = [
+  'eligibility',
+  'cost',
+  'accuracy',
+  'insurance',
+  'instructions',
+  'reviews',
+  'side effects',
+  'results',
+  'preparation'
+];
+
+// Core terms applicable to most businesses
+const CORE_TERMS = [
+  'faq',
+  'how to',
+  'what is',
+  'benefits',
+  'features',
+  'pricing',
+  'support',
+  'reviews',
+  'alternatives'
+];
+
+// Likely path patterns that indicate high-value content
+const HIGH_VALUE_PATHS = [
+  '/faq',
+  '/support',
+  '/how-to',
+  '/help',
+  '/patient-stories',
+  '/pricing',
+  '/insurance',
+  '/contact',
+  '/about',
+  '/guide'
+];
+
 /**
- * Fetch Brave AI Summarizer API results
- * Returns summarized answer with citations from search results
+ * Build smart, diverse queries optimized for AI answer engines
+ * Uses path analysis, H1 extraction, and entity-aware templates
  */
-export async function fetchSummarizer(
-  apiKey: string, 
-  query: string,
-  timeout: number = 7000
-): Promise<BraveAIEvidence> {
-  const url = `https://api.search.brave.com/res/v1/summarizer/search?q=${encodeURIComponent(query)}`;
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const resp = await fetch(url, {
-      headers: { 
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
-        'X-Subscription-Token': apiKey
-      },
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!resp.ok) {
-      throw new Error(`Brave Summarizer API error: ${resp.status}`);
+export function buildSmartQueries(opts: SmartQueryOpts): string[] {
+  const { brand, domain, pages, extraTerms = [], maxQueries, hardCap, enableCompare } = opts;
+
+  const queries: string[] = [];
+
+  // 1) Base site queries
+  queries.push(
+    `site:${domain}`,
+    brand,
+    `${brand} faq`,
+    `how to use ${brand}`,
+    `${brand} features`,
+    `${brand} pricing`
+  );
+
+  // 2) Path-aware queries (check if page exists, then query it)
+  const paths = pages.map(p => p.path.toLowerCase());
+  HIGH_VALUE_PATHS.forEach(valuePath => {
+    const matchingPage = paths.find(p => p.startsWith(valuePath));
+    if (matchingPage) {
+      // Clean up path for query (remove slashes, make readable)
+      const readable = valuePath.replace(/\//g, ' ').trim();
+      queries.push(`${brand} ${readable}`);
     }
-    
-    const j = await resp.json() as any;
-    const summary = j.summary || {};
-    const enrichments = summary.enrichments || [];
-    
-    // Extract sources from enrichments (citations)
-    const sources: { url: string; title?: string }[] = [];
-    enrichments.forEach((enr: any) => {
-      if (enr.type === 'web_search_api_item' && enr.url) {
-        sources.push({
-          url: enr.url,
-          title: enr.title || enr.description
-        });
+  });
+
+  // 3) H1-driven queries (substantial pages with good content)
+  const substantialPages = pages
+    .filter(p => (p.words ?? 0) >= 300 && p.h1 && p.h1.length > 5)
+    .slice(0, 8); // Top 8 most substantial pages
+
+  substantialPages.forEach(p => {
+    if (p.h1) {
+      // Combine brand + H1 for context
+      queries.push(`${brand} ${p.h1}`);
+    }
+  });
+
+  // 4) Entity intent queries (medical + core terms)
+  MEDICAL_TERMS.forEach(term => {
+    queries.push(`${brand} ${term}`);
+  });
+
+  CORE_TERMS.forEach(term => {
+    queries.push(`${brand} ${term}`);
+  });
+
+  // 5) Extra terms from user input (run-more or advanced options)
+  extraTerms.forEach(term => {
+    const cleaned = term.trim();
+    if (cleaned) {
+      // Smart formatting: if term doesn't already include brand, add it
+      if (cleaned.toLowerCase().includes(brand.toLowerCase())) {
+        queries.push(cleaned);
+      } else {
+        queries.push(`${brand} ${cleaned}`);
       }
+    }
+  });
+
+  // 6) Optional: Competitor comparison queries
+  if (enableCompare) {
+    // TODO: Could be populated from TF-IDF analysis or user input
+    // For now, these are stubs that can be customized per vertical
+    const competitors = ['competitor']; // Replace with actual competitor detection
+    competitors.forEach(comp => {
+      queries.push(`${brand} vs ${comp}`);
     });
+  }
+
+  // Deduplicate, sanitize, and cap to limits
+  const uniqueQueries = uniq(
+    queries
+      .map(q => q.trim())
+      .filter(q => q.length > 0 && q.length < 200) // Reasonable query length
+  );
+
+  // Respect both soft (maxQueries) and hard (hardCap) limits
+  const finalLimit = clamp(maxQueries, 1, hardCap);
+  return uniqueQueries.slice(0, finalLimit);
+}
+
+/**
+ * Call a single Brave AI endpoint (grounding or summarizer)
+ * Returns detailed log with timing, sources, and domain matches
+ */
+async function callBrave(
+  apiKey: string,
+  api: BraveMode,
+  query: string,
+  domain: string,
+  timeoutMs: number
+): Promise<BraveQueryLog> {
+  const ts = Date.now();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    // Construct appropriate endpoint URL
+    const baseUrl = 'https://api.search.brave.com/res/v1';
+    const endpoint = api === 'grounding' 
+      ? `${baseUrl}/ai/grounding`
+      : `${baseUrl}/summarizer/search`;
     
+    const url = `${endpoint}?q=${encodeURIComponent(query)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip',
+        'X-Subscription-Token': apiKey
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    const status = response.status;
+    let sourcesTotal = 0;
+    let domainSources = 0;
+    let domainPaths: string[] = [];
+
+    if (response.ok) {
+      const data = await response.json();
+
+      // Extract sources (both APIs have slightly different structures)
+      let sources: string[] = [];
+      
+      if (api === 'grounding') {
+        // Grounding API structure
+        sources = (data.sources || []).map((s: any) => s.url).filter(Boolean);
+      } else {
+        // Summarizer API structure
+        const summary = data.summary || {};
+        const enrichments = summary.enrichments || [];
+        sources = enrichments
+          .filter((e: any) => e.type === 'web_search_api_item' && e.url)
+          .map((e: any) => e.url);
+      }
+
+      sourcesTotal = sources.length;
+
+      // Filter to sources from the audited domain
+      const normalizedDomain = domain.replace(/^www\./, '');
+      const domainSourceUrls = sources.filter(url => {
+        try {
+          const urlHost = new URL(url).hostname.replace(/^www\./, '');
+          return urlHost === normalizedDomain;
+        } catch {
+          return false;
+        }
+      });
+
+      domainSources = domainSourceUrls.length;
+      domainPaths = uniq(domainSourceUrls.map(url => extractPathname(url)));
+    }
+
     return {
-      query,
-      mode: 'summarizer',
-      answerText: summary.text,
-      sources,
-      raw: j
+      provider: 'brave',
+      api,
+      q: query,
+      ts,
+      ok: response.ok,
+      status,
+      durationMs: Date.now() - ts,
+      sourcesTotal,
+      domainSources,
+      domainPaths,
+      error: response.ok ? null : `HTTP ${status}`
     };
+
   } catch (error: any) {
     clearTimeout(timeoutId);
-    console.error(`Brave Summarizer failed for "${query}":`, error.message);
+    
     return {
-      query,
-      mode: 'summarizer',
-      sources: [],
-      raw: { error: error.message }
+      provider: 'brave',
+      api,
+      q: query,
+      ts,
+      ok: false,
+      durationMs: Date.now() - ts,
+      sourcesTotal: 0,
+      domainSources: 0,
+      domainPaths: [],
+      error: error?.name === 'AbortError' ? 'timeout' : String(error?.message ?? error)
     };
   }
 }
 
 /**
- * Run Brave AI queries for a domain
- * Returns both grounding and summarizer results
+ * Run multiple Brave AI queries with concurrency control
+ * Each query hits both grounding AND summarizer endpoints
  */
 export async function runBraveAIQueries(
   apiKey: string,
+  queries: string[],
   domain: string,
-  brand?: string
-): Promise<BraveAIEvidence[]> {
-  const queries = [
-    `site:${domain}`,
-    brand || domain,
-    `${brand || domain} faq`,
-    `how to use ${brand || domain}`,
-    `${brand || domain} features`
-  ];
+  opts?: { timeoutMs?: number; concurrency?: number }
+): Promise<BraveQueryLog[]> {
+  const timeoutMs = opts?.timeoutMs ?? 7000;
+  const concurrency = opts?.concurrency ?? 2;
   
-  const results: BraveAIEvidence[] = [];
+  const limit = pLimit(concurrency);
+
+  // For each query, call BOTH grounding and summarizer
+  const tasks: Promise<BraveQueryLog>[] = [];
   
-  // Run queries with small concurrency (2 at a time to respect rate limits)
-  for (let i = 0; i < queries.length; i += 2) {
-    const batch = queries.slice(i, i + 2);
-    const promises = batch.flatMap(q => [
-      fetchGrounding(apiKey, q),
-      fetchSummarizer(apiKey, q)
-    ]);
-    
-    const batchResults = await Promise.all(promises);
-    results.push(...batchResults);
-    
-    // Small delay between batches to avoid rate limits
-    if (i + 2 < queries.length) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
+  for (const query of queries) {
+    tasks.push(limit(() => callBrave(apiKey, 'grounding', query, domain, timeoutMs)));
+    tasks.push(limit(() => callBrave(apiKey, 'summarizer', query, domain, timeoutMs)));
   }
-  
-  return results;
+
+  const logs = await Promise.all(tasks);
+  return logs;
 }
 
+/**
+ * Legacy export for backward compatibility
+ * @deprecated Use runBraveAIQueries instead
+ */
 export { extractPathname };
-

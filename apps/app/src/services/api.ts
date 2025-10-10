@@ -74,18 +74,36 @@ export type AiAccess = {
   baselineStatus: number;
 };
 
+// Phase F+ enhanced types
+export type BraveQueryLog = {
+  provider: 'brave';
+  api: 'grounding' | 'summarizer';
+  q: string;
+  ts: number;
+  ok: boolean;
+  status?: number;
+  durationMs?: number;
+  sourcesTotal?: number;
+  domainSources?: number;
+  domainPaths?: string[];
+  error?: string | null;
+};
+
+export type BraveAIMeta = {
+  queries: number;
+  pagesCited: number;
+  byApi: {
+    grounding: number;
+    summarizer: number;
+  };
+};
+
+// Legacy types for backward compat
 export type BraveAIQuery = {
   query: string;
   mode: 'grounding' | 'summarizer';
   answerText?: string;
   sources: { url: string; title?: string }[];
-};
-
-export type BraveAIMeta = {
-  totalQueries: number;
-  totalSources: number;
-  pagesCited: number;
-  queries: BraveAIQuery[];
 };
 
 export type SiteMeta = {
@@ -377,6 +395,27 @@ export async function getAuditCitations(
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`getAuditCitations failed: ${res.status}`);
   return res.json() as Promise<CitationsResponse>;
+}
+
+// Phase F+ Brave AI query logs
+export async function getBraveQueries(auditId: string): Promise<{ ok: boolean; queries: BraveQueryLog[] }> {
+  const res = await fetch(`${API_BASE}/v1/audits/${auditId}/brave/queries`);
+  if (!res.ok) throw new Error(`getBraveQueries failed: ${res.status}`);
+  return res.json();
+}
+
+export async function runMoreBrave(
+  auditId: string, 
+  add: number = 10, 
+  extraTerms: string[] = []
+): Promise<{ ok: boolean; added: number; totalQueries: number; message?: string }> {
+  const res = await fetch(`${API_BASE}/v1/audits/${auditId}/brave/run-more`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ add, extraTerms })
+  });
+  if (!res.ok) throw new Error(`runMoreBrave failed: ${res.status}`);
+  return res.json();
 }
 
 // Base64 URL-safe encoding/decoding helpers

@@ -7,7 +7,7 @@ import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractO
 import { calculateScores } from './score';
 import { renderPage } from './render';
 import { checkCrawlability, probeAiAccess } from './crawl';
-import { runBraveAIQueries, extractPathname } from './brave/ai';
+import { runBraveAIQueries, buildSmartQueries, extractPathname, BraveQueryLog, PageData } from './brave/ai';
 
 interface Env {
   DB: D1Database;
@@ -15,6 +15,11 @@ interface Env {
   AUDIT_MAX_PAGES: string;
   BRAVE_SEARCH?: string; // Brave Search API key (for regular search)
   BRAVE_SEARCH_AI?: string; // Brave AI API key (for AI Grounding & Summarizer)
+  BRAVE_AI_MAX_QUERIES?: string;
+  BRAVE_AI_HARD_CAP?: string;
+  BRAVE_TIMEOUT_MS?: string;
+  BRAVE_CONCURRENCY?: string;
+  BRAVE_AI_ENABLE_COMPARE?: string;
 }
 
 interface AuditIssue {
@@ -556,20 +561,60 @@ export async function runAudit(
     // Step 5: Calculate scores
     const scores = calculateScores(pages, issues, crawlabilityData, structuredData);
 
-    // Step 5.5: Run Brave AI queries (if enabled)
-    let braveAI: any = null;
+    // Step 5.5: Run Brave AI queries (Phase F+ with smart query builder)
+    let braveQueryLogs: BraveQueryLog[] = [];
     const ENABLE_BRAVE = !!env.BRAVE_SEARCH_AI;
     
     if (ENABLE_BRAVE) {
       try {
-        console.log('Running Brave AI queries...');
+        console.log('Running Brave AI queries (Phase F+)...');
+        
+        // Prepare config
+        const maxQueries = Number(env.BRAVE_AI_MAX_QUERIES ?? 30);
+        const hardCap = Number(env.BRAVE_AI_HARD_CAP ?? 60);
+        const enableCompare = env.BRAVE_AI_ENABLE_COMPARE === 'true';
         const brand = property.display_name || property.domain.replace(/^www\./, '').split('.')[0];
-        const queries = await runBraveAIQueries(env.BRAVE_SEARCH_AI!, property.domain, brand);
-        braveAI = { queries };
-        console.log(`Brave AI complete: ${queries.length} queries, ${queries.reduce((sum, q) => sum + (q.sources?.length || 0), 0)} total sources`);
+        
+        // Convert pages to minimal format for query builder
+        const minimalPages: PageData[] = pages.map(p => ({
+          path: p.pathname || p.url.replace(property.domain, '').replace(/^https?:\/\/[^/]+/, '') || '/',
+          h1: p.h1 || null,
+          words: p.word_count || 0
+        }));
+        
+        // Build smart queries (path-aware, H1-driven, entity intents)
+        const smartQueries = buildSmartQueries({
+          brand,
+          domain: property.domain,
+          pages: minimalPages,
+          extraTerms: [], // Can be extended from request body in future
+          maxQueries,
+          hardCap,
+          enableCompare
+        });
+        
+        console.log(`Generated ${smartQueries.length} smart queries for ${brand}`);
+        
+        // Run queries (each hits grounding + summarizer)
+        braveQueryLogs = await runBraveAIQueries(
+          env.BRAVE_SEARCH_AI!,
+          smartQueries,
+          property.domain,
+          {
+            timeoutMs: Number(env.BRAVE_TIMEOUT_MS ?? 7000),
+            concurrency: Number(env.BRAVE_CONCURRENCY ?? 2)
+          }
+        );
+        
+        // Calculate summary stats
+        const totalSources = braveQueryLogs.reduce((sum, log) => sum + (log.sourcesTotal ?? 0), 0);
+        const domainSources = braveQueryLogs.reduce((sum, log) => sum + (log.domainSources ?? 0), 0);
+        const uniquePaths = Array.from(new Set(braveQueryLogs.flatMap(log => log.domainPaths ?? [])));
+        
+        console.log(`Brave AI complete: ${braveQueryLogs.length} queries (${smartQueries.length} unique), ${totalSources} total sources, ${domainSources} from domain, ${uniquePaths.length} unique paths cited`);
       } catch (e) {
         console.error('Brave AI failed:', e instanceof Error ? e.message : String(e));
-        braveAI = null; // Graceful fallback
+        braveQueryLogs = []; // Graceful fallback
       }
     } else {
       console.log('Brave AI disabled (no BRAVE_SEARCH_AI key)');
@@ -603,7 +648,7 @@ export async function runAudit(
       issues.length,
       JSON.stringify(aiAccess),
       JSON.stringify(aiFlags),
-      braveAI ? JSON.stringify(braveAI) : null,
+      braveQueryLogs.length > 0 ? JSON.stringify({ queries: braveQueryLogs }) : null,
       auditId
     ).run();
     

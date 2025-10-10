@@ -6,6 +6,7 @@ import IssuesTable from "../components/IssuesTable";
 import PagesTable from "../components/PagesTable";
 import EntityRecommendations from "../components/EntityRecommendations";
 import Citations from "../components/Citations";
+import BraveQueriesModal from "../components/BraveQueriesModal";
 
 export default function PublicAudit() {
   const { id } = useParams();
@@ -15,6 +16,7 @@ export default function PublicAudit() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations'>('scores');
   const [rerunning, setRerunning] = useState(false);
+  const [showBraveModal, setShowBraveModal] = useState(false);
   
   const hasApiKey = useMemo(() => !!localStorage.getItem('ov_api_key'), []);
 
@@ -344,19 +346,32 @@ export default function PublicAudit() {
             </div>
           )}
           
-          {/* Brave AI chip */}
+          {/* Brave AI chip (Phase F+ clickable) */}
           {audit.site?.braveAI && (
             <div style={{ marginTop: 8 }}>
-              <span style={{
-                fontSize: 11,
-                padding: '4px 8px',
-                borderRadius: 12,
-                background: 'rgba(99,102,241,.2)',
-                color: '#6366f1',
-                display: 'inline-block',
-              }} title="Brave AI Answer sources analyzed">
-                🤖 Brave AI: {audit.site.braveAI.totalQueries} queries · {audit.site.braveAI.pagesCited} pages cited
-              </span>
+              <button
+                onClick={() => setShowBraveModal(true)}
+                style={{
+                  fontSize: 11,
+                  padding: '4px 8px',
+                  borderRadius: 12,
+                  background: 'rgba(99,102,241,.2)',
+                  color: '#6366f1',
+                  display: 'inline-block',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(99,102,241,.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(99,102,241,.2)';
+                }}
+                title="Click to view Brave AI query details"
+              >
+                🤖 Brave AI: {audit.site.braveAI.queries} queries · {audit.site.braveAI.pagesCited} pages cited
+              </button>
             </div>
           )}
         </div>
@@ -464,6 +479,21 @@ export default function PublicAudit() {
           <Citations auditId={id!} citations={audit.citations}/>
         )}
       </div>
+      
+      {/* Brave AI Queries Modal (Phase F+) */}
+      {showBraveModal && audit && (
+        <BraveQueriesModal 
+          auditId={audit.id}
+          onClose={() => setShowBraveModal(false)}
+          onUpdate={async () => {
+            // Refresh audit data after running more queries
+            if (id) {
+              const refreshed = await getAudit(id);
+              setAudit(refreshed);
+            }
+          }}
+        />
+      )}
     </>
   );
 }
