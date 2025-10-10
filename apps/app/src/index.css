@@ -7,5 +7,26 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+#root {
+  min-height: 100vh;
+  padding: 20px;
+}
+
+/* Ensure good contrast for all text elements */
+h1, h2, h3, h4, h5, h6 {
+  color: #1e293b;
+}
+
+a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 

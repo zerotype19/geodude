@@ -241,8 +241,14 @@ export default function PageReport() {
       </div>
 
       {activeTab === 'overview' && (
-        <>
-          <h2 style={{ margin: '16px 0', fontSize: '24px' }}>
+        <div style={{ 
+          background: 'white',
+          color: '#1e293b', 
+          padding: '24px', 
+          borderRadius: 12,
+          marginTop: 16
+        }}>
+          <h2 style={{ margin: '0 0 16px', fontSize: '24px', color: '#1e293b' }}>
             Issues on this page ({data.issues.length})
           </h2>
           {data.issues.length > 0 ? (
@@ -254,11 +260,11 @@ export default function PageReport() {
           )}
           
           {/* Citations Panel */}
-          <h2 style={{ margin: '32px 0 16px', fontSize: '24px' }}>
+          <h2 style={{ margin: '32px 0 16px', fontSize: '24px', color: '#1e293b' }}>
             Citations ({citationsTotal})
           </h2>
           {citationsLoading ? (
-            <div style={{ padding: '24px', textAlign: 'center', opacity: 0.6 }}>
+            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>
               Loading citations...
             </div>
           ) : citations.length > 0 ? (
@@ -348,17 +354,23 @@ export default function PageReport() {
               )}
             </>
           ) : (
-            <div style={{ padding: '24px', textAlign: 'center', opacity: 0.6 }}>
+            <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>
               No citations found for this page yet.
             </div>
           )}
-        </>
+        </div>
       )}
       
       {activeTab === 'recommendations' && (
-        <div>
+        <div style={{ 
+          background: 'white',
+          color: '#1e293b', 
+          padding: '24px', 
+          borderRadius: 12,
+          marginTop: 16
+        }}>
           {recsLoading && (
-            <div style={{ padding: '40px', textAlign: 'center' }}>
+            <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
               Loading recommendations...
             </div>
           )}
@@ -396,7 +408,7 @@ export default function PageReport() {
               {/* Header: Detected intent + Priority */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
                 <div>
-                  <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 4 }}>Detected Intent</div>
+                  <div style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>Detected Intent</div>
                   <span style={{
                     padding: '6px 12px',
                     background: '#dbeafe',
@@ -409,7 +421,7 @@ export default function PageReport() {
                   </span>
                 </div>
                 <div style={{ marginLeft: 'auto' }}>
-                  <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 4 }}>Priority</div>
+                  <div style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>Priority</div>
                   <span style={{
                     padding: '6px 12px',
                     background: recs.priority === 'high' ? '#fee2e2' : recs.priority === 'medium' ? '#fed7aa' : '#d1fae5',
@@ -583,11 +595,11 @@ export default function PageReport() {
             <div style={{
               padding: '40px',
               textAlign: 'center',
-              color: '#6b7280'
+              color: '#64748b'
             }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
-              <p>We didn't detect a strong intent.</p>
-              <p style={{ fontSize: 14, opacity: 0.8 }}>
+              <p style={{ color: '#475569', fontSize: 16, margin: '0 0 8px' }}>We didn't detect a strong intent.</p>
+              <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>
                 Consider adding clearer headings or more structured content.
               </p>
             </div>
