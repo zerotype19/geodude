@@ -10,7 +10,7 @@ database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
 
 [[kv_namespaces]]
 binding = "RECO_CACHE"
-id = "placeholder-will-be-created"
+id = "6f25c753a8734206bc07c1418423ca1b"
 
 [[queues.consumers]]
 queue = "reco-queue"

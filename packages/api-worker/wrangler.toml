@@ -15,7 +15,7 @@ id = "29edf1f05bde42c09b7afa8e128b7066"
 
 [[kv_namespaces]]
 binding = "RECO_CACHE"
-id = "placeholder-will-be-created"
+id = "6f25c753a8734206bc07c1418423ca1b"
 
 [[queues.producers]]
 binding = "RECO_PRODUCER"
