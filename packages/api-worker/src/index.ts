@@ -1252,24 +1252,26 @@ export default {
 
         // Transform pages and add citation counts
         const pagesOut = (pages.results as any[]).map((p: any) => {
-          let key = p.url;
+          // Normalize path for citations mapping
+          let path = '/';
           try {
             const u = new URL(p.url);
-            key = u.pathname.replace(/\/+$/,'') || '/';
+            path = u.pathname.replace(/\/+$/,'') || '/';
           } catch (_) {}
+          
           return {
             url: p.url,
-            statusCode: p.status_code,
-            title: p.title,
-            h1: p.h1,
-            hasH1: p.has_h1,
-            jsonLdCount: p.jsonld_count,
-            faqOnPage: p.faq_present,
-            words: p.rendered_words ?? p.word_count ?? 0,
-            snippet: p.snippet,
-            loadTimeMs: p.load_time_ms,
-            error: p.error,
-            citationCount: countsByPath.get(key) || 0,
+            statusCode: p.status_code ?? p.status ?? null,  // Ensure we surface a number or null
+            title: p.title ?? null,
+            h1: p.h1 ?? null,
+            hasH1: p.has_h1 ?? false,
+            jsonLdCount: p.jsonld_count ?? 0,
+            faqOnPage: typeof p.faq_present === 'boolean' ? p.faq_present : null,  // Keep for Page Report
+            words: p.rendered_words ?? p.word_count ?? null,  // Map to camelCase with fallback
+            snippet: p.snippet ?? null,
+            loadTimeMs: p.load_time_ms ?? null,
+            error: p.error ?? null,
+            citationCount: countsByPath.get(path) || 0,
           };
         });
 

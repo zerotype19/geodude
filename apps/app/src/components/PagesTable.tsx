@@ -18,6 +18,9 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
 
   if (!pages?.length) return <div>No pages captured.</div>;
   
+  // Only show FAQ column if any page has FAQPage JSON-LD
+  const anyFaq = pages.some(p => p.faqOnPage === true);
+  
   return (
     <table>
       <thead>
@@ -27,9 +30,11 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
           <th>Title</th>
           <th style={{ textAlign: 'right' }}>Words</th>
           <th>JSON-LD</th>
-          <th title="Only shows 'Yes' when this page has a FAQPage JSON-LD block. FAQ is primarily a site-level signal.">
-            FAQ (page)
-          </th>
+          {anyFaq && (
+            <th title="Only shows 'Yes' when this page has a FAQPage JSON-LD block. FAQ is primarily a site-level signal.">
+              FAQ (page)
+            </th>
+          )}
           <th style={{ textAlign: 'right' }}>Cites</th>
         </tr>
       </thead>
@@ -62,17 +67,17 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                   </a>
                 )}
               </td>
-              <td>{p.statusCode || "-"}</td>
+              <td>{p.statusCode ?? "—"}</td>
               <td style={{
                 maxWidth: 300,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap"
               }}>
-                {p.title ?? "-"}
+                {p.title ?? "—"}
               </td>
               <td style={{ textAlign: 'right' }}>
-                {words > 0 ? (
+                {typeof words === 'number' && words > 0 ? (
                   <span style={{ 
                     color: words < 120 ? '#ef4444' : words < 300 ? '#f59e0b' : '#10b981',
                     fontWeight: words < 120 ? 'bold' : 'normal'
@@ -80,11 +85,11 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                     {words}
                   </span>
                 ) : (
-                  <span style={{ color: '#999' }}>-</span>
+                  <span style={{ color: '#999' }}>—</span>
                 )}
               </td>
               <td>{p.jsonLdCount ?? 0}</td>
-              <td>{p.faqOnPage ? "Yes" : "—"}</td>
+              {anyFaq && <td>{p.faqOnPage ? "Yes" : "—"}</td>}
               <td style={{ textAlign: 'right' }} className="tabular-nums">
                 {p.citationCount ?? 0}
               </td>

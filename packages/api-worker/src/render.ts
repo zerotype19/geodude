@@ -116,8 +116,8 @@ export async function renderPage(
         timeout: 30_000,
       });
       
-      // Get status code from response
-      const statusCode = response?.status() ?? 200;
+      // Get status code from response (0 = unknown/network error)
+      const statusCode = response?.status() ?? 0;
 
       // Get full HTML after JS runs
       const html: string = await page.content();

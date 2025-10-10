@@ -10,17 +10,17 @@ export type AuditIssue = {
 
 export type AuditPage = { 
   url: string; 
-  statusCode: number;
-  title?: string; 
-  h1?: string;
+  statusCode: number | null;  // null for older audits or network errors
+  title: string | null;
+  h1?: string | null;
   hasH1: boolean;
   jsonLdCount: number;
-  faqOnPage?: boolean; // Only present if this page has FAQPage JSON-LD
-  words: number;
-  snippet?: string;
-  loadTimeMs?: number;
+  faqOnPage?: boolean | null; // Keep for Page Report but not required in Pages table
+  words: number | null;  // null for older audits or render failures
+  snippet?: string | null;
+  loadTimeMs?: number | null;
   error?: string | null;
-  citationCount?: number; // Number of citations referencing this page
+  citationCount: number; // Number of citations referencing this page
 };
 
 export type ScoresBreakdown = {
