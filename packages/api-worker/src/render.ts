@@ -43,6 +43,7 @@ export async function renderPage(
 
   // Try Browser first unless forced to html
   if (force !== 'html' && env.BROWSER) {
+    const startTime = Date.now();
     try {
       console.log(`[render] attempting browser mode for ${url}`);
       
@@ -55,6 +56,18 @@ export async function renderPage(
       if (opts?.userAgent) {
         await page.setUserAgent(opts.userAgent);
       }
+
+      // Block heavy assets to speed up rendering (images, media, fonts)
+      // We only need text content, not visuals
+      await page.setRequestInterception(true);
+      page.on('request', (request) => {
+        const resourceType = request.resourceType();
+        if (['image', 'media', 'font', 'stylesheet'].includes(resourceType)) {
+          request.abort();
+        } else {
+          request.continue();
+        }
+      });
 
       // Navigate and wait for content
       await page.goto(url, {
@@ -69,7 +82,8 @@ export async function renderPage(
       await browser.close();
 
       const extracted = await extractFromHTML(html);
-      console.log(`[render] browser: ${url} -> ${extracted.words} words`);
+      const renderTime = Date.now() - startTime;
+      console.log(`[render] browser: ${url} -> ${extracted.words} words in ${renderTime}ms`);
       
       return { mode: 'browser', status: 200, ...extracted };
     } catch (err: any) {

@@ -13,7 +13,10 @@ export type AuditPage = {
   http_status?: number; 
   title?: string; 
   jsonld_types?: string; 
-  has_faq?: number 
+  has_faq?: number;
+  word_count?: number;
+  rendered_words?: number;
+  snippet?: string;
 };
 
 export type Scores = { 

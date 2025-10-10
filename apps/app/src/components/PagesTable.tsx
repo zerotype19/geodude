@@ -25,37 +25,66 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
           <th>URL</th>
           <th>Status</th>
           <th>Title</th>
+          <th style={{ textAlign: 'right' }}>Words</th>
           <th>JSON-LD</th>
           <th>FAQ</th>
         </tr>
       </thead>
       <tbody>
-        {pages.map((p, idx) => (
-          <tr key={idx}>
-            <td style={{
-              maxWidth: 420, 
-              overflow: "hidden", 
-              textOverflow: "ellipsis", 
-              whiteSpace: "nowrap"
-            }}>
-              {auditId ? (
-                <Link
-                  to={`/a/${auditId}/p/${b64u.enc(p.url)}`}
-                  title={p.url}
-                  style={{ color: "#667eea" }}
-                >
-                  {formatUrl(p.url)}
-                </Link>
-              ) : (
-                <a href={p.url} target="_blank" rel="noreferrer">{formatUrl(p.url)}</a>
-              )}
-            </td>
-            <td>{p.http_status ?? "-"}</td>
-            <td>{p.title ?? "-"}</td>
-            <td>{p.jsonld_types ?? "-"}</td>
-            <td>{p.has_faq ? "Yes" : "No"}</td>
-          </tr>
-        ))}
+        {pages.map((p, idx) => {
+          const words = p.rendered_words ?? p.word_count ?? 0;
+          const tooltip = p.snippet 
+            ? `${p.url}\n\nSnippet: ${p.snippet}` 
+            : p.url;
+          
+          return (
+            <tr key={idx}>
+              <td style={{
+                maxWidth: 420, 
+                overflow: "hidden", 
+                textOverflow: "ellipsis", 
+                whiteSpace: "nowrap"
+              }}>
+                {auditId ? (
+                  <Link
+                    to={`/a/${auditId}/p/${b64u.enc(p.url)}`}
+                    title={tooltip}
+                    style={{ color: "#667eea" }}
+                  >
+                    {formatUrl(p.url)}
+                  </Link>
+                ) : (
+                  <a href={p.url} target="_blank" rel="noreferrer" title={tooltip}>
+                    {formatUrl(p.url)}
+                  </a>
+                )}
+              </td>
+              <td>{p.http_status ?? "-"}</td>
+              <td style={{
+                maxWidth: 300,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }}>
+                {p.title ?? "-"}
+              </td>
+              <td style={{ textAlign: 'right' }}>
+                {words > 0 ? (
+                  <span style={{ 
+                    color: words < 120 ? '#ef4444' : words < 300 ? '#f59e0b' : '#10b981',
+                    fontWeight: words < 120 ? 'bold' : 'normal'
+                  }}>
+                    {words}
+                  </span>
+                ) : (
+                  <span style={{ color: '#999' }}>-</span>
+                )}
+              </td>
+              <td>{p.jsonld_types ?? "-"}</td>
+              <td>{p.has_faq ? "Yes" : "No"}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
