@@ -18,6 +18,7 @@ interface QueueMessage {
   url: string;
   audit_id?: string;
   page_id?: string;
+  refresh?: boolean;
 }
 
 interface PageFacts {
@@ -46,24 +47,31 @@ interface ModelOutput {
 export default {
   async queue(batch: MessageBatch<QueueMessage>, env: Env) {
     for (const msg of batch.messages) {
-      const { id, url, audit_id, page_id } = msg.body;
+      const { id, url, audit_id, page_id, refresh } = msg.body;
       
-      console.log(`[reco] Processing job ${id} for ${url}`);
+      console.log(`[reco] Processing job ${id} for ${url}${refresh ? ' (refresh)' : ''}`);
       
       try {
+        // Step 0: Validate URL (SSRF protection)
+        if (!isValidUrl(url)) {
+          throw new Error('Invalid URL: must be public HTTP(S)');
+        }
+        
         // Step 1: Mark as rendering
         await mark(env, id, 'rendering');
 
         // Step 2: Render via Browser Rendering and extract facts
         const { html, etag, facts } = await renderAndExtract(env, url);
 
-        // Step 3: Check KV cache for de-duplication
-        const cacheKey = `reco:${url}:${etag}`;
-        const cached = await env.RECO_CACHE.get(cacheKey);
-        if (cached) {
-          console.log(`[reco] Cache hit for ${url}`);
-          await save(env, id, 'done', etag, cached);
-          continue;
+        // Step 3: Check KV cache for de-duplication (unless refresh requested)
+        if (!refresh) {
+          const cacheKey = `reco:${url}:${etag}`;
+          const cached = await env.RECO_CACHE.get(cacheKey);
+          if (cached) {
+            console.log(`[reco] Cache hit for ${url}`);
+            await save(env, id, 'done', etag, cached);
+            continue;
+          }
         }
 
         // Step 4: Mark as analyzing
@@ -72,8 +80,8 @@ export default {
         // Step 5: Ask GPT-4o for recommendations
         const modelOut = await recommendWithGPT4(env, { url, etag, facts });
 
-        // Step 6: Validate output
-        validateReco(modelOut);
+        // Step 6: Validate output (with URL check)
+        validateReco(modelOut, url);
 
         // Step 7: Persist + cache
         const asText = JSON.stringify(modelOut);
@@ -91,6 +99,44 @@ export default {
     }
   }
 };
+
+// SSRF Protection: Validate URL is public HTTP(S)
+function isValidUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    
+    // Must be HTTP or HTTPS
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return false;
+    }
+    
+    // Block private/internal IPs
+    const hostname = url.hostname.toLowerCase();
+    
+    // Block localhost
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      return false;
+    }
+    
+    // Block private IP ranges (simple check)
+    if (
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./)
+    ) {
+      return false;
+    }
+    
+    // Block metadata endpoints
+    if (hostname === '169.254.169.254') {
+      return false;
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // Update job status
 async function mark(env: Env, id: string, status: string) {
@@ -141,22 +187,60 @@ async function renderAndExtract(env: Env, target: string): Promise<{ html: strin
     const q = (sel: string) => document.querySelector(sel);
     const qa: Array<{ q: string; a: string }> = [];
 
-    // Q/A detection: H2/H3 with following paragraphs
-    const heads = Array.from(document.querySelectorAll('h2, h3'));
-    for (const h of heads) {
-      const question = h.textContent?.trim() || '';
-      let a = '';
-      let n = h.nextElementSibling;
-      let hops = 0;
-      while (n && hops < 8 && !/^H[1-6]$/.test(n.tagName)) {
-        if (n.tagName === 'P' || n.getAttribute('role') === 'region' || n.tagName === 'DIV') {
-          a += ' ' + (n.textContent || '').trim();
-        }
-        n = n.nextElementSibling;
-        hops++;
+    // Q/A detection: ARIA accordions (better for modern medical sites)
+    const accordionButtons = Array.from(document.querySelectorAll(
+      '[role="button"][aria-controls], [role="button"][aria-expanded], .accordion button, .accordion-button, [data-accordion] button, [data-faq] button'
+    ));
+    
+    for (const btn of accordionButtons.slice(0, 60)) {
+      const question = btn.textContent?.trim() || '';
+      if (!question || question.length < 5) continue;
+      
+      // Try to find associated answer region
+      const regionId = btn.getAttribute('aria-controls');
+      let answerRegion: Element | null = null;
+      
+      if (regionId) {
+        answerRegion = document.getElementById(regionId);
+      } else {
+        // Fallback: look for sibling or parent-adjacent region
+        answerRegion = btn.nextElementSibling?.matches('[role="region"], .accordion-panel, .accordion-content')
+          ? btn.nextElementSibling
+          : btn.closest('.accordion-item, .accordion, [data-accordion]')?.querySelector('[role="region"], .accordion-panel, .accordion-content') || null;
       }
-      if (question && a.trim().length > 60) {
-        qa.push({ q: question, a: a.trim().slice(0, 1200) });
+      
+      if (answerRegion) {
+        let answer = answerRegion.textContent?.trim() || '';
+        // Strip common boilerplate patterns
+        answer = answer.replace(/^(Show|Hide|Expand|Collapse)\s+/i, '');
+        answer = answer.replace(/\s+(back to top|return to top|↑|⬆)\s*$/i, '');
+        
+        if (answer.length > 80) {
+          qa.push({ q: question, a: answer.slice(0, 1200) });
+        }
+      }
+    }
+
+    // Fallback: H2/H3 with following paragraphs (for non-accordion layouts)
+    if (qa.length < 3) {
+      const heads = Array.from(document.querySelectorAll('h2, h3'));
+      for (const h of heads) {
+        const question = h.textContent?.trim() || '';
+        if (!question || qa.some(item => item.q === question)) continue;
+        
+        let a = '';
+        let n = h.nextElementSibling;
+        let hops = 0;
+        while (n && hops < 8 && !/^H[1-6]$/.test(n.tagName)) {
+          if (n.tagName === 'P' || n.getAttribute('role') === 'region' || n.tagName === 'DIV') {
+            a += ' ' + (n.textContent || '').trim();
+          }
+          n = n.nextElementSibling;
+          hops++;
+        }
+        if (question && a.trim().length > 60) {
+          qa.push({ q: question, a: a.trim().slice(0, 1200) });
+        }
       }
     }
 
@@ -204,9 +288,11 @@ async function recommendWithGPT4(
 
   const system = [
     "You are Optiview's Content Recommender.",
-    'Your job: suggest minimal, correct Schema.org JSON-LD and concise content edits.',
-    'Voice: clear, empathetic, medically accurate, non-alarming (6th–8th grade reading).',
-    'Never invent medical claims or facts. Use only what the page shows.',
+    'Produce minimal, correct Schema.org JSON-LD and concise content edits.',
+    'Voice: clear, empathetic, medically accurate, non-alarming (US 6th–8th grade reading level).',
+    'Never invent clinical claims or medical facts. Only summarize what is explicitly shown on the page.',
+    'If information is missing, use placeholders like "[Page description]" rather than making assumptions.',
+    'For medical/health pages, maintain compliant language (e.g., "screening test" not "diagnostic test").',
   ].join(' ');
 
   const jsonSchema = {
@@ -288,8 +374,8 @@ async function recommendWithGPT4(
   return JSON.parse(content);
 }
 
-// Validate model output
-function validateReco(obj: any): asserts obj is ModelOutput {
+// Validate model output with enhanced Schema.org checks
+function validateReco(obj: any, requestUrl?: string): asserts obj is ModelOutput {
   const ajv = new Ajv({ allErrors: true, strict: false });
   const schema = {
     type: 'object',
@@ -307,6 +393,30 @@ function validateReco(obj: any): asserts obj is ModelOutput {
       throw new Error('LD-JSON missing @context/@type');
     }
     
+    // URL validation: must match request URL or canonical
+    if (ld.url && requestUrl) {
+      try {
+        const ldHost = new URL(ld.url).host.toLowerCase().replace(/^www\./, '');
+        const reqHost = new URL(requestUrl).host.toLowerCase().replace(/^www\./, '');
+        if (ldHost !== reqHost) {
+          throw new Error(`Schema.org URL host mismatch: ${ld.url} vs ${requestUrl}`);
+        }
+      } catch (e) {
+        console.warn('URL validation warning:', e);
+      }
+    }
+    
+    // WebPage validation
+    if (ld['@type'] === 'WebPage') {
+      if (ld.name && (ld.name.length < 5 || ld.name.length > 120)) {
+        throw new Error('WebPage.name must be 5-120 characters');
+      }
+      if (ld.description && (ld.description.length < 50 || ld.description.length > 160)) {
+        throw new Error('WebPage.description must be 50-160 characters');
+      }
+    }
+    
+    // FAQPage validation
     if (ld['@type'] === 'FAQPage') {
       if (!Array.isArray(ld.mainEntity) || ld.mainEntity.length === 0) {
         throw new Error('FAQPage requires non-empty mainEntity');
@@ -316,15 +426,16 @@ function validateReco(obj: any): asserts obj is ModelOutput {
         if (q['@type'] !== 'Question') {
           throw new Error('FAQPage mainEntity items must be Question');
         }
-        if (!q.name) {
-          throw new Error('Question.name required');
+        if (!q.name || q.name.length < 5) {
+          throw new Error('Question.name required (min 5 chars)');
         }
         if (
           !q.acceptedAnswer ||
           q.acceptedAnswer['@type'] !== 'Answer' ||
-          !q.acceptedAnswer.text
+          !q.acceptedAnswer.text ||
+          q.acceptedAnswer.text.length < 10
         ) {
-          throw new Error('Question.acceptedAnswer.text required');
+          throw new Error('Question.acceptedAnswer.text required (min 10 chars)');
         }
       }
     }

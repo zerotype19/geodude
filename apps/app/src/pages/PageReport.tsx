@@ -39,6 +39,7 @@ export default function PageReport() {
   const [recoJobId, setRecoJobId] = useState<string | null>(null);
   const [recoStatus, setRecoStatus] = useState<string | null>(null);
   const [generatedContent, setGeneratedContent] = useState<any | null>(null);
+  const [refreshCache, setRefreshCache] = useState(false);
 
   useEffect(() => {
     if (!target) {
@@ -149,7 +150,7 @@ export default function PageReport() {
       const res = await fetch('https://api.optiview.ai/v1/reco', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: target, audit_id: auditId })
+        body: JSON.stringify({ url: target, audit_id: auditId, refresh: refreshCache })
       });
       
       const data = await res.json();
@@ -486,7 +487,7 @@ export default function PageReport() {
           {/* Generate Content Button */}
           {!generatedContent && (
             <div style={{ marginBottom: 24, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>
                     🤖 AI Content Generation
@@ -516,6 +517,18 @@ export default function PageReport() {
                    recoStatus === 'error' ? 'Retry' :
                    'Generate Content'}
                 </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={refreshCache}
+                    onChange={(e) => setRefreshCache(e.target.checked)}
+                    disabled={!!recoStatus && recoStatus !== 'error'}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>⚡ Bypass cache (generate fresh)</span>
+                </label>
               </div>
               {recoStatus === 'error' && (
                 <div style={{ marginTop: 12, padding: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 6, fontSize: 14 }}>

@@ -511,7 +511,8 @@ export default {
       }
 
       try {
-        const body = await request.json<{ url: string; audit_id?: string; page_id?: string }>();
+        const body = await request.json<{ url: string; audit_id?: string; page_id?: string; refresh?: boolean }>();
+        const refresh = body.refresh || url.searchParams.get('refresh') === '1';
         
         if (!body.url || !/^https?:\/\//i.test(body.url)) {
           return new Response(
@@ -545,10 +546,16 @@ export default {
            VALUES (?, ?, ?, ?, ?, ?, ?)`
         ).bind(id, body.url, body.audit_id || null, body.page_id || null, 'queued', now, now).run();
 
-        await env.RECO_PRODUCER.send({ id, url: body.url, audit_id: body.audit_id, page_id: body.page_id });
+        await env.RECO_PRODUCER.send({ 
+          id, 
+          url: body.url, 
+          audit_id: body.audit_id, 
+          page_id: body.page_id,
+          refresh 
+        });
 
         return new Response(
-          JSON.stringify({ ok: true, id, status: 'queued' }),
+          JSON.stringify({ ok: true, id, status: 'queued', refresh }),
           {
             status: 202,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
