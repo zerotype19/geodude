@@ -48,15 +48,24 @@ export default function PublicAudit() {
         z-index: 9999;
         font-size: 14px;
         max-width: 400px;
+        cursor: pointer;
       `;
       notification.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 4px;">✓ New audit started!</div>
-        <div style="opacity: 0.9;">Redirecting to audit ${result.id}...</div>
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <div style="font-weight: 600; margin-bottom: 4px;">✓ New audit started!</div>
+            <div style="opacity: 0.9;">Redirecting to audit ${result.id}...</div>
+          </div>
+          <button style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; padding: 0; margin-left: 12px; line-height: 1;">×</button>
+        </div>
       `;
+      notification.onclick = () => notification.remove();
       document.body.appendChild(notification);
       
       // Navigate after brief delay to show notification
       setTimeout(() => {
+        setRerunning(false); // Reset state before navigation
+        notification.remove(); // Remove notification
         navigate(newAuditUrl);
       }, 800);
     } catch (e: any) {
@@ -86,12 +95,19 @@ export default function PublicAudit() {
         <div style="opacity: 0.9;">${message}</div>
         <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">Click to dismiss</div>
       `;
-      notification.onclick = () => notification.remove();
+      notification.onclick = () => {
+        notification.remove();
+        setRerunning(false); // Ensure state is reset when dismissed
+      };
       document.body.appendChild(notification);
       
-      // Auto-dismiss after 5 seconds
-      setTimeout(() => notification.remove(), 5000);
-      
+      // Auto-dismiss after 5 seconds and reset state
+      setTimeout(() => {
+        notification.remove();
+        setRerunning(false);
+      }, 5000);
+    } finally {
+      // Ensure state is always reset
       setRerunning(false);
     }
   }
