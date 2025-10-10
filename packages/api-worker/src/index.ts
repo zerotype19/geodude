@@ -777,9 +777,12 @@ export default {
       // Parse filter params
       const typeFilter = url.searchParams.get('type') as 'AEO' | 'GEO' | 'Organic' | null;
       const pathFilter = url.searchParams.get('path');
+      const providerFilter = url.searchParams.get('provider'); // 'Brave' or null
+      const modeFilter = url.searchParams.get('mode') as 'grounding' | 'summarizer' | null;
+      const isAIOfferedFilter = url.searchParams.get('isAIOffered') === 'true';
 
       try {
-        // Get all citations (we'll filter in-memory for now since we have type/pathname in response)
+        // Get all regular citations from DB
         const result = await env.DB.prepare(
           `SELECT engine, query, url, title, cited_at
            FROM citations
@@ -799,12 +802,47 @@ export default {
           }
         };
         
-        // Add type and pathname to all citations
+        // Add type and pathname to all DB citations
         let allCitations = (result.results || []).map((c: any) => ({
           ...c,
           type: classifyCitation(c),
-          pagePathname: extractPath(c.url)
+          pagePathname: extractPath(c.url),
+          provider: c.engine === 'brave' ? 'Brave' : null,
+          mode: null,
+          isAIOffered: false
         }));
+        
+        // Fetch Brave AI citations from brave_ai_json
+        const auditRow = await env.DB.prepare(
+          'SELECT brave_ai_json FROM audits WHERE id = ?'
+        ).bind(auditId).first<{ brave_ai_json: string | null }>();
+        
+        if (auditRow?.brave_ai_json) {
+          try {
+            const braveData = JSON.parse(auditRow.brave_ai_json);
+            const queries = braveData.queries || [];
+            
+            // Extract Brave AI sources
+            for (const query of queries) {
+              for (const source of (query.sources || [])) {
+                allCitations.push({
+                  engine: 'brave',
+                  query: query.query,
+                  url: source.url,
+                  title: source.title || null,
+                  cited_at: Date.now(), // Use current time for AI sources
+                  type: 'AEO', // Brave AI answers are AEO signals
+                  pagePathname: extractPath(source.url),
+                  provider: 'Brave',
+                  mode: query.mode,
+                  isAIOffered: true
+                });
+              }
+            }
+          } catch (e) {
+            console.error('Failed to parse brave_ai_json:', e);
+          }
+        }
         
         // Apply filters
         if (typeFilter) {
@@ -812,6 +850,15 @@ export default {
         }
         if (pathFilter) {
           allCitations = allCitations.filter((c: any) => c.pagePathname === pathFilter);
+        }
+        if (providerFilter) {
+          allCitations = allCitations.filter((c: any) => c.provider === providerFilter);
+        }
+        if (modeFilter) {
+          allCitations = allCitations.filter((c: any) => c.mode === modeFilter);
+        }
+        if (isAIOfferedFilter) {
+          allCitations = allCitations.filter((c: any) => c.isAIOffered === true);
         }
         
         // Calculate counts for all types (before pagination)
@@ -1199,7 +1246,7 @@ export default {
           `SELECT id, property_id, status, score_overall, score_crawlability, 
                   score_structured, score_answerability, score_trust, 
                   pages_crawled, pages_total, issues_count, 
-                  started_at, completed_at, error, ai_access_json
+                  started_at, completed_at, error, ai_access_json, ai_flags_json, brave_ai_json
            FROM audits WHERE id = ?`
         ).bind(auditId).first();
 
@@ -1404,6 +1451,37 @@ export default {
         // Parse AI flags
         const aiFlags = audit.ai_flags_json ? JSON.parse(audit.ai_flags_json as string) : null;
         
+        // Parse Brave AI results
+        let braveAI = null;
+        if (audit.brave_ai_json) {
+          try {
+            const braveData = JSON.parse(audit.brave_ai_json as string);
+            const queries = braveData.queries || [];
+            const allSources = queries.flatMap((q: any) => q.sources || []);
+            
+            // Helper: extract pathname from URL
+            const extractPathname = (urlStr: string): string => {
+              try {
+                const u = new URL(urlStr);
+                return u.pathname.replace(/\/+$/, '') || '/';
+              } catch {
+                return '/';
+              }
+            };
+            
+            const pagesCited = new Set(allSources.map((s: any) => extractPathname(s.url))).size;
+            
+            braveAI = {
+              totalQueries: queries.length,
+              totalSources: allSources.length,
+              pagesCited,
+              queries
+            };
+          } catch (e) {
+            console.error('Failed to parse brave_ai_json:', e);
+          }
+        }
+        
         // Build site metadata
         const site = {
           faqSchemaPresent: siteFaqSchemaPresent,
@@ -1413,6 +1491,7 @@ export default {
           aiBots,
           aiAccess,
           flags: aiFlags,
+          braveAI,
         };
 
         // Transform scores from flat columns to nested object
@@ -1446,6 +1525,26 @@ export default {
           } catch (_) {}
         }
 
+        // Build Brave AI answer counts per page path
+        const braveAnswersByPath = new Map<string, number>();
+        if (braveAI) {
+          const extractPathname = (urlStr: string): string => {
+            try {
+              const u = new URL(urlStr);
+              return u.pathname.replace(/\/+$/, '') || '/';
+            } catch {
+              return '/';
+            }
+          };
+          
+          for (const query of braveAI.queries) {
+            for (const source of (query.sources || [])) {
+              const path = extractPathname(source.url);
+              braveAnswersByPath.set(path, (braveAnswersByPath.get(path) || 0) + 1);
+            }
+          }
+        }
+
         // Transform pages and add citation counts
         const pagesOut = (pages.results as any[]).map((p: any) => {
           // Normalize path for citations mapping
@@ -1468,6 +1567,7 @@ export default {
             loadTimeMs: p.loadTimeMs ?? null,
             error: p.error ?? null,
             citationCount: countsByPath.get(path) || 0,
+            aiAnswers: braveAnswersByPath.get(path) || 0,  // Brave AI answer count
           };
         });
 

@@ -7,11 +7,13 @@ import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractO
 import { calculateScores } from './score';
 import { renderPage } from './render';
 import { checkCrawlability, probeAiAccess } from './crawl';
+import { runBraveAIQueries, extractPathname } from './brave/ai';
 
 interface Env {
   DB: D1Database;
   USER_AGENT: string;
   AUDIT_MAX_PAGES: string;
+  BRAVE_SEARCH?: string; // Brave API key (optional)
 }
 
 interface AuditIssue {
@@ -553,6 +555,25 @@ export async function runAudit(
     // Step 5: Calculate scores
     const scores = calculateScores(pages, issues, crawlabilityData, structuredData);
 
+    // Step 5.5: Run Brave AI queries (if enabled)
+    let braveAI: any = null;
+    const ENABLE_BRAVE = !!env.BRAVE_SEARCH;
+    
+    if (ENABLE_BRAVE) {
+      try {
+        console.log('Running Brave AI queries...');
+        const brand = property.display_name || property.domain.replace(/^www\./, '').split('.')[0];
+        const queries = await runBraveAIQueries(env.BRAVE_SEARCH!, property.domain, brand);
+        braveAI = { queries };
+        console.log(`Brave AI complete: ${queries.length} queries, ${queries.reduce((sum, q) => sum + (q.sources?.length || 0), 0)} total sources`);
+      } catch (e) {
+        console.error('Brave AI failed:', e instanceof Error ? e.message : String(e));
+        braveAI = null; // Graceful fallback
+      }
+    } else {
+      console.log('Brave AI disabled (no API key)');
+    }
+
     // Step 6: Save results to database
     await env.DB.prepare(
       `UPDATE audits 
@@ -567,6 +588,7 @@ export async function runAudit(
            issues_count = ?,
            ai_access_json = ?,
            ai_flags_json = ?,
+           brave_ai_json = ?,
            completed_at = datetime('now')
        WHERE id = ?`
     ).bind(
@@ -580,6 +602,7 @@ export async function runAudit(
       issues.length,
       JSON.stringify(aiAccess),
       JSON.stringify(aiFlags),
+      braveAI ? JSON.stringify(braveAI) : null,
       auditId
     ).run();
     
