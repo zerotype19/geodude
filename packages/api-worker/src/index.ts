@@ -1103,16 +1103,16 @@ export default {
           () => checkCitationsBudget(env) // budget guard
         );
 
-        // Compute rollups from pages for breakdown
+        // Compute rollups from pages for breakdown (use raw DB columns)
         const totalPages = pages.results.length;
-        const pagesWithJsonLd = pages.results.filter((p: any) => p.jsonLdCount > 0).length;
+        const pagesWithJsonLd = pages.results.filter((p: any) => (p.jsonld_count ?? 0) > 0).length;
         const pagesWithTitle = pages.results.filter((p: any) => p.title && p.title.length > 0).length;
-        const pagesWithH1 = pages.results.filter((p: any) => p.hasH1).length;
-        const pagesWithContent = pages.results.filter((p: any) => p.words >= 120).length;
-        const pages2xx = pages.results.filter((p: any) => p.statusCode >= 200 && p.statusCode < 300).length;
+        const pagesWithH1 = pages.results.filter((p: any) => p.has_h1).length;
+        const pagesWithContent = pages.results.filter((p: any) => (p.rendered_words ?? p.word_count ?? 0) >= 120).length;
+        const pages2xx = pages.results.filter((p: any) => (p.status_code ?? 0) >= 200 && (p.status_code ?? 0) < 300).length;
         
         // FAQ detection (separate page vs schema)
-        const siteFaqSchemaPresent = pages.results.some((p: any) => p.faqOnPage); // Has FAQPage JSON-LD
+        const siteFaqSchemaPresent = pages.results.some((p: any) => p.faq_present); // Has FAQPage JSON-LD
         const siteFaqPagePresent = pages.results.some((p: any) => {
           const url = String(p.url || '').toLowerCase();
           const title = String(p.title || '').toLowerCase();
@@ -1134,7 +1134,7 @@ export default {
         
         // Calculate average render time
         const renderTimes = pages.results
-          .map((p: any) => p.loadTimeMs)
+          .map((p: any) => p.load_time_ms)
           .filter((t: number) => t && t > 0);
         const avgRenderMs = renderTimes.length > 0 
           ? Math.round(renderTimes.reduce((sum: number, t: number) => sum + t, 0) / renderTimes.length)
@@ -1258,7 +1258,17 @@ export default {
             key = u.pathname.replace(/\/+$/,'') || '/';
           } catch (_) {}
           return {
-            ...mapToCamel(p),
+            url: p.url,
+            statusCode: p.status_code,
+            title: p.title,
+            h1: p.h1,
+            hasH1: p.has_h1,
+            jsonLdCount: p.jsonld_count,
+            faqOnPage: p.faq_present,
+            words: p.rendered_words ?? p.word_count ?? 0,
+            snippet: p.snippet,
+            loadTimeMs: p.load_time_ms,
+            error: p.error,
             citationCount: countsByPath.get(key) || 0,
           };
         });
