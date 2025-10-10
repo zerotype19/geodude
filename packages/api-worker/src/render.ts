@@ -59,14 +59,16 @@ export async function renderPage(
 
   try {
     if (env.BROWSER) {
-      // ---- Browser mode (headless Chromium) ----
+      // ---- Browser mode (Cloudflare Browser Rendering) ----
       try {
         console.log(`[render] browser mode for ${url}`);
-        const browser = await env.BROWSER.launch();
-        const context = await browser.newContext({
+        
+        // Cloudflare binding exposes newContext() directly; no launch()
+        const context = await env.BROWSER.newContext({
           userAgent: userAgent || USER_AGENT,
-          viewport: { width: 1366, height: 900 },
           javaScriptEnabled: true,
+          deviceScaleFactor: 1,
+          viewport: { width: 1366, height: 900 },
         });
 
         const page = await context.newPage();
@@ -90,8 +92,9 @@ export async function renderPage(
         }
 
         const html = await page.content();
+        
+        await page.close();
         await context.close();
-        await browser.close();
 
         const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
         

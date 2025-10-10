@@ -636,6 +636,8 @@ export default {
     // GET /v1/debug/render - Quick render test endpoint
     if (path === '/v1/debug/render' && request.method === 'GET') {
       const testUrl = url.searchParams.get('url');
+      const force = url.searchParams.get('force'); // "browser" | "html"
+      
       if (!testUrl) {
         return new Response(
           JSON.stringify({ error: 'Missing url query parameter' }),
@@ -645,7 +647,13 @@ export default {
 
       try {
         const { renderPage } = await import('./render');
-        const result = await renderPage(env, testUrl);
+        
+        // Temporarily override BROWSER binding for testing
+        const testEnv = force === 'html' ? { ...env, BROWSER: undefined } :
+                        force === 'browser' ? { ...env, BROWSER: env.BROWSER } : 
+                        env;
+        
+        const result = await renderPage(testEnv, testUrl);
         
         return new Response(
           JSON.stringify({
@@ -656,6 +664,7 @@ export default {
             hasH1: result.hasH1,
             jsonLdCount: result.jsonLdCount,
             status: result.status,
+            forced: force || 'auto',
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
