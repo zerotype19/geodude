@@ -168,12 +168,14 @@ export function buildSmartQueries(opts: SmartQueryOpts): string[] {
 /**
  * Call Brave Web Search API (correct endpoint)
  * This is step 1 of the two-step process
+ * Includes retry logic for 429 rate limit errors
  */
 async function callBraveWebSearch(
   apiKey: string,
   query: string,
   domain: string,
-  timeoutMs: number
+  timeoutMs: number,
+  retryCount: number = 0
 ): Promise<BraveQueryLog> {
   const ts = Date.now();
   const controller = new AbortController();
@@ -181,7 +183,7 @@ async function callBraveWebSearch(
 
   try {
     // CORRECT ENDPOINT per Brave API docs
-    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&summary=1`;
+    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}`;
 
     const response = await fetch(url, {
       headers: {
@@ -193,6 +195,14 @@ async function callBraveWebSearch(
     });
 
     clearTimeout(timeoutId);
+    
+    // Handle 429 rate limit with exponential backoff
+    if (response.status === 429 && retryCount < 2) {
+      const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s
+      console.log(`Rate limited on "${query}", retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return callBraveWebSearch(apiKey, query, domain, timeoutMs, retryCount + 1);
+    }
 
     const status = response.status;
     let sourcesTotal = 0;
@@ -358,6 +368,7 @@ async function callBraveSummarizer(
 /**
  * Run multiple Brave AI queries with concurrency control
  * SIMPLIFIED: Just use web search endpoint (correct per Brave docs)
+ * Added delays to prevent 429 rate limiting
  */
 export async function runBraveAIQueries(
   apiKey: string,
@@ -366,18 +377,35 @@ export async function runBraveAIQueries(
   opts?: { timeoutMs?: number; concurrency?: number }
 ): Promise<BraveQueryLog[]> {
   const timeoutMs = opts?.timeoutMs ?? 7000;
-  const concurrency = opts?.concurrency ?? 2;
+  const concurrency = opts?.concurrency ?? 1; // Reduced to 1 to avoid rate limits
   
   const limit = pLimit(concurrency);
+  const logs: BraveQueryLog[] = [];
 
-  // For each query, just call web search (the correct Brave API endpoint)
-  const tasks: Promise<BraveQueryLog>[] = [];
-  
-  for (const query of queries) {
-    tasks.push(limit(() => callBraveWebSearch(apiKey, query, domain, timeoutMs)));
+  // Process queries in batches with delays to avoid 429 errors
+  const batchSize = 5;
+  for (let i = 0; i < queries.length; i += batchSize) {
+    const batch = queries.slice(i, i + batchSize);
+    
+    const batchTasks = batch.map(query => 
+      limit(async () => {
+        const result = await callBraveWebSearch(apiKey, query, domain, timeoutMs);
+        // Add small delay between queries
+        await new Promise(resolve => setTimeout(resolve, 200));
+        return result;
+      })
+    );
+    
+    const batchResults = await Promise.all(batchTasks);
+    logs.push(...batchResults);
+    
+    // Add delay between batches (1 second)
+    if (i + batchSize < queries.length) {
+      console.log(`Completed ${i + batchSize}/${queries.length} queries, pausing...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
   }
 
-  const logs = await Promise.all(tasks);
   return logs;
 }
 

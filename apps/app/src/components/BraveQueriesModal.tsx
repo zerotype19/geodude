@@ -202,13 +202,13 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
                         {log.domainSources ?? 0}
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-xs text-zinc-400 max-w-md">
+                    <td className="py-3 px-3 text-xs max-w-md">
                       {log.domainPaths && log.domainPaths.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {log.domainPaths.map((path, pidx) => (
                             <span 
                               key={pidx}
-                              className="bg-zinc-800 px-1.5 py-0.5 rounded"
+                              className="bg-indigo-500/10 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/20"
                             >
                               {path}
                             </span>
