@@ -22,6 +22,85 @@ interface AuditIssue {
   details?: string;
 }
 
+// Helper: Normalize URL (strip tracking params, lowercase, canonical form)
+function normalizeUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    
+    // Remove tracking parameters
+    const trackingParams = [
+      'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+      'fbclid', 'gclid', 'msclkid', '_ga', 'mc_cid', 'mc_eid'
+    ];
+    
+    for (const param of trackingParams) {
+      urlObj.searchParams.delete(param);
+    }
+    
+    // Lowercase hostname, preserve path case, remove fragment
+    urlObj.hostname = urlObj.hostname.toLowerCase();
+    urlObj.hash = '';
+    
+    // Sort remaining params for consistency
+    urlObj.searchParams.sort();
+    
+    return urlObj.toString();
+  } catch {
+    return url;
+  }
+}
+
+// Helper: Check if URL is non-HTML (binary/document)
+function isNonHtmlUrl(url: string): boolean {
+  const nonHtmlExtensions = [
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.zip', '.rar', '.tar', '.gz', '.7z',
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.ico',
+    '.mp4', '.avi', '.mov', '.wmv', '.flv', '.mp3', '.wav',
+    '.xml', '.json', '.csv', '.txt'
+  ];
+  
+  try {
+    const urlObj = new URL(url);
+    const path = urlObj.pathname.toLowerCase();
+    return nonHtmlExtensions.some(ext => path.endsWith(ext));
+  } catch {
+    return false;
+  }
+}
+
+// Helper: Fetch and parse sitemap (supports sitemap index)
+async function fetchSitemapUrls(sitemapUrl: string, userAgent: string, maxUrls: number): Promise<string[]> {
+  try {
+    const response = await fetch(sitemapUrl, { headers: { 'User-Agent': userAgent } });
+    if (!response.ok) return [];
+    
+    const text = await response.text();
+    
+    // Check if this is a sitemap index
+    if (text.includes('<sitemapindex')) {
+      console.log('Detected sitemap index, fetching child sitemaps...');
+      const sitemapMatches = text.matchAll(/<loc>([^<]+)<\/loc>/g);
+      const childSitemaps = Array.from(sitemapMatches, m => m[1]);
+      
+      let allUrls: string[] = [];
+      for (const childUrl of childSitemaps.slice(0, 10)) { // Max 10 child sitemaps
+        const childUrls = await fetchSitemapUrls(childUrl, userAgent, maxUrls - allUrls.length);
+        allUrls.push(...childUrls);
+        if (allUrls.length >= maxUrls) break;
+      }
+      return allUrls;
+    }
+    
+    // Regular sitemap
+    const urlMatches = text.matchAll(/<loc>([^<]+)<\/loc>/g);
+    return Array.from(urlMatches, m => m[1]);
+  } catch (error) {
+    console.error(`Sitemap fetch failed: ${error}`);
+    return [];
+  }
+}
+
 export async function runAudit(propertyId: string, env: Env): Promise<string> {
   const auditId = `aud_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const maxPages = parseInt(env.AUDIT_MAX_PAGES || '100');
@@ -101,65 +180,68 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
     // Step 2: Get URLs to crawl (fallback to just homepage if no sitemap)
     let urlsToCrawl: string[] = [baseUrl];
     
-    // Try to fetch sitemap for URL list
-    try {
-      const sitemapUrl = `${baseUrl}/sitemap.xml`;
-      const sitemapResponse = await fetch(sitemapUrl, { headers: { 'User-Agent': env.USER_AGENT } });
+    // Step 2a: Fetch sitemap URLs (supports sitemap index)
+    let sitemapUrls = await fetchSitemapUrls(`${baseUrl}/sitemap.xml`, env.USER_AGENT, maxPages * 2);
+    
+    if (sitemapUrls.length > 0) {
+      console.log(`Fetched ${sitemapUrls.length} URLs from sitemap`);
       
-      if (sitemapResponse.ok) {
-        const sitemapText = await sitemapResponse.text();
-        const urlMatches = sitemapText.matchAll(/<loc>([^<]+)<\/loc>/g);
-        let sitemapUrls = Array.from(urlMatches, m => m[1]);
-        
-        // Filter URLs: exclude non-English paths and limit depth
-        sitemapUrls = sitemapUrls.filter(url => {
-          try {
-            const urlObj = new URL(url);
-            const path = urlObj.pathname.toLowerCase();
-            
-            // Exclude non-English language paths
-            const nonEnglishPatterns = [
-              '/es-us/', '/es/', '/es-mx/', '/es-la/',  // Spanish
-              '/fr/', '/fr-ca/', '/fr-fr/',              // French
-              '/de/', '/de-de/',                         // German
-              '/pt/', '/pt-br/',                         // Portuguese
-              '/it/', '/it-it/',                         // Italian
-              '/ja/', '/ja-jp/',                         // Japanese
-              '/zh/', '/zh-cn/', '/zh-tw/',              // Chinese
-              '/ko/', '/ko-kr/',                         // Korean
-              '/ru/', '/ru-ru/',                         // Russian
-              '/ar/', '/ar-sa/',                         // Arabic
-            ];
-            
-            for (const pattern of nonEnglishPatterns) {
-              if (path.includes(pattern)) {
-                return false;
-              }
-            }
-            
-            // Limit URL depth (max 4 levels: / /about /about/team /about/team/history)
-            const pathSegments = path.split('/').filter(Boolean);
-            if (pathSegments.length > 4) {
-              return false;
-            }
-            
-            return true;
-          } catch {
+      // Step 2b: Filter URLs
+      sitemapUrls = sitemapUrls.filter(url => {
+        try {
+          // Skip non-HTML files
+          if (isNonHtmlUrl(url)) {
             return false;
           }
-        });
-        
-        // Take up to maxPages URLs
-        sitemapUrls = sitemapUrls.slice(0, maxPages);
-        
-        if (sitemapUrls.length > 0) {
-          urlsToCrawl = sitemapUrls;
-          console.log(`Filtered to ${sitemapUrls.length} English URLs within 4 levels`);
+          
+          const urlObj = new URL(url);
+          const path = urlObj.pathname.toLowerCase();
+          
+          // Exclude non-English language paths
+          const nonEnglishPatterns = [
+            '/es-us/', '/es/', '/es-mx/', '/es-la/',  // Spanish
+            '/fr/', '/fr-ca/', '/fr-fr/',              // French
+            '/de/', '/de-de/',                         // German
+            '/pt/', '/pt-br/',                         // Portuguese
+            '/it/', '/it-it/',                         // Italian
+            '/ja/', '/ja-jp/',                         // Japanese
+            '/zh/', '/zh-cn/', '/zh-tw/',              // Chinese
+            '/ko/', '/ko-kr/',                         // Korean
+            '/ru/', '/ru-ru/',                         // Russian
+            '/ar/', '/ar-sa/',                         // Arabic
+          ];
+          
+          for (const pattern of nonEnglishPatterns) {
+            if (path.includes(pattern)) {
+              return false;
+            }
+          }
+          
+          // Limit URL depth (max 4 levels)
+          const pathSegments = path.split('/').filter(Boolean);
+          if (pathSegments.length > 4) {
+            return false;
+          }
+          
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      
+      // Step 2c: Normalize and dedupe URLs
+      const normalizedMap = new Map<string, string>();
+      for (const url of sitemapUrls) {
+        const normalized = normalizeUrl(url);
+        if (!normalizedMap.has(normalized)) {
+          normalizedMap.set(normalized, url); // Keep original URL
         }
       }
-    } catch (error) {
-      // Sitemap fetch failed, use homepage only
-      console.log('Sitemap fetch failed, using homepage only');
+      
+      urlsToCrawl = Array.from(normalizedMap.values()).slice(0, maxPages);
+      console.log(`After filtering: ${urlsToCrawl.length} English HTML URLs (deduped from ${sitemapUrls.length})`);
+    } else {
+      console.log('No sitemap URLs found, using homepage only');
     }
 
     // Step 3: Crawl pages (max 100 English URLs within 4 levels, 1 RPS throttle)
