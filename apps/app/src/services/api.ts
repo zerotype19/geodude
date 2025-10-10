@@ -15,7 +15,7 @@ export type AuditPage = {
   h1?: string;
   hasH1: boolean;
   jsonLdCount: number;
-  faqPresent: boolean;
+  faqOnPage?: boolean; // Only present if this page has FAQPage JSON-LD
   words: number;
   snippet?: string;
   loadTimeMs?: number;

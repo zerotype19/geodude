@@ -16,7 +16,7 @@ export interface RenderResult {
   snippet: string;
   hasH1: boolean;
   jsonLdCount: number;
-  faqPresent: boolean;
+  faqOnPage: boolean; // True only if this page has FAQPage JSON-LD
 }
 
 async function extractFromHTML(html: string): Promise<Omit<RenderResult, 'mode' | 'statusCode'>> {
@@ -33,23 +33,46 @@ async function extractFromHTML(html: string): Promise<Omit<RenderResult, 'mode' 
   const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
   const jsonLdCount = jsonLdScripts.length;
   
-  // Check for FAQ schema in JSON-LD
-  let faqPresent = false;
-  for (let i = 0; i < jsonLdScripts.length; i++) {
+  // Detect FAQPage on this specific page
+  const faqOnPage = detectFaqOnPage(document);
+
+  return { html, text, words, snippet, hasH1, jsonLdCount, faqOnPage };
+}
+
+/**
+ * Detects if this page has a FAQPage JSON-LD block.
+ * Only returns true if @type includes "FAQPage" (case-insensitive).
+ */
+function detectFaqOnPage(document: any): boolean {
+  const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+  
+  for (const s of scripts) {
+    const txt = ((s as any).textContent || '').trim();
+    if (!txt) continue;
+    
+    // Try to parse as JSON
     try {
-      const content = jsonLdScripts[i].textContent || '';
-      const data = JSON.parse(content);
-      const type = Array.isArray(data) ? data.map(d => d['@type']).join(',') : data['@type'];
-      if (type && (type.includes('FAQPage') || type.includes('Question'))) {
-        faqPresent = true;
-        break;
+      const parsed = JSON.parse(txt);
+      const blocks = Array.isArray(parsed) ? parsed : [parsed];
+      
+      for (const block of blocks) {
+        const type = block?.['@type'];
+        if (!type) continue;
+        
+        const types = Array.isArray(type) ? type : [type];
+        if (types.some((t: any) => String(t).toLowerCase() === 'faqpage')) {
+          return true;
+        }
       }
     } catch {
-      // Ignore parse errors
+      // Best-effort fallback: regex check for FAQPage in raw text
+      if (/"@type"\s*:\s*"FAQPage"/i.test(txt)) {
+        return true;
+      }
     }
   }
-
-  return { html, text, words, snippet, hasH1, jsonLdCount, faqPresent };
+  
+  return false;
 }
 
 export async function renderPage(
@@ -152,7 +175,7 @@ export async function renderPage(
       snippet: '',
       hasH1: false,
       jsonLdCount: 0,
-      faqPresent: false,
+      faqOnPage: false,
     };
   }
 }

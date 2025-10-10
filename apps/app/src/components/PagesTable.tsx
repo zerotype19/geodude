@@ -27,7 +27,9 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
           <th>Title</th>
           <th style={{ textAlign: 'right' }}>Words</th>
           <th>JSON-LD</th>
-          <th>FAQ</th>
+          <th title="Only shows 'Yes' when this page has a FAQPage JSON-LD block. FAQ is primarily a site-level signal.">
+            FAQ (page)
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -81,7 +83,7 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                 )}
               </td>
               <td>{p.jsonLdCount ?? 0}</td>
-              <td>{p.faqPresent ? "Yes" : "No"}</td>
+              <td>{p.faqOnPage ? "Yes" : "—"}</td>
             </tr>
           );
         })}

@@ -149,7 +149,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
           const snippet = rendered.snippet;
           const hasH1 = rendered.hasH1;
           const jsonLdCount = rendered.jsonLdCount;
-          const faqPresent = rendered.faqPresent;
+          const faqOnPage = rendered.faqOnPage; // Per-page FAQ detection
 
           // Still need to extract JSON-LD blocks for Organization check
           const jsonLdBlocks = extractJSONLD(html);
@@ -179,7 +179,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
             h1,
             has_h1: hasH1,
             jsonld_count: jsonLdCount,
-            faq_present: faqPresent,
+            faq_present: faqOnPage, // Store per-page FAQ detection
             word_count: wordCount,
             rendered_words: wordCount,
             snippet,

@@ -874,7 +874,7 @@ export default {
               snippet: pageRow.snippet,
               hasH1: !!pageRow.has_h1,
               jsonLdCount: pageRow.jsonld_count ?? 0,
-              faqPresent: !!pageRow.faq_present,
+              faqOnPage: !!pageRow.faq_present, // Per-page FAQ detection
               score_hints: scoreHints,
             },
             issues,
@@ -943,7 +943,7 @@ export default {
             h1: p.h1,
             hasH1: !!p.has_h1,
             jsonLdCount: p.jsonld_count ?? 0,
-            faqPresent: !!p.faq_present,
+            faqOnPage: !!p.faq_present, // Per-page FAQ detection
             words: p.rendered_words ?? p.word_count ?? 0,
             snippet: p.snippet,
             loadTimeMs: p.load_time_ms,
