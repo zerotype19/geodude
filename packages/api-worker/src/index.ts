@@ -234,10 +234,13 @@ export default {
           'SELECT COUNT(DISTINCT property_id) as d FROM audits WHERE started_at >= ?'
         ).bind(new Date(sevenDaysAgo * 1000).toISOString()).first<{ d: number }>();
 
+        // Clamp avg_score_7d to 0-100 and return as number
+        const avgScore7d = Math.min(100, Math.max(0, Math.round(avgScore7?.a ?? 0)));
+
         return new Response(
           JSON.stringify({
             audits_7d: audits7?.c ?? 0,
-            avg_score_7d: Number(avgScore7?.a ?? 0).toFixed(3),
+            avg_score_7d: avgScore7d, // Number 0-100, not string
             domains_7d: domains7?.d ?? 0,
             timestamp: new Date().toISOString(),
           }),

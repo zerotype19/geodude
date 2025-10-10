@@ -26,8 +26,12 @@ export default function Admin() {
     return () => clearInterval(id);
   }, []);
 
-  const pct = (v: any) =>
-    `${Math.round((typeof v === "string" ? parseFloat(v) : v) * 100)}%`;
+  // API returns 0-100 already, just clamp and format
+  const pct = (v: any) => {
+    const num = typeof v === "string" ? parseFloat(v) : (v ?? 0);
+    const clamped = Math.max(0, Math.min(100, Math.round(num)));
+    return `${clamped}%`;
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-50 px-6 py-10">

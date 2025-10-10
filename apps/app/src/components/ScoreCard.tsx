@@ -1,5 +1,6 @@
 export default function ScoreCard({ title, value }: { title: string; value: number }) {
-  const pct = Math.round((value ?? 0) * 100);
+  // Backend returns 0-100 already, just clamp and format
+  const pct = Math.max(0, Math.min(100, Math.round(value ?? 0)));
   
   return (
     <div className="card" style={{minWidth:180}}>

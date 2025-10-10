@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getAuditPage, b64u } from '../services/api';
 import IssuesTable from '../components/IssuesTable';
+import { StatCard } from '../components/StatCard';
 
 export default function PageReport() {
   const { auditId = '', encoded = '' } = useParams();
@@ -75,7 +76,7 @@ export default function PageReport() {
 
       <h1 style={{ margin: '8px 0 6px', fontSize: '32px' }}>Page Report</h1>
       <div style={{ opacity: 0.7, marginBottom: 16 }}>
-        {p.title || 'Untitled'} — {p.status || '-'} status
+        {p.title || 'Untitled'} — {p.statusCode || '-'} status
       </div>
 
       <div style={{
@@ -84,42 +85,27 @@ export default function PageReport() {
         gap: 12,
         marginBottom: 16
       }}>
-        <div style={{
-          padding: '16px',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          background: 'white'
-        }}>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Word Count</div>
-          <div style={{ fontSize: '24px', fontWeight: '600' }}>{p.word_count ?? '—'}</div>
-        </div>
-        <div style={{
-          padding: '16px',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          background: 'white'
-        }}>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Has H1</div>
-          <div style={{ fontSize: '24px', fontWeight: '600' }}>{p.has_h1 ? 'Yes' : 'No'}</div>
-        </div>
-        <div style={{
-          padding: '16px',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          background: 'white'
-        }}>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>JSON-LD</div>
-          <div style={{ fontSize: '24px', fontWeight: '600' }}>{p.json_ld_count ?? 0}</div>
-        </div>
-        <div style={{
-          padding: '16px',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          background: 'white'
-        }}>
-          <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>FAQ Present</div>
-          <div style={{ fontSize: '24px', fontWeight: '600' }}>{p.faq_present ? 'Yes' : 'No'}</div>
-        </div>
+        <StatCard 
+          label="Word Count" 
+          value={p.words ?? "—"} 
+          tone={(p.words ?? 0) >= 300 ? "good" : (p.words ?? 0) >= 120 ? "warn" : "bad"} 
+          sub="Rendered text" 
+        />
+        <StatCard 
+          label="Has H1" 
+          value={p.hasH1 ? "Yes" : "No"} 
+          tone={p.hasH1 ? "good" : "bad"} 
+        />
+        <StatCard 
+          label="JSON-LD" 
+          value={p.jsonLdCount ?? 0} 
+          tone={(p.jsonLdCount ?? 0) > 0 ? "good" : "bad"} 
+        />
+        <StatCard 
+          label="FAQ (page)" 
+          value={p.faqOnPage ? "Yes" : "—"} 
+          tone={p.faqOnPage ? "good" : "neutral"} 
+        />
       </div>
 
       <div style={{ margin: '12px 0 24px' }}>
