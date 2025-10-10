@@ -13,7 +13,8 @@ interface Env {
   DB: D1Database;
   USER_AGENT: string;
   AUDIT_MAX_PAGES: string;
-  BRAVE_SEARCH?: string; // Brave API key (optional)
+  BRAVE_SEARCH?: string; // Brave Search API key (for regular search)
+  BRAVE_SEARCH_AI?: string; // Brave AI API key (for AI Grounding & Summarizer)
 }
 
 interface AuditIssue {
@@ -557,13 +558,13 @@ export async function runAudit(
 
     // Step 5.5: Run Brave AI queries (if enabled)
     let braveAI: any = null;
-    const ENABLE_BRAVE = !!env.BRAVE_SEARCH;
+    const ENABLE_BRAVE = !!env.BRAVE_SEARCH_AI;
     
     if (ENABLE_BRAVE) {
       try {
         console.log('Running Brave AI queries...');
         const brand = property.display_name || property.domain.replace(/^www\./, '').split('.')[0];
-        const queries = await runBraveAIQueries(env.BRAVE_SEARCH!, property.domain, brand);
+        const queries = await runBraveAIQueries(env.BRAVE_SEARCH_AI!, property.domain, brand);
         braveAI = { queries };
         console.log(`Brave AI complete: ${queries.length} queries, ${queries.reduce((sum, q) => sum + (q.sources?.length || 0), 0)} total sources`);
       } catch (e) {
@@ -571,7 +572,7 @@ export async function runAudit(
         braveAI = null; // Graceful fallback
       }
     } else {
-      console.log('Brave AI disabled (no API key)');
+      console.log('Brave AI disabled (no BRAVE_SEARCH_AI key)');
     }
 
     // Step 6: Save results to database
