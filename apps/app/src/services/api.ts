@@ -74,10 +74,10 @@ export type AiAccess = {
   baselineStatus: number;
 };
 
-// Phase F+ enhanced types
+// Phase F+ enhanced types (fixed: correct API names)
 export type BraveQueryLog = {
   provider: 'brave';
-  api: 'grounding' | 'summarizer';
+  api: 'search' | 'summarizer';
   q: string;
   ts: number;
   ok: boolean;
@@ -93,7 +93,7 @@ export type BraveAIMeta = {
   queries: number;
   pagesCited: number;
   byApi: {
-    grounding: number;
+    search: number;
     summarizer: number;
   };
 };

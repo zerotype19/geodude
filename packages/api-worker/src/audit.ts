@@ -595,7 +595,7 @@ export async function runAudit(
         
         console.log(`Generated ${smartQueries.length} smart queries for ${brand}`);
         
-        // Run queries (each hits grounding + summarizer)
+        // Run queries (fixed: uses correct Brave Web Search API)
         braveQueryLogs = await runBraveAIQueries(
           env.BRAVE_SEARCH_AI!,
           smartQueries,
@@ -611,7 +611,7 @@ export async function runAudit(
         const domainSources = braveQueryLogs.reduce((sum, log) => sum + (log.domainSources ?? 0), 0);
         const uniquePaths = Array.from(new Set(braveQueryLogs.flatMap(log => log.domainPaths ?? [])));
         
-        console.log(`Brave AI complete: ${braveQueryLogs.length} queries (${smartQueries.length} unique), ${totalSources} total sources, ${domainSources} from domain, ${uniquePaths.length} unique paths cited`);
+        console.log(`Brave AI complete: ${braveQueryLogs.length} queries, ${totalSources} total sources, ${domainSources} from domain, ${uniquePaths.length} unique paths cited`);
       } catch (e) {
         console.error('Brave AI failed:', e instanceof Error ? e.message : String(e));
         braveQueryLogs = []; // Graceful fallback

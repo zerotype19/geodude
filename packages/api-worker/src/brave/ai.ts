@@ -1,11 +1,12 @@
 /**
- * Brave AI Answer Integration (Phase F+ "Stunner")
- * Smart query generation, detailed logging, and multi-mode support
+ * Brave AI Answer Integration (Phase F+ "Stunner") - FIXED
+ * Correct implementation using Brave's actual API endpoints
+ * Based on official documentation at api-dashboard.search.brave.com
  */
 
 import { uniq, clamp, extractPathname, pLimit } from '../util';
 
-export type BraveMode = 'grounding' | 'summarizer';
+export type BraveMode = 'search' | 'summarizer';
 export type Provider = 'brave';
 
 export interface BraveQueryLog {
@@ -165,12 +166,11 @@ export function buildSmartQueries(opts: SmartQueryOpts): string[] {
 }
 
 /**
- * Call a single Brave AI endpoint (grounding or summarizer)
- * Returns detailed log with timing, sources, and domain matches
+ * Call Brave Web Search API (correct endpoint)
+ * This is step 1 of the two-step process
  */
-async function callBrave(
+async function callBraveWebSearch(
   apiKey: string,
-  api: BraveMode,
   query: string,
   domain: string,
   timeoutMs: number
@@ -180,13 +180,8 @@ async function callBrave(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    // Construct appropriate endpoint URL
-    const baseUrl = 'https://api.search.brave.com/res/v1';
-    const endpoint = api === 'grounding' 
-      ? `${baseUrl}/ai/grounding`
-      : `${baseUrl}/summarizer/search`;
-    
-    const url = `${endpoint}?q=${encodeURIComponent(query)}`;
+    // CORRECT ENDPOINT per Brave API docs
+    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&summary=1`;
 
     const response = await fetch(url, {
       headers: {
@@ -207,19 +202,14 @@ async function callBrave(
     if (response.ok) {
       const data = await response.json();
 
-      // Extract sources (both APIs have slightly different structures)
+      // Extract sources from web results
       let sources: string[] = [];
       
-      if (api === 'grounding') {
-        // Grounding API structure
-        sources = (data.sources || []).map((s: any) => s.url).filter(Boolean);
-      } else {
-        // Summarizer API structure
-        const summary = data.summary || {};
-        const enrichments = summary.enrichments || [];
-        sources = enrichments
-          .filter((e: any) => e.type === 'web_search_api_item' && e.url)
-          .map((e: any) => e.url);
+      // Web search results contain multiple result types
+      if (data.web?.results) {
+        sources = data.web.results
+          .filter((r: any) => r.url)
+          .map((r: any) => r.url);
       }
 
       sourcesTotal = sources.length;
@@ -241,7 +231,7 @@ async function callBrave(
 
     return {
       provider: 'brave',
-      api,
+      api: 'search',
       q: query,
       ts,
       ok: response.ok,
@@ -258,7 +248,101 @@ async function callBrave(
     
     return {
       provider: 'brave',
-      api,
+      api: 'search',
+      q: query,
+      ts,
+      ok: false,
+      durationMs: Date.now() - ts,
+      sourcesTotal: 0,
+      domainSources: 0,
+      domainPaths: [],
+      error: error?.name === 'AbortError' ? 'timeout' : String(error?.message ?? error)
+    };
+  }
+}
+
+/**
+ * Call Brave Summarizer API (step 2, optional - only if we have a summarizer key)
+ * For now, we'll skip this since it requires the two-step flow
+ */
+async function callBraveSummarizer(
+  apiKey: string,
+  summarizerKey: string,
+  query: string,
+  domain: string,
+  timeoutMs: number
+): Promise<BraveQueryLog> {
+  const ts = Date.now();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const url = `https://api.search.brave.com/res/v1/summarizer/search?key=${encodeURIComponent(summarizerKey)}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip',
+        'X-Subscription-Token': apiKey
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    const status = response.status;
+    let sourcesTotal = 0;
+    let domainSources = 0;
+    let domainPaths: string[] = [];
+
+    if (response.ok) {
+      const data = await response.json();
+
+      // Summarizer returns enrichments with sources
+      let sources: string[] = [];
+      
+      if (data.summary?.enrichments) {
+        sources = data.summary.enrichments
+          .filter((e: any) => e.type === 'web_search_api_item' && e.url)
+          .map((e: any) => e.url);
+      }
+
+      sourcesTotal = sources.length;
+
+      const normalizedDomain = domain.replace(/^www\./, '');
+      const domainSourceUrls = sources.filter(url => {
+        try {
+          const urlHost = new URL(url).hostname.replace(/^www\./, '');
+          return urlHost === normalizedDomain;
+        } catch {
+          return false;
+        }
+      });
+
+      domainSources = domainSourceUrls.length;
+      domainPaths = uniq(domainSourceUrls.map(url => extractPathname(url)));
+    }
+
+    return {
+      provider: 'brave',
+      api: 'summarizer',
+      q: query,
+      ts,
+      ok: response.ok,
+      status,
+      durationMs: Date.now() - ts,
+      sourcesTotal,
+      domainSources,
+      domainPaths,
+      error: response.ok ? null : `HTTP ${status}`
+    };
+
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    return {
+      provider: 'brave',
+      api: 'summarizer',
       q: query,
       ts,
       ok: false,
@@ -273,7 +357,7 @@ async function callBrave(
 
 /**
  * Run multiple Brave AI queries with concurrency control
- * Each query hits both grounding AND summarizer endpoints
+ * SIMPLIFIED: Just use web search endpoint (correct per Brave docs)
  */
 export async function runBraveAIQueries(
   apiKey: string,
@@ -286,12 +370,11 @@ export async function runBraveAIQueries(
   
   const limit = pLimit(concurrency);
 
-  // For each query, call BOTH grounding and summarizer
+  // For each query, just call web search (the correct Brave API endpoint)
   const tasks: Promise<BraveQueryLog>[] = [];
   
   for (const query of queries) {
-    tasks.push(limit(() => callBrave(apiKey, 'grounding', query, domain, timeoutMs)));
-    tasks.push(limit(() => callBrave(apiKey, 'summarizer', query, domain, timeoutMs)));
+    tasks.push(limit(() => callBraveWebSearch(apiKey, query, domain, timeoutMs)));
   }
 
   const logs = await Promise.all(tasks);

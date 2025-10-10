@@ -63,7 +63,7 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
 
   const total = logs.length;
   const uniquePaths = Array.from(new Set(logs.flatMap(l => l.domainPaths ?? []))).length;
-  const groundingLogs = logs.filter(l => l.api === 'grounding');
+  const searchLogs = logs.filter(l => l.api === 'search');
   const summarizerLogs = logs.filter(l => l.api === 'summarizer');
 
   return (
@@ -97,12 +97,16 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
             </span>
             <span>•</span>
             <span>
-              Grounding: <strong className="text-indigo-400">{groundingLogs.length}</strong>
+              Web Search: <strong className="text-indigo-400">{searchLogs.length}</strong>
             </span>
-            <span>•</span>
-            <span>
-              Summarizer: <strong className="text-purple-400">{summarizerLogs.length}</strong>
-            </span>
+            {summarizerLogs.length > 0 && (
+              <>
+                <span>•</span>
+                <span>
+                  Summarizer: <strong className="text-purple-400">{summarizerLogs.length}</strong>
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -166,18 +170,25 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
                     <td className="py-3 px-3">
                       <span className={`
                         inline-block px-2 py-0.5 rounded text-xs font-medium
-                        ${log.api === 'grounding' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-purple-500/20 text-purple-300'}
+                        ${log.api === 'search' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}
                       `}>
                         {log.api}
                       </span>
                     </td>
                     <td className="py-3 px-3">
                       {log.ok ? (
-                        <span className="text-emerald-400 font-medium">{log.status ?? 'OK'}</span>
+                        <span className="text-emerald-400 font-medium tabular-nums">{log.status ?? 'OK'}</span>
                       ) : (
-                        <span className="text-rose-400 text-xs" title={log.error ?? undefined}>
-                          {log.error || 'failed'}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-rose-400 font-medium tabular-nums">
+                            {log.status || 'ERR'}
+                          </span>
+                          {log.error && (
+                            <span className="text-rose-300 text-xs max-w-[200px] truncate" title={log.error}>
+                              {log.error}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="py-3 px-3 text-right text-zinc-400 tabular-nums">
@@ -216,9 +227,8 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
 
         {/* Footer */}
         <div className="border-t border-zinc-800 p-4 bg-zinc-900/50 text-xs text-zinc-500 text-center">
-          Each query hits both <span className="text-indigo-400">Grounding</span> and{' '}
-          <span className="text-purple-400">Summarizer</span> APIs.
-          {total > 0 && ` ${(total / 2).toFixed(0)} unique queries × 2 = ${total} API calls.`}
+          Using Brave <span className="text-blue-400">Web Search API</span> with AI summary enabled.
+          {total > 0 && ` ${total} ${total === 1 ? 'query' : 'queries'} executed.`}
         </div>
       </div>
     </div>

@@ -1635,15 +1635,15 @@ export default {
               });
             });
             
-            // Count by API type
-            const groundingCount = queries.filter((q: any) => q.api === 'grounding').length;
+            // Count by API type (fixed: uses 'search' and 'summarizer')
+            const searchCount = queries.filter((q: any) => q.api === 'search').length;
             const summarizerCount = queries.filter((q: any) => q.api === 'summarizer').length;
             
             braveAI = {
               queries: queries.length,
               pagesCited: allDomainPaths.size,
               byApi: {
-                grounding: groundingCount,
+                search: searchCount,
                 summarizer: summarizerCount
               }
             };
