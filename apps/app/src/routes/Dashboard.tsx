@@ -71,30 +71,71 @@ export default function Dashboard() {
 
   return (
     <>
+      <h1>Optiview — Dashboard</h1>
+      
       <div className="card">
-        <div className="row" style={{alignItems:"center"}}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
           <div>
-            <div>API Key</div>
-            <div style={{display:"flex",gap:8,marginTop:6}}>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: '#475569' }}>API Key</div>
+            <div style={{ display: 'flex', gap: 8 }}>
               <input 
-                placeholder="x-api-key" 
+                placeholder="prj_live_..." 
                 value={apiKey} 
                 onChange={e => save(e.target.value)} 
-                style={{minWidth:300}}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontFamily: 'Monaco, Consolas, monospace'
+                }}
               />
-              <button onClick={clear}>Clear</button>
+              <button 
+                onClick={clear}
+                style={{
+                  padding: '8px 16px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500
+                }}
+              >
+                Clear
+              </button>
             </div>
           </div>
           <div>
-            <div>Property ID</div>
-            <div style={{display:"flex",gap:8,marginTop:6}}>
+            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: '#475569' }}>Property ID</div>
+            <div style={{ display: 'flex', gap: 8 }}>
               <input 
                 value={propertyId} 
                 onChange={e => setPropertyId(e.target.value)} 
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontFamily: 'Monaco, Consolas, monospace'
+                }}
               />
               <button 
                 onClick={runAudit} 
                 disabled={!apiKey || loading}
+                style={{
+                  padding: '8px 16px',
+                  background: (!apiKey || loading) ? '#cbd5e1' : '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: (!apiKey || loading) ? 'not-allowed' : 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500
+                }}
               >
                 {loading ? "Running..." : "Run Audit"}
               </button>
@@ -102,8 +143,14 @@ export default function Dashboard() {
                 onClick={() => setShowAdvanced(true)} 
                 disabled={!apiKey || loading}
                 style={{
-                  background: '#27272a',
-                  border: '1px solid #3f3f46',
+                  padding: '8px 16px',
+                  background: (!apiKey || loading) ? '#f8fafc' : 'white',
+                  color: (!apiKey || loading) ? '#cbd5e1' : '#475569',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  cursor: (!apiKey || loading) ? 'not-allowed' : 'pointer',
+                  fontSize: 14,
+                  fontWeight: 500
                 }}
               >
                 Advanced...
@@ -112,11 +159,17 @@ export default function Dashboard() {
           </div>
         </div>
         {audit?.id && (
-          <div style={{marginTop:8}}>
-            Share link copied: <code>{`${location.origin}/a/${audit.id}`}</code>
+          <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6 }}>
+            <span style={{ color: '#166534', fontSize: 14 }}>
+              ✓ Share link copied: <code style={{ background: 'white', padding: '2px 6px', borderRadius: 4, fontSize: 13 }}>{`${location.origin}/a/${audit.id}`}</code>
+            </span>
           </div>
         )}
-        {error && <div style={{marginTop:8, color:"#fca5a5"}}>{error}</div>}
+        {error && (
+          <div style={{ marginTop: 16, padding: 12, background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6, color: '#991b1b' }}>
+            {error}
+          </div>
+        )}
       </div>
 
       <AdvancedRunDrawer
@@ -144,50 +197,33 @@ export default function Dashboard() {
             />
           )}
 
-          <div style={{display:'flex', gap:12, marginTop:16, marginBottom:8}}>
+          <div className="tabs-container" style={{ marginTop: 24 }}>
             {(['scores', 'issues', 'pages', 'citations'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: '8px 16px',
-                  background: activeTab === tab ? '#3b82f6' : '#1e293b',
-                  border: 'none',
-                  color: activeTab === tab ? 'white' : '#94a3b8',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  fontSize: 14
-                }}
+                className={`tab-button ${activeTab === tab ? 'active' : ''}`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
 
-          <div className="card">
+          <div className="tab-content">
             {activeTab === 'scores' && (
               <div>
-                <h3 style={{marginTop:0}}>Score Breakdown</h3>
-                <p style={{opacity:0.8}}>Overall score: {Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</p>
+                <h3 style={{ marginTop: 0 }}>Score Breakdown</h3>
+                <p style={{ color: '#64748b' }}>Overall score: {Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</p>
               </div>
             )}
             {activeTab === 'issues' && (
-              <>
-                <h3 style={{marginTop:0}}>Issues</h3>
-                <IssuesTable issues={audit.issues || []}/>
-              </>
+              <IssuesTable issues={audit.issues || []}/>
             )}
             {activeTab === 'pages' && (
-              <>
-                <h3 style={{marginTop:0}}>Pages</h3>
-                <PagesTable pages={audit.pages || []}/>
-              </>
+              <PagesTable pages={audit.pages || []} auditId={audit.id}/>
             )}
             {activeTab === 'citations' && (
-              <>
-                <h3 style={{marginTop:0}}>Citations</h3>
-                <Citations auditId={audit.id} citations={audit.citations}/>
-              </>
+              <Citations auditId={audit.id} citations={audit.citations}/>
             )}
           </div>
         </>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { getAuditPage, getPageRecommendations, getAuditCitations, b64u, type PageRecommendations, type Citation } from '../services/api';
+import { getAuditPage, getPageRecommendations, getAuditCitations, b64u, type PageRecommendations, type Citation, type CitationType } from '../services/api';
 import IssuesTable from '../components/IssuesTable';
 import { StatCard } from '../components/StatCard';
 
@@ -111,6 +111,27 @@ export default function PageReport() {
       {ok ? '✓ ' : '✕ '}{label}
     </span>
   );
+
+  const renderTypeBadge = (type: CitationType) => {
+    const styles = {
+      AEO: { background: '#8b5cf6', color: 'white' },
+      GEO: { background: '#3b82f6', color: 'white' },
+      Organic: { background: '#10b981', color: 'white' }
+    }[type];
+
+    return (
+      <span 
+        className="pill" 
+        style={{ 
+          ...styles,
+          marginLeft: 12,
+          flexShrink: 0
+        }}
+      >
+        {type}
+      </span>
+    );
+  };
 
   const formatUrl = (url: string) => {
     try {
@@ -240,26 +261,19 @@ export default function PageReport() {
                 {citations.map((citation, idx) => {
                   const urlObj = new URL(citation.url);
                   
-                  // Type badge colors
-                  let typeBadgeStyle = { background: '#10b981', color: 'white' }; // Organic
-                  if (citation.type === 'AEO') {
-                    typeBadgeStyle = { background: '#8b5cf6', color: 'white' };
-                  } else if (citation.type === 'GEO') {
-                    typeBadgeStyle = { background: '#3b82f6', color: 'white' };
-                  }
-                  
                   return (
                     <div 
                       key={idx} 
                       style={{ 
                         padding: 12, 
-                        background: '#1a1b1e', 
+                        background: 'white', 
                         borderRadius: 8,
                         marginBottom: 8,
-                        border: '1px solid #2a2b2e',
+                        border: '1px solid #e2e8f0',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'start'
+                        alignItems: 'start',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
                       }}
                     >
                       <div style={{ flex: 1 }}>
@@ -271,31 +285,20 @@ export default function PageReport() {
                             fontWeight: 500, 
                             fontSize: 15,
                             textDecoration: 'none',
-                            color: '#93c5fd'
+                            color: '#3b82f6'
                           }}
                         >
                           {citation.title || citation.url}
                         </a>
                         <div style={{ 
                           fontSize: 12, 
-                          opacity: 0.6, 
+                          color: '#64748b', 
                           marginTop: 4
                         }}>
                           {urlObj.hostname} • via {citation.engine}
                         </div>
                       </div>
-                      <span 
-                        className="pill" 
-                        style={{ 
-                          ...typeBadgeStyle,
-                          fontSize: 11,
-                          padding: '4px 8px',
-                          marginLeft: 12,
-                          flexShrink: 0
-                        }}
-                      >
-                        {citation.type}
-                      </span>
+                      {renderTypeBadge(citation.type)}
                     </div>
                   );
                 })}

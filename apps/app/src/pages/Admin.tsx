@@ -34,98 +34,112 @@ export default function Admin() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-50 px-6 py-10">
-      <div className="max-w-5xl mx-auto space-y-8">
-        <header className="flex items-center justify-between">
-          <h1 className="text-3xl font-semibold">Optiview — Admin Dashboard</h1>
-          <div className="space-x-3">
-            <button
-              onClick={load}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm"
-            >
-              Refresh
-            </button>
-            <a
-              href="/admin/logout"
-              className="text-sm text-gray-400 hover:text-gray-200"
-            >
-              Logout
-            </a>
-          </div>
-        </header>
-
-        <p className="text-gray-400 text-sm">
-          Live operational metrics. Auto-refresh every 30 s.
-        </p>
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-400 text-red-300 p-4 rounded-lg">
-            Error: {error}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="text-gray-400">Loading…</div>
-        ) : (
-          data && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <StatCard title="Audits (7d)" value={data.audits_7d} />
-                <StatCard title="Avg. Score (7d)" value={pct(data.avg_score_7d)} />
-                <StatCard title="Domains (7d)" value={data.domains_7d} />
-              </div>
-
-              {/* AI Bot Access Summary */}
-              {data.ai_access && (
-                <div className="mt-3 text-xs text-zinc-400 flex flex-wrap gap-2">
-                  <span>AI bots allowed: {data.ai_access.allowed}/{data.ai_access.tested}</span>
-                  {data.ai_access.waf && <span>• WAF: {data.ai_access.waf}</span>}
-                </div>
-              )}
-
-              {data.citations_budget && (
-                <div className="mt-6 bg-gray-900 p-6 rounded-xl border border-gray-800">
-                  <h2 className="font-medium text-gray-300 mb-3">
-                    Citations Budget
-                  </h2>
-                  <div className="text-sm text-gray-400 mb-2">
-                    {data.citations_budget.used}/{data.citations_budget.max} used —{" "}
-                    {data.citations_budget.remaining} remaining
-                  </div>
-                  <div className="w-full h-2 bg-gray-800 rounded">
-                    <div
-                      className={`h-2 rounded bg-emerald-500`}
-                      style={{
-                        width: `${
-                          (data.citations_budget.used / data.citations_budget.max) *
-                          100
-                        }%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              <footer className="mt-10 text-xs text-gray-500">
-                Last updated:{" "}
-                {new Date(data.timestamp).toLocaleString(undefined, {
-                  dateStyle: "short",
-                  timeStyle: "medium",
-                })}
-              </footer>
-            </>
-          )
-        )}
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h1>Optiview — Admin Dashboard</h1>
+          <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
+            Live operational metrics. Auto-refresh every 30 s.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button
+            onClick={load}
+            style={{
+              padding: '8px 16px',
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: 500
+            }}
+          >
+            Refresh
+          </button>
+          <a
+            href="/admin/logout"
+            style={{ color: '#3b82f6', textDecoration: 'none', fontSize: 14 }}
+          >
+            Logout
+          </a>
+        </div>
       </div>
+
+      {error && (
+        <div style={{
+          padding: 16,
+          background: '#fee2e2',
+          border: '1px solid #fca5a5',
+          color: '#991b1b',
+          borderRadius: 8,
+          marginBottom: 16
+        }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Loading…</div>
+      ) : (
+        data && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+              <StatCard title="Audits (7d)" value={data.audits_7d} />
+              <StatCard title="Avg. Score (7d)" value={pct(data.avg_score_7d)} />
+              <StatCard title="Domains (7d)" value={data.domains_7d} />
+            </div>
+
+            {/* AI Bot Access Summary */}
+            {data.ai_access && (
+              <div style={{ marginBottom: 16, fontSize: 13, color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                <span>AI bots allowed: {data.ai_access.allowed}/{data.ai_access.tested}</span>
+                {data.ai_access.waf && <span>• WAF: {data.ai_access.waf}</span>}
+              </div>
+            )}
+
+            {data.citations_budget && (
+              <div className="card" style={{ marginTop: 24 }}>
+                <h2 style={{ margin: '0 0 12px' }}>Citations Budget</h2>
+                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12 }}>
+                  {data.citations_budget.used}/{data.citations_budget.max} used —{" "}
+                  {data.citations_budget.remaining} remaining
+                </div>
+                <div style={{ width: '100%', height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      background: '#10b981',
+                      width: `${
+                        (data.citations_budget.used / data.citations_budget.max) * 100
+                      }%`,
+                      transition: 'width 0.3s ease'
+                    }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 40, fontSize: 12, color: '#94a3b8' }}>
+              Last updated:{" "}
+              {new Date(data.timestamp).toLocaleString(undefined, {
+                dateStyle: "short",
+                timeStyle: "medium",
+              })}
+            </div>
+          </>
+        )
+      )}
     </div>
   );
 }
 
 function StatCard({ title, value }: { title: string; value: any }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-      <div className="text-gray-400 text-sm">{title}</div>
-      <div className="text-2xl font-semibold text-white mt-2">{value ?? "—"}</div>
+    <div className="card">
+      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: 28, fontWeight: 700, color: '#1e293b' }}>{value ?? "—"}</div>
     </div>
   );
 }
