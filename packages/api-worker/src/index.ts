@@ -645,7 +645,7 @@ export default {
     // GET /v1/debug/render - Quick render test endpoint
     if (path === '/v1/debug/render' && request.method === 'GET') {
       const testUrl = url.searchParams.get('url');
-      const force = url.searchParams.get('force'); // "browser" | "html"
+      const force = url.searchParams.get('force') as 'browser' | 'html' | null;
       
       if (!testUrl) {
         return new Response(
@@ -657,15 +657,14 @@ export default {
       try {
         const { renderPage } = await import('./render');
         
-        // Temporarily override BROWSER binding for testing
-        const testEnv = force === 'html' ? { ...env, BROWSER: undefined } :
-                        force === 'browser' ? { ...env, BROWSER: env.BROWSER } : 
-                        env;
-        
         // Clear any previous error hint
         (globalThis as any).__render_error_hint = undefined;
         
-        const result = await renderPage(testEnv, testUrl, { debug: true });
+        const result = await renderPage(env, testUrl, { 
+          force: force || undefined,
+          debug: true 
+        });
+        
         const hint = (globalThis as any).__render_error_hint;
         
         return new Response(
@@ -682,11 +681,14 @@ export default {
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-      } catch (error) {
+      } catch (error: any) {
         return new Response(
           JSON.stringify({
+            ok: false,
             error: 'Render failed',
-            message: error instanceof Error ? error.message : String(error),
+            message: error?.message || String(error),
+            forced: force || 'auto',
+            hint: error?.message || String(error),
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );

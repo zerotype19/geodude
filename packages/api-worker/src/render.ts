@@ -1,164 +1,121 @@
-// Unified renderer: "browser" (CF Browser), "browserless", "html" (fallback).
-// Returns { mode, html, text, status, hasH1, jsonLdCount, snippet, words }
+// Cloudflare Browser Rendering using official @cloudflare/puppeteer adapter
+// Falls back to HTML + Readability when browser unavailable
 
+import puppeteer from '@cloudflare/puppeteer';
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 
+type Mode = 'browser' | 'html';
+
 export interface RenderResult {
-  mode: 'browser' | 'browserless' | 'html';
+  mode: Mode;
+  status: number;
   html: string;
   text: string;
-  status: number;
+  words: number;
+  snippet: string;
   hasH1: boolean;
   jsonLdCount: number;
-  snippet: string;
-  words: number;
 }
 
-const ABSOLUTE_TIMEOUT_MS = 30_000;
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 OptiviewAudit/0.16';
-
-function extractReadable(html: string): {
-  text: string;
-  words: number;
-  hasH1: boolean;
-  jsonLdCount: number;
-  snippet: string;
-} {
+async function extractFromHTML(html: string): Promise<Omit<RenderResult, 'mode' | 'status'>> {
   const { document } = parseHTML(html);
+  
+  // Use Readability for main content
+  const reader = new Readability(document as any);
+  const article = reader.parse();
+  const text = (article?.textContent || document.body?.textContent || '').trim();
+  const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+  const snippet = (article?.excerpt || text.slice(0, 240)).trim();
 
   const hasH1 = !!document.querySelector('h1');
   const jsonLdCount = document.querySelectorAll('script[type="application/ld+json"]').length;
 
-  // Use Readability for main content
-  const documentClone = document.cloneNode(true) as Document;
-  const reader = new Readability(documentClone);
-  const article = reader.parse();
-  const text = (article?.textContent || document.body?.textContent || '')
-    .trim()
-    .replace(/\s+/g, ' ');
-  const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
-  const snippet = (article?.excerpt || text).slice(0, 280);
-
-  return { text, words, hasH1, jsonLdCount, snippet };
+  return { html, text, words, snippet, hasH1, jsonLdCount };
 }
 
-/**
- * Render a page using Cloudflare Browser Rendering when available,
- * otherwise fall back to fetch + Readability.
- */
 export async function renderPage(
   env: any,
   url: string,
-  opts?: { debug?: boolean; userAgent?: string }
+  opts?: { force?: Mode; userAgent?: string; debug?: boolean }
 ): Promise<RenderResult> {
-  const userAgent = opts?.userAgent;
-  const controller = new AbortController();
-  const kill = setTimeout(() => controller.abort(), ABSOLUTE_TIMEOUT_MS);
+  const force = opts?.force;
 
+  // Try Browser first unless forced to html
+  if (force !== 'html' && env.BROWSER) {
+    try {
+      console.log(`[render] attempting browser mode for ${url}`);
+      
+      // Official Cloudflare Browser Rendering API
+      const browser = await puppeteer.launch(env.BROWSER);
+      const page = await browser.newPage();
+      page.setDefaultNavigationTimeout(30_000);
+
+      // Set user agent if provided
+      if (opts?.userAgent) {
+        await page.setUserAgent(opts.userAgent);
+      }
+
+      // Navigate and wait for content
+      await page.goto(url, {
+        waitUntil: ['load', 'domcontentloaded', 'networkidle0'] as any,
+        timeout: 30_000,
+      });
+
+      // Get full HTML after JS runs
+      const html: string = await page.content();
+
+      // Clean up
+      await browser.close();
+
+      const extracted = await extractFromHTML(html);
+      console.log(`[render] browser: ${url} -> ${extracted.words} words`);
+      
+      return { mode: 'browser', status: 200, ...extracted };
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      console.error(`[render] browser failed for ${url}, falling back:`, errorMsg);
+      
+      // Surface error in debug mode
+      if (opts?.debug) {
+        (globalThis as any).__render_error_hint = errorMsg;
+      }
+      
+      // Fall through to HTML mode
+    }
+  }
+
+  // HTML fallback (fetch + Readability)
+  console.log(`[render] html mode for ${url}`);
   try {
-    if (env.BROWSER) {
-      // ---- Browser mode (Cloudflare Browser Rendering) ----
-      try {
-        console.log(`[render] browser mode for ${url}`);
-        
-        // Cloudflare binding exposes newContext() directly; no launch()
-        const context = await env.BROWSER.newContext({
-          userAgent: userAgent || USER_AGENT,
-          javaScriptEnabled: true,
-          deviceScaleFactor: 1,
-          viewport: { width: 1366, height: 900 },
-        });
-
-        const page = await context.newPage();
-        page.setDefaultNavigationTimeout(ABSOLUTE_TIMEOUT_MS);
-        
-        let status = 200;
-        try {
-          const response = await page.goto(url, { waitUntil: 'networkidle' });
-          if (response && typeof response.status === 'function') {
-            status = response.status();
-          }
-        } catch (e) {
-          console.log(`[render] navigation warning for ${url}:`, e);
-        }
-
-        // Optionally wait for body to have some content
-        try {
-          await page.waitForSelector('body', { timeout: 5000 });
-        } catch (e) {
-          console.log(`[render] body wait timeout for ${url}`);
-        }
-
-        const html = await page.content();
-        
-        await page.close();
-        await context.close();
-
-        const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
-        
-        console.log(`[render] browser: ${url} -> ${words} words`);
-        return { mode: 'browser', html, text, status, hasH1, jsonLdCount, snippet, words };
-      } catch (error: any) {
-        const errorMsg = String(error?.message || error);
-        console.error(`[render] browser failed for ${url}, falling back to HTML:`, errorMsg);
-        
-        // Surface the error in debug mode
-        if (opts?.debug) {
-          (globalThis as any).__render_error_hint = errorMsg;
-        }
-        
-        // Fall through to HTML mode
-      }
-    }
-
-    if (env.BROWSERLESS_URL) {
-      // ---- Browserless mode ----
-      try {
-        console.log(`[render] browserless mode for ${url}`);
-        const body = {
-          url,
-          options: { waitUntil: 'networkidle', timeout: ABSOLUTE_TIMEOUT_MS },
-          gotoOptions: { waitUntil: 'networkidle' },
-          html: true,
-        };
-        const r = await fetch(`${env.BROWSERLESS_URL}/playwright?stealth=true`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-        const status = r.status;
-        const html = await r.text();
-        const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
-        
-        console.log(`[render] browserless: ${url} -> ${words} words`);
-        return { mode: 'browserless', html, text, status, hasH1, jsonLdCount, snippet, words };
-      } catch (error) {
-        console.error(`[render] browserless failed for ${url}, falling back to HTML:`, error);
-        // Fall through to HTML mode
-      }
-    }
-
-    // ---- HTML fallback (fetch + Readability) ----
-    console.log(`[render] html mode for ${url}`);
     const resp = await fetch(url, {
-      signal: controller.signal,
+      redirect: 'follow',
       headers: {
-        'user-agent': userAgent || USER_AGENT,
-        accept: 'text/html,*/*;q=0.9',
+        'user-agent': opts?.userAgent || 
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+          '(KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 OptiviewAudit/0.16',
       },
+      cf: { cacheTtl: 300, cacheEverything: true } as any,
     });
-    const status = resp.status;
-    const html = await resp.text();
-
-    const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
     
-    console.log(`[render] html: ${url} -> ${words} words`);
-    return { mode: 'html', html, text, status, hasH1, jsonLdCount, snippet, words };
-  } finally {
-    clearTimeout(kill);
+    const html = await resp.text();
+    const extracted = await extractFromHTML(html);
+    
+    console.log(`[render] html: ${url} -> ${extracted.words} words`);
+    return { mode: 'html', status: resp.status, ...extracted };
+  } catch (err: any) {
+    console.error(`[render] html fetch failed for ${url}:`, err?.message);
+    
+    // Return empty result
+    return {
+      mode: 'html',
+      status: 0,
+      html: '',
+      text: '',
+      words: 0,
+      snippet: '',
+      hasH1: false,
+      jsonLdCount: 0,
+    };
   }
 }
