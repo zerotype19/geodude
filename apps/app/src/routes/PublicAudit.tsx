@@ -32,10 +32,66 @@ export default function PublicAudit() {
     try {
       setRerunning(true);
       const result = await rerunAudit(id);
-      navigate(`/a/${result.id}`);
+      
+      // Show success message before navigating
+      const newAuditUrl = `/a/${result.id}`;
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 9999;
+        font-size: 14px;
+        max-width: 400px;
+      `;
+      notification.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 4px;">✓ New audit started!</div>
+        <div style="opacity: 0.9;">Redirecting to audit ${result.id}...</div>
+      `;
+      document.body.appendChild(notification);
+      
+      // Navigate after brief delay to show notification
+      setTimeout(() => {
+        navigate(newAuditUrl);
+      }, 800);
     } catch (e: any) {
-      alert(e?.message || 'Re-run failed');
-    } finally {
+      const isRateLimit = e?.message?.includes('Rate limit') || e?.message?.includes('429');
+      const message = isRateLimit 
+        ? 'Daily audit budget reached. Try again after 00:00 UTC.'
+        : e?.message || 'Re-run failed';
+      
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ef4444;
+        color: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 9999;
+        font-size: 14px;
+        max-width: 400px;
+        cursor: pointer;
+      `;
+      notification.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 4px;">✕ Re-run Failed</div>
+        <div style="opacity: 0.9;">${message}</div>
+        <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">Click to dismiss</div>
+      `;
+      notification.onclick = () => notification.remove();
+      document.body.appendChild(notification);
+      
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => notification.remove(), 5000);
+      
       setRerunning(false);
     }
   }
@@ -73,10 +129,38 @@ export default function PublicAudit() {
               cursor: rerunning ? 'not-allowed' : 'pointer',
               fontSize: 14,
               fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.2s',
             }}
             title="Start a fresh audit for this property"
           >
-            {rerunning ? 'Re-running…' : '🔄 Re-run Audit'}
+            {rerunning ? (
+              <>
+                <span style={{ 
+                  display: 'inline-block',
+                  width: 14,
+                  height: 14,
+                  border: '2px solid white',
+                  borderTopColor: 'transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite'
+                }}>
+                  <style>{`
+                    @keyframes spin {
+                      to { transform: rotate(360deg); }
+                    }
+                  `}</style>
+                </span>
+                <span>Re-running…</span>
+              </>
+            ) : (
+              <>
+                <span>🔄</span>
+                <span>Re-run Audit</span>
+              </>
+            )}
           </button>
         )}
       </div>
