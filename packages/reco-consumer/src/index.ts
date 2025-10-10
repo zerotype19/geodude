@@ -2,7 +2,6 @@
 // Uses Cloudflare Browser Rendering + GPT-4o to generate page recommendations
 
 import puppeteer from '@cloudflare/puppeteer';
-import Ajv from 'ajv';
 
 interface Env {
   DB: D1Database;
@@ -370,15 +369,24 @@ async function recommendWithGPT4(
 
 // Validate model output with enhanced Schema.org checks
 function validateReco(obj: any, requestUrl?: string): asserts obj is ModelOutput {
-  const ajv = new Ajv({ allErrors: true, strict: false });
-  const schema = {
-    type: 'object',
-    required: ['detected_intent', 'missing_schemas', 'suggested_jsonld', 'content_suggestions'],
-  };
+  // Basic structure validation (no Ajv needed - Workers doesn't allow eval)
+  if (!obj || typeof obj !== 'object') {
+    throw new Error('Validation failed: Response must be an object');
+  }
   
-  const ok = ajv.validate(schema, obj);
-  if (!ok) {
-    throw new Error('Validation failed: ' + ajv.errorsText());
+  const required = ['detected_intent', 'missing_schemas', 'suggested_jsonld', 'content_suggestions'];
+  for (const field of required) {
+    if (!(field in obj)) {
+      throw new Error(`Validation failed: Missing required field '${field}'`);
+    }
+  }
+  
+  if (!Array.isArray(obj.suggested_jsonld)) {
+    throw new Error('Validation failed: suggested_jsonld must be an array');
+  }
+  
+  if (!Array.isArray(obj.content_suggestions)) {
+    throw new Error('Validation failed: content_suggestions must be an array');
   }
 
   // Schema.org sanity checks
