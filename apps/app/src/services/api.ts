@@ -283,9 +283,16 @@ export type PageRecommendations = {
   rationale: string;
 };
 
-export async function getPageRecommendations(auditId: string, pageUrl: string): Promise<PageRecommendations> {
-  const u = encodeURIComponent(pageUrl);
-  const res = await fetch(`${API_BASE}/v1/audits/${auditId}/page/recommendations?u=${u}`);
+export async function getPageRecommendations(
+  auditId: string, 
+  pageUrl: string, 
+  signal?: AbortSignal
+): Promise<PageRecommendations> {
+  const encodedUrl = encodeURIComponent(pageUrl);
+  const res = await fetch(
+    `${API_BASE}/v1/audits/${auditId}/pages/${encodedUrl}/recommendations`,
+    { signal }
+  );
   if (!res.ok) throw new Error(`getPageRecommendations failed: ${res.status}`);
   return res.json() as Promise<PageRecommendations>;
 }
