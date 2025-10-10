@@ -633,6 +633,43 @@ export default {
       }
     }
 
+    // GET /v1/debug/render - Quick render test endpoint
+    if (path === '/v1/debug/render' && request.method === 'GET') {
+      const testUrl = url.searchParams.get('url');
+      if (!testUrl) {
+        return new Response(
+          JSON.stringify({ error: 'Missing url query parameter' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        const { renderPage } = await import('./render');
+        const result = await renderPage(env, testUrl);
+        
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            mode: result.mode,
+            words: result.words,
+            snippet: result.snippet,
+            hasH1: result.hasH1,
+            jsonLdCount: result.jsonLdCount,
+            status: result.status,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Render failed',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // GET /v1/audits/:id/page - Get page-level report
     if (path.match(/^\/v1\/audits\/[^/]+\/page$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];

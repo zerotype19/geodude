@@ -1,10 +1,11 @@
 // Unified renderer: "browser" (CF Browser), "browserless", "html" (fallback).
-// Returns { html, text, status, hasH1, jsonLdCount, snippet, words }
+// Returns { mode, html, text, status, hasH1, jsonLdCount, snippet, words }
 
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 
 export interface RenderResult {
+  mode: 'browser' | 'browserless' | 'html';
   html: string;
   text: string;
   status: number;
@@ -13,6 +14,11 @@ export interface RenderResult {
   snippet: string;
   words: number;
 }
+
+const ABSOLUTE_TIMEOUT_MS = 30_000;
+const USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36 OptiviewAudit/0.16';
 
 function extractReadable(html: string): {
   text: string;
@@ -33,98 +39,115 @@ function extractReadable(html: string): {
   const text = (article?.textContent || document.body?.textContent || '')
     .trim()
     .replace(/\s+/g, ' ');
-  const words = text ? text.split(/\s+/).length : 0;
-  const snippet = text.slice(0, 240);
+  const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+  const snippet = (article?.excerpt || text).slice(0, 280);
 
   return { text, words, hasH1, jsonLdCount, snippet };
 }
 
+/**
+ * Render a page using Cloudflare Browser Rendering when available,
+ * otherwise fall back to fetch + Readability.
+ */
 export async function renderPage(
   env: any,
   url: string,
-  userAgent = 'OptiviewAuditBot/1.0'
+  userAgent?: string
 ): Promise<RenderResult> {
-  const mode = (env.RENDER_MODE || 'html').toLowerCase();
-  const timeout = Number(env.RENDER_TIMEOUT_MS || 8000);
+  const controller = new AbortController();
+  const kill = setTimeout(() => controller.abort(), ABSOLUTE_TIMEOUT_MS);
 
-  if (mode === 'browser' && env.BROWSER) {
-    // Cloudflare Browser Rendering
-    try {
-      const browser = env.BROWSER;
-      const page = await browser.newPage();
-      
-      let status = 200;
-      try {
-        const response = await Promise.race([
-          page.goto(url, { waitUntil: 'load' }),
-          new Promise<null>((_, rej) => setTimeout(() => rej(new Error('timeout')), timeout)),
-        ]);
-        
-        if (response && typeof response === 'object' && 'status' in response) {
-          status = (response as any).status();
-        }
-      } catch (e) {
-        console.log(`Browser navigation warning for ${url}:`, e);
-        // Continue with whatever content we got
-      }
-
-      const html = await page.content();
-      await page.close();
-
-      const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
-      return { html, text, status, hasH1, jsonLdCount, snippet, words };
-    } catch (error) {
-      console.error(`Browser rendering failed for ${url}, falling back to HTML:`, error);
-      // Fall through to HTML mode
-    }
-  }
-
-  if (mode === 'browserless' && env.BROWSERLESS_URL) {
-    // Browserless /playwright
-    try {
-      const body = {
-        url,
-        options: { waitUntil: 'networkidle', timeout },
-        gotoOptions: { waitUntil: 'networkidle' },
-        html: true,
-      };
-      const r = await fetch(`${env.BROWSERLESS_URL}/playwright?stealth=true`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const status = r.status;
-      const html = await r.text();
-      const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
-      return { html, text, status, hasH1, jsonLdCount, snippet, words };
-    } catch (error) {
-      console.error(`Browserless rendering failed for ${url}, falling back to HTML:`, error);
-      // Fall through to HTML mode
-    }
-  }
-
-  // Fallback: raw HTML
   try {
-    const r = await fetch(url, { 
-      headers: { 'user-agent': userAgent },
-      signal: AbortSignal.timeout(timeout)
+    if (env.BROWSER) {
+      // ---- Browser mode (headless Chromium) ----
+      try {
+        console.log(`[render] browser mode for ${url}`);
+        const browser = await env.BROWSER.launch();
+        const context = await browser.newContext({
+          userAgent: userAgent || USER_AGENT,
+          viewport: { width: 1366, height: 900 },
+          javaScriptEnabled: true,
+        });
+
+        const page = await context.newPage();
+        page.setDefaultNavigationTimeout(ABSOLUTE_TIMEOUT_MS);
+        
+        let status = 200;
+        try {
+          const response = await page.goto(url, { waitUntil: 'networkidle' });
+          if (response && typeof response.status === 'function') {
+            status = response.status();
+          }
+        } catch (e) {
+          console.log(`[render] navigation warning for ${url}:`, e);
+        }
+
+        // Optionally wait for body to have some content
+        try {
+          await page.waitForSelector('body', { timeout: 5000 });
+        } catch (e) {
+          console.log(`[render] body wait timeout for ${url}`);
+        }
+
+        const html = await page.content();
+        await context.close();
+        await browser.close();
+
+        const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
+        
+        console.log(`[render] browser: ${url} -> ${words} words`);
+        return { mode: 'browser', html, text, status, hasH1, jsonLdCount, snippet, words };
+      } catch (error) {
+        console.error(`[render] browser failed for ${url}, falling back to HTML:`, error);
+        // Fall through to HTML mode
+      }
+    }
+
+    if (env.BROWSERLESS_URL) {
+      // ---- Browserless mode ----
+      try {
+        console.log(`[render] browserless mode for ${url}`);
+        const body = {
+          url,
+          options: { waitUntil: 'networkidle', timeout: ABSOLUTE_TIMEOUT_MS },
+          gotoOptions: { waitUntil: 'networkidle' },
+          html: true,
+        };
+        const r = await fetch(`${env.BROWSERLESS_URL}/playwright?stealth=true`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+        const status = r.status;
+        const html = await r.text();
+        const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
+        
+        console.log(`[render] browserless: ${url} -> ${words} words`);
+        return { mode: 'browserless', html, text, status, hasH1, jsonLdCount, snippet, words };
+      } catch (error) {
+        console.error(`[render] browserless failed for ${url}, falling back to HTML:`, error);
+        // Fall through to HTML mode
+      }
+    }
+
+    // ---- HTML fallback (fetch + Readability) ----
+    console.log(`[render] html mode for ${url}`);
+    const resp = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'user-agent': userAgent || USER_AGENT,
+        accept: 'text/html,*/*;q=0.9',
+      },
     });
-    const status = r.status;
-    const html = await r.text();
+    const status = resp.status;
+    const html = await resp.text();
+
     const { text, words, hasH1, jsonLdCount, snippet } = extractReadable(html);
-    return { html, text, status, hasH1, jsonLdCount, snippet, words };
-  } catch (error) {
-    console.error(`HTML fetch failed for ${url}:`, error);
-    // Return empty result
-    return {
-      html: '',
-      text: '',
-      status: 0,
-      hasH1: false,
-      jsonLdCount: 0,
-      snippet: '',
-      words: 0,
-    };
+    
+    console.log(`[render] html: ${url} -> ${words} words`);
+    return { mode: 'html', html, text, status, hasH1, jsonLdCount, snippet, words };
+  } finally {
+    clearTimeout(kill);
   }
 }
-

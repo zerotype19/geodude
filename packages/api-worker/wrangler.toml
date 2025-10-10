@@ -33,6 +33,12 @@ RENDER_MAX_PAGES = "30"
 [browser]
 binding = "BROWSER"
 
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+
 # Secrets (set via wrangler secret put):
 # - BRAVE_SEARCH (already set in Cloudflare)
 # - RESEND_KEY (already set in Cloudflare)

@@ -153,6 +153,9 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
         // Use renderPage for accurate content extraction
         const rendered = await renderPage(env, pageUrl, env.USER_AGENT);
         const pageTime = Date.now() - pageStart;
+        
+        // Log render mode for observability
+        console.log(`render: ${pageUrl} -> mode=${rendered.mode}, words=${rendered.words}`);
 
         if (rendered.status === 200 || rendered.status === 0) {
           const html = rendered.html;
