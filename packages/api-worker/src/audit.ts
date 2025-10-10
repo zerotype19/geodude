@@ -24,7 +24,7 @@ interface AuditIssue {
 
 export async function runAudit(propertyId: string, env: Env): Promise<string> {
   const auditId = `aud_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const maxPages = parseInt(env.AUDIT_MAX_PAGES || '30');
+  const maxPages = parseInt(env.AUDIT_MAX_PAGES || '100');
   
   // Get property details
   const property = await env.DB.prepare(
@@ -109,10 +109,52 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
       if (sitemapResponse.ok) {
         const sitemapText = await sitemapResponse.text();
         const urlMatches = sitemapText.matchAll(/<loc>([^<]+)<\/loc>/g);
-        const sitemapUrls = Array.from(urlMatches, m => m[1]).slice(0, maxPages);
+        let sitemapUrls = Array.from(urlMatches, m => m[1]);
+        
+        // Filter URLs: exclude non-English paths and limit depth
+        sitemapUrls = sitemapUrls.filter(url => {
+          try {
+            const urlObj = new URL(url);
+            const path = urlObj.pathname.toLowerCase();
+            
+            // Exclude non-English language paths
+            const nonEnglishPatterns = [
+              '/es-us/', '/es/', '/es-mx/', '/es-la/',  // Spanish
+              '/fr/', '/fr-ca/', '/fr-fr/',              // French
+              '/de/', '/de-de/',                         // German
+              '/pt/', '/pt-br/',                         // Portuguese
+              '/it/', '/it-it/',                         // Italian
+              '/ja/', '/ja-jp/',                         // Japanese
+              '/zh/', '/zh-cn/', '/zh-tw/',              // Chinese
+              '/ko/', '/ko-kr/',                         // Korean
+              '/ru/', '/ru-ru/',                         // Russian
+              '/ar/', '/ar-sa/',                         // Arabic
+            ];
+            
+            for (const pattern of nonEnglishPatterns) {
+              if (path.includes(pattern)) {
+                return false;
+              }
+            }
+            
+            // Limit URL depth (max 4 levels: / /about /about/team /about/team/history)
+            const pathSegments = path.split('/').filter(Boolean);
+            if (pathSegments.length > 4) {
+              return false;
+            }
+            
+            return true;
+          } catch {
+            return false;
+          }
+        });
+        
+        // Take up to maxPages URLs
+        sitemapUrls = sitemapUrls.slice(0, maxPages);
         
         if (sitemapUrls.length > 0) {
           urlsToCrawl = sitemapUrls;
+          console.log(`Filtered to ${sitemapUrls.length} English URLs within 4 levels`);
         }
       }
     } catch (error) {
@@ -120,7 +162,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
       console.log('Sitemap fetch failed, using homepage only');
     }
 
-    // Step 3: Crawl pages (max 30, 1 RPS throttle)
+    // Step 3: Crawl pages (max 100 English URLs within 4 levels, 1 RPS throttle)
     for (let i = 0; i < Math.min(urlsToCrawl.length, maxPages); i++) {
       const pageUrl = urlsToCrawl[i];
       
