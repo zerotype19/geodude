@@ -1,12 +1,12 @@
 /**
- * Scoring Model
+ * Scoring Model v2.0
  * Calculates AI optimization scores based on audit results
  * 
- * Weights:
- * - Crawlability: 0.4 (robots.txt, sitemap, accessibility)
- * - Structured Data: 0.3 (JSON-LD, schema markup)
- * - Answerability: 0.2 (FAQ, clear content, word count)
- * - Trust: 0.1 (HTTPS, valid metadata, canonical)
+ * Weights (v2 spec-aligned):
+ * - Crawlability: 40% (robots.txt, sitemap, AI bot access)
+ * - Structured Data: 30% (JSON-LD coverage, FAQ site-level, schema types)
+ * - Answerability: 20% (titles, H1s, content depth)
+ * - Trust: 10% (HTTP status, render performance)
  */
 
 interface AuditPage {
@@ -14,9 +14,11 @@ interface AuditPage {
   status_code: number;
   title: string | null;
   h1: string | null;
-  has_json_ld: boolean;
-  has_faq: boolean;
+  has_h1?: boolean;
+  jsonld_count?: number;
+  faq_present?: boolean;
   word_count: number;
+  rendered_words?: number;
   load_time_ms: number;
   error: string | null;
 }
@@ -29,149 +31,311 @@ interface AuditIssue {
   details?: string;
 }
 
-interface Scores {
+interface CrawlabilityData {
+  robotsFound: boolean;
+  sitemapFound: boolean;
+  aiBotsAllowed: Record<string, boolean>;
+}
+
+interface StructuredData {
+  siteFaqPresent: boolean;
+  schemaTypes: string[];
+}
+
+export interface Scores {
   overall: number;
   crawlability: number;
   structured: number;
   answerability: number;
   trust: number;
-}
-
-export function calculateScores(pages: AuditPage[], issues: AuditIssue[]): Scores {
-  const crawlability = calculateCrawlability(pages, issues);
-  const structured = calculateStructured(pages, issues);
-  const answerability = calculateAnswerability(pages, issues);
-  const trust = calculateTrust(pages, issues);
-
-  // Weighted overall score
-  const overall = 
-    crawlability * 0.4 +
-    structured * 0.3 +
-    answerability * 0.2 +
-    trust * 0.1;
-
-  return {
-    overall: Math.round(overall * 100) / 100,
-    crawlability: Math.round(crawlability * 100) / 100,
-    structured: Math.round(structured * 100) / 100,
-    answerability: Math.round(answerability * 100) / 100,
-    trust: Math.round(trust * 100) / 100,
+  breakdown: {
+    crawlability: {
+      robotsPresent: number;
+      aiBotsAllowed: number;
+      sitemapFound: number;
+      successRate: number;
+    };
+    structured: {
+      jsonLdCoverage: number;
+      siteFaq: number;
+      schemaVariety: number;
+    };
+    answerability: {
+      titles: number;
+      h1s: number;
+      contentDepth: number;
+    };
+    trust: {
+      httpStatus: number;
+      renderPerformance: number;
+    };
   };
 }
 
-function calculateCrawlability(pages: AuditPage[], issues: AuditIssue[]): number {
-  let score = 1.0;
+export function calculateScores(
+  pages: AuditPage[], 
+  issues: AuditIssue[],
+  crawlability?: CrawlabilityData,
+  structured?: StructuredData
+): Scores {
+  // Calculate each pillar (returns 0-100)
+  const crawlabilityScore = calculateCrawlability(pages, issues, crawlability);
+  const structuredScore = calculateStructured(pages, issues, structured);
+  const answerabilityScore = calculateAnswerability(pages, issues);
+  const trustScore = calculateTrust(pages, issues);
 
-  // Check for robots.txt issues
-  const robotsIssues = issues.filter((i) => 
-    i.issue_type.startsWith('robots_')
-  );
-  
-  if (robotsIssues.some((i) => i.severity === 'critical')) {
-    score -= 0.3; // Blocking AI bots is critical
-  }
-  if (robotsIssues.some((i) => i.severity === 'warning')) {
-    score -= 0.1;
+  // Weighted overall score (40/30/20/10)
+  const overall = 
+    crawlabilityScore.score * 0.4 +
+    structuredScore.score * 0.3 +
+    answerabilityScore.score * 0.2 +
+    trustScore.score * 0.1;
+
+  return {
+    overall: Math.round(overall * 100) / 100,
+    crawlability: Math.round(crawlabilityScore.score * 100) / 100,
+    structured: Math.round(structuredScore.score * 100) / 100,
+    answerability: Math.round(answerabilityScore.score * 100) / 100,
+    trust: Math.round(trustScore.score * 100) / 100,
+    breakdown: {
+      crawlability: crawlabilityScore.breakdown,
+      structured: structuredScore.breakdown,
+      answerability: answerabilityScore.breakdown,
+      trust: trustScore.breakdown,
+    },
+  };
+}
+
+/**
+ * Crawlability: 40% total
+ * - robots.txt present & parseable (10%)
+ * - AI bots allowed (20% total → ~3.3% each for 6 bots)
+ * - Sitemap referenced in robots.txt and reachable (10%)
+ */
+function calculateCrawlability(
+  pages: AuditPage[], 
+  issues: AuditIssue[],
+  data?: CrawlabilityData
+): { score: number; breakdown: any } {
+  let score = 0;
+  const breakdown = {
+    robotsPresent: 0,
+    aiBotsAllowed: 0,
+    sitemapFound: 0,
+    successRate: 0,
+  };
+
+  // robots.txt present & parseable (10 points)
+  if (data?.robotsFound) {
+    score += 10;
+    breakdown.robotsPresent = 10;
   }
 
-  // Check for sitemap issues
-  const sitemapIssues = issues.filter((i) => 
-    i.issue_type.startsWith('sitemap_')
-  );
-  
-  if (sitemapIssues.some((i) => i.severity === 'critical')) {
-    score -= 0.2;
-  }
-  if (sitemapIssues.some((i) => i.severity === 'warning')) {
-    score -= 0.1;
+  // AI bots allowed (20 points total)
+  if (data?.aiBotsAllowed) {
+    const bots = ['GPTBot', 'ClaudeBot', 'Claude-Web', 'PerplexityBot', 'CCBot', 'Google-Extended'];
+    const allowedCount = bots.filter(bot => data.aiBotsAllowed[bot] !== false).length;
+    const botScore = (allowedCount / bots.length) * 20;
+    score += botScore;
+    breakdown.aiBotsAllowed = Math.round(botScore * 100) / 100;
+  } else {
+    // If no robots data, assume open (benefit of doubt)
+    score += 20;
+    breakdown.aiBotsAllowed = 20;
   }
 
-  // Page accessibility
+  // Sitemap found (10 points)
+  if (data?.sitemapFound) {
+    score += 10;
+    breakdown.sitemapFound = 10;
+  }
+
+  // Success rate penalty (no additional points, but can reduce score)
+  // If pages fail, reduce crawlability proportionally
   const totalPages = pages.length;
-  const successfulPages = pages.filter((p) => p.status_code === 200).length;
-  
   if (totalPages > 0) {
+    const successfulPages = pages.filter(p => p.status_code >= 200 && p.status_code < 400).length;
     const successRate = successfulPages / totalPages;
-    score *= successRate; // Penalize based on failure rate
+    breakdown.successRate = Math.round(successRate * 100);
+    
+    // If success rate < 80%, penalize
+    if (successRate < 0.8) {
+      const penalty = (0.8 - successRate) * 40; // Max 32 point penalty for 0% success
+      score -= penalty;
+    }
   }
 
-  // Slow pages
-  const avgLoadTime = pages.reduce((sum, p) => sum + p.load_time_ms, 0) / totalPages;
-  if (avgLoadTime > 3000) {
-    score -= 0.1; // Pages slower than 3s
-  }
-
-  return Math.max(0, Math.min(1, score));
+  return { 
+    score: Math.max(0, Math.min(100, score)),
+    breakdown 
+  };
 }
 
-function calculateStructured(pages: AuditPage[], issues: AuditIssue[]): number {
-  let score = 1.0;
+/**
+ * Structured Data: 30% total
+ * - JSON-LD present on ≥X% of pages (15 points, X=50%)
+ * - FAQ present somewhere on site (10 points)
+ * - Schema variety: at least one of Organization/Article/Product/Breadcrumb/WebSite (5 points)
+ */
+function calculateStructured(
+  pages: AuditPage[], 
+  issues: AuditIssue[],
+  data?: StructuredData
+): { score: number; breakdown: any } {
+  let score = 0;
+  const breakdown = {
+    jsonLdCoverage: 0,
+    siteFaq: 0,
+    schemaVariety: 0,
+  };
 
   const totalPages = pages.length;
-  if (totalPages === 0) return 0;
+  if (totalPages === 0) return { score: 0, breakdown };
 
-  // Pages with JSON-LD
-  const pagesWithJsonLd = pages.filter((p) => p.has_json_ld).length;
+  // JSON-LD coverage (15 points)
+  const pagesWithJsonLd = pages.filter(p => (p.jsonld_count ?? 0) > 0).length;
   const jsonLdRate = pagesWithJsonLd / totalPages;
-
-  score = jsonLdRate * 0.7; // JSON-LD is 70% of structured score
-
-  // Pages with FAQ
-  const pagesWithFaq = pages.filter((p) => p.has_faq).length;
-  const faqRate = pagesWithFaq / totalPages;
-
-  score += faqRate * 0.3; // FAQ is 30% of structured score
-
-  return Math.max(0, Math.min(1, score));
-}
-
-function calculateAnswerability(pages: AuditPage[], issues: AuditIssue[]): number {
-  let score = 1.0;
-
-  const totalPages = pages.length;
-  if (totalPages === 0) return 0;
-
-  // Missing titles
-  const missingTitles = issues.filter((i) => i.issue_type === 'missing_title').length;
-  score -= (missingTitles / totalPages) * 0.3;
-
-  // Missing H1s
-  const missingH1s = issues.filter((i) => i.issue_type === 'missing_h1').length;
-  score -= (missingH1s / totalPages) * 0.2;
-
-  // Thin content
-  const thinContent = issues.filter((i) => i.issue_type === 'thin_content').length;
-  score -= (thinContent / totalPages) * 0.3;
-
-  // Bonus for good word count
-  const avgWordCount = pages.reduce((sum, p) => sum + p.word_count, 0) / totalPages;
-  if (avgWordCount >= 500) {
-    score += 0.2; // Bonus for substantial content
+  
+  // Target is 50% minimum, scale up to 100%
+  if (jsonLdRate >= 0.5) {
+    const coverageScore = 15 * ((jsonLdRate - 0.5) / 0.5); // 50% = 0 points, 100% = 15 points
+    score += coverageScore;
+    breakdown.jsonLdCoverage = Math.round(coverageScore * 100) / 100;
   }
 
-  return Math.max(0, Math.min(1, score));
+  // Site FAQ (10 points)
+  if (data?.siteFaqPresent) {
+    score += 10;
+    breakdown.siteFaq = 10;
+  }
+
+  // Schema variety (5 points)
+  const importantSchemas = ['Organization', 'Article', 'Product', 'BreadcrumbList', 'WebSite'];
+  if (data?.schemaTypes) {
+    const hasImportant = data.schemaTypes.some(type => 
+      importantSchemas.some(important => type.includes(important))
+    );
+    if (hasImportant) {
+      score += 5;
+      breakdown.schemaVariety = 5;
+    }
+  }
+
+  return { 
+    score: Math.max(0, Math.min(100, score)),
+    breakdown 
+  };
 }
 
-function calculateTrust(pages: AuditPage[], issues: AuditIssue[]): number {
-  let score = 1.0;
+/**
+ * Answerability: 20% total
+ * - Title present on ≥X% pages (7 points, X=80%)
+ * - H1 present on ≥X% pages (7 points, X=80%)
+ * - Content depth: words ≥120 on ≥X% pages (6 points, X=80%)
+ */
+function calculateAnswerability(
+  pages: AuditPage[], 
+  issues: AuditIssue[]
+): { score: number; breakdown: any } {
+  let score = 0;
+  const breakdown = {
+    titles: 0,
+    h1s: 0,
+    contentDepth: 0,
+  };
 
   const totalPages = pages.length;
-  if (totalPages === 0) return 0;
+  if (totalPages === 0) return { score: 0, breakdown };
 
-  // HTTPS check (all pages should be HTTPS)
-  const httpPages = pages.filter((p) => p.url.startsWith('http://')).length;
-  score -= (httpPages / totalPages) * 0.4;
+  const TARGET_COVERAGE = 0.8; // 80%
 
-  // Pages with titles (basic metadata)
-  const pagesWithTitles = pages.filter((p) => p.title !== null).length;
-  score *= pagesWithTitles / totalPages;
+  // Title coverage (7 points)
+  const pagesWithTitles = pages.filter(p => p.title && p.title.length > 0).length;
+  const titleRate = pagesWithTitles / totalPages;
+  if (titleRate >= TARGET_COVERAGE) {
+    const titleScore = 7 * (titleRate / 1.0); // Scale to 7 points at 100%
+    score += titleScore;
+    breakdown.titles = Math.round(titleScore * 100) / 100;
+  }
 
-  // Page errors reduce trust
-  const errorPages = issues.filter((i) => 
-    i.issue_type === 'page_error' || i.issue_type === 'page_unreachable'
-  ).length;
-  score -= (errorPages / totalPages) * 0.3;
+  // H1 coverage (7 points)
+  const pagesWithH1 = pages.filter(p => p.has_h1 || (p.h1 && p.h1.length > 0)).length;
+  const h1Rate = pagesWithH1 / totalPages;
+  if (h1Rate >= TARGET_COVERAGE) {
+    const h1Score = 7 * (h1Rate / 1.0);
+    score += h1Score;
+    breakdown.h1s = Math.round(h1Score * 100) / 100;
+  }
 
-  return Math.max(0, Math.min(1, score));
+  // Content depth (6 points)
+  const pagesWithContent = pages.filter(p => (p.rendered_words ?? p.word_count ?? 0) >= 120).length;
+  const contentRate = pagesWithContent / totalPages;
+  if (contentRate >= TARGET_COVERAGE) {
+    const contentScore = 6 * (contentRate / 1.0);
+    score += contentScore;
+    breakdown.contentDepth = Math.round(contentScore * 100) / 100;
+  }
+
+  return { 
+    score: Math.max(0, Math.min(100, score)),
+    breakdown 
+  };
 }
 
+/**
+ * Trust: 10% total
+ * - 2xx status on ≥X% pages (7 points, X=80%)
+ * - Median render time under N seconds (3 points, N=3.0s)
+ */
+function calculateTrust(
+  pages: AuditPage[], 
+  issues: AuditIssue[]
+): { score: number; breakdown: any } {
+  let score = 0;
+  const breakdown = {
+    httpStatus: 0,
+    renderPerformance: 0,
+  };
+
+  const totalPages = pages.length;
+  if (totalPages === 0) return { score: 0, breakdown };
+
+  const TARGET_COVERAGE = 0.8; // 80%
+  const TARGET_RENDER_TIME = 3000; // 3 seconds
+
+  // HTTP 2xx status coverage (7 points)
+  const pages2xx = pages.filter(p => p.status_code >= 200 && p.status_code < 300).length;
+  const statusRate = pages2xx / totalPages;
+  if (statusRate >= TARGET_COVERAGE) {
+    const statusScore = 7 * (statusRate / 1.0);
+    score += statusScore;
+    breakdown.httpStatus = Math.round(statusScore * 100) / 100;
+  }
+
+  // Render performance (3 points)
+  // Calculate median render time
+  const sortedTimes = pages
+    .map(p => p.load_time_ms)
+    .filter(t => t > 0)
+    .sort((a, b) => a - b);
+  
+  if (sortedTimes.length > 0) {
+    const medianIdx = Math.floor(sortedTimes.length / 2);
+    const medianTime = sortedTimes[medianIdx];
+    
+    if (medianTime <= TARGET_RENDER_TIME) {
+      score += 3;
+      breakdown.renderPerformance = 3;
+    } else if (medianTime <= TARGET_RENDER_TIME * 2) {
+      // Partial credit for up to 6s
+      const perfScore = 3 * (1 - (medianTime - TARGET_RENDER_TIME) / TARGET_RENDER_TIME);
+      score += perfScore;
+      breakdown.renderPerformance = Math.round(perfScore * 100) / 100;
+    }
+  }
+
+  return { 
+    score: Math.max(0, Math.min(100, score)),
+    breakdown 
+  };
+}

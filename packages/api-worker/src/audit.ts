@@ -6,6 +6,7 @@
 import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractOrganization } from './html';
 import { calculateScores } from './score';
 import { renderPage } from './render';
+import { checkCrawlability } from './crawl';
 
 interface Env {
   DB: D1Database;
@@ -49,8 +50,9 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
     status_code: number;
     title: string | null;
     h1: string | null;
-    has_json_ld: boolean;
-    has_faq: boolean;
+    has_h1: boolean;
+    jsonld_count: number;
+    faq_present: boolean;
     word_count: number;
     rendered_words: number;
     snippet: string | null;
@@ -59,83 +61,63 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
   }> = [];
 
   try {
-    // Step 1: Check robots.txt
-    const robotsUrl = `${baseUrl}/robots.txt`;
-    const robotsStart = Date.now();
-    const robotsResponse = await fetch(robotsUrl, {
-      headers: { 'User-Agent': env.USER_AGENT },
-    });
-    const robotsTime = Date.now() - robotsStart;
-
-    if (robotsResponse.status === 200) {
-      const robotsText = await robotsResponse.text();
-      
-      // Check for AI bot allowances
-      const hasSitemap = /sitemap:/i.test(robotsText);
-      const allowsGPTBot = /User-agent:\s*GPTBot/i.test(robotsText) && !/Disallow:\s*\//i.test(robotsText);
-      const allowsClaudeBot = /User-agent:\s*(Claude-Web|ClaudeBot)/i.test(robotsText);
-      
-      if (!hasSitemap) {
-        issues.push({
-          page_url: robotsUrl,
-          issue_type: 'robots_missing_sitemap',
-          severity: 'warning',
-          message: 'robots.txt does not reference a sitemap',
-        });
-      }
-
-      if (!allowsGPTBot && !allowsClaudeBot) {
-        issues.push({
-          page_url: robotsUrl,
-          issue_type: 'robots_blocks_ai',
-          severity: 'critical',
-          message: 'robots.txt may be blocking AI crawlers',
-          details: 'Consider explicitly allowing GPTBot, ClaudeBot, and other AI agents',
-        });
-      }
-    } else {
+    // Step 1: Check crawlability (robots.txt, sitemap, AI bots)
+    const crawlabilityData = await checkCrawlability(baseUrl);
+    
+    // Add issues based on crawlability checks
+    if (!crawlabilityData.robotsFound) {
       issues.push({
-        page_url: robotsUrl,
+        page_url: null,
         issue_type: 'robots_missing',
         severity: 'warning',
-        message: 'robots.txt not found',
+        message: 'robots.txt not found - consider adding one to guide AI crawlers',
+      });
+    }
+    
+    if (!crawlabilityData.sitemapFound) {
+      issues.push({
+        page_url: null,
+        issue_type: 'sitemap_missing',
+        severity: 'warning',
+        message: 'Sitemap not found or not referenced in robots.txt',
+      });
+    }
+    
+    // Check if key AI bots are blocked
+    const blockedBots = Object.entries(crawlabilityData.aiBotsAllowed)
+      .filter(([bot, allowed]) => !allowed)
+      .map(([bot]) => bot);
+    
+    if (blockedBots.length > 0) {
+      issues.push({
+        page_url: null,
+        issue_type: 'robots_blocks_ai',
+        severity: 'critical',
+        message: `robots.txt is blocking AI bots: ${blockedBots.join(', ')}`,
+        details: 'Consider explicitly allowing GPTBot, ClaudeBot, PerplexityBot, and other AI agents',
       });
     }
 
-    // Step 2: Check sitemap
-    const sitemapUrl = `${baseUrl}/sitemap.xml`;
-    const sitemapStart = Date.now();
-    const sitemapResponse = await fetch(sitemapUrl, {
-      headers: { 'User-Agent': env.USER_AGENT },
-    });
-    const sitemapTime = Date.now() - sitemapStart;
-
+    // Step 2: Get URLs to crawl (fallback to just homepage if no sitemap)
     let urlsToCrawl: string[] = [baseUrl];
-
-    if (sitemapResponse.status === 200) {
-      const sitemapText = await sitemapResponse.text();
+    
+    // Try to fetch sitemap for URL list
+    try {
+      const sitemapUrl = `${baseUrl}/sitemap.xml`;
+      const sitemapResponse = await fetch(sitemapUrl, { headers: { 'User-Agent': env.USER_AGENT } });
       
-      // Extract URLs from sitemap (simple regex parsing)
-      const urlMatches = sitemapText.matchAll(/<loc>([^<]+)<\/loc>/g);
-      const sitemapUrls = Array.from(urlMatches, m => m[1]).slice(0, maxPages);
-      
-      if (sitemapUrls.length > 0) {
-        urlsToCrawl = sitemapUrls;
-      } else {
-        issues.push({
-          page_url: sitemapUrl,
-          issue_type: 'sitemap_empty',
-          severity: 'warning',
-          message: 'Sitemap contains no URLs',
-        });
+      if (sitemapResponse.ok) {
+        const sitemapText = await sitemapResponse.text();
+        const urlMatches = sitemapText.matchAll(/<loc>([^<]+)<\/loc>/g);
+        const sitemapUrls = Array.from(urlMatches, m => m[1]).slice(0, maxPages);
+        
+        if (sitemapUrls.length > 0) {
+          urlsToCrawl = sitemapUrls;
+        }
       }
-    } else {
-      issues.push({
-        page_url: sitemapUrl,
-        issue_type: 'sitemap_missing',
-        severity: 'warning',
-        message: 'sitemap.xml not found',
-      });
+    } catch (error) {
+      // Sitemap fetch failed, use homepage only
+      console.log('Sitemap fetch failed, using homepage only');
     }
 
     // Step 3: Crawl pages (max 30, 1 RPS throttle)
@@ -271,8 +253,9 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
           status_code: 0,
           title: null,
           h1: null,
-          has_json_ld: false,
-          has_faq: false,
+          has_h1: false,
+          jsonld_count: 0,
+          faq_present: false,
           word_count: 0,
           rendered_words: 0,
           snippet: null,
@@ -290,10 +273,38 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
       }
     }
 
-    // Step 4: Calculate scores
-    const scores = calculateScores(pages, issues);
+    // Step 4: Compute site-level rollups
+    const siteFaqPresent = pages.some(p => p.faq_present);
+    const allSchemaTypes: string[] = [];
+    
+    for (const page of pages) {
+      if (page.jsonld_count > 0) {
+        // Extract JSON-LD from stored content (if we had it)
+        // For now, we'll need to mark this as a TODO or extract during render
+        // Placeholder: assume we track this somewhere
+      }
+    }
+    
+    // Add site-level FAQ issue if missing
+    if (!siteFaqPresent) {
+      issues.push({
+        page_url: null,
+        issue_type: 'site_missing_faq',
+        severity: 'info',
+        message: 'Site lacks FAQ schema (FAQPage) - consider adding FAQ content with structured data',
+        details: 'FAQ schema helps AI assistants provide accurate answers about your product/service',
+      });
+    }
+    
+    const structuredData = {
+      siteFaqPresent,
+      schemaTypes: allSchemaTypes,
+    };
 
-    // Step 5: Save results to database
+    // Step 5: Calculate scores
+    const scores = calculateScores(pages, issues, crawlabilityData, structuredData);
+
+    // Step 6: Save results to database
     await env.DB.prepare(
       `UPDATE audits 
        SET status = 'completed',
