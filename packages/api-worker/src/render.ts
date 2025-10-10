@@ -9,16 +9,17 @@ type Mode = 'browser' | 'html';
 
 export interface RenderResult {
   mode: Mode;
-  status: number;
+  statusCode: number;
   html: string;
   text: string;
   words: number;
   snippet: string;
   hasH1: boolean;
   jsonLdCount: number;
+  faqPresent: boolean;
 }
 
-async function extractFromHTML(html: string): Promise<Omit<RenderResult, 'mode' | 'status'>> {
+async function extractFromHTML(html: string): Promise<Omit<RenderResult, 'mode' | 'statusCode'>> {
   const { document } = parseHTML(html);
   
   // Use Readability for main content
@@ -29,9 +30,26 @@ async function extractFromHTML(html: string): Promise<Omit<RenderResult, 'mode' 
   const snippet = (article?.excerpt || text.slice(0, 240)).trim();
 
   const hasH1 = !!document.querySelector('h1');
-  const jsonLdCount = document.querySelectorAll('script[type="application/ld+json"]').length;
+  const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+  const jsonLdCount = jsonLdScripts.length;
+  
+  // Check for FAQ schema in JSON-LD
+  let faqPresent = false;
+  for (let i = 0; i < jsonLdScripts.length; i++) {
+    try {
+      const content = jsonLdScripts[i].textContent || '';
+      const data = JSON.parse(content);
+      const type = Array.isArray(data) ? data.map(d => d['@type']).join(',') : data['@type'];
+      if (type && (type.includes('FAQPage') || type.includes('Question'))) {
+        faqPresent = true;
+        break;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
 
-  return { html, text, words, snippet, hasH1, jsonLdCount };
+  return { html, text, words, snippet, hasH1, jsonLdCount, faqPresent };
 }
 
 export async function renderPage(
@@ -70,10 +88,13 @@ export async function renderPage(
       });
 
       // Navigate and wait for content
-      await page.goto(url, {
+      const response = await page.goto(url, {
         waitUntil: ['load', 'domcontentloaded', 'networkidle0'] as any,
         timeout: 30_000,
       });
+      
+      // Get status code from response
+      const statusCode = response?.status() ?? 200;
 
       // Get full HTML after JS runs
       const html: string = await page.content();
@@ -83,9 +104,9 @@ export async function renderPage(
 
       const extracted = await extractFromHTML(html);
       const renderTime = Date.now() - startTime;
-      console.log(`[render] browser: ${url} -> ${extracted.words} words in ${renderTime}ms`);
+      console.log(`[render] browser: ${url} -> ${extracted.words} words, status ${statusCode}, in ${renderTime}ms`);
       
-      return { mode: 'browser', status: 200, ...extracted };
+      return { mode: 'browser', statusCode, ...extracted };
     } catch (err: any) {
       const errorMsg = err?.message || String(err);
       console.error(`[render] browser failed for ${url}, falling back:`, errorMsg);
@@ -112,24 +133,26 @@ export async function renderPage(
       cf: { cacheTtl: 300, cacheEverything: true } as any,
     });
     
+    const statusCode = resp.status;
     const html = await resp.text();
     const extracted = await extractFromHTML(html);
     
-    console.log(`[render] html: ${url} -> ${extracted.words} words`);
-    return { mode: 'html', status: resp.status, ...extracted };
+    console.log(`[render] html: ${url} -> ${extracted.words} words, status ${statusCode}`);
+    return { mode: 'html', statusCode, ...extracted };
   } catch (err: any) {
     console.error(`[render] html fetch failed for ${url}:`, err?.message);
     
     // Return empty result
     return {
       mode: 'html',
-      status: 0,
+      statusCode: 0,
       html: '',
       text: '',
       words: 0,
       snippet: '',
       hasH1: false,
       jsonLdCount: 0,
+      faqPresent: false,
     };
   }
 }

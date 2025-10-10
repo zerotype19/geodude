@@ -157,16 +157,20 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
         // Log render mode for observability
         console.log(`render: ${pageUrl} -> mode=${rendered.mode}, words=${rendered.words}`);
 
-        if (rendered.status === 200 || rendered.status === 0) {
+        if (rendered.statusCode === 200 || rendered.statusCode === 0) {
           const html = rendered.html;
           const title = extractTitle(html);
           const h1 = extractH1(html);
-          const jsonLdBlocks = extractJSONLD(html);
-          const hasFaq = detectFAQ(html);
           
-          // Use rendered word count (more accurate)
+          // Use rendered values (more accurate than parsing)
           const wordCount = rendered.words;
           const snippet = rendered.snippet;
+          const hasH1 = rendered.hasH1;
+          const jsonLdCount = rendered.jsonLdCount;
+          const faqPresent = rendered.faqPresent;
+
+          // Still need to extract JSON-LD blocks for Organization check
+          const jsonLdBlocks = extractJSONLD(html);
 
           // Check for Organization sameAs (only on homepage)
           if (pageUrl === baseUrl || pageUrl === `${baseUrl}/`) {
@@ -188,11 +192,12 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
 
           pages.push({
             url: pageUrl,
-            status_code: rendered.status || 200,
+            status_code: rendered.statusCode || 200,
             title,
             h1,
-            has_json_ld: jsonLdBlocks.length > 0,
-            has_faq: hasFaq,
+            has_h1: hasH1,
+            jsonld_count: jsonLdCount,
+            faq_present: faqPresent,
             word_count: wordCount,
             rendered_words: wordCount,
             snippet,
@@ -200,7 +205,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
             error: null,
           });
 
-          // Check for issues
+          // Check for issues using rendered values
           if (!title) {
             issues.push({
               page_url: pageUrl,
@@ -210,7 +215,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
             });
           }
 
-          if (!h1 || !rendered.hasH1) {
+          if (!hasH1) {
             issues.push({
               page_url: pageUrl,
               issue_type: 'missing_h1',
@@ -219,7 +224,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
             });
           }
 
-          if (jsonLdBlocks.length === 0 || rendered.jsonLdCount === 0) {
+          if (jsonLdCount === 0) {
             issues.push({
               page_url: pageUrl,
               issue_type: 'missing_structured_data',
@@ -318,16 +323,17 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
     for (const page of pages) {
       await env.DB.prepare(
         `INSERT INTO audit_pages 
-         (audit_id, url, status_code, title, h1, has_json_ld, has_faq, word_count, rendered_words, snippet, load_time_ms, error)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (audit_id, url, status_code, title, h1, has_h1, jsonld_count, faq_present, word_count, rendered_words, snippet, load_time_ms, error)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         auditId,
         page.url,
         page.status_code,
         page.title,
         page.h1,
-        page.has_json_ld ? 1 : 0,
-        page.has_faq ? 1 : 0,
+        page.has_h1 ? 1 : 0,
+        page.jsonld_count ?? 0,
+        page.faq_present ? 1 : 0,
         page.word_count,
         page.rendered_words,
         page.snippet,

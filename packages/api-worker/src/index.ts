@@ -815,8 +815,8 @@ export default {
 
         // 1) Find the exact page row
         const pageRow = await env.DB.prepare(
-          `SELECT url, status_code as status, title, h1 as has_h1, word_count, 
-                  rendered_words, snippet, has_json_ld as json_ld_count, has_faq as faq_present
+          `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
+                  word_count, rendered_words, snippet
            FROM audit_pages
            WHERE audit_id = ? AND (url = ? OR url LIKE '%' || ?)
            ORDER BY (url = ?) DESC
@@ -848,7 +848,7 @@ export default {
         // 3) Lightweight page score breakdown (use rendered_words)
         const scoreHints = {
           has_h1: !!pageRow.has_h1,
-          has_json_ld: (pageRow.json_ld_count ?? 0) > 0,
+          has_json_ld: (pageRow.jsonld_count ?? 0) > 0,
           word_ok: (pageRow.rendered_words ?? pageRow.word_count ?? 0) >= 120,
           faq_ok: !!pageRow.faq_present,
         };
@@ -869,12 +869,12 @@ export default {
             page: {
               url: pageRow.url,
               title: pageRow.title,
-              status: pageRow.status,
-              word_count: pageRow.rendered_words ?? pageRow.word_count,
+              statusCode: pageRow.status_code,
+              words: pageRow.rendered_words ?? pageRow.word_count,
               snippet: pageRow.snippet,
-              has_h1: !!pageRow.has_h1,
-              json_ld_count: pageRow.json_ld_count ?? 0,
-              faq_present: !!pageRow.faq_present,
+              hasH1: !!pageRow.has_h1,
+              jsonLdCount: pageRow.jsonld_count ?? 0,
+              faqPresent: !!pageRow.faq_present,
               score_hints: scoreHints,
             },
             issues,
@@ -927,12 +927,29 @@ export default {
         }
 
         // Get pages
-        const pages = await env.DB.prepare(
-          `SELECT url, status_code, title, h1, has_json_ld, has_faq, 
+        const pagesResult = await env.DB.prepare(
+          `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present, 
                   word_count, rendered_words, snippet, load_time_ms, error
            FROM audit_pages WHERE audit_id = ?
            ORDER BY url`
         ).bind(auditId).all();
+        
+        // Normalize field names to camelCase
+        const pages = {
+          results: (pagesResult.results || []).map((p: any) => ({
+            url: p.url,
+            statusCode: p.status_code,
+            title: p.title,
+            h1: p.h1,
+            hasH1: !!p.has_h1,
+            jsonLdCount: p.jsonld_count ?? 0,
+            faqPresent: !!p.faq_present,
+            words: p.rendered_words ?? p.word_count ?? 0,
+            snippet: p.snippet,
+            loadTimeMs: p.load_time_ms,
+            error: p.error,
+          })),
+        };
 
         // Get issues
         const issues = await env.DB.prepare(

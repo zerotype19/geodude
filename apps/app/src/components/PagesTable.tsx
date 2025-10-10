@@ -32,7 +32,7 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
       </thead>
       <tbody>
         {pages.map((p, idx) => {
-          const words = p.rendered_words ?? p.word_count ?? 0;
+          const words = p.words ?? 0;
           const tooltip = p.snippet 
             ? `${p.url}\n\nSnippet: ${p.snippet}` 
             : p.url;
@@ -59,7 +59,7 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                   </a>
                 )}
               </td>
-              <td>{p.http_status ?? "-"}</td>
+              <td>{p.statusCode || "-"}</td>
               <td style={{
                 maxWidth: 300,
                 overflow: "hidden",
@@ -80,8 +80,8 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                   <span style={{ color: '#999' }}>-</span>
                 )}
               </td>
-              <td>{p.jsonld_types ?? "-"}</td>
-              <td>{p.has_faq ? "Yes" : "No"}</td>
+              <td>{p.jsonLdCount ?? 0}</td>
+              <td>{p.faqPresent ? "Yes" : "No"}</td>
             </tr>
           );
         })}

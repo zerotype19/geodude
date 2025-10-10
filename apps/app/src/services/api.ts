@@ -10,13 +10,16 @@ export type AuditIssue = {
 
 export type AuditPage = { 
   url: string; 
-  http_status?: number; 
+  statusCode: number;
   title?: string; 
-  jsonld_types?: string; 
-  has_faq?: number;
-  word_count?: number;
-  rendered_words?: number;
+  h1?: string;
+  hasH1: boolean;
+  jsonLdCount: number;
+  faqPresent: boolean;
+  words: number;
   snippet?: string;
+  loadTimeMs?: number;
+  error?: string | null;
 };
 
 export type Scores = { 
