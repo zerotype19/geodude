@@ -266,6 +266,30 @@ export async function getAuditPage(auditId: string, decodedUrlOrPath: string) {
   }>;
 }
 
+export type PageRecommendations = {
+  ok: boolean;
+  inferredType: string;
+  missingSchemas: string[];
+  suggestedJsonLd: Array<{
+    type: string;
+    json: any;
+    copyButton: string;
+  }>;
+  copyBlocks: Array<{
+    label: string;
+    content: string;
+  }>;
+  priority: 'high' | 'medium' | 'low';
+  rationale: string;
+};
+
+export async function getPageRecommendations(auditId: string, pageUrl: string): Promise<PageRecommendations> {
+  const u = encodeURIComponent(pageUrl);
+  const res = await fetch(`${API_BASE}/v1/audits/${auditId}/page/recommendations?u=${u}`);
+  if (!res.ok) throw new Error(`getPageRecommendations failed: ${res.status}`);
+  return res.json() as Promise<PageRecommendations>;
+}
+
 // Base64 URL-safe encoding/decoding helpers
 export const b64u = {
   enc: (s: string) =>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { getCitations, type Citation } from "../services/api";
 
 interface Props {
@@ -7,12 +8,16 @@ interface Props {
 }
 
 export default function Citations({ auditId, citations: initialCitations }: Props) {
+  const location = useLocation();
+  const urlFilter = new URLSearchParams(location.search).get('filter') || '';
+  
   const [citations, setCitations] = useState<Citation[]>(initialCitations || []);
   const [loading, setLoading] = useState(!initialCitations || initialCitations.length === 0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [limit] = useState(10);
+  const [filter, setFilter] = useState(urlFilter);
 
   useEffect(() => {
     if (!initialCitations || initialCitations.length === 0) {
@@ -61,8 +66,13 @@ export default function Citations({ auditId, citations: initialCitations }: Prop
     );
   }
 
+  // Filter citations by URL if filter is set
+  const filteredCitations = filter
+    ? citations.filter(c => c.url.includes(filter))
+    : citations;
+
   // Group by query
-  const byQuery = citations.reduce((acc, c) => {
+  const byQuery = filteredCitations.reduce((acc, c) => {
     if (!acc[c.query]) acc[c.query] = [];
     acc[c.query].push(c);
     return acc;
@@ -72,15 +82,43 @@ export default function Citations({ auditId, citations: initialCitations }: Prop
 
   return (
     <div>
+      {filter && (
+        <div style={{ 
+          marginBottom: 16, 
+          padding: '8px 12px', 
+          background: '#f3f4f6', 
+          borderRadius: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <span style={{ fontSize: 14 }}>
+            Filtered to: <strong>{filter}</strong>
+          </span>
+          <button
+            onClick={() => setFilter('')}
+            style={{
+              padding: '4px 8px',
+              fontSize: 12,
+              cursor: 'pointer',
+              background: 'white',
+              border: '1px solid #d1d5db',
+              borderRadius: 4
+            }}
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
       <p style={{ marginTop: 0, opacity: 0.9, fontSize: 14 }}>
         {total > 0 ? (
           <>
-            Showing {citations.length} of {total} citation{total !== 1 ? 's' : ''} 
+            Showing {filteredCitations.length} of {total} citation{total !== 1 ? 's' : ''} 
             where your domain appears in search results
           </>
         ) : (
           <>
-            Found {citations.length} citation{citations.length !== 1 ? 's' : ''} 
+            Found {filteredCitations.length} citation{filteredCitations.length !== 1 ? 's' : ''} 
             where your domain appears in search results
           </>
         )}

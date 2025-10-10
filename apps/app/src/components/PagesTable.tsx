@@ -26,7 +26,7 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
       <thead>
         <tr>
           <th>URL</th>
-          <th>Status</th>
+          <th title="HTTP status code. 0 = unknown (timeout/network error)">Status</th>
           <th>Title</th>
           <th style={{ textAlign: 'right' }}>Words</th>
           <th>JSON-LD</th>
@@ -35,7 +35,7 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
               FAQ (page)
             </th>
           )}
-          <th style={{ textAlign: 'right' }}>Cites</th>
+          <th style={{ textAlign: 'right' }} title="Number of AI citations to this page">Cites</th>
         </tr>
       </thead>
       <tbody>
@@ -91,7 +91,17 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
               <td>{p.jsonLdCount ?? 0}</td>
               {anyFaq && <td>{p.faqOnPage ? "Yes" : "—"}</td>}
               <td style={{ textAlign: 'right' }} className="tabular-nums">
-                {p.citationCount ?? 0}
+                {(p.citationCount ?? 0) > 0 && auditId ? (
+                  <Link
+                    to={`/a/${auditId}?tab=citations&filter=${encodeURIComponent(p.url)}`}
+                    style={{ color: '#667eea', textDecoration: 'underline', cursor: 'pointer' }}
+                    title="View citations to this page"
+                  >
+                    {p.citationCount}
+                  </Link>
+                ) : (
+                  <span>{p.citationCount ?? 0}</span>
+                )}
               </td>
             </tr>
           );

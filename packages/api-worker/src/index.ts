@@ -995,6 +995,83 @@ export default {
       }
     }
 
+    // GET /v1/audits/:id/page/recommendations - Get per-page schema recommendations
+    if (path.match(/^\/v1\/audits\/[^/]+\/page\/recommendations$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+      const rawU = url.searchParams.get('u') ?? '';
+      
+      if (!rawU) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required parameter: u (page URL)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        const pageUrl = decodeURIComponent(rawU);
+        
+        // Fetch page data from audit
+        const page = await env.DB.prepare(`
+          SELECT url, title, h1, rendered_words, word_count, jsonld_count, faq_present
+          FROM audit_pages
+          WHERE audit_id = ? AND url = ?
+        `).bind(auditId, pageUrl).first<any>();
+
+        if (!page) {
+          return new Response(
+            JSON.stringify({ error: 'Page not found in audit' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Extract JSON-LD types from the page (stub for now - enhance later)
+        // TODO: Parse actual JSON-LD from rendered content
+        const jsonLdTypes: string[] = [];
+
+        // Parse URL to get path segments
+        let pathSegments: string[] = [];
+        try {
+          const urlObj = new URL(pageUrl);
+          pathSegments = urlObj.pathname.split('/').filter(s => s.length > 0);
+        } catch {}
+
+        // Build signals for recommendation engine
+        const signals = {
+          url: pageUrl,
+          title: page.title,
+          h1: page.h1,
+          words: page.rendered_words ?? page.word_count ?? 0,
+          jsonLdCount: page.jsonld_count ?? 0,
+          jsonLdTypes,
+          faqPresent: page.faq_present ?? false,
+          hasPrice: false,  // TODO: Detect from rendered content
+          hasAddress: false,  // TODO: Detect from rendered content
+          hasPhone: false,  // TODO: Detect from rendered content
+          hasList: false,  // TODO: Detect from rendered content
+          hasHowTo: false,  // TODO: Detect from rendered content
+          pathSegments,
+        };
+
+        // Import and call recommendation engine
+        const { getRecommendations } = await import('./recommend');
+        const recommendations = getRecommendations(signals);
+
+        return new Response(
+          JSON.stringify({ ok: true, ...recommendations }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('Recommendations error:', error);
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to generate recommendations',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // GET /v1/audits/:id - Get audit details (public for now, could add auth later)
     if (path.match(/^\/v1\/audits\/[^/]+$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
