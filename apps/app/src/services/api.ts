@@ -22,12 +22,50 @@ export type AuditPage = {
   error?: string | null;
 };
 
+export type ScoresBreakdown = {
+  crawlability: {
+    robotsTxtFound: boolean;
+    sitemapReferenced: boolean;
+    sitemapOk: boolean;
+    aiBots: {
+      gptbot: boolean;
+      claude: boolean;
+      perplexity: boolean;
+      ccbot: boolean;
+      googleExtended: boolean;
+      bytespider: boolean;
+    };
+  };
+  structured: {
+    jsonLdCoveragePct: number;
+    faqSite: boolean;
+    schemaTypes: string[];
+  };
+  answerability: {
+    titleCoveragePct: number;
+    h1CoveragePct: number;
+    content120PlusPct: number;
+  };
+  trust: {
+    ok2xxPct: number;
+    avgRenderMs: number;
+  };
+};
+
+export type SiteMeta = {
+  faqPresent: boolean;
+  robotsTxtUrl: string | null;
+  sitemapUrl: string | null;
+  aiBots: ScoresBreakdown['crawlability']['aiBots'];
+};
+
 export type Scores = { 
   total: number; 
   crawlability: number; 
   structured: number; 
   answerability: number; 
-  trust: number 
+  trust: number;
+  breakdown?: ScoresBreakdown;
 };
 
 export type EntityRecommendations = {
@@ -49,6 +87,7 @@ export type Audit = {
   property_id: string; 
   domain: string; 
   scores: Scores; 
+  site?: SiteMeta;
   issues: AuditIssue[]; 
   pages: AuditPage[]; 
   started_at: number; 

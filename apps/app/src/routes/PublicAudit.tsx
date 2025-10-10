@@ -167,8 +167,79 @@ export default function PublicAudit() {
 
       <div className="row">
         <ScoreCard title="Overall" value={audit.scores.total}/>
-        <ScoreCard title="Crawlability" value={audit.scores.crawlability}/>
-        <ScoreCard title="Structured" value={audit.scores.structured}/>
+        
+        <div style={{ flex: 1 }}>
+          <ScoreCard title="Crawlability" value={audit.scores.crawlability}/>
+          {audit.scores.breakdown?.crawlability && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: audit.scores.breakdown.crawlability.robotsTxtFound ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                color: audit.scores.breakdown.crawlability.robotsTxtFound ? '#10b981' : '#ef4444',
+              }}>
+                robots.txt {audit.scores.breakdown.crawlability.robotsTxtFound ? '✓' : '✗'}
+              </span>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: audit.scores.breakdown.crawlability.sitemapOk ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                color: audit.scores.breakdown.crawlability.sitemapOk ? '#10b981' : '#ef4444',
+              }}>
+                sitemap {audit.scores.breakdown.crawlability.sitemapOk ? '✓' : '✗'}
+              </span>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: 'rgba(100,116,139,.15)',
+                color: '#64748b',
+              }} title="AI bots allowed">
+                AI bots: {Object.values(audit.scores.breakdown.crawlability.aiBots).filter(Boolean).length}/{Object.keys(audit.scores.breakdown.crawlability.aiBots).length}
+              </span>
+            </div>
+          )}
+        </div>
+        
+        <div style={{ flex: 1 }}>
+          <ScoreCard title="Structured" value={audit.scores.structured}/>
+          {audit.scores.breakdown?.structured && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: audit.scores.breakdown.structured.faqSite ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                color: audit.scores.breakdown.structured.faqSite ? '#10b981' : '#ef4444',
+              }}>
+                FAQ on site {audit.scores.breakdown.structured.faqSite ? '✓' : '✗'}
+              </span>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: 'rgba(56,189,248,.15)',
+                color: '#38bdf8',
+              }}>
+                JSON-LD {Math.round(audit.scores.breakdown.structured.jsonLdCoveragePct)}%
+              </span>
+              {audit.scores.breakdown.structured.schemaTypes.length > 0 && (
+                <span style={{
+                  fontSize: 11,
+                  padding: '4px 8px',
+                  borderRadius: 12,
+                  background: 'rgba(99,102,241,.15)',
+                  color: '#6366f1',
+                }} title={audit.scores.breakdown.structured.schemaTypes.join(', ')}>
+                  Schemas: {audit.scores.breakdown.structured.schemaTypes.length}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        
         <ScoreCard title="Answerability" value={audit.scores.answerability}/>
         <ScoreCard title="Trust" value={audit.scores.trust}/>
       </div>

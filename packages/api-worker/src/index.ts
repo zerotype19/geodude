@@ -1000,6 +1000,80 @@ export default {
           () => checkCitationsBudget(env) // budget guard
         );
 
+        // Compute rollups from pages for breakdown
+        const totalPages = pages.results.length;
+        const pagesWithJsonLd = pages.results.filter((p: any) => p.jsonLdCount > 0).length;
+        const pagesWithTitle = pages.results.filter((p: any) => p.title && p.title.length > 0).length;
+        const pagesWithH1 = pages.results.filter((p: any) => p.hasH1).length;
+        const pagesWithContent = pages.results.filter((p: any) => p.words >= 120).length;
+        const pages2xx = pages.results.filter((p: any) => p.statusCode >= 200 && p.statusCode < 300).length;
+        const siteFaqPresent = pages.results.some((p: any) => p.faqPresent);
+        
+        // Calculate percentages
+        const jsonLdCoveragePct = totalPages > 0 ? Math.round((pagesWithJsonLd / totalPages) * 1000) / 10 : 0;
+        const titleCoveragePct = totalPages > 0 ? Math.round((pagesWithTitle / totalPages) * 1000) / 10 : 0;
+        const h1CoveragePct = totalPages > 0 ? Math.round((pagesWithH1 / totalPages) * 1000) / 10 : 0;
+        const content120PlusPct = totalPages > 0 ? Math.round((pagesWithContent / totalPages) * 1000) / 10 : 0;
+        const ok2xxPct = totalPages > 0 ? Math.round((pages2xx / totalPages) * 1000) / 10 : 0;
+        
+        // Calculate average render time
+        const renderTimes = pages.results
+          .map((p: any) => p.loadTimeMs)
+          .filter((t: number) => t && t > 0);
+        const avgRenderMs = renderTimes.length > 0 
+          ? Math.round(renderTimes.reduce((sum: number, t: number) => sum + t, 0) / renderTimes.length)
+          : 0;
+        
+        // Check robots/sitemap from issues (we can reconstruct this)
+        const issuesArr = issues.results as any[];
+        const robotsMissing = issuesArr.some((i: any) => i.issue_type === 'robots_missing');
+        const sitemapMissing = issuesArr.some((i: any) => i.issue_type === 'sitemap_missing');
+        const aiBotsBlocked = issuesArr.find((i: any) => i.issue_type === 'robots_blocks_ai');
+        
+        // Parse blocked bots from issue message if present
+        const blockedBotsList = aiBotsBlocked?.message?.match(/blocking AI bots: (.+)$/)?.[1]?.split(', ') || [];
+        const allBots = ['GPTBot', 'ClaudeBot', 'Claude-Web', 'PerplexityBot', 'CCBot', 'Google-Extended', 'Bytespider'];
+        const aiBots: Record<string, boolean> = {
+          gptbot: !blockedBotsList.includes('GPTBot'),
+          claude: !blockedBotsList.includes('ClaudeBot') && !blockedBotsList.includes('Claude-Web'),
+          perplexity: !blockedBotsList.includes('PerplexityBot'),
+          ccbot: !blockedBotsList.includes('CCBot'),
+          googleExtended: !blockedBotsList.includes('Google-Extended'),
+          bytespider: !blockedBotsList.includes('Bytespider'),
+        };
+        
+        // Build breakdown
+        const breakdown = {
+          crawlability: {
+            robotsTxtFound: !robotsMissing,
+            sitemapReferenced: !sitemapMissing,
+            sitemapOk: !sitemapMissing,
+            aiBots,
+          },
+          structured: {
+            jsonLdCoveragePct,
+            faqSite: siteFaqPresent,
+            schemaTypes: [], // TODO: extract from pages if we store them
+          },
+          answerability: {
+            titleCoveragePct,
+            h1CoveragePct,
+            content120PlusPct,
+          },
+          trust: {
+            ok2xxPct,
+            avgRenderMs,
+          },
+        };
+        
+        // Build site metadata
+        const site = {
+          faqPresent: siteFaqPresent,
+          robotsTxtUrl: property?.domain ? `https://${property.domain}/robots.txt` : null,
+          sitemapUrl: property?.domain ? `https://${property.domain}/sitemap.xml` : null,
+          aiBots,
+        };
+
         // Transform scores from flat columns to nested object
         const scores = audit.score_overall !== null ? {
           total: audit.score_overall,
@@ -1007,6 +1081,7 @@ export default {
           structured: audit.score_structured,
           answerability: audit.score_answerability,
           trust: audit.score_trust,
+          breakdown,
         } : null;
 
         // Transform issues to match frontend expectations
@@ -1025,6 +1100,7 @@ export default {
           status: audit.status,
           domain: property?.domain || null,
           scores: scores,
+          site: site,
           pages_crawled: audit.pages_crawled,
           pages_total: audit.pages_total,
           issues_count: audit.issues_count,
