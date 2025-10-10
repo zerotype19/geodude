@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { getAudit, rerunAudit, type Audit } from "../services/api";
 import ScoreCard from "../components/ScoreCard";
 import IssuesTable from "../components/IssuesTable";
@@ -10,12 +10,22 @@ import Citations from "../components/Citations";
 export default function PublicAudit() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [audit, setAudit] = useState<Audit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations'>('scores');
   const [rerunning, setRerunning] = useState(false);
   
   const hasApiKey = useMemo(() => !!localStorage.getItem('ov_api_key'), []);
+
+  // Read tab from URL on mount and when URL changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'citations' || tabParam === 'scores' || tabParam === 'issues' || tabParam === 'pages') {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     (async () => {
@@ -344,7 +354,11 @@ export default function PublicAudit() {
         {(['scores', 'issues', 'pages', 'citations'] as const).map(tab => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              const params = new URLSearchParams(location.search);
+              params.set('tab', tab);
+              navigate(`${location.pathname}?${params.toString()}`, { replace: false });
+            }}
             style={{
               padding: '8px 16px',
               background: activeTab === tab ? '#3b82f6' : '#1e293b',

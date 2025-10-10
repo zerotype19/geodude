@@ -7,22 +7,44 @@ interface Props {
   citations?: Citation[];
 }
 
+// Synonym mapping for ct parameter (handle common typos)
+const CT_SYNONYMS: Record<string, CitationType | null> = {
+  'aeo': 'AEO',
+  'geo': 'GEO', 
+  'organic': 'Organic',
+  'seo': 'AEO', // Common typo/synonym
+  'all': null,
+};
+
 export default function Citations({ auditId }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
   
-  const urlTypeFilter = params.get('ct') as CitationType | null;
+  // Map ct parameter through synonyms
+  const rawCt = (params.get('ct') || 'all').toLowerCase();
+  const urlTypeFilter = CT_SYNONYMS[rawCt] ?? null;
   const urlPathFilter = params.get('path') || params.get('filter') || ''; // Support both 'path' and legacy 'filter'
   
   const [citations, setCitations] = useState<Citation[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [counts, setCounts] = useState<CitationCounts>({ AEO: 0, GEO: 0, Organic: 0 });
+  const [fullCounts, setFullCounts] = useState<CitationCounts>({ AEO: 0, GEO: 0, Organic: 0 }); // STABLE counts from full dataset
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [typeFilter, setTypeFilter] = useState<CitationType | null>(urlTypeFilter);
   const [pathFilter, setPathFilter] = useState(urlPathFilter);
+
+  // Fetch full counts once on mount (stays stable regardless of filters)
+  useEffect(() => {
+    getAuditCitations(auditId, { pageSize: 1 }) // Fetch just 1 item to get counts
+      .then((data) => {
+        setFullCounts(data.counts); // These counts never change
+      })
+      .catch((error) => {
+        console.error('Failed to load citation counts:', error);
+      });
+  }, [auditId]);
 
   // Update URL when filters change
   useEffect(() => {
@@ -59,7 +81,7 @@ export default function Citations({ auditId }: Props) {
       .then((data) => {
         setCitations(data.items);
         setTotal(data.total);
-        setCounts(data.counts);
+        // Don't update fullCounts here - they stay stable!
         setLoading(false);
       })
       .catch((error) => {
@@ -106,12 +128,12 @@ export default function Citations({ auditId }: Props) {
     return acc;
   }, {} as Record<string, Citation[]>);
 
-  const totalCitations = counts.AEO + counts.GEO + counts.Organic;
+  const totalCitations = fullCounts.AEO + fullCounts.GEO + fullCounts.Organic;
   const hasMore = total > page * pageSize;
 
   return (
     <div>
-      {/* Count chips */}
+      {/* Count chips - STABLE (never change when filtering) */}
       <div style={{ 
         display: 'flex', 
         gap: 12, 
@@ -124,29 +146,29 @@ export default function Citations({ auditId }: Props) {
         <div 
           className="pill" 
           style={{ 
-            background: counts.AEO > 0 ? '#8b5cf6' : '#374151', 
+            background: fullCounts.AEO > 0 ? '#8b5cf6' : '#374151', 
             fontSize: 13 
           }}
         >
-          AEO: {counts.AEO}
+          AEO: {fullCounts.AEO}
         </div>
         <div 
           className="pill" 
           style={{ 
-            background: counts.GEO > 0 ? '#3b82f6' : '#374151', 
+            background: fullCounts.GEO > 0 ? '#3b82f6' : '#374151', 
             fontSize: 13 
           }}
         >
-          GEO: {counts.GEO}
+          GEO: {fullCounts.GEO}
         </div>
         <div 
           className="pill" 
           style={{ 
-            background: counts.Organic > 0 ? '#10b981' : '#374151', 
+            background: fullCounts.Organic > 0 ? '#10b981' : '#374151', 
             fontSize: 13 
           }}
         >
-          Organic: {counts.Organic}
+          Organic: {fullCounts.Organic}
         </div>
       </div>
 
