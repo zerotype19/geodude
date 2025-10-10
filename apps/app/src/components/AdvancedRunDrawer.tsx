@@ -32,7 +32,7 @@ export default function AdvancedRunDrawer({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.6)',
+        background: 'rgba(0,0,0,0.5)',
         display: 'grid',
         placeItems: 'center',
         zIndex: 50,
@@ -41,17 +41,18 @@ export default function AdvancedRunDrawer({
     >
       <div 
         style={{
-          background: '#18181b',
+          background: 'white',
           width: '680px',
           maxWidth: '95vw',
-          borderRadius: 16,
-          padding: 24,
+          borderRadius: 12,
+          padding: 32,
           display: 'flex',
           flexDirection: 'column',
-          gap: 16,
+          gap: 20,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
+        <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#0f172a' }}>
           Advanced Audit Options
         </h3>
 
@@ -62,7 +63,8 @@ export default function AdvancedRunDrawer({
               display: 'block', 
               fontSize: 14, 
               marginBottom: 8,
-              opacity: 0.9,
+              color: '#475569',
+              fontWeight: 500,
             }}
           >
             Max pages (10–200)
@@ -76,12 +78,13 @@ export default function AdvancedRunDrawer({
             onChange={(e) => setMaxPages(parseInt(e.target.value || '100', 10))}
             style={{
               width: 128,
-              background: '#27272a',
-              border: '1px solid #3f3f46',
-              borderRadius: 8,
+              background: 'white',
+              border: '1px solid #e2e8f0',
+              borderRadius: 6,
               padding: '8px 12px',
-              color: 'white',
+              color: '#1e293b',
               fontSize: 14,
+              fontFamily: 'Inter, sans-serif',
             }}
           />
         </div>
@@ -100,7 +103,8 @@ export default function AdvancedRunDrawer({
                 display: 'block', 
                 fontSize: 14, 
                 marginBottom: 8,
-                opacity: 0.9,
+                color: '#475569',
+                fontWeight: 500,
               }}
             >
               Include (regex per line, optional)
@@ -113,19 +117,19 @@ export default function AdvancedRunDrawer({
               style={{
                 width: '100%',
                 height: 128,
-                background: '#27272a',
-                border: '1px solid #3f3f46',
-                borderRadius: 8,
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: 6,
                 padding: '8px 12px',
-                color: 'white',
+                color: '#1e293b',
                 fontSize: 13,
-                fontFamily: 'ui-monospace, monospace',
+                fontFamily: 'Monaco, Consolas, monospace',
                 resize: 'vertical',
               }}
             />
             <p style={{ 
               fontSize: 12, 
-              opacity: 0.6, 
+              color: '#64748b', 
               marginTop: 6, 
               marginBottom: 0 
             }}>
@@ -140,7 +144,8 @@ export default function AdvancedRunDrawer({
                 display: 'block', 
                 fontSize: 14, 
                 marginBottom: 8,
-                opacity: 0.9,
+                color: '#475569',
+                fontWeight: 500,
               }}
             >
               Exclude (regex per line, optional)
@@ -153,19 +158,19 @@ export default function AdvancedRunDrawer({
               style={{
                 width: '100%',
                 height: 128,
-                background: '#27272a',
-                border: '1px solid #3f3f46',
-                borderRadius: 8,
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: 6,
                 padding: '8px 12px',
-                color: 'white',
+                color: '#1e293b',
                 fontSize: 13,
-                fontFamily: 'ui-monospace, monospace',
+                fontFamily: 'Monaco, Consolas, monospace',
                 resize: 'vertical',
               }}
             />
             <p style={{ 
               fontSize: 12, 
-              opacity: 0.6, 
+              color: '#64748b', 
               marginTop: 6, 
               marginBottom: 0 
             }}>
@@ -185,11 +190,11 @@ export default function AdvancedRunDrawer({
           <button
             onClick={onClose}
             style={{
-              padding: '8px 16px',
-              borderRadius: 8,
-              background: '#27272a',
-              border: '1px solid #3f3f46',
-              color: 'white',
+              padding: '10px 20px',
+              borderRadius: 6,
+              background: 'white',
+              border: '1px solid #e2e8f0',
+              color: '#475569',
               cursor: 'pointer',
               fontSize: 14,
               fontWeight: 500,
@@ -200,8 +205,8 @@ export default function AdvancedRunDrawer({
           <button
             onClick={submit}
             style={{
-              padding: '8px 16px',
-              borderRadius: 8,
+              padding: '10px 20px',
+              borderRadius: 6,
               background: '#3b82f6',
               border: 'none',
               color: 'white',

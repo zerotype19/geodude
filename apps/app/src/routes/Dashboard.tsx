@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useApiKey } from "../hooks/useApiKey";
 import { startAudit, getAudit, type Audit } from "../services/api";
+import { Link } from "react-router-dom";
 import ScoreCard from "../components/ScoreCard";
 import IssuesTable from "../components/IssuesTable";
 import PagesTable from "../components/PagesTable";
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations'>('scores');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [recentAudits, setRecentAudits] = useState<string[]>([]);
   const [advancedOpts, setAdvancedOpts] = useState<{
     maxPages?: number;
     include?: string[];
@@ -27,6 +29,18 @@ export default function Dashboard() {
       return {};
     }
   });
+
+  // Load recent audits from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('recentAudits');
+      if (stored) {
+        setRecentAudits(JSON.parse(stored));
+      }
+    } catch {
+      setRecentAudits([]);
+    }
+  }, []);
 
   async function runAudit() {
     setError(null); 
@@ -45,6 +59,15 @@ export default function Dashboard() {
       });
       const full = await getAudit(id);
       setAudit(full);
+      
+      // Save to recent audits
+      try {
+        const stored = localStorage.getItem('recentAudits');
+        const existing = stored ? JSON.parse(stored) : [];
+        const updated = [id, ...existing.filter((aid: string) => aid !== id)].slice(0, 10); // Keep last 10
+        localStorage.setItem('recentAudits', JSON.stringify(updated));
+        setRecentAudits(updated);
+      } catch {}
       
       // copy share link to clipboard for convenience
       const share = `${location.origin}/a/${id}`;
@@ -178,6 +201,48 @@ export default function Dashboard() {
         onRun={handleAdvancedRun}
         initial={advancedOpts}
       />
+
+      {/* Recent Audits */}
+      {recentAudits.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Recent Audits</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {recentAudits.map((auditId) => (
+              <Link
+                key={auditId}
+                to={`/a/${auditId}`}
+                style={{
+                  padding: '12px 16px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 6,
+                  textDecoration: 'none',
+                  color: '#3b82f6',
+                  fontSize: 14,
+                  fontFamily: 'Monaco, Consolas, monospace',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f1f5f9';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                }}
+              >
+                <span>{auditId}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {audit && (
         <>
