@@ -269,12 +269,12 @@ export default function Citations({ auditId }: Props) {
             {results.map((citation, idx) => {
               const urlObj = new URL(citation.url);
               
-              // Type badge colors
-              let typeBadgeStyle = { background: '#10b981', color: 'white' }; // Organic
+              // Type badge colors - match filter pill styling
+              let typeBadgeStyle = { background: '#d1fae5', color: '#065f46' }; // Organic
               if (citation.type === 'AEO') {
-                typeBadgeStyle = { background: '#8b5cf6', color: 'white' };
+                typeBadgeStyle = { background: '#f3e8ff', color: '#6b21a8' };
               } else if (citation.type === 'GEO') {
-                typeBadgeStyle = { background: '#3b82f6', color: 'white' };
+                typeBadgeStyle = { background: '#dbeafe', color: '#1e40af' };
               }
               
               return (
@@ -318,8 +318,6 @@ export default function Citations({ auditId }: Props) {
                     className="pill" 
                     style={{ 
                       ...typeBadgeStyle,
-                      fontSize: 11,
-                      padding: '4px 8px',
                       marginLeft: 12,
                       flexShrink: 0
                     }}

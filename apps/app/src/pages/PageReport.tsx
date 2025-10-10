@@ -114,9 +114,9 @@ export default function PageReport() {
 
   const renderTypeBadge = (type: CitationType) => {
     const styles = {
-      AEO: { background: '#8b5cf6', color: 'white' },
-      GEO: { background: '#3b82f6', color: 'white' },
-      Organic: { background: '#10b981', color: 'white' }
+      AEO: { background: '#f3e8ff', color: '#6b21a8' },
+      GEO: { background: '#dbeafe', color: '#1e40af' },
+      Organic: { background: '#d1fae5', color: '#065f46' }
     }[type];
 
     return (
