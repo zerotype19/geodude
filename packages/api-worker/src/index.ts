@@ -14,6 +14,8 @@ import { warmCitations } from './citations-warm';
 interface Env {
   DB: D1Database;
   RATE_LIMIT_KV: KVNamespace;
+  RECO_CACHE?: KVNamespace;
+  RECO_PRODUCER?: Queue;
   R2_BACKUPS: R2Bucket;
   USER_AGENT: string;
   AUDIT_MAX_PAGES: string;
@@ -26,6 +28,8 @@ interface Env {
   RESEND_KEY?: string;
   FROM_EMAIL?: string;
   ADMIN_BASIC_AUTH?: string;
+  RECO_ALLOWED_DOMAINS?: string;
+  OPENAI_API_KEY?: string;
 }
 
 // Helper: Validate API key
@@ -484,6 +488,140 @@ export default {
         return new Response(
           JSON.stringify({
             error: 'Verification failed',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // POST /v1/reco - Create content recommendation job
+    if (path === '/v1/reco' && request.method === 'POST') {
+      if (!env.RECO_PRODUCER) {
+        return new Response(
+          JSON.stringify({ error: 'Service unavailable', message: 'Content recommendations not configured' }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      try {
+        const body = await request.json<{ url: string; audit_id?: string; page_id?: string }>();
+        
+        if (!body.url || !/^https?:\/\//i.test(body.url)) {
+          return new Response(
+            JSON.stringify({ error: 'Bad Request', message: 'Provide a valid absolute URL' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Domain allowlist (safety)
+        const allowed = (env.RECO_ALLOWED_DOMAINS || '').split(',').map(d => d.trim().toLowerCase());
+        const host = new URL(body.url).host.toLowerCase();
+        
+        if (allowed.length > 0 && !allowed.includes(host)) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden', message: `Domain ${host} not allowed for content recommendations` }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const id = crypto.randomUUID();
+        const now = Date.now();
+        
+        await env.DB.prepare(
+          `INSERT INTO reco_jobs (id, url, audit_id, page_id, status, created_at, updated_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(id, body.url, body.audit_id || null, body.page_id || null, 'queued', now, now).run();
+
+        await env.RECO_PRODUCER.send({ id, url: body.url, audit_id: body.audit_id, page_id: body.page_id });
+
+        return new Response(
+          JSON.stringify({ ok: true, id, status: 'queued' }),
+          {
+            status: 202,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to create recommendation job',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // GET /v1/reco/:id - Get recommendation job status
+    if (path.match(/^\/v1\/reco\/[^/]+$/) && request.method === 'GET') {
+      const id = path.split('/').pop()!;
+      
+      try {
+        const row = await env.DB.prepare(
+          `SELECT * FROM reco_jobs WHERE id = ?`
+        ).bind(id).first<any>();
+        
+        if (!row) {
+          return new Response(
+            JSON.stringify({ error: 'Not Found', message: `Job ${id} not found` }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Parse result_json if present
+        let result = null;
+        if (row.result_json) {
+          try {
+            result = JSON.parse(row.result_json);
+          } catch (e) {
+            console.error('Failed to parse result_json:', e);
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            job: {
+              id: row.id,
+              url: row.url,
+              audit_id: row.audit_id,
+              page_id: row.page_id,
+              status: row.status,
+              created_at: row.created_at,
+              updated_at: row.updated_at,
+              input_hash: row.input_hash,
+              result,
+              error: row.error,
+            },
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to fetch job',
             message: error instanceof Error ? error.message : String(error),
           }),
           {

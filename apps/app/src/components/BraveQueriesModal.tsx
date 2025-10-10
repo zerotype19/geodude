@@ -104,25 +104,25 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
         </div>
 
         {/* Run More Section */}
-        <div className="border-b border-gray-200 px-6 py-3 bg-gray-50">
+        <div className="border-b border-gray-200 px-6 py-3 bg-white">
           <div className="flex items-center gap-3">
             <input
               value={extraTerms}
               onChange={(e) => setExtraTerms(e.target.value)}
               placeholder="Add custom terms (comma or line separated)"
-              className="flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+              className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 bg-white"
               disabled={running}
             />
             <button
               onClick={() => runMore(10)}
               disabled={running}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 px-4 py-2 rounded text-sm font-medium text-white whitespace-nowrap"
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 px-4 py-1.5 rounded text-sm font-medium text-white whitespace-nowrap"
             >
               {running ? 'Running...' : 'Run +10 More'}
             </button>
           </div>
           {error && (
-            <p className="mt-2 text-sm text-red-600">⚠️ {error}</p>
+            <p className="mt-2 text-xs text-red-600">⚠️ {error}</p>
           )}
         </div>
 
@@ -141,14 +141,14 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
           ) : (
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
-                <tr className="text-gray-700 text-left">
-                  <th className="py-2 px-3 font-medium">Query</th>
-                  <th className="py-2 px-3 font-medium">API</th>
-                  <th className="py-2 px-3 font-medium">Status</th>
-                  <th className="py-2 px-3 font-medium text-right">Duration</th>
-                  <th className="py-2 px-3 font-medium text-right">Sources</th>
-                  <th className="py-2 px-3 font-medium text-right">Yours</th>
-                  <th className="py-2 px-3 font-medium">Your Paths</th>
+                <tr className="text-gray-700 text-left text-xs">
+                  <th className="py-1.5 px-2 font-medium">Query</th>
+                  <th className="py-1.5 px-2 font-medium">API</th>
+                  <th className="py-1.5 px-2 font-medium">Status</th>
+                  <th className="py-1.5 px-2 font-medium text-right">Duration</th>
+                  <th className="py-1.5 px-2 font-medium text-right">Sources</th>
+                  <th className="py-1.5 px-2 font-medium text-right">Yours</th>
+                  <th className="py-1.5 px-2 font-medium">Your Paths</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,11 +157,11 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
                     key={idx} 
                     className="border-b border-gray-100 hover:bg-gray-50"
                   >
-                    <td className="py-2 px-3 text-gray-900 max-w-xs truncate" title={log.q}>
+                    <td className="py-1.5 px-2 text-gray-900 max-w-xs truncate text-xs" title={log.q}>
                       {log.q}
                     </td>
-                    <td className="py-2 px-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs ${
+                    <td className="py-1.5 px-2">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${
                         log.api === 'search' 
                           ? 'bg-blue-100 text-blue-700' 
                           : 'bg-purple-100 text-purple-700'
@@ -169,43 +169,40 @@ export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props)
                         {log.api}
                       </span>
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-1.5 px-2 text-xs whitespace-nowrap">
                       {log.ok ? (
                         <span className="text-emerald-600 font-medium">{log.status ?? 'OK'}</span>
                       ) : (
-                        <div>
-                          <span className="text-red-600 font-medium">{log.status || 'ERR'}</span>
-                          {log.error && (
-                            <div className="text-red-500 text-xs mt-0.5">{log.error}</div>
-                          )}
-                        </div>
+                        <span className="text-red-600 font-medium" title={log.error || undefined}>
+                          {log.status || 'ERR'}
+                        </span>
                       )}
                     </td>
-                    <td className="py-2 px-3 text-right text-gray-600 tabular-nums">
+                    <td className="py-1.5 px-2 text-right text-gray-600 tabular-nums text-xs whitespace-nowrap">
                       {log.durationMs ? `${log.durationMs}ms` : '—'}
                     </td>
-                    <td className="py-2 px-3 text-right text-gray-900 tabular-nums">
+                    <td className="py-1.5 px-2 text-right text-gray-900 tabular-nums text-xs">
                       {log.sourcesTotal ?? 0}
                     </td>
-                    <td className="py-2 px-3 text-right tabular-nums">
+                    <td className="py-1.5 px-2 text-right tabular-nums text-xs">
                       <span className={log.domainSources && log.domainSources > 0 ? 'text-emerald-600 font-semibold' : 'text-gray-400'}>
                         {log.domainSources ?? 0}
                       </span>
                     </td>
-                    <td className="py-2 px-3">
+                    <td className="py-1.5 px-2">
                       {log.domainPaths && log.domainPaths.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {log.domainPaths.map((path, pidx) => (
                             <span 
                               key={pidx}
-                              className="inline-block bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-xs"
+                              className="inline-block bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap"
                             >
                               {path}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-gray-400 text-xs">—</span>
                       )}
                     </td>
                   </tr>

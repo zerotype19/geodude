@@ -34,6 +34,11 @@ export default function PageReport() {
   
   const [braveQueries, setBraveQueries] = useState<BraveAIQuery[]>([]);
   const [braveLoading, setBraveLoading] = useState(false);
+  
+  // Content generation state
+  const [recoJobId, setRecoJobId] = useState<string | null>(null);
+  const [recoStatus, setRecoStatus] = useState<string | null>(null);
+  const [generatedContent, setGeneratedContent] = useState<any | null>(null);
 
   useEffect(() => {
     if (!target) {
@@ -132,6 +137,64 @@ export default function PageReport() {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
+  
+  // Generate content recommendation
+  const handleGenerateContent = async () => {
+    if (!target) return;
+    
+    try {
+      setRecoStatus('queued');
+      setGeneratedContent(null);
+      
+      const res = await fetch('https://api.optiview.ai/v1/reco', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: target, audit_id: auditId })
+      });
+      
+      const data = await res.json();
+      
+      if (data.ok) {
+        setRecoJobId(data.id);
+        setRecoStatus(data.status);
+      } else {
+        setRecoStatus('error');
+        alert(data.message || 'Failed to start content generation');
+      }
+    } catch (error) {
+      console.error('Failed to start content generation:', error);
+      setRecoStatus('error');
+      alert('Failed to start content generation');
+    }
+  };
+  
+  // Poll for job status
+  useEffect(() => {
+    if (!recoJobId || recoStatus === 'done' || recoStatus === 'error') return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`https://api.optiview.ai/v1/reco/${recoJobId}`);
+        const data = await res.json();
+        
+        if (data.ok && data.job) {
+          setRecoStatus(data.job.status);
+          
+          if (data.job.status === 'done' && data.job.result) {
+            setGeneratedContent(data.job.result);
+            clearInterval(interval);
+          } else if (data.job.status === 'error') {
+            clearInterval(interval);
+            console.error('Content generation failed:', data.job.error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to poll job status:', error);
+      }
+    }, 1200);
+    
+    return () => clearInterval(interval);
+  }, [recoJobId, recoStatus]);
 
   if (loading) return <div style={{padding: '40px', textAlign: 'center'}}>Loading page report…</div>;
   if (err) return <div style={{padding: '40px', textAlign: 'center', color: '#ef4444'}}>Error: {err}</div>;
@@ -420,6 +483,48 @@ export default function PageReport() {
       
       {activeTab === 'recommendations' && (
         <div className="tab-content">
+          {/* Generate Content Button */}
+          {!generatedContent && (
+            <div style={{ marginBottom: 24, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>
+                    🤖 AI Content Generation
+                  </div>
+                  <div style={{ fontSize: 14, color: '#64748b' }}>
+                    Let GPT-4o analyze this page and suggest ready-to-paste Schema.org JSON-LD + content improvements
+                  </div>
+                </div>
+                <button
+                  onClick={handleGenerateContent}
+                  disabled={!!recoStatus && recoStatus !== 'error'}
+                  style={{
+                    padding: '10px 20px',
+                    background: recoStatus && recoStatus !== 'error' ? '#cbd5e1' : '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: recoStatus && recoStatus !== 'error' ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {recoStatus === 'queued' ? 'Queued...' : 
+                   recoStatus === 'rendering' ? 'Rendering...' :
+                   recoStatus === 'analyzing' ? 'Analyzing...' :
+                   recoStatus === 'error' ? 'Retry' :
+                   'Generate Content'}
+                </button>
+              </div>
+              {recoStatus === 'error' && (
+                <div style={{ marginTop: 12, padding: 12, background: '#fee2e2', color: '#991b1b', borderRadius: 6, fontSize: 14 }}>
+                  ⚠️ Content generation failed. Please try again.
+                </div>
+              )}
+            </div>
+          )}
+          
           {recsLoading && (
             <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
               Loading recommendations...
@@ -454,7 +559,186 @@ export default function PageReport() {
             </div>
           )}
           
-          {recs && !recsLoading && (
+          {/* Generated Content Display */}
+          {generatedContent && (
+            <div>
+              {/* Header: Detected intent */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>Detected Intent</div>
+                  <span style={{
+                    padding: '6px 12px',
+                    background: '#dbeafe',
+                    color: '#1e40af',
+                    borderRadius: 6,
+                    fontSize: 16,
+                    fontWeight: 600
+                  }}>
+                    {generatedContent.detected_intent}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setGeneratedContent(null);
+                    setRecoStatus(null);
+                    setRecoJobId(null);
+                  }}
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '6px 12px',
+                    background: 'white',
+                    color: '#64748b',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontSize: 13
+                  }}
+                >
+                  Generate New
+                </button>
+              </div>
+              
+              {/* Missing Schemas */}
+              {generatedContent.missing_schemas && generatedContent.missing_schemas.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <h3 style={{ margin: '0 0 12px', fontSize: 18, color: '#1e293b', fontWeight: 600 }}>Missing Schemas</h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {generatedContent.missing_schemas.map((schema: string) => (
+                      <span key={schema} style={{
+                        padding: '4px 12px',
+                        background: '#dbeafe',
+                        color: '#1e40af',
+                        borderRadius: 16,
+                        fontSize: 14
+                      }}>
+                        {schema}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Suggested JSON-LD */}
+              {generatedContent.suggested_jsonld && generatedContent.suggested_jsonld.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <h3 style={{ margin: '0 0 12px', fontSize: 18, color: '#1e293b', fontWeight: 600 }}>Suggested JSON-LD</h3>
+                  {generatedContent.suggested_jsonld.map((ld: any, idx: number) => (
+                    <div key={idx} style={{
+                      marginBottom: 16,
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}>
+                      <div style={{
+                        padding: '12px 16px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <strong style={{ color: '#1e293b', fontSize: 14 }}>@type: {ld['@type']}</strong>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => copyToClipboard(JSON.stringify(ld, null, 2), 'JSON-LD')}
+                            style={{
+                              padding: '6px 12px',
+                              background: '#667eea',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              fontSize: 13
+                            }}
+                          >
+                            Copy JSON
+                          </button>
+                          <button
+                            onClick={() => openSchemaValidator(ld)}
+                            style={{
+                              padding: '6px 12px',
+                              background: 'white',
+                              color: '#667eea',
+                              border: '1px solid #667eea',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              fontSize: 13
+                            }}
+                          >
+                            Validate
+                          </button>
+                        </div>
+                      </div>
+                      <pre style={{
+                        padding: 16,
+                        margin: 0,
+                        background: '#0f172a',
+                        color: '#f1f5f9',
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                        overflow: 'auto',
+                        maxHeight: 400,
+                        fontFamily: 'Monaco, Consolas, "Courier New", monospace'
+                      }}>
+                        {JSON.stringify(ld, null, 2)}
+                      </pre>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Content Suggestions */}
+              {generatedContent.content_suggestions && generatedContent.content_suggestions.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <h3 style={{ margin: '0 0 12px', fontSize: 18, color: '#1e293b', fontWeight: 600 }}>Content Suggestions</h3>
+                  {generatedContent.content_suggestions.map((suggestion: any, idx: number) => (
+                    <div key={idx} style={{
+                      marginBottom: 12,
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      background: 'white'
+                    }}>
+                      <div style={{
+                        padding: '12px 16px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 8
+                      }}>
+                        <strong style={{ color: '#1e293b', fontSize: 14 }}>{suggestion.title}</strong>
+                        <span style={{
+                          padding: '4px 8px',
+                          background: suggestion.priority === 'High' ? '#fee2e2' : suggestion.priority === 'Medium' ? '#fed7aa' : '#d1fae5',
+                          color: suggestion.priority === 'High' ? '#991b1b' : suggestion.priority === 'Medium' ? '#9a3412' : '#065f46',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600
+                        }}>
+                          {suggestion.priority}
+                        </span>
+                      </div>
+                      <div style={{
+                        padding: 16,
+                        fontSize: 14,
+                        lineHeight: 1.6,
+                        color: '#334155',
+                        background: '#fefefe'
+                      }}>
+                        {suggestion.note}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {recs && !recsLoading && !generatedContent && (
             <div>
               {/* Header: Detected intent + Priority */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>

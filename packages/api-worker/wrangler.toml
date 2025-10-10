@@ -13,6 +13,14 @@ migrations_dir = "../../db/migrations"
 binding = "RATE_LIMIT_KV"
 id = "29edf1f05bde42c09b7afa8e128b7066"
 
+[[kv_namespaces]]
+binding = "RECO_CACHE"
+id = "placeholder-will-be-created"
+
+[[queues.producers]]
+binding = "RECO_PRODUCER"
+queue = "reco-queue"
+
 [[r2_buckets]]
 binding = "R2_BACKUPS"
 bucket_name = "geodude-backups"
@@ -37,6 +45,9 @@ BRAVE_AI_ENABLE_COMPARE = "false"
 ENABLE_PERPLEXITY = "false"
 ENABLE_YOUCOM = "false"
 ENABLE_HEADLESS_PROVIDERS = "false"
+OPENAI_API_BASE = "https://api.openai.com/v1"
+OPENAI_MODEL = "gpt-4o"
+RECO_ALLOWED_DOMAINS = "cologuard.com,www.cologuard.com,learnings.org,www.learnings.org"
 
 [browser]
 binding = "BROWSER"
@@ -49,7 +60,9 @@ enabled = true
 
 # Secrets (set via wrangler secret put):
 # - BRAVE_SEARCH (already set in Cloudflare)
+# - BRAVE_SEARCH_AI (already set in Cloudflare)
 # - RESEND_KEY (already set in Cloudflare)
+# - OPENAI_API_KEY (required for content recommendations)
 
 [triggers]
 crons = ["0 6 * * 1", "0 3 * * *"]
