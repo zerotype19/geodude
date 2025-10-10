@@ -118,7 +118,7 @@ export default function Dashboard() {
             {activeTab === 'scores' && (
               <div>
                 <h3 style={{marginTop:0}}>Score Breakdown</h3>
-                <p style={{opacity:0.8}}>Overall score: {Math.round((audit.scores.total || 0) * 100)}%</p>
+                <p style={{opacity:0.8}}>Overall score: {Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</p>
               </div>
             )}
             {activeTab === 'issues' && (
