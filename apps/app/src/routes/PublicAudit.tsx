@@ -207,15 +207,36 @@ export default function PublicAudit() {
           <ScoreCard title="Structured" value={audit.scores.structured}/>
           {audit.scores.breakdown?.structured && (
             <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{
-                fontSize: 11,
-                padding: '4px 8px',
-                borderRadius: 12,
-                background: audit.scores.breakdown.structured.faqSite ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
-                color: audit.scores.breakdown.structured.faqSite ? '#10b981' : '#ef4444',
-              }}>
-                FAQ on site {audit.scores.breakdown.structured.faqSite ? '✓' : '✗'}
-              </span>
+              {/* FAQ Page (URL heuristic) */}
+              {audit.scores.breakdown.structured.faqPagePresent !== undefined && (
+                <span 
+                  style={{
+                    fontSize: 11,
+                    padding: '4px 8px',
+                    borderRadius: 12,
+                    background: audit.scores.breakdown.structured.faqPagePresent ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                    color: audit.scores.breakdown.structured.faqPagePresent ? '#10b981' : '#ef4444',
+                  }}
+                  title="Detected FAQ page by URL/title"
+                >
+                  FAQ page {audit.scores.breakdown.structured.faqPagePresent ? '✓' : '✗'}
+                </span>
+              )}
+              {/* FAQ Schema (JSON-LD FAQPage) */}
+              {audit.scores.breakdown.structured.faqSchemaPresent !== undefined && (
+                <span 
+                  style={{
+                    fontSize: 11,
+                    padding: '4px 8px',
+                    borderRadius: 12,
+                    background: audit.scores.breakdown.structured.faqSchemaPresent ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                    color: audit.scores.breakdown.structured.faqSchemaPresent ? '#10b981' : '#ef4444',
+                  }}
+                  title="Detected FAQPage JSON-LD schema"
+                >
+                  FAQ schema {audit.scores.breakdown.structured.faqSchemaPresent ? '✓' : '✗'}
+                </span>
+              )}
               <span style={{
                 fontSize: 11,
                 padding: '4px 8px',

@@ -398,7 +398,23 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
     }
 
     // Step 4: Compute site-level rollups
-    const siteFaqPresent = pages.some(p => p.faq_present);
+    
+    // FAQ Schema Present: Does ANY page have FAQPage JSON-LD?
+    const siteFaqSchemaPresent = pages.some(p => p.faq_present);
+    
+    // FAQ Page Present: Does ANY page look like an FAQ page (URL heuristic)?
+    const siteFaqPagePresent = pages.some(p => {
+      const url = p.url.toLowerCase();
+      const title = (p.title || '').toLowerCase();
+      return (
+        url.includes('/faq') || 
+        url.includes('/faqs') || 
+        url.includes('/frequently-asked') ||
+        title.includes('faq') ||
+        title.includes('frequently asked')
+      );
+    });
+    
     const allSchemaTypes: string[] = [];
     
     for (const page of pages) {
@@ -409,19 +425,28 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
       }
     }
     
-    // Add site-level FAQ issue if missing
-    if (!siteFaqPresent) {
+    // Add site-level FAQ issue if missing BOTH page and schema
+    if (!siteFaqSchemaPresent && !siteFaqPagePresent) {
       issues.push({
         page_url: null,
         issue_type: 'site_missing_faq',
         severity: 'info',
-        message: 'Site lacks FAQ schema (FAQPage) - consider adding FAQ content with structured data',
-        details: 'FAQ schema helps AI assistants provide accurate answers about your product/service',
+        message: 'Site lacks FAQ content - consider adding an FAQ page with structured data',
+        details: 'FAQ content helps AI assistants provide accurate answers about your product/service',
+      });
+    } else if (siteFaqPagePresent && !siteFaqSchemaPresent) {
+      issues.push({
+        page_url: null,
+        issue_type: 'faq_missing_schema',
+        severity: 'warning',
+        message: 'FAQ page found but missing FAQPage schema',
+        details: 'Add JSON-LD FAQPage markup to your FAQ page for better AI visibility',
       });
     }
     
     const structuredData = {
-      siteFaqPresent,
+      siteFaqSchemaPresent,
+      siteFaqPagePresent,
       schemaTypes: allSchemaTypes,
     };
 

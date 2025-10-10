@@ -38,7 +38,8 @@ interface CrawlabilityData {
 }
 
 interface StructuredData {
-  siteFaqPresent: boolean;
+  siteFaqSchemaPresent: boolean;
+  siteFaqPagePresent: boolean;
   schemaTypes: string[];
 }
 
@@ -203,11 +204,17 @@ function calculateStructured(
     breakdown.jsonLdCoverage = Math.round(coverageScore * 100) / 100;
   }
 
-  // Site FAQ (10 points)
-  if (data?.siteFaqPresent) {
-    score += 10;
-    breakdown.siteFaq = 10;
+  // Site FAQ (10 points total)
+  // Award points if EITHER page exists OR schema present
+  // Full points only if both are present
+  let faqScore = 0;
+  if (data?.siteFaqSchemaPresent && data?.siteFaqPagePresent) {
+    faqScore = 10; // Full points: both page and schema
+  } else if (data?.siteFaqSchemaPresent || data?.siteFaqPagePresent) {
+    faqScore = 5; // Partial points: only one present
   }
+  score += faqScore;
+  breakdown.siteFaq = faqScore;
 
   // Schema variety (5 points)
   const importantSchemas = ['Organization', 'Article', 'Product', 'BreadcrumbList', 'WebSite'];

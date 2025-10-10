@@ -1010,7 +1010,20 @@ export default {
         const pagesWithH1 = pages.results.filter((p: any) => p.hasH1).length;
         const pagesWithContent = pages.results.filter((p: any) => p.words >= 120).length;
         const pages2xx = pages.results.filter((p: any) => p.statusCode >= 200 && p.statusCode < 300).length;
-        const siteFaqPresent = pages.results.some((p: any) => p.faqPresent);
+        
+        // FAQ detection (separate page vs schema)
+        const siteFaqSchemaPresent = pages.results.some((p: any) => p.faqOnPage); // Has FAQPage JSON-LD
+        const siteFaqPagePresent = pages.results.some((p: any) => {
+          const url = String(p.url || '').toLowerCase();
+          const title = String(p.title || '').toLowerCase();
+          return (
+            url.includes('/faq') || 
+            url.includes('/faqs') || 
+            url.includes('/frequently-asked') ||
+            title.includes('faq') ||
+            title.includes('frequently asked')
+          );
+        });
         
         // Calculate percentages
         const jsonLdCoveragePct = totalPages > 0 ? Math.round((pagesWithJsonLd / totalPages) * 1000) / 10 : 0;
@@ -1055,7 +1068,8 @@ export default {
           },
           structured: {
             jsonLdCoveragePct,
-            faqSite: siteFaqPresent,
+            faqSchemaPresent: siteFaqSchemaPresent,
+            faqPagePresent: siteFaqPagePresent,
             schemaTypes: [], // TODO: extract from pages if we store them
           },
           answerability: {
@@ -1071,7 +1085,8 @@ export default {
         
         // Build site metadata
         const site = {
-          faqPresent: siteFaqPresent,
+          faqSchemaPresent: siteFaqSchemaPresent,
+          faqPagePresent: siteFaqPagePresent,
           robotsTxtUrl: property?.domain ? `https://${property.domain}/robots.txt` : null,
           sitemapUrl: property?.domain ? `https://${property.domain}/sitemap.xml` : null,
           aiBots,
