@@ -21,10 +21,10 @@ jobs:
       
       - name: API smoke - citations shape
         run: |
-          # Test that citations endpoint returns {items:[]} shape
+          # Test that citations endpoint returns {ok, total, counts, page, pageSize, items} shape
           RESPONSE=$(curl -s https://api.optiview.ai/v1/audits/aud_1760034537103_bx07fbfu2/citations)
-          echo "$RESPONSE" | jq -e 'has("items")' || (echo "❌ Citations endpoint missing 'items' key" && exit 1)
-          echo "✅ Citations endpoint returns correct shape"
+          echo "$RESPONSE" | jq -e 'has("items") and has("total") and has("counts") and has("ok")' || (echo "❌ Citations endpoint missing required keys" && exit 1)
+          echo "✅ Citations endpoint returns correct shape (Phase F format)"
       
       - name: API smoke - status
         run: |
