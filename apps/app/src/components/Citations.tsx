@@ -72,11 +72,18 @@ export default function Citations({ auditId }: Props) {
   // Fetch citations when filters change
   useEffect(() => {
     setLoading(true);
+    
+    // Check for Brave AI filter from URL
+    const provider = params.get('provider') || undefined;
+    const isAIOffered = params.get('isAIOffered') === 'true' ? true : undefined;
+    
     getAuditCitations(auditId, {
       type: typeFilter || undefined,
       path: pathFilter || undefined,
       page,
-      pageSize
+      pageSize,
+      provider,
+      isAIOffered
     })
       .then((data) => {
         setCitations(data.items);
@@ -88,7 +95,7 @@ export default function Citations({ auditId }: Props) {
         console.error('Failed to load citations:', error);
         setLoading(false);
       });
-  }, [auditId, typeFilter, pathFilter, page, pageSize]);
+  }, [auditId, typeFilter, pathFilter, page, pageSize, location.search]);
 
   const handleTypeFilter = (type: CitationType | null) => {
     setTypeFilter(type);
@@ -197,6 +204,57 @@ export default function Citations({ auditId }: Props) {
           Organic ({fullCounts.Organic})
         </button>
       </div>
+      
+      {/* Secondary filter: Brave AI */}
+      {typeFilter === 'AEO' && (
+        <div style={{ 
+          display: 'flex', 
+          gap: 8, 
+          marginBottom: 16,
+          marginLeft: 8
+        }}>
+          <span style={{ fontSize: 12, color: '#64748b', alignSelf: 'center' }}>AEO Source:</span>
+          <button
+            onClick={() => {
+              setPathFilter('');
+              setPage(1);
+            }}
+            className="pill"
+            style={{
+              cursor: 'pointer',
+              background: pathFilter === '' ? '#667eea' : '#e2e8f0',
+              color: pathFilter === '' ? 'white' : '#64748b',
+              border: 'none',
+              fontSize: 12,
+              padding: '4px 10px'
+            }}
+          >
+            All AEO
+          </button>
+          <button
+            onClick={() => {
+              // Navigate to Brave AI filter
+              const newParams = new URLSearchParams(location.search);
+              newParams.set('ct', 'AEO');
+              newParams.set('provider', 'Brave');
+              newParams.set('isAIOffered', 'true');
+              newParams.delete('path');
+              navigate(`${location.pathname}?${newParams.toString()}`, { replace: true });
+            }}
+            className="pill"
+            style={{
+              cursor: 'pointer',
+              background: params.get('provider') === 'Brave' ? '#6366f1' : '#e0e7ff',
+              color: params.get('provider') === 'Brave' ? 'white' : '#4338ca',
+              border: 'none',
+              fontSize: 12,
+              padding: '4px 10px'
+            }}
+          >
+            🤖 Brave AI Only
+          </button>
+        </div>
+      )}
 
       {/* Path filter chip */}
       {pathFilter && (
@@ -314,16 +372,49 @@ export default function Citations({ auditId }: Props) {
                       {urlObj.hostname}{urlObj.pathname !== '/' ? urlObj.pathname : ''}
                     </div>
                   </div>
-                  <span 
-                    className="pill" 
-                    style={{ 
-                      ...typeBadgeStyle,
-                      marginLeft: 12,
-                      flexShrink: 0
-                    }}
-                  >
-                    {citation.type}
-                  </span>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: 6, 
+                    alignItems: 'center',
+                    flexShrink: 0,
+                    marginLeft: 12
+                  }}>
+                    {/* AI Answer badge */}
+                    {citation.isAIOffered && (
+                      <span 
+                        className="pill"
+                        style={{ 
+                          background: '#e0e7ff', 
+                          color: '#4338ca',
+                          fontSize: 11
+                        }}
+                        title="From Brave AI Answer"
+                      >
+                        🤖 AI Answer
+                      </span>
+                    )}
+                    {/* Mode badge */}
+                    {citation.mode && (
+                      <span 
+                        className="pill"
+                        style={{ 
+                          background: '#f3f4f6', 
+                          color: '#6b7280',
+                          fontSize: 10
+                        }}
+                        title={`Brave AI ${citation.mode} API`}
+                      >
+                        {citation.mode}
+                      </span>
+                    )}
+                    {/* Type badge */}
+                    <span 
+                      className="pill" 
+                      style={typeBadgeStyle}
+                    >
+                      {citation.type}
+                    </span>
+                  </div>
                 </div>
               );
             })}

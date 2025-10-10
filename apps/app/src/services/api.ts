@@ -21,6 +21,7 @@ export type AuditPage = {
   loadTimeMs?: number | null;
   error?: string | null;
   citationCount: number; // Number of citations referencing this page
+  aiAnswers?: number; // Number of Brave AI answer citations referencing this page
 };
 
 export type ScoresBreakdown = {
@@ -73,6 +74,20 @@ export type AiAccess = {
   baselineStatus: number;
 };
 
+export type BraveAIQuery = {
+  query: string;
+  mode: 'grounding' | 'summarizer';
+  answerText?: string;
+  sources: { url: string; title?: string }[];
+};
+
+export type BraveAIMeta = {
+  totalQueries: number;
+  totalSources: number;
+  pagesCited: number;
+  queries: BraveAIQuery[];
+};
+
 export type SiteMeta = {
   faqPresent?: boolean;
   faqSchemaPresent?: boolean;
@@ -87,6 +102,7 @@ export type SiteMeta = {
     blockedBots: string[];
     wafName?: string | null;
   } | null;
+  braveAI?: BraveAIMeta | null;
 };
 
 export type Scores = { 
@@ -114,6 +130,9 @@ export type Citation = {
   cited_at: number;
   type: CitationType;
   pagePathname?: string | null;
+  provider?: string | null; // 'Brave' for AI answer sources
+  mode?: 'grounding' | 'summarizer' | null;
+  isAIOffered?: boolean; // true for Brave AI answer citations
 };
 
 export type CitationCounts = {
@@ -337,6 +356,9 @@ export async function getAuditCitations(
     path?: string;
     page?: number;
     pageSize?: number;
+    provider?: string; // 'Brave' or null
+    mode?: 'grounding' | 'summarizer'; // Brave AI mode filter
+    isAIOffered?: boolean; // Filter for AI answer citations
   },
   signal?: AbortSignal
 ): Promise<CitationsResponse> {
@@ -345,6 +367,9 @@ export async function getAuditCitations(
   if (opts?.path) params.set('path', opts.path);
   if (opts?.page) params.set('page', String(opts.page));
   if (opts?.pageSize) params.set('pageSize', String(opts.pageSize));
+  if (opts?.provider) params.set('provider', opts.provider);
+  if (opts?.mode) params.set('mode', opts.mode);
+  if (opts?.isAIOffered !== undefined) params.set('isAIOffered', String(opts.isAIOffered));
   
   const queryString = params.toString();
   const url = `${API_BASE}/v1/audits/${auditId}/citations${queryString ? '?' + queryString : ''}`;

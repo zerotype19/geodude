@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { getAuditPage, getPageRecommendations, getAuditCitations, b64u, type PageRecommendations, type Citation, type CitationType } from '../services/api';
+import { getAudit, getAuditPage, getPageRecommendations, getAuditCitations, b64u, type PageRecommendations, type Citation, type CitationType, type BraveAIQuery } from '../services/api';
 import IssuesTable from '../components/IssuesTable';
 import { StatCard } from '../components/StatCard';
 
@@ -31,6 +31,9 @@ export default function PageReport() {
   const [citations, setCitations] = useState<Citation[]>([]);
   const [citationsLoading, setCitationsLoading] = useState(false);
   const [citationsTotal, setCitationsTotal] = useState(0);
+  
+  const [braveQueries, setBraveQueries] = useState<BraveAIQuery[]>([]);
+  const [braveLoading, setBraveLoading] = useState(false);
 
   useEffect(() => {
     if (!target) {
@@ -45,6 +48,39 @@ export default function PageReport() {
       .then(setData)
       .catch(e => setErr(e.message))
       .finally(() => setLoading(false));
+  }, [auditId, target]);
+  
+  // Fetch Brave AI queries that cite this page
+  useEffect(() => {
+    setBraveLoading(true);
+    getAudit(auditId)
+      .then(audit => {
+        if (audit.site?.braveAI) {
+          // Extract pathname from target URL
+          let pathname = '/';
+          try {
+            pathname = new URL(target).pathname.replace(/\/+$/, '') || '/';
+          } catch {
+            pathname = target.replace(/\/+$/, '') || '/';
+          }
+          
+          // Filter queries that cite this page
+          const relevantQueries = audit.site.braveAI.queries.filter(q => 
+            q.sources.some(s => {
+              try {
+                const sourcePath = new URL(s.url).pathname.replace(/\/+$/, '') || '/';
+                return sourcePath === pathname;
+              } catch {
+                return false;
+              }
+            })
+          );
+          
+          setBraveQueries(relevantQueries);
+        }
+      })
+      .catch(err => console.error('Failed to load Brave AI data:', err))
+      .finally(() => setBraveLoading(false));
   }, [auditId, target]);
   
   // Fetch citations for this page
@@ -245,6 +281,57 @@ export default function PageReport() {
             <div style={{ padding: '24px', textAlign: 'center', color: '#10b981' }}>
               No issues found on this page! 🎉
             </div>
+          )}
+          
+          {/* Brave AI Panel */}
+          {braveQueries.length > 0 && (
+            <>
+              <h2 style={{ margin: '32px 0 16px', fontSize: '24px', color: '#1e293b' }}>
+                🤖 Brave AI Answers ({braveQueries.length})
+              </h2>
+              <div style={{ 
+                padding: 20, 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                borderRadius: 12,
+                marginBottom: 32
+              }}>
+                <p style={{ 
+                  margin: '0 0 12px', 
+                  color: 'white', 
+                  fontSize: 14,
+                  opacity: 0.9
+                }}>
+                  This page appears in {braveQueries.length} Brave AI answer{braveQueries.length !== 1 ? 's' : ''} for:
+                </p>
+                <ul style={{ 
+                  listStyle: 'none', 
+                  padding: 0, 
+                  margin: 0 
+                }}>
+                  {braveQueries.map((q, idx) => (
+                    <li key={idx} style={{ 
+                      padding: '8px 12px', 
+                      background: 'rgba(255,255,255,0.15)', 
+                      borderRadius: 6,
+                      marginBottom: 8,
+                      color: 'white',
+                      fontSize: 14
+                    }}>
+                      <strong style={{ fontSize: 15 }}>"{q.query}"</strong>
+                      <span style={{ 
+                        marginLeft: 10, 
+                        fontSize: 11, 
+                        padding: '2px 6px', 
+                        background: 'rgba(255,255,255,0.2)',
+                        borderRadius: 4
+                      }}>
+                        {q.mode}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
           )}
           
           {/* Citations Panel */}

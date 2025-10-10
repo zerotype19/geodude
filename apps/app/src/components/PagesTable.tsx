@@ -36,6 +36,7 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
             </th>
           )}
           <th style={{ textAlign: 'right' }} title="Number of AI citations to this page">Cites</th>
+          <th style={{ textAlign: 'right' }} title="Number of Brave AI answer citations to this page">AI (Brave)</th>
         </tr>
       </thead>
       <tbody>
@@ -101,6 +102,19 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                   </Link>
                 ) : (
                   <span>{p.citationCount ?? 0}</span>
+                )}
+              </td>
+              <td style={{ textAlign: 'right' }} className="tabular-nums">
+                {(p.aiAnswers ?? 0) > 0 && auditId ? (
+                  <Link
+                    to={`/a/${auditId}?tab=citations&provider=Brave&isAIOffered=true&path=${encodeURIComponent(formatUrl(p.url))}`}
+                    style={{ color: '#6366f1', textDecoration: 'underline', cursor: 'pointer' }}
+                    title="View Brave AI citations to this page"
+                  >
+                    {p.aiAnswers}
+                  </Link>
+                ) : (
+                  <span>{p.aiAnswers ?? 0}</span>
                 )}
               </td>
             </tr>

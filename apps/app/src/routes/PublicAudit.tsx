@@ -343,6 +343,22 @@ export default function PublicAudit() {
               ))}
             </div>
           )}
+          
+          {/* Brave AI chip */}
+          {audit.site?.braveAI && (
+            <div style={{ marginTop: 8 }}>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: 'rgba(99,102,241,.2)',
+                color: '#6366f1',
+                display: 'inline-block',
+              }} title="Brave AI Answer sources analyzed">
+                🤖 Brave AI: {audit.site.braveAI.totalQueries} queries · {audit.site.braveAI.pagesCited} pages cited
+              </span>
+            </div>
+          )}
         </div>
         
         <div style={{ flex: 1 }}>
