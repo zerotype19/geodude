@@ -702,24 +702,44 @@ export default {
       }
     }
 
-    // GET /v1/audits/:id/citations - Get citations for audit (read-only from table)
+    // GET /v1/audits/:id/citations - Get citations for audit with pagination
     if (path.match(/^\/v1\/audits\/[^/]+\/citations$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
+      const url = new URL(request.url);
+      
+      // Parse pagination params
+      const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '10')));
+      const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0'));
 
       try {
-        // Read from database only (no fetch)
+        // Get total count
+        const countResult = await env.DB.prepare(
+          `SELECT COUNT(*) as total FROM citations WHERE audit_id = ?`
+        ).bind(auditId).first<{ total: number }>();
+        
+        const total = countResult?.total || 0;
+        
+        // Get paginated results
         const result = await env.DB.prepare(
           `SELECT engine, query, url, title, cited_at
            FROM citations
            WHERE audit_id = ?
            ORDER BY cited_at DESC
-           LIMIT 50`
-        ).bind(auditId).all();
+           LIMIT ? OFFSET ?`
+        ).bind(auditId, limit, offset).all();
         
-        const citations = result.results || [];
+        const items = result.results || [];
         
         return new Response(
-          JSON.stringify({ items: citations }),
+          JSON.stringify({ 
+            ok: true,
+            provider: items.length > 0 ? (items[0] as any).engine : 'brave',
+            query: items.length > 0 ? (items[0] as any).query : '',
+            total,
+            items,
+            limit,
+            offset
+          }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
@@ -727,6 +747,7 @@ export default {
       } catch (error) {
         return new Response(
           JSON.stringify({
+            ok: false,
             error: 'Failed to fetch citations',
             message: error instanceof Error ? error.message : String(error),
           }),

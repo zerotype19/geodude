@@ -9,18 +9,37 @@ interface Props {
 export default function Citations({ auditId, citations: initialCitations }: Props) {
   const [citations, setCitations] = useState<Citation[]>(initialCitations || []);
   const [loading, setLoading] = useState(!initialCitations || initialCitations.length === 0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [limit] = useState(10);
 
   useEffect(() => {
     if (!initialCitations || initialCitations.length === 0) {
       // Try to fetch from dedicated endpoint
-      getCitations(auditId).then((data) => {
+      getCitations(auditId, limit, 0).then((data) => {
         setCitations(data.items);
+        setTotal(data.total);
+        setOffset(data.items.length);
         setLoading(false);
       }).catch(() => {
         setLoading(false);
       });
     }
-  }, [auditId, initialCitations]);
+  }, [auditId, initialCitations, limit]);
+  
+  const handleLoadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const data = await getCitations(auditId, limit, offset);
+      setCitations(prev => [...prev, ...data.items]);
+      setOffset(prev => prev + data.items.length);
+    } catch (error) {
+      console.error('Failed to load more citations:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 48 }}>Loading citations...</div>;
@@ -49,11 +68,22 @@ export default function Citations({ auditId, citations: initialCitations }: Prop
     return acc;
   }, {} as Record<string, Citation[]>);
 
+  const hasMore = total > citations.length;
+
   return (
     <div>
       <p style={{ marginTop: 0, opacity: 0.9, fontSize: 14 }}>
-        Found {citations.length} citation{citations.length !== 1 ? 's' : ''} 
-        where your domain appears in search results:
+        {total > 0 ? (
+          <>
+            Showing {citations.length} of {total} citation{total !== 1 ? 's' : ''} 
+            where your domain appears in search results
+          </>
+        ) : (
+          <>
+            Found {citations.length} citation{citations.length !== 1 ? 's' : ''} 
+            where your domain appears in search results
+          </>
+        )}
       </p>
       
       {Object.entries(byQuery).map(([query, results]) => {
@@ -112,6 +142,28 @@ export default function Citations({ auditId, citations: initialCitations }: Prop
           </div>
         </div>
       )})}
+      
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: 24 }}>
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            style={{
+              padding: '10px 20px',
+              background: loadingMore ? '#64748b' : '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: loadingMore ? 'not-allowed' : 'pointer',
+              fontSize: 14,
+              fontWeight: 500,
+              transition: 'all 0.2s',
+            }}
+          >
+            {loadingMore ? 'Loading...' : `Load ${Math.min(limit, total - citations.length)} More`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
