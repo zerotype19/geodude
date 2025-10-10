@@ -1015,7 +1015,7 @@ export default {
           `SELECT id, property_id, status, score_overall, score_crawlability, 
                   score_structured, score_answerability, score_trust, 
                   pages_crawled, pages_total, issues_count, 
-                  started_at, completed_at, error
+                  started_at, completed_at, error, ai_access_json
            FROM audits WHERE id = ?`
         ).bind(auditId).first();
 
@@ -1261,15 +1261,15 @@ export default {
           
           return {
             url: p.url,
-            statusCode: p.status_code ?? p.status ?? null,  // Ensure we surface a number or null
+            statusCode: p.statusCode ?? null,  // Already camelCase from first mapping
             title: p.title ?? null,
             h1: p.h1 ?? null,
-            hasH1: p.has_h1 ?? false,
-            jsonLdCount: p.jsonld_count ?? 0,
-            faqOnPage: typeof p.faq_present === 'boolean' ? p.faq_present : null,  // Keep for Page Report
-            words: p.rendered_words ?? p.word_count ?? null,  // Map to camelCase with fallback
+            hasH1: p.hasH1 ?? false,
+            jsonLdCount: p.jsonLdCount ?? 0,
+            faqOnPage: p.faqOnPage ?? null,  // Already properly mapped
+            words: p.words ?? null,  // Already camelCase from first mapping
             snippet: p.snippet ?? null,
-            loadTimeMs: p.load_time_ms ?? null,
+            loadTimeMs: p.loadTimeMs ?? null,
             error: p.error ?? null,
             citationCount: countsByPath.get(path) || 0,
           };

@@ -187,6 +187,7 @@ export async function runAudit(
     // Step 1a: Probe AI bot access to detect CDN/WAF blocking
     console.log('Probing AI bot access...');
     const aiAccess = await probeAiAccess(baseUrl);
+    console.log('AI access probe complete:', JSON.stringify(aiAccess).substring(0, 200));
     const blockedBotsProbe = aiAccess.results.filter(r => r.blocked);
     
     // Add issues based on crawlability checks
@@ -559,6 +560,8 @@ export async function runAudit(
       JSON.stringify(aiAccess),
       auditId
     ).run();
+    
+    console.log('Audit saved. AI access JSON length:', JSON.stringify(aiAccess).length);
 
     // Save pages
     for (const page of pages) {
