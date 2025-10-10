@@ -20,7 +20,7 @@ bucket_name = "geodude-backups"
 [vars]
 USER_AGENT = "OptiviewAuditBot/1.0 (+https://www.optiview.ai)"
 AUDIT_MAX_PAGES = "100"
-AUDIT_DAILY_LIMIT = "10"
+AUDIT_DAILY_LIMIT = "20"
 HASH_SALT = "prod_salt_6bd61859686eebd3e0caa31f2192ac83"
 BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 CITATIONS_MAX_PER_QUERY = "5"
