@@ -819,6 +819,23 @@ export default {
       );
     }
 
+    // GET /v1/debug/ai-access/:auditId - Get AI bot probe results
+    if (path.match(/^\/v1\/debug\/ai-access\/[^/]+$/) && request.method === 'GET') {
+      const auditId = path.split('/').pop()!;
+      const row = await env.DB.prepare(
+        'SELECT ai_access_json FROM audits WHERE id = ?'
+      ).bind(auditId).first<{ ai_access_json: string | null }>();
+      
+      return new Response(
+        JSON.stringify({ 
+          ok: true, 
+          auditId, 
+          aiAccess: row?.ai_access_json ? JSON.parse(row.ai_access_json) : null 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // GET /v1/debug/render - Quick render test endpoint
     if (path === '/v1/debug/render' && request.method === 'GET') {
       const testUrl = url.searchParams.get('url');
@@ -1155,6 +1172,32 @@ export default {
           },
         };
         
+        // Parse AI access probe results
+        const aiAccessRaw = audit.ai_access_json ? JSON.parse(audit.ai_access_json as string) : null;
+        const aiAccess = aiAccessRaw ? {
+          summary: {
+            allowed: aiAccessRaw.results.filter((r: any) => r.ok).length,
+            blocked: aiAccessRaw.results.filter((r: any) => r.blocked).length,
+            tested: aiAccessRaw.results.length,
+            waf: aiAccessRaw.results.find((r: any) => r.cfRay) ? 'Cloudflare' :
+                 aiAccessRaw.results.find((r: any) => r.akamai) ? 'Akamai' : null,
+          },
+          results: Object.fromEntries(
+            aiAccessRaw.results.map((r: any) => [
+              r.bot,
+              {
+                status: r.status,
+                ok: r.ok,
+                blocked: r.blocked,
+                server: r.server,
+                cfRay: r.cfRay,
+                akamai: r.akamai,
+              }
+            ])
+          ),
+          baselineStatus: aiAccessRaw.baselineStatus,
+        } : null;
+        
         // Build site metadata
         const site = {
           faqSchemaPresent: siteFaqSchemaPresent,
@@ -1162,6 +1205,7 @@ export default {
           robotsTxtUrl: property?.domain ? `https://${property.domain}/robots.txt` : null,
           sitemapUrl: property?.domain ? `https://${property.domain}/sitemap.xml` : null,
           aiBots,
+          aiAccess,
         };
 
         // Transform scores from flat columns to nested object

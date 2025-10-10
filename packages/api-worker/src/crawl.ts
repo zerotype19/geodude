@@ -25,6 +25,32 @@ const AI_BOTS = [
   'Bytespider',
 ];
 
+const AI_BOT_USER_AGENTS = [
+  { name: "GPTBot", ua: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.0; +https://openai.com/gptbot)" },
+  { name: "Claude-Web", ua: "Claude-Web/1.0" },
+  { name: "ClaudeBot", ua: "ClaudeBot/1.0" },
+  { name: "PerplexityBot", ua: "PerplexityBot/1.0 (+https://perplexity.ai/bot)" },
+  { name: "CCBot", ua: "CCBot/2.0 (https://commoncrawl.org/faq/)" },
+  { name: "Google-Extended", ua: "Mozilla/5.0 (compatible; Google-Extended)" },
+  { name: "Bytespider", ua: "Mozilla/5.0 (compatible; Bytespider; https://zhanzhang.toutiao.com/)" },
+];
+
+interface AiBotProbeResult {
+  bot: string;
+  status: number;
+  ok: boolean;
+  diff: boolean;
+  server: string | null;
+  cfRay: string | null;
+  akamai: string | null;
+  blocked: boolean;
+}
+
+interface AiAccessProbeResult {
+  baselineStatus: number;
+  results: AiBotProbeResult[];
+}
+
 /**
  * Fetch and parse robots.txt
  */
@@ -179,6 +205,80 @@ export async function checkSitemap(sitemapUrls: string[]): Promise<SitemapData> 
     console.error('Failed to fetch sitemap:', error);
     return { found: false };
   }
+}
+
+/**
+ * Probe AI bot access to detect CDN/WAF blocking
+ * Tests actual HTTP responses for different AI bot user agents
+ */
+export async function probeAiAccess(url: string): Promise<AiAccessProbeResult> {
+  // First, get baseline with normal user agent
+  let baselineStatus = 0;
+  try {
+    const baseline = await fetch(url, { 
+      method: 'HEAD',
+      redirect: 'manual', // Don't follow redirects
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    baselineStatus = baseline.status;
+  } catch (error) {
+    console.error('Baseline probe failed:', error);
+  }
+
+  const results: AiBotProbeResult[] = [];
+
+  // Test each AI bot user agent
+  for (const bot of AI_BOT_USER_AGENTS) {
+    try {
+      const response = await fetch(url, {
+        method: 'HEAD',
+        redirect: 'manual',
+        headers: {
+          'User-Agent': bot.ua
+        }
+      });
+
+      const status = response.status;
+      const ok = status >= 200 && status < 400;
+      const diff = status !== baselineStatus;
+      const blocked = status === 403 || status === 401 || status === 429 || (diff && !ok);
+
+      results.push({
+        bot: bot.name,
+        status,
+        ok,
+        diff,
+        server: response.headers.get('server'),
+        cfRay: response.headers.get('cf-ray'),
+        akamai: response.headers.get('x-akamai-request-id'),
+        blocked,
+      });
+
+      // Small delay between requests to be polite
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } catch (error) {
+      console.error(`Probe failed for ${bot.name}:`, error);
+      results.push({
+        bot: bot.name,
+        status: 0,
+        ok: false,
+        diff: true,
+        server: null,
+        cfRay: null,
+        akamai: null,
+        blocked: true,
+      });
+    }
+  }
+
+  console.log(`AI bot probe: baseline=${baselineStatus}, blocked=${results.filter(r => r.blocked).length}/${results.length}`);
+
+  return {
+    baselineStatus,
+    results,
+  };
 }
 
 /**

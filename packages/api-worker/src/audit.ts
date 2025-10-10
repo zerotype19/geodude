@@ -6,7 +6,7 @@
 import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractOrganization } from './html';
 import { calculateScores } from './score';
 import { renderPage } from './render';
-import { checkCrawlability } from './crawl';
+import { checkCrawlability, probeAiAccess } from './crawl';
 
 interface Env {
   DB: D1Database;
@@ -184,6 +184,11 @@ export async function runAudit(
     // Step 1: Check crawlability (robots.txt, sitemap, AI bots)
     const crawlabilityData = await checkCrawlability(baseUrl);
     
+    // Step 1a: Probe AI bot access to detect CDN/WAF blocking
+    console.log('Probing AI bot access...');
+    const aiAccess = await probeAiAccess(baseUrl);
+    const blockedBotsProbe = aiAccess.results.filter(r => r.blocked);
+    
     // Add issues based on crawlability checks
     if (!crawlabilityData.robotsFound) {
       issues.push({
@@ -203,7 +208,7 @@ export async function runAudit(
       });
     }
     
-    // Check if key AI bots are blocked
+    // Check if key AI bots are blocked by robots.txt
     const blockedBots = Object.entries(crawlabilityData.aiBotsAllowed)
       .filter(([bot, allowed]) => !allowed)
       .map(([bot]) => bot);
@@ -215,6 +220,22 @@ export async function runAudit(
         severity: 'critical',
         message: `robots.txt is blocking AI bots: ${blockedBots.join(', ')}`,
         details: 'Consider explicitly allowing GPTBot, ClaudeBot, PerplexityBot, and other AI agents',
+      });
+    }
+    
+    // Check if AI bots are blocked by CDN/WAF
+    if (blockedBotsProbe.length > 0) {
+      const blockedBotNames = blockedBotsProbe.map(b => b.bot).join(', ');
+      const cdnInfo = blockedBotsProbe[0].cfRay ? 'Cloudflare' : blockedBotsProbe[0].akamai ? 'Akamai' : 'CDN/WAF';
+      issues.push({
+        page_url: null,
+        issue_type: 'cdn_blocks_ai',
+        severity: 'critical',
+        message: `${cdnInfo} is blocking AI bots: ${blockedBotNames}`,
+        details: JSON.stringify({ 
+          blockedBots: blockedBotsProbe.map(b => ({ bot: b.bot, status: b.status, server: b.server })),
+          baseline: aiAccess.baselineStatus
+        }),
       });
     }
 
@@ -523,6 +544,7 @@ export async function runAudit(
            pages_crawled = ?,
            pages_total = ?,
            issues_count = ?,
+           ai_access_json = ?,
            completed_at = datetime('now')
        WHERE id = ?`
     ).bind(
@@ -534,6 +556,7 @@ export async function runAudit(
       pages.length,
       urlsToCrawl.length,
       issues.length,
+      JSON.stringify(aiAccess),
       auditId
     ).run();
 

@@ -201,6 +201,48 @@ export default function PublicAudit() {
               </span>
             </div>
           )}
+          
+          {/* AI Bot Access Probe Results */}
+          {audit.site?.aiAccess && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: audit.site.aiAccess.summary.blocked > 0 ? 'rgba(239,68,68,.2)' : 'rgba(16,185,129,.2)',
+                color: audit.site.aiAccess.summary.blocked > 0 ? '#ef4444' : '#10b981',
+              }} title={`${audit.site.aiAccess.summary.blocked} blocked bots detected`}>
+                AI Access: {audit.site.aiAccess.summary.allowed}/{audit.site.aiAccess.summary.tested} {audit.site.aiAccess.summary.blocked > 0 ? '⚠' : '✓'}
+              </span>
+              {audit.site.aiAccess.summary.waf && (
+                <span style={{
+                  fontSize: 11,
+                  padding: '4px 8px',
+                  borderRadius: 12,
+                  background: 'rgba(251,191,36,.2)',
+                  color: '#fbbf24',
+                }} title="CDN/WAF detected">
+                  {audit.site.aiAccess.summary.waf}
+                </span>
+              )}
+              {/* Per-bot status badges */}
+              {Object.entries(audit.site.aiAccess.results).slice(0, 7).map(([bot, r]) => (
+                <span 
+                  key={bot} 
+                  title={`${bot}: ${r.status}${r.server ? ` (${r.server})` : ''}`}
+                  style={{
+                    fontSize: 10,
+                    padding: '3px 6px',
+                    borderRadius: 8,
+                    background: r.ok ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                    color: r.ok ? '#10b981' : '#ef4444',
+                  }}
+                >
+                  {bot}: {r.status}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         
         <div style={{ flex: 1 }}>

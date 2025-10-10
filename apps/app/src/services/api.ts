@@ -52,11 +52,34 @@ export type ScoresBreakdown = {
   };
 };
 
+export type AiAccessResult = { 
+  status: number; 
+  ok: boolean;
+  blocked: boolean; 
+  server?: string | null;
+  cfRay?: string | null;
+  akamai?: string | null;
+};
+
+export type AiAccess = {
+  summary: { 
+    allowed: number; 
+    blocked: number; 
+    tested: number; 
+    waf?: string | null;
+  };
+  results: Record<string, AiAccessResult>;
+  baselineStatus: number;
+};
+
 export type SiteMeta = {
-  faqPresent: boolean;
+  faqPresent?: boolean;
+  faqSchemaPresent?: boolean;
+  faqPagePresent?: boolean;
   robotsTxtUrl: string | null;
   sitemapUrl: string | null;
   aiBots: ScoresBreakdown['crawlability']['aiBots'];
+  aiAccess?: AiAccess | null;
 };
 
 export type Scores = { 
