@@ -151,7 +151,7 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
         const pageStart = Date.now();
         
         // Use renderPage for accurate content extraction
-        const rendered = await renderPage(env, pageUrl, env.USER_AGENT);
+        const rendered = await renderPage(env, pageUrl, { userAgent: env.USER_AGENT });
         const pageTime = Date.now() - pageStart;
         
         // Log render mode for observability

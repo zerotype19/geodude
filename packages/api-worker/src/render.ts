@@ -52,8 +52,9 @@ function extractReadable(html: string): {
 export async function renderPage(
   env: any,
   url: string,
-  userAgent?: string
+  opts?: { debug?: boolean; userAgent?: string }
 ): Promise<RenderResult> {
+  const userAgent = opts?.userAgent;
   const controller = new AbortController();
   const kill = setTimeout(() => controller.abort(), ABSOLUTE_TIMEOUT_MS);
 
@@ -100,8 +101,15 @@ export async function renderPage(
         
         console.log(`[render] browser: ${url} -> ${words} words`);
         return { mode: 'browser', html, text, status, hasH1, jsonLdCount, snippet, words };
-      } catch (error) {
-        console.error(`[render] browser failed for ${url}, falling back to HTML:`, error);
+      } catch (error: any) {
+        const errorMsg = String(error?.message || error);
+        console.error(`[render] browser failed for ${url}, falling back to HTML:`, errorMsg);
+        
+        // Surface the error in debug mode
+        if (opts?.debug) {
+          (globalThis as any).__render_error_hint = errorMsg;
+        }
+        
         // Fall through to HTML mode
       }
     }

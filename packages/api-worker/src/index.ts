@@ -633,6 +633,15 @@ export default {
       }
     }
 
+    // GET /v1/debug/env - Check if BROWSER binding is available
+    if (path === '/v1/debug/env' && request.method === 'GET') {
+      const hasBrowser = !!env.BROWSER;
+      return new Response(
+        JSON.stringify({ ok: true, hasBrowser }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // GET /v1/debug/render - Quick render test endpoint
     if (path === '/v1/debug/render' && request.method === 'GET') {
       const testUrl = url.searchParams.get('url');
@@ -653,7 +662,11 @@ export default {
                         force === 'browser' ? { ...env, BROWSER: env.BROWSER } : 
                         env;
         
-        const result = await renderPage(testEnv, testUrl);
+        // Clear any previous error hint
+        (globalThis as any).__render_error_hint = undefined;
+        
+        const result = await renderPage(testEnv, testUrl, { debug: true });
+        const hint = (globalThis as any).__render_error_hint;
         
         return new Response(
           JSON.stringify({
@@ -665,6 +678,7 @@ export default {
             jsonLdCount: result.jsonLdCount,
             status: result.status,
             forced: force || 'auto',
+            hint: hint || undefined,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
