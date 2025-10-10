@@ -104,16 +104,11 @@ export default function PageReport() {
   const p = data.page;
   
   const badge = (ok: boolean, label: string) => (
-    <span style={{
-      padding: '4px 8px',
-      borderRadius: 12,
-      marginRight: 8,
-      background: ok ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
-      color: ok ? 'rgb(16,185,129)' : 'rgb(239,68,68)',
-      fontSize: 12,
-      fontWeight: 600
+    <span className="pill" style={{
+      background: ok ? '#d1fae5' : '#fee2e2',
+      color: ok ? '#065f46' : '#991b1b'
     }}>
-      {label}{ok ? ' ✓' : ' ✕'}
+      {ok ? '✓ ' : '✕ '}{label}
     </span>
   );
 
@@ -149,39 +144,26 @@ export default function PageReport() {
   };
 
   return (
-    <div style={{ maxWidth: 1060, margin: '40px auto', padding: '0 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
-        <Link to={`/a/${auditId}`}>← Back to Audit</Link>
-        <div style={{ opacity: 0.5 }}>•</div>
-        <a href={p.url} target="_blank" rel="noreferrer" style={{ color: '#667eea' }}>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 16 }}>
+        <Link to={`/a/${auditId}`} style={{ color: '#3b82f6', textDecoration: 'none' }}>
+          ← Back to Audit
+        </Link>
+        <div style={{ opacity: 0.4 }}>•</div>
+        <a href={p.url} target="_blank" rel="noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', fontSize: 14 }}>
           {short}
         </a>
       </div>
 
-      <h1 style={{ margin: '8px 0 6px', fontSize: '32px' }}>Page Report</h1>
-      <div style={{ opacity: 0.7, marginBottom: 16 }}>
+      <h1>Page Report</h1>
+      <div style={{ color: '#64748b', marginBottom: 24, fontSize: 15 }}>
         {p.title || 'Untitled'} — {p.statusCode || '-'} status
       </div>
-      
-      {/* Tabs */}
-      <div className="tabs-container" style={{ marginTop: 16 }}>
-        <button
-          onClick={() => handleTabChange('overview')}
-          className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
-        >
-          Overview
-        </button>
-        <button
-          onClick={() => handleTabChange('recommendations')}
-          className={`tab-button ${activeTab === 'recommendations' ? 'active' : ''}`}
-        >
-          Recommendations
-        </button>
-      </div>
 
+      {/* StatCards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+        gridTemplateColumns: 'repeat(4, 1fr)',
         gap: 12,
         marginBottom: 16
       }}>
@@ -208,11 +190,27 @@ export default function PageReport() {
         />
       </div>
 
-      <div style={{ margin: '12px 0 24px' }}>
+      <div style={{ marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {badge(p.score_hints.word_ok, 'Content ≥120 words')}
         {badge(p.score_hints.has_h1, 'H1 present')}
         {badge(p.score_hints.has_json_ld, 'JSON-LD present')}
         {badge(p.score_hints.faq_ok, 'FAQ present')}
+      </div>
+      
+      {/* Tabs */}
+      <div className="tabs-container" style={{ marginTop: 24 }}>
+        <button
+          onClick={() => handleTabChange('overview')}
+          className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => handleTabChange('recommendations')}
+          className={`tab-button ${activeTab === 'recommendations' ? 'active' : ''}`}
+        >
+          Recommendations
+        </button>
       </div>
 
       {activeTab === 'overview' && (
