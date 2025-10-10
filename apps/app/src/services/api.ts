@@ -96,17 +96,29 @@ export type Audit = {
   citations?: Citation[];
 };
 
-export async function startAudit(property_id: string, apiKey: string): Promise<{ id: string }> {
+export async function startAudit(opts: {
+  property_id: string;
+  apiKey: string;
+  maxPages?: number;
+  filters?: {
+    include?: string[];
+    exclude?: string[];
+  };
+}): Promise<{ id: string }> {
+  const { property_id, apiKey, maxPages, filters } = opts;
   const res = await fetch(`${API_BASE}/v1/audits/start`, {
     method: "POST",
     headers: { 
       "content-type": "application/json", 
       "x-api-key": apiKey 
     },
-    body: JSON.stringify({ property_id })
+    body: JSON.stringify({ property_id, maxPages, filters })
   });
   
-  if (!res.ok) throw new Error(`startAudit failed ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Audit failed' }));
+    throw new Error(err.error || err.message || `startAudit failed ${res.status}`);
+  }
   return res.json();
 }
 

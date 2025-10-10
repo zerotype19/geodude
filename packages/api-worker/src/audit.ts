@@ -101,9 +101,50 @@ async function fetchSitemapUrls(sitemapUrl: string, userAgent: string, maxUrls: 
   }
 }
 
-export async function runAudit(propertyId: string, env: Env): Promise<string> {
+// Helper: Apply include/exclude filters
+function applyIncludeExclude(urls: string[], filters?: { include?: RegExp[]; exclude?: RegExp[] }): string[] {
+  let list = urls;
+
+  // Exclude first (removes unwanted paths)
+  if (filters?.exclude && filters.exclude.length > 0) {
+    list = list.filter(url => {
+      try {
+        const pathname = new URL(url).pathname;
+        return !filters.exclude!.some(rx => rx.test(pathname));
+      } catch {
+        return true; // Keep if URL parsing fails
+      }
+    });
+  }
+
+  // Include (restrictive - only keep matching paths)
+  if (filters?.include && filters.include.length > 0) {
+    list = list.filter(url => {
+      try {
+        const pathname = new URL(url).pathname;
+        return filters.include!.some(rx => rx.test(pathname));
+      } catch {
+        return false; // Drop if URL parsing fails
+      }
+    });
+  }
+
+  return list;
+}
+
+export async function runAudit(
+  propertyId: string, 
+  env: Env,
+  options?: {
+    maxPages?: number;
+    filters?: {
+      include?: RegExp[];
+      exclude?: RegExp[];
+    };
+  }
+): Promise<string> {
   const auditId = `aud_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const maxPages = parseInt(env.AUDIT_MAX_PAGES || '100');
+  const maxPages = options?.maxPages ?? parseInt(env.AUDIT_MAX_PAGES || '100');
   
   // Get property details
   const property = await env.DB.prepare(
@@ -186,8 +227,32 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
     if (sitemapUrls.length > 0) {
       console.log(`Fetched ${sitemapUrls.length} URLs from sitemap`);
       
-      // Step 2b: Filter URLs
-      sitemapUrls = sitemapUrls.filter(url => {
+      // Step 2b: Normalize and dedupe URLs first
+      const normalizedMap = new Map<string, string>();
+      for (const url of sitemapUrls) {
+        const normalized = normalizeUrl(url);
+        if (!normalizedMap.has(normalized)) {
+          normalizedMap.set(normalized, url); // Keep original URL
+        }
+      }
+      let filteredUrls = Array.from(normalizedMap.values());
+      console.log(`After normalization: ${filteredUrls.length} unique URLs`);
+      
+      // Step 2c: Apply user filters (include/exclude)
+      const beforeUserFilters = filteredUrls.length;
+      filteredUrls = applyIncludeExclude(filteredUrls, options?.filters);
+      if (options?.filters?.include && options.filters.include.length > 0) {
+        console.log(`filters.include: ${options.filters.include.map(r => r.source).join(', ')}`);
+      }
+      if (options?.filters?.exclude && options.filters.exclude.length > 0) {
+        console.log(`filters.exclude: ${options.filters.exclude.map(r => r.source).join(', ')}`);
+      }
+      if (beforeUserFilters !== filteredUrls.length) {
+        console.log(`After user filters: ${filteredUrls.length}/${beforeUserFilters} URLs`);
+      }
+      
+      // Step 2d: Apply safety filters (non-HTML, language, depth)
+      filteredUrls = filteredUrls.filter(url => {
         try {
           // Skip non-HTML files
           if (isNonHtmlUrl(url)) {
@@ -229,17 +294,10 @@ export async function runAudit(propertyId: string, env: Env): Promise<string> {
         }
       });
       
-      // Step 2c: Normalize and dedupe URLs
-      const normalizedMap = new Map<string, string>();
-      for (const url of sitemapUrls) {
-        const normalized = normalizeUrl(url);
-        if (!normalizedMap.has(normalized)) {
-          normalizedMap.set(normalized, url); // Keep original URL
-        }
-      }
-      
-      urlsToCrawl = Array.from(normalizedMap.values()).slice(0, maxPages);
-      console.log(`After filtering: ${urlsToCrawl.length} English HTML URLs (deduped from ${sitemapUrls.length})`);
+      // Step 2e: Cap to maxPages
+      urlsToCrawl = filteredUrls.slice(0, maxPages);
+      console.log(`maxPages: ${maxPages}`);
+      console.log(`Final crawl list: ${urlsToCrawl.length} English HTML URLs (from ${sitemapUrls.length} sitemap entries)`);
     } else {
       console.log('No sitemap URLs found, using homepage only');
     }

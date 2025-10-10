@@ -625,11 +625,56 @@ export default {
       }
 
       try {
-        const body = await request.json() as { property_id: string };
+        const body = await request.json() as { 
+          property_id: string;
+          maxPages?: number;
+          filters?: {
+            include?: string[];
+            exclude?: string[];
+          };
+        };
         
         if (!body.property_id) {
           return new Response(
             JSON.stringify({ error: 'property_id is required' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Validate and compile filters
+        const maxPages = Math.max(10, Math.min(200, body.maxPages ?? 100));
+        
+        const compileRegexArray = (arr?: string[], listName?: string): RegExp[] | { error: string } => {
+          if (!arr || arr.length === 0) return [];
+          const out: RegExp[] = [];
+          for (let i = 0; i < arr.length; i++) {
+            try {
+              out.push(new RegExp(arr[i]));
+            } catch (e: any) {
+              return { error: `Invalid ${listName} regex [${i}]: ${e.message || String(e)}` };
+            }
+          }
+          return out;
+        };
+
+        const includePatterns = compileRegexArray(body.filters?.include, 'include');
+        if ('error' in includePatterns) {
+          return new Response(
+            JSON.stringify({ ok: false, error: includePatterns.error }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const excludePatterns = compileRegexArray(body.filters?.exclude, 'exclude');
+        if ('error' in excludePatterns) {
+          return new Response(
+            JSON.stringify({ ok: false, error: excludePatterns.error }),
             {
               status: 400,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -652,7 +697,13 @@ export default {
           );
         }
 
-        const auditId = await runAudit(body.property_id, env);
+        const auditId = await runAudit(body.property_id, env, {
+          maxPages,
+          filters: {
+            include: includePatterns as RegExp[],
+            exclude: excludePatterns as RegExp[],
+          },
+        });
 
         // Fetch the completed audit
         const audit = await env.DB.prepare(

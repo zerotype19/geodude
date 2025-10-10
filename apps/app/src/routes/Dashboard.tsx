@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApiKey } from "../hooks/useApiKey";
 import { startAudit, getAudit, type Audit } from "../services/api";
 import ScoreCard from "../components/ScoreCard";
@@ -6,6 +6,7 @@ import IssuesTable from "../components/IssuesTable";
 import PagesTable from "../components/PagesTable";
 import EntityRecommendations from "../components/EntityRecommendations";
 import Citations from "../components/Citations";
+import AdvancedRunDrawer from "../components/AdvancedRunDrawer";
 
 export default function Dashboard() {
   const { apiKey, save, clear } = useApiKey();
@@ -14,13 +15,34 @@ export default function Dashboard() {
   const [audit, setAudit] = useState<Audit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations'>('scores');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advancedOpts, setAdvancedOpts] = useState<{
+    maxPages?: number;
+    include?: string[];
+    exclude?: string[];
+  }>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('auditAdvanced') || '{}');
+    } catch {
+      return {};
+    }
+  });
 
   async function runAudit() {
     setError(null); 
     setLoading(true);
+    setShowAdvanced(false);
     
     try {
-      const { id } = await startAudit(propertyId, apiKey);
+      const { id } = await startAudit({
+        property_id: propertyId,
+        apiKey,
+        maxPages: advancedOpts.maxPages,
+        filters: {
+          include: advancedOpts.include,
+          exclude: advancedOpts.exclude,
+        },
+      });
       const full = await getAudit(id);
       setAudit(full);
       
@@ -35,6 +57,17 @@ export default function Dashboard() {
       setLoading(false);
     }
   }
+
+  function handleAdvancedRun(opts: { maxPages?: number; include?: string[]; exclude?: string[] }) {
+    setAdvancedOpts(opts);
+    localStorage.setItem('auditAdvanced', JSON.stringify(opts));
+    runAudit();
+  }
+
+  useEffect(() => {
+    // Keep localStorage in sync
+    localStorage.setItem('auditAdvanced', JSON.stringify(advancedOpts));
+  }, [advancedOpts]);
 
   return (
     <>
@@ -65,6 +98,16 @@ export default function Dashboard() {
               >
                 {loading ? "Running..." : "Run Audit"}
               </button>
+              <button 
+                onClick={() => setShowAdvanced(true)} 
+                disabled={!apiKey || loading}
+                style={{
+                  background: '#27272a',
+                  border: '1px solid #3f3f46',
+                }}
+              >
+                Advanced...
+              </button>
             </div>
           </div>
         </div>
@@ -75,6 +118,13 @@ export default function Dashboard() {
         )}
         {error && <div style={{marginTop:8, color:"#fca5a5"}}>{error}</div>}
       </div>
+
+      <AdvancedRunDrawer
+        open={showAdvanced}
+        onClose={() => setShowAdvanced(false)}
+        onRun={handleAdvancedRun}
+        initial={advancedOpts}
+      />
 
       {audit && (
         <>
