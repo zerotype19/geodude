@@ -764,43 +764,74 @@ export default {
       }
     }
 
-    // GET /v1/audits/:id/citations - Get citations for audit with pagination
+    // GET /v1/audits/:id/citations - Get citations for audit with pagination and filtering
     if (path.match(/^\/v1\/audits\/[^/]+\/citations$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
       const url = new URL(request.url);
       
       // Parse pagination params
-      const limit = Math.min(50, Math.max(1, parseInt(url.searchParams.get('limit') || '10')));
-      const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0'));
+      const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
+      const pageSize = Math.min(50, Math.max(1, parseInt(url.searchParams.get('pageSize') || '20')));
+      const offset = (page - 1) * pageSize;
+      
+      // Parse filter params
+      const typeFilter = url.searchParams.get('type') as 'AEO' | 'GEO' | 'Organic' | null;
+      const pathFilter = url.searchParams.get('path');
 
       try {
-        // Get total count
-        const countResult = await env.DB.prepare(
-          `SELECT COUNT(*) as total FROM citations WHERE audit_id = ?`
-        ).bind(auditId).first<{ total: number }>();
-        
-        const total = countResult?.total || 0;
-        
-        // Get paginated results
+        // Get all citations (we'll filter in-memory for now since we have type/pathname in response)
         const result = await env.DB.prepare(
           `SELECT engine, query, url, title, cited_at
            FROM citations
            WHERE audit_id = ?
-           ORDER BY cited_at DESC
-           LIMIT ? OFFSET ?`
-        ).bind(auditId, limit, offset).all();
+           ORDER BY cited_at DESC`
+        ).bind(auditId).all();
         
-        const items = result.results || [];
+        // Import classification function
+        const { classifyCitation } = await import('./citations');
+        
+        // Helper to extract pathname
+        const extractPath = (url: string) => {
+          try {
+            return new URL(url).pathname.replace(/\/+$/, '') || '/';
+          } catch {
+            return null;
+          }
+        };
+        
+        // Add type and pathname to all citations
+        let allCitations = (result.results || []).map((c: any) => ({
+          ...c,
+          type: classifyCitation(c),
+          pagePathname: extractPath(c.url)
+        }));
+        
+        // Apply filters
+        if (typeFilter) {
+          allCitations = allCitations.filter((c: any) => c.type === typeFilter);
+        }
+        if (pathFilter) {
+          allCitations = allCitations.filter((c: any) => c.pagePathname === pathFilter);
+        }
+        
+        // Calculate counts for all types (before pagination)
+        const counts = {
+          AEO: allCitations.filter((c: any) => c.type === 'AEO').length,
+          GEO: allCitations.filter((c: any) => c.type === 'GEO').length,
+          Organic: allCitations.filter((c: any) => c.type === 'Organic').length
+        };
+        
+        // Paginate
+        const items = allCitations.slice(offset, offset + pageSize);
         
         return new Response(
           JSON.stringify({ 
             ok: true,
-            provider: items.length > 0 ? (items[0] as any).engine : 'brave',
-            query: items.length > 0 ? (items[0] as any).query : '',
-            total,
-            items,
-            limit,
-            offset
+            total: allCitations.length,
+            counts,
+            page,
+            pageSize,
+            items
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -1256,6 +1287,14 @@ export default {
           () => checkCitationsBudget(env) // budget guard
         );
 
+        // Compute citations summary for Phase C
+        const citationsSummary = {
+          total: citations.length,
+          AEO: citations.filter(c => c.type === 'AEO').length,
+          GEO: citations.filter(c => c.type === 'GEO').length,
+          Organic: citations.filter(c => c.type === 'Organic').length
+        };
+
         // Compute rollups from pages for breakdown (use raw DB columns)
         const totalPages = pages.results.length;
         const pagesWithJsonLd = pages.results.filter((p: any) => (p.jsonld_count ?? 0) > 0).length;
@@ -1449,6 +1488,7 @@ export default {
           pages: pagesOut,
           issues: transformedIssues,
           citations: citations,
+          citationsSummary: citationsSummary,
         };
 
         if (entity_recommendations) {

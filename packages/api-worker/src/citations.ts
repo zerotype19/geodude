@@ -21,7 +21,20 @@ export interface Citation {
   url: string;
   title: string | null;
   cited_at: number;
-  type?: CitationType; // Added for Phase C
+  type: CitationType;
+  pagePathname?: string | null; // Added for Phase D
+}
+
+/**
+ * Extract pathname from URL for filtering citations by page
+ */
+function extractPathname(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -105,11 +118,12 @@ export async function fetchCitations(
      ORDER BY cited_at DESC`
   ).bind(auditId).all<Citation>();
 
-  // If we have citations, classify them and return
+  // If we have citations, classify them and add pathname
   if (existing.results && existing.results.length > 0) {
     return existing.results.map(c => ({
       ...c,
-      type: classifyCitation(c)
+      type: classifyCitation(c),
+      pagePathname: extractPathname(c.url)
     }));
   }
 
@@ -126,10 +140,11 @@ export async function fetchCitations(
   try {
     const braveCitations = await fetchCitationsBrave(env, domain, brand);
     
-    // Classify and store citations in database
+    // Classify and add pathname to citations
     const classifiedCitations = braveCitations.map(c => ({
       ...c,
-      type: classifyCitation(c)
+      type: classifyCitation(c),
+      pagePathname: extractPathname(c.url)
     }));
     
     for (const citation of classifiedCitations) {
