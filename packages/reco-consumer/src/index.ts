@@ -44,7 +44,19 @@ interface ModelOutput {
 }
 
 export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    return new Response(JSON.stringify({ 
+      ok: true, 
+      service: 'geodude-reco-consumer',
+      note: 'This is a queue consumer worker. Jobs are processed via the reco-queue.'
+    }), {
+      headers: { 'content-type': 'application/json' }
+    });
+  },
+
   async queue(batch: MessageBatch<QueueMessage>, env: Env) {
+    console.log(`[reco] Received batch with ${batch.messages.length} messages`);
+    
     for (const msg of batch.messages) {
       const { id, url, audit_id, page_id, refresh } = msg.body;
       
