@@ -20,6 +20,7 @@ export type AuditPage = {
   snippet?: string;
   loadTimeMs?: number;
   error?: string | null;
+  citationCount?: number; // Number of citations referencing this page
 };
 
 export type ScoresBreakdown = {
@@ -108,7 +109,12 @@ export type Citation = {
 export type Audit = { 
   id: string; 
   property_id: string; 
-  domain: string; 
+  domain: string;
+  property?: {
+    id: string;
+    domain: string;
+    name: string;
+  };
   scores: Scores; 
   site?: SiteMeta;
   issues: AuditIssue[]; 

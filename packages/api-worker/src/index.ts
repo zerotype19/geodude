@@ -265,14 +265,24 @@ export default {
     // GET /status - System status page (public for monitoring)
     if (path === '/status' && request.method === 'GET') {
       try {
-        // Get latest audit
+        // Get latest audit with AI access data
         const latestAudit = await env.DB.prepare(
-          `SELECT id, status, completed_at 
+          `SELECT id, status, completed_at, ai_access_json 
            FROM audits 
            WHERE status = 'completed' 
            ORDER BY completed_at DESC 
            LIMIT 1`
-        ).first<{ id: string; status: string; completed_at: string }>();
+        ).first<{ id: string; status: string; completed_at: string; ai_access_json: string | null }>();
+
+        // Parse AI access from latest audit
+        const aiAccessRaw = latestAudit?.ai_access_json ? JSON.parse(latestAudit.ai_access_json) : null;
+        const aiAccess = aiAccessRaw ? {
+          allowed: aiAccessRaw.results.filter((r: any) => r.ok).length,
+          blocked: aiAccessRaw.results.filter((r: any) => r.blocked).length,
+          tested: aiAccessRaw.results.length,
+          waf: aiAccessRaw.results.find((r: any) => r.cfRay) ? 'Cloudflare' :
+               aiAccessRaw.results.find((r: any) => r.akamai) ? 'Akamai' : null,
+        } : null;
 
         // Get citations budget
         const today = new Date().toISOString().split('T')[0];
@@ -288,6 +298,7 @@ export default {
               id: latestAudit.id,
               completed_at: latestAudit.completed_at,
             } : null,
+            ai_access: aiAccess,
             citations_budget: {
               used: budgetUsed,
               remaining: Math.max(0, budgetMax - budgetUsed),
@@ -1228,11 +1239,40 @@ export default {
           details: issue.details,
         }));
 
+        // Build citation counts per page path
+        const citationsList = (citations?.items ?? citations ?? []) as any[];
+        const countsByPath = new Map<string, number>();
+        for (const c of citationsList) {
+          try {
+            const u = new URL(c.url);
+            const key = u.pathname.replace(/\/+$/,'') || '/';
+            countsByPath.set(key, (countsByPath.get(key) || 0) + 1);
+          } catch (_) {}
+        }
+
+        // Transform pages and add citation counts
+        const pagesOut = (pages.results as any[]).map((p: any) => {
+          let key = p.url;
+          try {
+            const u = new URL(p.url);
+            key = u.pathname.replace(/\/+$/,'') || '/';
+          } catch (_) {}
+          return {
+            ...mapToCamel(p),
+            citationCount: countsByPath.get(key) || 0,
+          };
+        });
+
         const response: any = {
           id: audit.id,
           property_id: audit.property_id,
           status: audit.status,
           domain: property?.domain || null,
+          property: property ? {
+            id: property.id,
+            domain: property.domain,
+            name: property.name || property.domain,
+          } : null,
           scores: scores,
           site: site,
           pages_crawled: audit.pages_crawled,
@@ -1241,7 +1281,7 @@ export default {
           started_at: audit.started_at,
           completed_at: audit.completed_at,
           error: audit.error,
-          pages: pages.results,
+          pages: pagesOut,
           issues: transformedIssues,
           citations: citations,
         };
@@ -1296,10 +1336,10 @@ export default {
           );
         }
 
-        // Fetch property
+        // Fetch property with name
         const property = await env.DB.prepare(
-          'SELECT * FROM properties WHERE id = ?'
-        ).bind(audit.property_id).first<any>();
+          'SELECT id, project_id, domain, name FROM properties WHERE id = ?'
+        ).bind(audit.property_id).first<{ id: string; project_id: string; domain: string; name: string | null }>();
 
         // Fetch project
         const project = await env.DB.prepare(

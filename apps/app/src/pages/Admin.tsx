@@ -75,6 +75,14 @@ export default function Admin() {
                 <StatCard title="Domains (7d)" value={data.domains_7d} />
               </div>
 
+              {/* AI Bot Access Summary */}
+              {data.ai_access && (
+                <div className="mt-3 text-xs text-zinc-400 flex flex-wrap gap-2">
+                  <span>AI bots allowed: {data.ai_access.allowed}/{data.ai_access.tested}</span>
+                  {data.ai_access.waf && <span>• WAF: {data.ai_access.waf}</span>}
+                </div>
+              )}
+
               {data.citations_budget && (
                 <div className="mt-6 bg-gray-900 p-6 rounded-xl border border-gray-800">
                   <h2 className="font-medium text-gray-300 mb-3">

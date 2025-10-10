@@ -110,7 +110,16 @@ export default function PublicAudit() {
       }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 24 }}>Audit Report</h1>
-          {audit.domain && (
+          {audit.property ? (
+            <p style={{ margin: '4px 0 0', fontSize: 14, opacity: 0.7 }}>
+              <span style={{ fontWeight: 500 }}>{audit.property.name}</span>
+              {audit.property.name !== audit.property.domain && (
+                <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.6 }}>
+                  {audit.property.domain}
+                </span>
+              )}
+            </p>
+          ) : audit.domain && (
             <p style={{ margin: '4px 0 0', fontSize: 14, opacity: 0.7 }}>
               {audit.domain}
             </p>
