@@ -66,16 +66,38 @@ function validateUrl(urlString: string): void {
 
 /**
  * Strict FAQ allowlist - only these paths can EVER produce FAQPage schema
+ * Default patterns (can be overridden via env.FAQ_ALLOWLIST)
  */
-const FAQ_ALLOWLIST = [
-  /^\/faq(?:\/|$)/i,                     // /faq or /faq/...
-  /^\/support\/faq(?:\/|$)/i,            // /support/faq or /support/faq/...
-  /^\/help\/faq(?:\/|$)/i,               // /help/faq or /help/faq/...
-  /^\/frequently-asked-questions(?:\/|$)/i,
-];
+const DEFAULT_FAQ_PATHS = '/faq,/support/faq,/help/faq,/frequently-asked-questions';
 
-function isFAQPath(pathname: string): boolean {
-  return FAQ_ALLOWLIST.some(rx => rx.test(pathname || ''));
+function buildFAQAllowlist(env: any): RegExp[] {
+  const paths = (env?.FAQ_ALLOWLIST || DEFAULT_FAQ_PATHS)
+    .split(',')
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+  
+  return paths.map((p: string) => {
+    // Escape special regex chars, then add (?:/|$) to match exact path or with trailing segments
+    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^${escaped}(?:/|$)`, 'i');
+  });
+}
+
+/**
+ * Normalize pathname for FAQ matching
+ * - Strip trailing slashes
+ * - Strip locale prefixes like /en/, /en-US/, /es-MX/
+ */
+function normalizePathname(pathname: string): string {
+  return pathname
+    .replace(/\/+$/, '')                          // Strip trailing slashes
+    .replace(/^\/[a-z]{2}(-[A-Z]{2})?(\/|$)/, '/'); // Strip /en/ or /en-US/
+}
+
+function isFAQPath(pathname: string, env?: any): boolean {
+  const normalized = normalizePathname(pathname || '');
+  const allowlist = buildFAQAllowlist(env || {});
+  return allowlist.some(rx => rx.test(normalized));
 }
 
 /**
@@ -96,9 +118,12 @@ function faqSignalCount(facts: any): number {
  * Determine if a page is eligible for FAQPage schema
  * Requirements: (1) on allowlist AND (2) has multiple FAQ signals
  */
-function isFAQEligible(pathname: string, facts: any): boolean {
+function isFAQEligible(pathname: string, facts: any, env?: any): boolean {
+  // Use canonical path if available (handles redirects/aliases)
+  const pathToCheck = facts.canonical ? new URL(facts.canonical).pathname : pathname;
+  
   // ONLY pages on allowlisted paths can ever be FAQ
-  if (!isFAQPath(pathname)) {
+  if (!isFAQPath(pathToCheck, env)) {
     return false;
   }
   
@@ -109,24 +134,28 @@ function isFAQEligible(pathname: string, facts: any): boolean {
 /**
  * Server-side enforcement: coerce FAQPage to WebPage if URL not allowed
  */
-function coerceToWebPageIfNotAllowed(urlPath: string, canonical: string, result: any, facts: any): any {
+function coerceToWebPageIfNotAllowed(urlPath: string, canonical: string, result: any, facts: any, env?: any): any {
   const hasFAQ = (result?.suggested_jsonld || []).some((obj: any) => obj['@type'] === 'FAQPage');
   
-  if (hasFAQ && !isFAQPath(urlPath)) {
-    console.warn(`[reco] Stripping FAQPage from non-FAQ URL: ${urlPath}`);
+  if (hasFAQ && !isFAQPath(urlPath, env)) {
+    // Telemetry: log when coercion triggers
+    console.warn(`[reco] intent-coerced url=${urlPath} from=FAQPage to=WebPage`);
     
     // Strip FAQ objects
     result.suggested_jsonld = (result.suggested_jsonld || []).filter((o: any) => o['@type'] !== 'FAQPage');
     
-    // Ensure we still output a sane WebPage object
+    // Ensure we still output a minimal WebPage object (5-120 chars name, 50-160 chars description)
     const hasWeb = (result.suggested_jsonld || []).some((o: any) => o['@type'] === 'WebPage');
     if (!hasWeb) {
+      const name = (facts.h1 || facts.title || '[Page name]').slice(0, 120);
+      const desc = (facts.metaDescription || '[Page description]').slice(0, 160);
+      
       result.suggested_jsonld.unshift({
         '@context': 'https://schema.org',
         '@type': 'WebPage',
         'url': canonical,
-        'name': facts.h1 || facts.title || '[Page name]',
-        'description': facts.metaDescription || '[Page description]'
+        'name': name,
+        'description': desc
       });
     }
     
@@ -209,7 +238,7 @@ export async function generateRecommendations(
 
   // Step 5.5: Server-side enforcement - coerce FAQPage to WebPage if URL not allowed
   const urlPath = new URL(input.url).pathname;
-  const coercedResult = coerceToWebPageIfNotAllowed(urlPath, facts.canonical, result, facts);
+  const coercedResult = coerceToWebPageIfNotAllowed(urlPath, facts.canonical, result, facts, env);
 
   // Step 6: Cache result
   coercedResult._meta = {
@@ -313,7 +342,7 @@ async function extractFacts(html: string, text: string, url: string) {
  */
 async function callGPT(env: any, payload: { url: string; facts: any; words: number }): Promise<RecoOutput> {
   // Use strict FAQ eligibility (allowlist + signals)
-  const desired = isFAQEligible(payload.facts.path, payload.facts) ? 'FAQPage' : 'WebPage';
+  const desired = isFAQEligible(payload.facts.path, payload.facts, env) ? 'FAQPage' : 'WebPage';
   
   console.log(`[reco] Page intent for ${payload.facts.path}: ${desired} (signals: ${faqSignalCount(payload.facts)})`);
 
@@ -466,17 +495,35 @@ function validateRecommendations(obj: any, requestUrl: string): void {
             q.acceptedAnswer.text.length < 10) {
           throw new Error('Question.acceptedAnswer.text required (min 10 chars)');
         }
+        
+        // Enforce max length for FAQ answers (1200 chars)
+        if (q.acceptedAnswer.text.length > 1200) {
+          console.warn(`[reco] FAQ answer too long (${q.acceptedAnswer.text.length} chars), truncating to 1200`);
+          q.acceptedAnswer.text = q.acceptedAnswer.text.slice(0, 1200) + '...';
+        }
       }
     }
 
-    // WebPage specific validation
+    // WebPage specific validation (enforce 5-120 chars name, 50-160 chars description)
     if (ld['@type'] === 'WebPage') {
-      if (ld.name && ld.name.length > 200) {
-        console.warn('[reco] WebPage.name too long (>200 chars), truncating in output');
+      if (ld.name) {
+        if (ld.name.length < 5) {
+          console.warn('[reco] WebPage.name too short (<5 chars)');
+        }
+        if (ld.name.length > 120) {
+          console.warn(`[reco] WebPage.name too long (${ld.name.length} chars), truncating to 120`);
+          ld.name = ld.name.slice(0, 120);
+        }
       }
       
-      if (ld.description && ld.description.length > 500) {
-        console.warn('[reco] WebPage.description too long (>500 chars), truncating in output');
+      if (ld.description) {
+        if (ld.description.length < 50) {
+          console.warn('[reco] WebPage.description too short (<50 chars)');
+        }
+        if (ld.description.length > 160) {
+          console.warn(`[reco] WebPage.description too long (${ld.description.length} chars), truncating to 160`);
+          ld.description = ld.description.slice(0, 160);
+        }
       }
     }
 

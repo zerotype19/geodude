@@ -53,6 +53,7 @@ TAVILY_QPS = "3"
 PPLX_QPS = "2"
 PROVIDER_CACHE_TTL = "86400"
 ENABLE_MULTI_PROVIDER = "1"
+FAQ_ALLOWLIST = "/faq,/support/faq,/help/faq,/frequently-asked-questions"
 
 [browser]
 binding = "BROWSER"
