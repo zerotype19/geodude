@@ -347,17 +347,30 @@ async function callGPT(env: any, payload: { url: string; facts: any; words: numb
   console.log(`[reco] Page intent for ${payload.facts.path}: ${desired} (signals: ${faqSignalCount(payload.facts)})`);
 
   const systemPrompt = [
-    "You are Optiview's Content Recommender.",
+    "You are Optiview's Content Recommender for Schema.org JSON-LD generation.",
+    'Your job: analyze the PROVIDED page content (title, H1-H3, text) and create accurate, ready-to-paste JSON-LD schemas.',
     'Return ONLY valid JSON that conforms to the schema.',
     'Voice: clear, empathetic, medically accurate, non-alarming (US 6th–8th grade reading level).',
-    'Never invent clinical claims or medical facts. Only summarize what is explicitly shown on the page.',
+    'CRITICAL: Use ONLY the actual content provided (title, H1, meta description, headings). Never invent facts.',
   ].join(' ');
 
   const hardRules = [
-    `Desired intent for this page: ${desired}.`,
-    `If desired is WebPage, DO NOT output FAQPage. Do not infer FAQs.`,
-    `If desired is FAQPage, build mainEntity from provided faqPairs only.`,
-    `If information is missing, use minimal placeholders like "[Page description]" rather than inventing content.`,
+    `Target schema type for this page: ${desired}.`,
+    ``,
+    `MANDATORY REQUIREMENTS:`,
+    `- For WebPage: Use the ACTUAL page title for "name" (from pageFacts.title or pageFacts.h1)`,
+    `- For WebPage: Use the ACTUAL meta description for "description" (from pageFacts.metaDescription)`,
+    `- For WebPage: If meta description is missing/short, create one by summarizing the H1 + first 2-3 H2 headings (50-160 chars)`,
+    `- For FAQPage: Build mainEntity ONLY from the provided faqPairs array. Do not invent questions.`,
+    `- Include the canonical URL in the url field`,
+    `- Do NOT use generic placeholders like "Basic WebPage schema" - use real content from the page`,
+    ``,
+    `SCHEMA SELECTION (missing_schemas):`,
+    `- If page is about medical/health topics: suggest MedicalWebPage`,
+    `- If page mentions a product/service: suggest Product`,
+    `- If page has breadcrumbs/navigation: suggest BreadcrumbList`,
+    `- If page lists items/steps: suggest HowTo or ItemList`,
+    ``,
     `For medical/health pages, maintain compliant language (e.g., "screening test" not "diagnostic test").`
   ].join('\n');
 
@@ -390,6 +403,7 @@ async function callGPT(env: any, payload: { url: string; facts: any; words: numb
       h1: payload.facts.h1,
       h2: payload.facts.h2,
       h3: payload.facts.h3,
+      textSnippet: payload.facts.textSnippet, // First 2000 chars for context
       faqPairs: payload.facts.faqPairs,
       existingLD: payload.facts.existingLD
     },
