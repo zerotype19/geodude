@@ -1,18 +1,24 @@
 /**
- * Brave AI Answer Integration (Phase F+ "Stunner") - FIXED
- * Correct implementation using Brave's actual API endpoints
- * Based on official documentation at api-dashboard.search.brave.com
+ * Brave AI Answer Integration (Phase F+ "Max" Mode)
+ * Enhanced with diagnostics, smart query builder, and retry logic
+ * Based on official Brave API documentation
  */
 
 import { uniq, clamp, extractPathname, pLimit } from '../util';
+import { buildSmartQueries as buildSmartQueriesNew, type SmartQuery, type QueryBucket } from './queryBuilder';
 
 export type BraveMode = 'search' | 'summarizer';
 export type Provider = 'brave';
+
+// Phase F+: Enhanced diagnostic types
+export type QueryStatus = 'ok' | 'empty' | 'rate_limited' | 'error' | 'timeout';
+export type QueryReason = 'NO_ANSWER' | 'HTTP_429' | 'HTTP_5XX' | 'TIMEOUT' | 'PARSE_FAIL' | 'SUCCESS';
 
 export interface BraveQueryLog {
   provider: Provider;
   api: BraveMode;
   q: string;
+  bucket?: QueryBucket; // Phase F+: query categorization
   ts: number;
   ok: boolean;
   status?: number;
@@ -21,6 +27,10 @@ export interface BraveQueryLog {
   domainSources?: number;
   domainPaths?: string[];
   error?: string | null;
+  // Phase F+: Enhanced diagnostics
+  queryStatus?: QueryStatus;
+  queryReason?: QueryReason;
+  weight?: number; // Query priority/importance
 }
 
 export interface PageData {
@@ -422,6 +432,158 @@ export async function runBraveAIQueries(
   console.log(`[brave] Completed: ${logs.filter(l => l.ok).length} succeeded, ${logs.filter(l => !l.ok).length} failed`);
 
   return logs;
+}
+
+/**
+ * Phase F+: Build and run smart queries with full diagnostics
+ */
+export async function runSmartBraveQueries(
+  apiKey: string,
+  opts: {
+    domain: string;
+    brand: string;
+    pages: PageData[];
+    strategy?: 'basic' | 'smart' | 'aggressive';
+    maxQueries?: number;
+    hardCap?: number;
+    enableCompare?: boolean;
+    timeoutMs?: number;
+    concurrency?: number;
+    enableRetry?: boolean;
+  }
+): Promise<{ logs: BraveQueryLog[]; queries: SmartQuery[] }> {
+  const {
+    domain,
+    brand,
+    pages,
+    strategy = 'smart',
+    maxQueries = 50,
+    hardCap = 100,
+    enableCompare = false,
+    timeoutMs = 7000,
+    concurrency = 2,
+    enableRetry = true,
+  } = opts;
+
+  // Build smart queries using new query builder
+  const smartQueries = buildSmartQueriesNew({
+    domain,
+    brand,
+    pages: pages.map(p => ({
+      url: `https://${domain}${p.path}`,
+      title: p.h1 || undefined,
+      h1: p.h1 || undefined,
+    })),
+    strategy,
+    maxQueries,
+    enableCompare,
+  });
+
+  console.log(`[brave-f+] Built ${smartQueries.length} smart queries (strategy: ${strategy})`);
+
+  // Run queries with enhanced diagnostics
+  const limit = pLimit(concurrency);
+  const logs: BraveQueryLog[] = [];
+
+  // Process in batches to avoid rate limits
+  const batchSize = 3;
+  for (let i = 0; i < smartQueries.length; i += batchSize) {
+    const batch = smartQueries.slice(i, i + batchSize);
+
+    const batchTasks = batch.map((sq) =>
+      limit(async () => {
+        const ts = Date.now();
+        let log: BraveQueryLog;
+
+        try {
+          // Call Brave Web Search
+          log = await callBraveWebSearch(apiKey, sq.q, domain, timeoutMs, 0);
+
+          // Enhance with query metadata
+          log.bucket = sq.bucket;
+          log.weight = sq.weight;
+
+          // Categorize result
+          if (log.ok) {
+            if (log.sourcesTotal === 0) {
+              log.queryStatus = 'empty';
+              log.queryReason = 'NO_ANSWER';
+            } else {
+              log.queryStatus = 'ok';
+              log.queryReason = 'SUCCESS';
+            }
+          } else {
+            if (log.status === 429) {
+              log.queryStatus = 'rate_limited';
+              log.queryReason = 'HTTP_429';
+            } else if (log.status && log.status >= 500) {
+              log.queryStatus = 'error';
+              log.queryReason = 'HTTP_5XX';
+              // Retry once on 5xx if enabled
+              if (enableRetry) {
+                console.log(`[brave-f+] Retrying 5xx for: "${sq.q}"`);
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                log = await callBraveWebSearch(apiKey, sq.q, domain, timeoutMs, 0);
+                log.bucket = sq.bucket;
+                log.weight = sq.weight;
+              }
+            } else if (log.error?.includes('timeout')) {
+              log.queryStatus = 'timeout';
+              log.queryReason = 'TIMEOUT';
+            } else {
+              log.queryStatus = 'error';
+              log.queryReason = 'PARSE_FAIL';
+            }
+          }
+        } catch (err: any) {
+          log = {
+            provider: 'brave',
+            api: 'search',
+            q: sq.q,
+            bucket: sq.bucket,
+            weight: sq.weight,
+            ts,
+            ok: false,
+            durationMs: Date.now() - ts,
+            sourcesTotal: 0,
+            domainSources: 0,
+            domainPaths: [],
+            error: String(err?.message || err),
+            queryStatus: 'error',
+            queryReason: 'PARSE_FAIL',
+          };
+        }
+
+        // Delay between queries
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return log;
+      })
+    );
+
+    const batchResults = await Promise.all(batchTasks);
+    logs.push(...batchResults);
+
+    // Delay between batches
+    if (i + batchSize < smartQueries.length) {
+      console.log(`[brave-f+] Completed ${i + batchSize}/${smartQueries.length} queries, pausing...`);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  }
+
+  const summary = {
+    total: logs.length,
+    ok: logs.filter((l) => l.queryStatus === 'ok').length,
+    empty: logs.filter((l) => l.queryStatus === 'empty').length,
+    rateLimited: logs.filter((l) => l.queryStatus === 'rate_limited').length,
+    error: logs.filter((l) => l.queryStatus === 'error').length,
+    timeout: logs.filter((l) => l.queryStatus === 'timeout').length,
+  };
+
+  console.log(
+    `[brave-f+] Results: ${summary.ok} OK • ${summary.empty} Empty • ${summary.rateLimited} RL • ${summary.error} Error • ${summary.timeout} Timeout`
+  );
+
+  return { logs, queries: smartQueries };
 }
 
 /**

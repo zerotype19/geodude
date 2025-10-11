@@ -38,10 +38,12 @@ RENDER_MODE = "browser"
 RENDER_TIMEOUT_MS = "8000"
 RENDER_MAX_PAGES = "100"
 # Phase F+ Brave AI Configuration
-BRAVE_AI_MAX_QUERIES = "50"         # Max queries per audit (was 20)
-BRAVE_AI_HARD_CAP = "100"           # Absolute max (was 40)
-BRAVE_TIMEOUT_MS = "10000"          # Per-query timeout
-BRAVE_MAX_CONCURRENT = "2"          # Max concurrent requests (was BRAVE_CONCURRENCY)
+BRAVE_MAX_QUERIES = "50"            # Soft cap per audit (was 20)
+BRAVE_AI_HARD_CAP = "100"           # Absolute max
+BRAVE_TIMEOUT_MS = "7000"           # Per-query timeout (7s)
+BRAVE_MAX_CONCURRENT = "2"          # Max concurrent requests
+BRAVE_RETRY_5XX = "1"               # Retry once on 5xx errors
+BRAVE_DIAGNOSTICS = "1"             # Enable per-query diagnostics
 BRAVE_AI_ENABLE_COMPARE = "false"   # Enable competitor comparison queries
 BRAVE_QUERY_STRATEGY = "smart"      # smart | basic | aggressive
 # Phase H: UI Scrape Adapters (Spike)
