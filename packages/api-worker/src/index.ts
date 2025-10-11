@@ -1142,11 +1142,20 @@ export default {
       }
 
       try {
-        // Normalize: allow path or absolute URL
-        const normalized = rawU.startsWith('http') ? rawU : rawU;
+        // Normalize: extract pathname if full URL provided
+        let normalized = rawU;
+        if (rawU.startsWith('http')) {
+          try {
+            const urlObj = new URL(rawU);
+            normalized = urlObj.pathname;
+          } catch (e) {
+            console.warn(`[page] Invalid URL: ${rawU}, using as-is`);
+          }
+        }
+        
         console.log(`[page] Looking for page: ${normalized} in audit ${auditId}`);
 
-        // 1) Find the exact page row
+        // 1) Find the exact page row (search by pathname or full URL)
         const pageRow = await env.DB.prepare(
           `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
                   word_count, rendered_words, snippet
@@ -1156,7 +1165,7 @@ export default {
            LIMIT 1`
         ).bind(auditId, normalized, normalized, normalized).first();
         
-        console.log(`[page] Found page row:`, !!pageRow);
+        console.log(`[page] Found page row:`, !!pageRow, `(searched for: "${normalized}")`);
 
         if (!pageRow) {
           return new Response(
