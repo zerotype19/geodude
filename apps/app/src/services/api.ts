@@ -219,11 +219,10 @@ export async function getAudit(id: string): Promise<Audit> {
 }
 
 export async function rerunAudit(auditId: string): Promise<{ id: string; url: string }> {
-  const apiKey = localStorage.getItem('ov_api_key') || '';
+  // Rerun is public - don't send API key to avoid project ownership conflicts
   const res = await fetch(`${API_BASE}/v1/audits/${auditId}/rerun`, {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
       'content-type': 'application/json',
     },
   });
