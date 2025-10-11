@@ -9,10 +9,17 @@ const corsHeaders = {
 // Helper to check admin auth
 function checkAdminAuth(request: Request, env: any): boolean {
   const authHeader = request.headers.get('Authorization');
-  if (!authHeader) return false;
+  if (!authHeader || !authHeader.startsWith('Basic ')) return false;
   
-  const expectedAuth = `Basic ${btoa(`ops:${env.ADMIN_PASSWORD || 'changeme'}`)}`;
-  return authHeader === expectedAuth;
+  const encoded = authHeader.slice(6);
+  const decoded = atob(encoded);
+  const [user, pass] = decoded.split(':');
+  
+  // Check against environment secrets
+  const validUser = env.ADMIN_BASIC_AUTH_USER || 'kevin';
+  const validPass = env.ADMIN_BASIC_AUTH_PASS || env.ADMIN_BASIC_AUTH || '';
+  
+  return user === validUser && pass === validPass;
 }
 
 // POST /v1/botlogs/ingest - Admin-only JSONL/JSON ingestion
