@@ -65,6 +65,89 @@ function validateUrl(urlString: string): void {
 }
 
 /**
+ * Strict FAQ allowlist - only these paths can EVER produce FAQPage schema
+ */
+const FAQ_ALLOWLIST = [
+  /^\/faq(?:\/|$)/i,                     // /faq or /faq/...
+  /^\/support\/faq(?:\/|$)/i,            // /support/faq or /support/faq/...
+  /^\/help\/faq(?:\/|$)/i,               // /help/faq or /help/faq/...
+  /^\/frequently-asked-questions(?:\/|$)/i,
+];
+
+function isFAQPath(pathname: string): boolean {
+  return FAQ_ALLOWLIST.some(rx => rx.test(pathname || ''));
+}
+
+/**
+ * Count FAQ signals from page structure
+ */
+function faqSignalCount(facts: any): number {
+  // Question-like headings (end with '?', reasonably short)
+  const qHeads = [...(facts.h2 || []), ...(facts.h3 || [])]
+    .filter((t: string) => /\?\s*$/.test(t) && t.length <= 140).length;
+
+  // Structural FAQ indicators from DOM
+  const structuralSignals = facts.structuralFaqSignals || 0;
+
+  return qHeads + structuralSignals;
+}
+
+/**
+ * Determine if a page is eligible for FAQPage schema
+ * Requirements: (1) on allowlist AND (2) has multiple FAQ signals
+ */
+function isFAQEligible(pathname: string, facts: any): boolean {
+  // ONLY pages on allowlisted paths can ever be FAQ
+  if (!isFAQPath(pathname)) {
+    return false;
+  }
+  
+  // Require multiple signals (≥3 question-like headings or accordion markup)
+  return faqSignalCount(facts) >= 3;
+}
+
+/**
+ * Server-side enforcement: coerce FAQPage to WebPage if URL not allowed
+ */
+function coerceToWebPageIfNotAllowed(urlPath: string, canonical: string, result: any, facts: any): any {
+  const hasFAQ = (result?.suggested_jsonld || []).some((obj: any) => obj['@type'] === 'FAQPage');
+  
+  if (hasFAQ && !isFAQPath(urlPath)) {
+    console.warn(`[reco] Stripping FAQPage from non-FAQ URL: ${urlPath}`);
+    
+    // Strip FAQ objects
+    result.suggested_jsonld = (result.suggested_jsonld || []).filter((o: any) => o['@type'] !== 'FAQPage');
+    
+    // Ensure we still output a sane WebPage object
+    const hasWeb = (result.suggested_jsonld || []).some((o: any) => o['@type'] === 'WebPage');
+    if (!hasWeb) {
+      result.suggested_jsonld.unshift({
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        'url': canonical,
+        'name': facts.h1 || facts.title || '[Page name]',
+        'description': facts.metaDescription || '[Page description]'
+      });
+    }
+    
+    // Fix detected_intent
+    result.detected_intent = 'WebPage';
+    
+    // Add a content suggestion note
+    result.content_suggestions = [
+      {
+        title: 'Use WebPage schema',
+        priority: 'High',
+        note: 'This page is not the site\'s FAQ. Only the dedicated FAQ URL should use FAQPage schema.'
+      },
+      ...(result.content_suggestions || [])
+    ];
+  }
+  
+  return result;
+}
+
+/**
  * Generate content recommendations for a single page.
  * Uses existing renderPage() from the audit system, so no duplicate browser overhead!
  */
@@ -124,8 +207,12 @@ export async function generateRecommendations(
   // Step 5: Validate result quality
   validateRecommendations(result, input.url);
 
+  // Step 5.5: Server-side enforcement - coerce FAQPage to WebPage if URL not allowed
+  const urlPath = new URL(input.url).pathname;
+  const coercedResult = coerceToWebPageIfNotAllowed(urlPath, facts.canonical, result, facts);
+
   // Step 6: Cache result
-  result._meta = {
+  coercedResult._meta = {
     render_ms,
     model_ms,
     total_ms: Date.now() - t0,
@@ -135,12 +222,12 @@ export async function generateRecommendations(
 
   if (env.RECO_CACHE) {
     const cacheKey = `reco:v2:${input.url}`;
-    await env.RECO_CACHE.put(cacheKey, JSON.stringify(result), {
+    await env.RECO_CACHE.put(cacheKey, JSON.stringify(coercedResult), {
       expirationTtl: 60 * 60 * 24 * 7 // 7 days
     });
   }
 
-  return result;
+  return coercedResult;
 }
 
 /**
@@ -200,6 +287,11 @@ async function extractFacts(html: string, text: string, url: string) {
   const metaDesc = (q('meta[name="description"]') as any)?.getAttribute('content') || '';
   const canonical = (q('link[rel="canonical"]') as any)?.getAttribute('href') || url;
 
+  // Count structural FAQ indicators (conservatively)
+  const faqButtons = document.querySelectorAll('[data-faq], .faq, .faq-item, [role="button"][aria-controls]');
+  const accordionPanels = document.querySelectorAll('[role="region"], .accordion-panel, [aria-expanded]');
+  const structuralFaqSignals = Math.min((faqButtons?.length || 0) + (accordionPanels?.length || 0), 10);
+
   return {
     url,
     title: document.title || '',
@@ -211,7 +303,8 @@ async function extractFacts(html: string, text: string, url: string) {
     h3: h('h3').slice(0, 15),
     faqPairs: qa.slice(0, 40),
     existingLD,
-    textSnippet: text.slice(0, 2000) // First 2000 chars of clean text
+    textSnippet: text.slice(0, 2000), // First 2000 chars of clean text
+    structuralFaqSignals // New field for FAQ detection
   };
 }
 
@@ -219,16 +312,25 @@ async function extractFacts(html: string, text: string, url: string) {
  * Call OpenAI GPT with medical-safe prompt
  */
 async function callGPT(env: any, payload: { url: string; facts: any; words: number }): Promise<RecoOutput> {
-  const looksFAQ = /faq/i.test(payload.facts.path) || payload.facts.faqPairs.length >= 3;
+  // Use strict FAQ eligibility (allowlist + signals)
+  const desired = isFAQEligible(payload.facts.path, payload.facts) ? 'FAQPage' : 'WebPage';
+  
+  console.log(`[reco] Page intent for ${payload.facts.path}: ${desired} (signals: ${faqSignalCount(payload.facts)})`);
 
   const systemPrompt = [
     "You are Optiview's Content Recommender.",
-    'Produce minimal, correct Schema.org JSON-LD and concise content edits.',
+    'Return ONLY valid JSON that conforms to the schema.',
     'Voice: clear, empathetic, medically accurate, non-alarming (US 6th–8th grade reading level).',
     'Never invent clinical claims or medical facts. Only summarize what is explicitly shown on the page.',
-    'If information is missing, use placeholders like "[Page description]" rather than making assumptions.',
-    'For medical/health pages, maintain compliant language (e.g., "screening test" not "diagnostic test").',
   ].join(' ');
+
+  const hardRules = [
+    `Desired intent for this page: ${desired}.`,
+    `If desired is WebPage, DO NOT output FAQPage. Do not infer FAQs.`,
+    `If desired is FAQPage, build mainEntity from provided faqPairs only.`,
+    `If information is missing, use minimal placeholders like "[Page description]" rather than inventing content.`,
+    `For medical/health pages, maintain compliant language (e.g., "screening test" not "diagnostic test").`
+  ].join('\n');
 
   const jsonSchema = {
     detected_intent: 'FAQPage or WebPage or Article',
@@ -251,17 +353,19 @@ async function callGPT(env: any, payload: { url: string; facts: any; words: numb
 
   const userMessage = JSON.stringify({
     url: payload.url,
-    desired: looksFAQ ? 'FAQPage' : 'WebPage',
-    pageFacts: payload.facts,
+    desired,
+    pageFacts: {
+      title: payload.facts.title,
+      metaDescription: payload.facts.metaDescription,
+      canonical: payload.facts.canonical,
+      h1: payload.facts.h1,
+      h2: payload.facts.h2,
+      h3: payload.facts.h3,
+      faqPairs: payload.facts.faqPairs,
+      existingLD: payload.facts.existingLD
+    },
     wordCount: payload.words,
-    instructions: [
-      'Return missing_schemas array.',
-      'Return suggested_jsonld (ready-to-paste, minimal, include url from canonical).',
-      'If FAQPage: build mainEntity from faqPairs. Each Question must have name and acceptedAnswer.Answer.text.',
-      'If WebPage: include name, description (2 sentences max), url.',
-      'Do not duplicate existing LD if equivalent—improve it instead.',
-      'Keep JSON concise. No explanatory text outside the JSON structure.'
-    ].join(' ')
+    instructions: hardRules
   });
 
   const apiBase = env.OPENAI_API_BASE || 'https://api.openai.com/v1';
@@ -279,9 +383,10 @@ async function callGPT(env: any, payload: { url: string; facts: any; words: numb
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
         {
           role: 'user',
-          content: `${userMessage}\n\nExpected JSON schema (for guidance):\n${JSON.stringify(jsonSchema, null, 2)}`
+          content: `Expected JSON schema (for guidance):\n${JSON.stringify(jsonSchema, null, 2)}`
         }
       ]
     })
