@@ -37,6 +37,7 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
           )}
           <th style={{ textAlign: 'right' }} title="Number of AI citations to this page">Cites</th>
           <th style={{ textAlign: 'right' }} title="Number of Brave AI answer citations to this page">AI (Brave)</th>
+          <th style={{ textAlign: 'right' }} title="Real AI bot crawler hits in last 30 days">AI Hits</th>
         </tr>
       </thead>
       <tbody>
@@ -116,6 +117,14 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                 ) : (
                   <span>{p.aiAnswers ?? 0}</span>
                 )}
+              </td>
+              <td style={{ textAlign: 'right' }} className="tabular-nums">
+                <span style={{ 
+                  color: (p.aiHits ?? 0) > 0 ? '#10b981' : '#6b7280',
+                  fontWeight: (p.aiHits ?? 0) > 0 ? 'bold' : 'normal'
+                }}>
+                  {p.aiHits ?? 0}
+                </span>
               </td>
             </tr>
           );

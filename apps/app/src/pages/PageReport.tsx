@@ -35,6 +35,9 @@ export default function PageReport() {
   const [braveQueries, setBraveQueries] = useState<BraveAIQuery[]>([]);
   const [braveLoading, setBraveLoading] = useState(false);
   
+  // Phase G: crawler data
+  const [crawlerData, setCrawlerData] = useState<any>(null);
+  
   // Content generation state
   const [recoJobId, setRecoJobId] = useState<string | null>(null);
   const [recoStatus, setRecoStatus] = useState<string | null>(null);
@@ -56,20 +59,21 @@ export default function PageReport() {
       .finally(() => setLoading(false));
   }, [auditId, target]);
   
-  // Fetch Brave AI queries that cite this page
+  // Fetch Brave AI queries and crawler data that reference this page
   useEffect(() => {
     setBraveLoading(true);
     getAudit(auditId)
       .then(audit => {
+        // Extract pathname from target URL
+        let pathname = '/';
+        try {
+          pathname = new URL(target).pathname.replace(/\/+$/, '') || '/';
+        } catch {
+          pathname = target.replace(/\/+$/, '') || '/';
+        }
+        
+        // Brave AI queries
         if (audit.site?.braveAI?.queries) {
-          // Extract pathname from target URL
-          let pathname = '/';
-          try {
-            pathname = new URL(target).pathname.replace(/\/+$/, '') || '/';
-          } catch {
-            pathname = target.replace(/\/+$/, '') || '/';
-          }
-          
           // Filter queries that cite this page (using domainPaths array)
           const relevantQueries = audit.site.braveAI.queries.filter(q => {
             // Check if this query has domainPaths and if any match our pathname
@@ -80,6 +84,11 @@ export default function PageReport() {
           });
           
           setBraveQueries(relevantQueries);
+        }
+        
+        // Phase G: Crawler data (save site-level + find page hits)
+        if (audit.site?.crawlers) {
+          setCrawlerData(audit.site.crawlers);
         }
       })
       .catch(err => console.error('Failed to load Brave AI data:', err))
@@ -364,6 +373,65 @@ export default function PageReport() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            </>
+          )}
+          
+          {/* Phase G: AI Crawlers Panel (30d) */}
+          {crawlerData && crawlerData.total > 0 && (
+            <>
+              <h2 style={{ margin: '32px 0 16px', fontSize: '24px', color: '#1e293b' }}>
+                🕷️ AI Crawlers (30d)
+              </h2>
+              <div style={{ 
+                padding: 20, 
+                background: 'white', 
+                borderRadius: 12,
+                marginBottom: 32,
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: '1px solid #e2e8f0'
+                }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#475569' }}>Bot</h3>
+                  <div style={{ display: 'flex', gap: 40 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, color: '#475569', width: 80, textAlign: 'right' }}>Hits (site)</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 600, color: '#475569', width: 140, textAlign: 'right' }}>Last Seen</h3>
+                  </div>
+                </div>
+                {Object.entries(crawlerData.byBot).sort((a: any, b: any) => b[1] - a[1]).map(([bot, n]: [string, any]) => (
+                  <div 
+                    key={bot} 
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      padding: '8px 0',
+                      borderBottom: '1px solid #f1f5f9'
+                    }}
+                  >
+                    <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>{bot}</div>
+                    <div style={{ display: 'flex', gap: 40 }}>
+                      <div style={{ fontSize: 14, color: '#10b981', fontWeight: 'bold', width: 80, textAlign: 'right' }}>{n}</div>
+                      <div style={{ fontSize: 13, color: '#64748b', width: 140, textAlign: 'right' }}>
+                        {crawlerData.lastSeen[bot]
+                          ? new Date(crawlerData.lastSeen[bot]).toLocaleDateString()
+                          : '—'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <p style={{ 
+                  margin: '16px 0 0', 
+                  fontSize: 12, 
+                  color: '#94a3b8',
+                  fontStyle: 'italic'
+                }}>
+                  Page hits for this URL: <strong style={{ color: '#10b981' }}>{data?.aiHits ?? 0}</strong>
+                </p>
               </div>
             </>
           )}

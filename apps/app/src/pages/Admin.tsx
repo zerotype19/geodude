@@ -98,6 +98,26 @@ export default function Admin() {
                 {data.ai_access.waf && <span>• WAF: {data.ai_access.waf}</span>}
               </div>
             )}
+            
+            {/* Phase G: Real AI Crawler Hits Summary */}
+            {data.crawlers && (
+              <div style={{ marginBottom: 16, fontSize: 13, color: '#10b981', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                <span style={{ fontWeight: 'bold' }}>Real AI hits (30d): {data.crawlers.total}</span>
+                <span>•</span>
+                {Object.entries(data.crawlers.byBot).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5).map(([bot, n]: [string, any], idx) => (
+                  <span key={bot} style={{ 
+                    padding: '2px 8px', 
+                    background: '#dcfce7', 
+                    color: '#166534', 
+                    borderRadius: 12, 
+                    fontSize: 11,
+                    fontWeight: 600
+                  }}>
+                    {bot}: {n}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {data.citations_budget && (
               <div className="card" style={{ marginTop: 24 }}>

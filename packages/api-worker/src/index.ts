@@ -1827,6 +1827,43 @@ export default {
           }
         }
         
+        // --- Phase G: real AI crawler signals (30d window)
+        const now = Date.now();
+        const lookbackMs = 30 * 24 * 60 * 60 * 1000;
+        const sinceTs = now - lookbackMs;
+
+        // 1) Site-level summary (by bot + lastSeen)
+        const siteRows = await env.DB.prepare(`
+          SELECT bot, COUNT(*) as hits, MAX(ts) as last_seen
+          FROM ai_crawler_hits
+          WHERE domain = ? AND ts >= ?
+          GROUP BY bot
+        `).bind(property.domain, sinceTs).all();
+
+        const byBot: Record<string, number> = {};
+        const lastSeen: Record<string, number> = {};
+        let totalHits = 0;
+        for (const r of siteRows.results ?? []) {
+          const b = String(r.bot);
+          const h = Number(r.hits || 0);
+          totalHits += h;
+          byBot[b] = h;
+          if (r.last_seen) lastSeen[b] = Number(r.last_seen);
+        }
+
+        // 2) Per-page totals for this audit (by path)
+        const pageRows = await env.DB.prepare(`
+          SELECT path, COUNT(*) as hits
+          FROM ai_crawler_hits
+          WHERE domain = ? AND ts >= ?
+          GROUP BY path
+        `).bind(property.domain, sinceTs).all();
+
+        const hitsByPath: Record<string, number> = {};
+        for (const r of pageRows.results ?? []) {
+          hitsByPath[String(r.path)] = Number(r.hits || 0);
+        }
+
         // Build site metadata
         const site = {
           faqSchemaPresent: siteFaqSchemaPresent,
@@ -1837,6 +1874,7 @@ export default {
           aiAccess,
           flags: aiFlags,
           braveAI,
+          crawlers: { total: totalHits, byBot, lastSeen },  // Phase G
         };
 
         // Transform scores from flat columns to nested object
@@ -1910,6 +1948,7 @@ export default {
             error: p.error ?? null,
             citationCount: countsByPath.get(path) || 0,
             aiAnswers: braveAnswersByPath.get(path) || 0,  // Brave AI answer count
+            aiHits: hitsByPath[path] || 0,  // Phase G: real crawler hits
           };
         });
 

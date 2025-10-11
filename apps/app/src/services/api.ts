@@ -22,6 +22,7 @@ export type AuditPage = {
   error?: string | null;
   citationCount: number; // Number of citations referencing this page
   aiAnswers?: number; // Number of Brave AI answer citations referencing this page
+  aiHits?: number; // Phase G: Real AI crawler hits (30d)
 };
 
 export type ScoresBreakdown = {
@@ -106,6 +107,13 @@ export type BraveAIQuery = {
   sources: { url: string; title?: string }[];
 };
 
+// Phase G: Real AI crawler signals
+export type CrawlSummary = {
+  total: number;
+  byBot: Record<string, number>;
+  lastSeen: Record<string, number>;
+};
+
 export type SiteMeta = {
   faqPresent?: boolean;
   faqSchemaPresent?: boolean;
@@ -121,6 +129,7 @@ export type SiteMeta = {
     wafName?: string | null;
   } | null;
   braveAI?: BraveAIMeta | null;
+  crawlers?: CrawlSummary; // Phase G
 };
 
 export type Scores = { 

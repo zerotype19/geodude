@@ -374,6 +374,19 @@ export default function PublicAudit() {
               </button>
             </div>
           )}
+          
+          {/* Phase G: Real AI crawler traffic (30d) */}
+          {audit.site?.crawlers && audit.site.crawlers.total > 0 && (
+            <div style={{ marginTop: 8, fontSize: 11, color: '#6b7280' }}>
+              <strong style={{ color: '#10b981' }}>AI Bot Traffic (30d):</strong>{' '}
+              {Object.entries(audit.site.crawlers.byBot)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 4)
+                .map(([bot, n]) => `${bot}:${n}`)
+                .join(' • ')}
+              {Object.keys(audit.site.crawlers.byBot).length > 4 && ' • …'}
+            </div>
+          )}
         </div>
         
         <div style={{ flex: 1 }}>

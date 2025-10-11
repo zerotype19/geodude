@@ -77,10 +77,11 @@ export function calculateScores(
   pages: AuditPage[], 
   issues: AuditIssue[],
   crawlability?: CrawlabilityData,
-  structured?: StructuredData
+  structured?: StructuredData,
+  crawlersTotal30d?: number  // Phase G: real AI crawler hits
 ): Scores {
   // Calculate each pillar (returns 0-100)
-  const crawlabilityScore = calculateCrawlability(pages, issues, crawlability);
+  const crawlabilityScore = calculateCrawlability(pages, issues, crawlability, crawlersTotal30d);
   const structuredScore = calculateStructured(pages, issues, structured);
   const answerabilityScore = calculateAnswerability(pages, issues);
   const trustScore = calculateTrust(pages, issues);
@@ -112,11 +113,13 @@ export function calculateScores(
  * - robots.txt present & parseable (10%)
  * - AI bots allowed (20% total → ~3.3% each for 6 bots)
  * - Sitemap referenced in robots.txt and reachable (10%)
+ * - Phase G: +2 bonus if real AI crawler hits detected (30d)
  */
 function calculateCrawlability(
   pages: AuditPage[], 
   issues: AuditIssue[],
-  data?: CrawlabilityData
+  data?: CrawlabilityData,
+  crawlersTotal30d?: number  // Phase G
 ): { score: number; breakdown: any } {
   let score = 0;
   const breakdown = {
@@ -124,6 +127,7 @@ function calculateCrawlability(
     aiBotsAllowed: 0,
     sitemapFound: 0,
     successRate: 0,
+    realCrawlerBonus: 0,  // Phase G
   };
 
   // robots.txt present & parseable (10 points)
@@ -149,6 +153,12 @@ function calculateCrawlability(
   if (data?.sitemapFound) {
     score += 10;
     breakdown.sitemapFound = 10;
+  }
+
+  // Phase G: Real AI crawler bonus (+2 if any hits in last 30d)
+  if ((crawlersTotal30d ?? 0) > 0) {
+    score += 2;
+    breakdown.realCrawlerBonus = 2;
   }
 
   // Success rate penalty (no additional points, but can reduce score)
