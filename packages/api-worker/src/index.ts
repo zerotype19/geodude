@@ -11,6 +11,7 @@ import { createProject, createProperty, verifyProperty } from './onboarding';
 import { backupToR2 } from './backup';
 import { warmCitations } from './citations-warm';
 import { handleCitations } from './routes/citations';
+import { handleBotLogsIngest, handleGetCrawlers } from './bots/routes';
 
 interface Env {
   DB: D1Database;
@@ -502,6 +503,17 @@ export default {
     // POST /v1/citations - Multi-provider citation search
     if (path === '/v1/citations' && request.method === 'POST') {
       return handleCitations(request, env);
+    }
+
+    // POST /v1/botlogs/ingest - Admin-only AI bot log ingestion (Phase G)
+    if (path === '/v1/botlogs/ingest' && request.method === 'POST') {
+      return handleBotLogsIngest(request, env);
+    }
+
+    // GET /v1/audits/:id/crawlers - Get AI crawler summary for audit (Phase G)
+    if (path.match(/^\/v1\/audits\/[^/]+\/crawlers$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+      return handleGetCrawlers(auditId, env, url.searchParams);
     }
 
     // POST /v1/reco - Generate content recommendations (synchronous, 15-25s)
