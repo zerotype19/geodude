@@ -113,24 +113,14 @@ export default function Dashboard() {
                 onChange={e => save(e.target.value)} 
                 style={{
                   flex: 1,
-                  padding: '8px 12px',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 6,
-                  fontSize: 14,
                   fontFamily: 'Monaco, Consolas, monospace'
                 }}
               />
               <button 
                 onClick={clear}
                 style={{
-                  padding: '8px 16px',
                   background: '#f1f5f9',
-                  color: '#475569',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 500
+                  color: '#475569'
                 }}
               >
                 Clear
@@ -145,26 +135,12 @@ export default function Dashboard() {
                 onChange={e => setPropertyId(e.target.value)} 
                 style={{
                   flex: 1,
-                  padding: '8px 12px',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 6,
-                  fontSize: 14,
                   fontFamily: 'Monaco, Consolas, monospace'
                 }}
               />
               <button 
                 onClick={runAudit} 
                 disabled={!apiKey || loading}
-                style={{
-                  padding: '8px 16px',
-                  background: (!apiKey || loading) ? '#cbd5e1' : '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 6,
-                  cursor: (!apiKey || loading) ? 'not-allowed' : 'pointer',
-                  fontSize: 14,
-                  fontWeight: 500
-                }}
               >
                 {loading ? "Running..." : "Run Audit"}
               </button>
@@ -172,14 +148,9 @@ export default function Dashboard() {
                 onClick={() => setShowAdvanced(true)} 
                 disabled={!apiKey || loading}
                 style={{
-                  padding: '8px 16px',
                   background: (!apiKey || loading) ? '#f8fafc' : 'white',
                   color: (!apiKey || loading) ? '#cbd5e1' : '#475569',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 6,
-                  cursor: (!apiKey || loading) ? 'not-allowed' : 'pointer',
-                  fontSize: 14,
-                  fontWeight: 500
+                  border: '1px solid #e2e8f0'
                 }}
               >
                 Advanced...

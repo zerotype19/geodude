@@ -645,25 +645,11 @@ export default {
       }
     }
 
-    // POST /v1/audits/:id/rerun - Re-run an existing audit
+    // POST /v1/audits/:id/rerun - Re-run an existing audit (public, no auth required)
     if (path.match(/^\/v1\/audits\/[^/]+\/rerun$/) && request.method === 'POST') {
       const auditId = path.split('/')[3];
 
-      // Check API key
-      const apiKey = request.headers.get('x-api-key');
-      const authResult = await validateApiKey(apiKey, env);
-
-      if (!authResult.valid) {
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-
-      // Fetch original audit and verify ownership
+      // Fetch original audit
       const originalAudit = await env.DB.prepare(
         `SELECT a.id, a.property_id, p.project_id, p.domain
          FROM audits a
@@ -681,18 +667,39 @@ export default {
         );
       }
 
-      if (originalAudit.project_id !== authResult.projectId) {
-        return new Response(
-          JSON.stringify({ error: 'Forbidden', message: 'You do not own this audit' }),
-          {
-            status: 403,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
+      // Optional: Check API key if provided (for ownership verification)
+      const apiKey = request.headers.get('x-api-key');
+      let authResult = null;
+      
+      if (apiKey) {
+        authResult = await validateApiKey(apiKey, env);
+        
+        // If API key is provided but invalid, reject
+        if (!authResult.valid) {
+          return new Response(
+            JSON.stringify({ error: 'Unauthorized', message: 'Invalid x-api-key header' }),
+            {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // If API key is valid but doesn't own this audit, reject
+        if (originalAudit.project_id && originalAudit.project_id !== authResult.projectId) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden', message: 'You do not own this audit' }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
       }
 
-      // Check rate limit
-      const rateLimit = await checkRateLimit(authResult.projectId!, env);
+      // Check rate limit (use property's project_id or fallback to 'public' for unauthenticated requests)
+      const projectIdForRateLimit = originalAudit.project_id || 'public';
+      const rateLimit = await checkRateLimit(projectIdForRateLimit, env);
       
       if (!rateLimit.allowed) {
         return new Response(
