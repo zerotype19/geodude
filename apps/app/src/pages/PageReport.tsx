@@ -139,12 +139,12 @@ export default function PageReport() {
     setSearchParams({ tab });
   };
   
-  // Generate content recommendation
+  // Generate content recommendation (synchronous, 15-25s)
   const handleGenerateContent = async () => {
     if (!target) return;
     
     try {
-      setRecoStatus('queued');
+      setRecoStatus('processing');
       setGeneratedContent(null);
       
       const res = await fetch('https://api.optiview.ai/v1/reco', {
@@ -155,47 +155,20 @@ export default function PageReport() {
       
       const data = await res.json();
       
-      if (data.ok) {
+      if (data.ok && data.status === 'done') {
         setRecoJobId(data.id);
-        setRecoStatus(data.status);
+        setRecoStatus('done');
+        setGeneratedContent(data.result);
       } else {
         setRecoStatus('error');
-        alert(data.message || 'Failed to start content generation');
+        alert(data.message || data.error || 'Failed to generate content');
       }
     } catch (error) {
-      console.error('Failed to start content generation:', error);
+      console.error('Failed to generate content:', error);
       setRecoStatus('error');
-      alert('Failed to start content generation');
+      alert('Failed to generate content. Please try again.');
     }
   };
-  
-  // Poll for job status
-  useEffect(() => {
-    if (!recoJobId || recoStatus === 'done' || recoStatus === 'error') return;
-    
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`https://api.optiview.ai/v1/reco/${recoJobId}`);
-        const data = await res.json();
-        
-        if (data.ok && data.job) {
-          setRecoStatus(data.job.status);
-          
-          if (data.job.status === 'done' && data.job.result) {
-            setGeneratedContent(data.job.result);
-            clearInterval(interval);
-          } else if (data.job.status === 'error') {
-            clearInterval(interval);
-            console.error('Content generation failed:', data.job.error);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to poll job status:', error);
-      }
-    }, 1200);
-    
-    return () => clearInterval(interval);
-  }, [recoJobId, recoStatus]);
 
   if (loading) return <div style={{padding: '40px', textAlign: 'center'}}>Loading page report…</div>;
   if (err) return <div style={{padding: '40px', textAlign: 'center', color: '#ef4444'}}>Error: {err}</div>;
@@ -493,41 +466,43 @@ export default function PageReport() {
                     🤖 AI Content Generation
                   </div>
                   <div style={{ fontSize: 14, color: '#64748b' }}>
-                    Let GPT-4.5-turbo analyze this page and suggest ready-to-paste Schema.org JSON-LD + content improvements
+                    AI analyzes the actual page content and generates Schema.org JSON-LD plus actionable content suggestions
                   </div>
                 </div>
                 <button
                   onClick={handleGenerateContent}
-                  disabled={!!recoStatus && recoStatus !== 'error'}
+                  disabled={recoStatus === 'processing'}
                   style={{
                     padding: '10px 20px',
-                    background: recoStatus && recoStatus !== 'error' ? '#cbd5e1' : '#3b82f6',
+                    background: recoStatus === 'processing' ? '#cbd5e1' : '#3b82f6',
                     color: 'white',
                     border: 'none',
                     borderRadius: 8,
                     fontSize: 14,
                     fontWeight: 600,
-                    cursor: recoStatus && recoStatus !== 'error' ? 'not-allowed' : 'pointer',
+                    cursor: recoStatus === 'processing' ? 'not-allowed' : 'pointer',
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  {recoStatus === 'queued' ? 'Queued...' : 
-                   recoStatus === 'rendering' ? 'Rendering...' :
-                   recoStatus === 'analyzing' ? 'Analyzing...' :
+                  {recoStatus === 'processing' ? '⏳ Generating... (15-25s)' :
                    recoStatus === 'error' ? 'Retry' :
+                   recoStatus === 'done' ? 'Regenerate' :
                    'Generate Content'}
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b', cursor: 'pointer' }}>
+                <label 
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b', cursor: 'pointer' }}
+                  title="Results are cached for 7 days. Check this to bypass the cache and re-analyze the current page content."
+                >
                   <input
                     type="checkbox"
                     checked={refreshCache}
                     onChange={(e) => setRefreshCache(e.target.checked)}
-                    disabled={!!recoStatus && recoStatus !== 'error'}
+                    disabled={recoStatus === 'processing'}
                     style={{ cursor: 'pointer' }}
                   />
-                  <span>⚡ Bypass cache (generate fresh)</span>
+                  <span>⚡ Generate fresh (bypass 7-day cache)</span>
                 </label>
               </div>
               {recoStatus === 'error' && (

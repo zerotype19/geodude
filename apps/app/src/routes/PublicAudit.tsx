@@ -370,7 +370,7 @@ export default function PublicAudit() {
                 }}
                 title="Click to view Brave AI query details"
               >
-                🤖 Brave AI: {audit.site.braveAI.queries} queries · {audit.site.braveAI.pagesCited} pages cited
+                🤖 Brave AI: {audit.site.braveAI.queriesCount || audit.site.braveAI.queries?.length || 0} queries · {audit.site.braveAI.pagesCited} pages cited
               </button>
             </div>
           )}

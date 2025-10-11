@@ -10,6 +10,7 @@ import { fetchCitations } from './citations';
 import { createProject, createProperty, verifyProperty } from './onboarding';
 import { backupToR2 } from './backup';
 import { warmCitations } from './citations-warm';
+import { handleCitations } from './routes/citations';
 
 interface Env {
   DB: D1Database;
@@ -498,18 +499,13 @@ export default {
       }
     }
 
-    // POST /v1/reco - Create content recommendation job
-    if (path === '/v1/reco' && request.method === 'POST') {
-      if (!env.RECO_PRODUCER) {
-        return new Response(
-          JSON.stringify({ error: 'Service unavailable', message: 'Content recommendations not configured' }),
-          {
-            status: 503,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
+    // POST /v1/citations - Multi-provider citation search
+    if (path === '/v1/citations' && request.method === 'POST') {
+      return handleCitations(request, env);
+    }
 
+    // POST /v1/reco - Generate content recommendations (synchronous, 15-25s)
+    if (path === '/v1/reco' && request.method === 'POST') {
       try {
         const body = await request.json<{ url: string; audit_id?: string; page_id?: string; refresh?: boolean }>();
         const refresh = body.refresh || url.searchParams.get('refresh') === '1';
@@ -541,30 +537,40 @@ export default {
         const id = crypto.randomUUID();
         const now = Date.now();
         
+        // Create job record
         await env.DB.prepare(
           `INSERT INTO reco_jobs (id, url, audit_id, page_id, status, created_at, updated_at) 
            VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).bind(id, body.url, body.audit_id || null, body.page_id || null, 'queued', now, now).run();
+        ).bind(id, body.url, body.audit_id || null, body.page_id || null, 'processing', now, now).run();
 
-        await env.RECO_PRODUCER.send({ 
-          id, 
-          url: body.url, 
-          audit_id: body.audit_id, 
+        // Generate recommendations synchronously (reuses renderPage from audit!)
+        const { generateRecommendations } = await import('./reco-simple');
+        const result = await generateRecommendations(env, {
+          url: body.url,
+          audit_id: body.audit_id,
           page_id: body.page_id,
-          refresh 
+          refresh
         });
 
+        // Save result
+        await env.DB.prepare(
+          `UPDATE reco_jobs 
+           SET status = 'done', result_json = ?, updated_at = ? 
+           WHERE id = ?`
+        ).bind(JSON.stringify(result), Date.now(), id).run();
+
         return new Response(
-          JSON.stringify({ ok: true, id, status: 'queued', refresh }),
+          JSON.stringify({ ok: true, id, status: 'done', result }),
           {
-            status: 202,
+            status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
         );
       } catch (error) {
+        console.error('[reco] Error:', error);
         return new Response(
           JSON.stringify({
-            error: 'Failed to create recommendation job',
+            error: 'Failed to generate recommendations',
             message: error instanceof Error ? error.message : String(error),
           }),
           {
@@ -1138,6 +1144,7 @@ export default {
       try {
         // Normalize: allow path or absolute URL
         const normalized = rawU.startsWith('http') ? rawU : rawU;
+        console.log(`[page] Looking for page: ${normalized} in audit ${auditId}`);
 
         // 1) Find the exact page row
         const pageRow = await env.DB.prepare(
@@ -1148,6 +1155,8 @@ export default {
            ORDER BY (url = ?) DESC
            LIMIT 1`
         ).bind(auditId, normalized, normalized, normalized).first();
+        
+        console.log(`[page] Found page row:`, !!pageRow);
 
         if (!pageRow) {
           return new Response(
@@ -1760,22 +1769,13 @@ export default {
         if (audit.brave_ai_json) {
           try {
             const braveData = JSON.parse(audit.brave_ai_json as string);
-            const queries = braveData.queries || [];
-            
-            // Helper: extract pathname from domain paths
-            const extractPathname = (urlStr: string): string => {
-              try {
-                const u = new URL(urlStr);
-                return u.pathname.replace(/\/+$/, '') || '/';
-              } catch {
-                return '/';
-              }
-            };
+            const queries = Array.isArray(braveData.queries) ? braveData.queries : [];
             
             // Aggregate all unique paths cited (from domainPaths)
             const allDomainPaths = new Set<string>();
             queries.forEach((q: any) => {
-              (q.domainPaths || []).forEach((path: string) => {
+              const paths = Array.isArray(q.domainPaths) ? q.domainPaths : [];
+              paths.forEach((path: string) => {
                 allDomainPaths.add(path);
               });
             });
@@ -1785,7 +1785,8 @@ export default {
             const summarizerCount = queries.filter((q: any) => q.api === 'summarizer').length;
             
             braveAI = {
-              queries: queries.length,
+              queries: queries,  // Full query details for Brave AI modal
+              queriesCount: queries.length,  // Count for chips
               pagesCited: allDomainPaths.size,
               byApi: {
                 search: searchCount,
@@ -1794,6 +1795,7 @@ export default {
             };
           } catch (e) {
             console.error('Failed to parse brave_ai_json:', e);
+            braveAI = { queries: [], queriesCount: 0, pagesCited: 0, byApi: { search: 0, summarizer: 0 } };
           }
         }
         

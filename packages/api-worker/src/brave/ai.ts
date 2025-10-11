@@ -182,10 +182,14 @@ async function callBraveWebSearch(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    // CORRECT ENDPOINT per Brave API docs
-    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}`;
+    // CORRECT ENDPOINT per Brave API docs with enhanced parameters
+    const url = new URL('https://api.search.brave.com/res/v1/web/search');
+    url.searchParams.set('q', query.trim());
+    url.searchParams.set('count', '10'); // Request up to 10 results
+    url.searchParams.set('country', 'us');
+    url.searchParams.set('safesearch', 'moderate');
 
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       headers: {
         'Accept': 'application/json',
         'Accept-Encoding': 'gzip',
@@ -196,10 +200,12 @@ async function callBraveWebSearch(
 
     clearTimeout(timeoutId);
     
-    // Handle 429 rate limit with exponential backoff
-    if (response.status === 429 && retryCount < 2) {
-      const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s
-      console.log(`Rate limited on "${query}", retrying in ${delay}ms...`);
+    // Handle 429 rate limit with exponential backoff + jitter
+    if (response.status === 429 && retryCount < 3) {
+      const baseDelay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+      const jitter = Math.random() * 500; // 0-500ms jitter
+      const delay = baseDelay + jitter;
+      console.log(`[brave] Rate limited on "${query}", retry ${retryCount + 1}/3 in ${Math.round(delay)}ms`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return callBraveWebSearch(apiKey, query, domain, timeoutMs, retryCount + 1);
     }
@@ -376,22 +382,29 @@ export async function runBraveAIQueries(
   domain: string,
   opts?: { timeoutMs?: number; concurrency?: number }
 ): Promise<BraveQueryLog[]> {
-  const timeoutMs = opts?.timeoutMs ?? 7000;
-  const concurrency = opts?.concurrency ?? 1; // Reduced to 1 to avoid rate limits
+  const timeoutMs = opts?.timeoutMs ?? 10000; // Increased from 7s to 10s
+  const concurrency = opts?.concurrency ?? 1; // Keep at 1 to avoid rate limits
   
   const limit = pLimit(concurrency);
   const logs: BraveQueryLog[] = [];
 
-  // Process queries in batches with delays to avoid 429 errors
-  const batchSize = 5;
-  for (let i = 0; i < queries.length; i += batchSize) {
-    const batch = queries.slice(i, i + batchSize);
+  // Deduplicate and validate queries
+  const uniqueQueries = Array.from(new Set(
+    queries.map(q => q.trim()).filter(q => q.length >= 3)
+  ));
+
+  console.log(`[brave] Processing ${uniqueQueries.length} unique queries (${queries.length} total)`);
+
+  // Process queries in smaller batches with longer delays to avoid 429 errors
+  const batchSize = 3; // Reduced from 5 to 3
+  for (let i = 0; i < uniqueQueries.length; i += batchSize) {
+    const batch = uniqueQueries.slice(i, i + batchSize);
     
     const batchTasks = batch.map(query => 
       limit(async () => {
         const result = await callBraveWebSearch(apiKey, query, domain, timeoutMs);
-        // Add small delay between queries
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Add delay between queries within batch
+        await new Promise(resolve => setTimeout(resolve, 300)); // Increased from 200ms
         return result;
       })
     );
@@ -399,12 +412,14 @@ export async function runBraveAIQueries(
     const batchResults = await Promise.all(batchTasks);
     logs.push(...batchResults);
     
-    // Add delay between batches (1 second)
-    if (i + batchSize < queries.length) {
-      console.log(`Completed ${i + batchSize}/${queries.length} queries, pausing...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    // Add longer delay between batches (1.5 seconds)
+    if (i + batchSize < uniqueQueries.length) {
+      console.log(`[brave] Completed ${i + batchSize}/${uniqueQueries.length} queries, pausing...`);
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Increased from 1000ms
     }
   }
+
+  console.log(`[brave] Completed: ${logs.filter(l => l.ok).length} succeeded, ${logs.filter(l => !l.ok).length} failed`);
 
   return logs;
 }
