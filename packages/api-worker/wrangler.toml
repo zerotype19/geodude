@@ -37,11 +37,18 @@ FROM_EMAIL = "Optiview <no-reply@optiview.ai>"
 RENDER_MODE = "browser"
 RENDER_TIMEOUT_MS = "8000"
 RENDER_MAX_PAGES = "100"
-BRAVE_AI_MAX_QUERIES = "20"
-BRAVE_AI_HARD_CAP = "40"
-BRAVE_TIMEOUT_MS = "10000"
-BRAVE_CONCURRENCY = "1"
-BRAVE_AI_ENABLE_COMPARE = "false"
+# Phase F+ Brave AI Configuration
+BRAVE_AI_MAX_QUERIES = "50"         # Max queries per audit (was 20)
+BRAVE_AI_HARD_CAP = "100"           # Absolute max (was 40)
+BRAVE_TIMEOUT_MS = "10000"          # Per-query timeout
+BRAVE_MAX_CONCURRENT = "2"          # Max concurrent requests (was BRAVE_CONCURRENCY)
+BRAVE_AI_ENABLE_COMPARE = "false"   # Enable competitor comparison queries
+BRAVE_QUERY_STRATEGY = "smart"      # smart | basic | aggressive
+# Phase H: UI Scrape Adapters (Spike)
+LLM_UI_ENABLED = "false"            # Master flag for UI scraping
+LLM_UI_MAX_QUERIES = "10"           # Max UI queries per audit
+LLM_UI_TIMEOUT_MS = "30000"         # Per-query timeout (longer for UI rendering)
+LLM_UI_PROVIDERS = "perplexity"     # Comma-separated: perplexity,you,bing
 ENABLE_PERPLEXITY = "false"
 ENABLE_YOUCOM = "false"
 ENABLE_HEADLESS_PROVIDERS = "false"
