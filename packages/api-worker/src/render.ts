@@ -122,14 +122,32 @@ export async function renderPage(
       // Get full HTML after JS runs
       const html: string = await page.content();
 
+      // Extract metadata from browser DOM (more reliable than linkedom)
+      const browserData = await page.evaluate(() => {
+        const h1 = document.querySelector('h1');
+        const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+        return {
+          hasH1: !!h1,
+          h1Text: h1?.textContent?.trim() || null,
+          jsonLdCount: jsonLdScripts.length
+        };
+      });
+
       // Clean up
       await browser.close();
 
       const extracted = await extractFromHTML(html);
       const renderTime = Date.now() - startTime;
-      console.log(`[render] browser: ${url} -> ${extracted.words} words, status ${statusCode}, in ${renderTime}ms`);
+      console.log(`[render] browser: ${url} -> ${extracted.words} words, status ${statusCode}, H1: ${browserData.hasH1}, in ${renderTime}ms`);
       
-      return { mode: 'browser', statusCode, ...extracted };
+      // Override H1 detection with browser's result (more reliable than linkedom)
+      return { 
+        mode: 'browser', 
+        statusCode, 
+        ...extracted,
+        hasH1: browserData.hasH1,
+        jsonLdCount: browserData.jsonLdCount 
+      };
     } catch (err: any) {
       const errorMsg = err?.message || String(err);
       console.error(`[render] browser failed for ${url}, falling back:`, errorMsg);
