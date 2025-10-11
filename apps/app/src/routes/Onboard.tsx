@@ -154,7 +154,7 @@ export default function Onboard() {
 
           <div
             className="card"
-            style={{ background: "#1a1b1e", marginBottom: 12 }}
+            style={{ background: "#f8fafc", marginBottom: 12 }}
           >
             <b>HTML file (fastest)</b>
             <div style={{ marginTop: 8 }}>
@@ -167,7 +167,7 @@ export default function Onboard() {
 
           <div
             className="card"
-            style={{ background: "#1a1b1e", marginBottom: 12 }}
+            style={{ background: "#f8fafc", marginBottom: 12 }}
           >
             <b>DNS TXT</b>
             <div style={{ marginTop: 8 }}>
