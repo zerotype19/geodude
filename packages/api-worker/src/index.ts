@@ -1952,6 +1952,26 @@ export default {
           };
         });
 
+        // Phase G Polish: Apply read-time crawler bonus (+2 to crawlability if real hits exist)
+        if (totalHits > 0 && scores) {
+          // Add bonus to breakdown
+          if (!scores.breakdown) scores.breakdown = {} as any;
+          if (!scores.breakdown.crawlability) scores.breakdown.crawlability = {} as any;
+          scores.breakdown.crawlability.realCrawlerBonus = 2;
+          
+          // Apply bonus to crawlability score (capped at 100)
+          const oldCrawl = scores.crawlability || 0;
+          scores.crawlability = Math.min(100, oldCrawl + 2);
+          
+          // Recompute total (weighted: 40/30/20/10)
+          scores.total = Math.round(
+            (scores.crawlability * 0.4 +
+             scores.structured * 0.3 +
+             scores.answerability * 0.2 +
+             scores.trust * 0.1) * 100
+          ) / 100;
+        }
+
         const response: any = {
           id: audit.id,
           property_id: audit.property_id,

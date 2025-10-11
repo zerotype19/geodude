@@ -7,6 +7,7 @@ import PagesTable from "../components/PagesTable";
 import EntityRecommendations from "../components/EntityRecommendations";
 import Citations from "../components/Citations";
 import BraveQueriesModal from "../components/BraveQueriesModal";
+import { getBotMeta } from "../lib/botMeta";
 
 export default function PublicAudit() {
   const { id } = useParams();
@@ -382,8 +383,15 @@ export default function PublicAudit() {
               {Object.entries(audit.site.crawlers.byBot)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 4)
-                .map(([bot, n]) => `${bot}:${n}`)
-                .join(' • ')}
+                .map(([bot, n]) => {
+                  const meta = getBotMeta(bot);
+                  return (
+                    <span key={bot} title={`${meta.label} (${meta.org})`}>
+                      {meta.icon} {meta.label}:{n}
+                    </span>
+                  );
+                })
+                .reduce((acc, curr, idx) => idx === 0 ? [curr] : [...acc, ' • ', curr], [] as any[])}
               {Object.keys(audit.site.crawlers.byBot).length > 4 && ' • …'}
             </div>
           )}

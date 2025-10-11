@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { getAudit, getAuditPage, getPageRecommendations, getAuditCitations, b64u, type PageRecommendations, type Citation, type CitationType, type BraveAIQuery } from '../services/api';
 import IssuesTable from '../components/IssuesTable';
 import { StatCard } from '../components/StatCard';
+import { getBotMeta } from '../lib/botMeta';
 
 type TabType = 'overview' | 'recommendations';
 
@@ -378,12 +379,13 @@ export default function PageReport() {
           )}
           
           {/* Phase G: AI Crawlers Panel (30d) */}
-          {crawlerData && crawlerData.total > 0 && (
-            <>
-              <h2 style={{ margin: '32px 0 16px', fontSize: '24px', color: '#1e293b' }}>
-                🕷️ AI Crawlers (30d)
-              </h2>
-              <div style={{ 
+          {crawlerData ? (
+            crawlerData.total > 0 ? (
+              <>
+                <h2 style={{ margin: '32px 0 16px', fontSize: '24px', color: '#1e293b' }}>
+                  🕷️ AI Crawlers (30d)
+                </h2>
+                <div style={{ 
                 padding: 20, 
                 background: 'white', 
                 borderRadius: 12,
@@ -403,27 +405,48 @@ export default function PageReport() {
                     <h3 style={{ fontSize: 14, fontWeight: 600, color: '#475569', width: 140, textAlign: 'right' }}>Last Seen</h3>
                   </div>
                 </div>
-                {Object.entries(crawlerData.byBot).sort((a: any, b: any) => b[1] - a[1]).map(([bot, n]: [string, any]) => (
-                  <div 
-                    key={bot} 
-                    style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      padding: '8px 0',
-                      borderBottom: '1px solid #f1f5f9'
-                    }}
-                  >
-                    <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>{bot}</div>
-                    <div style={{ display: 'flex', gap: 40 }}>
-                      <div style={{ fontSize: 14, color: '#10b981', fontWeight: 'bold', width: 80, textAlign: 'right' }}>{n}</div>
-                      <div style={{ fontSize: 13, color: '#64748b', width: 140, textAlign: 'right' }}>
-                        {crawlerData.lastSeen[bot]
-                          ? new Date(crawlerData.lastSeen[bot]).toLocaleDateString()
-                          : '—'}
+                {Object.entries(crawlerData.byBot).sort((a: any, b: any) => b[1] - a[1]).map(([bot, n]: [string, any]) => {
+                  const meta = getBotMeta(bot);
+                  return (
+                    <div 
+                      key={bot} 
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between',
+                        padding: '8px 0',
+                        borderBottom: '1px solid #f1f5f9'
+                      }}
+                      title={`${meta.org}${meta.policyUrl ? ' - Click to view policy' : ''}`}
+                    >
+                      <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>{meta.icon}</span>
+                        {meta.policyUrl ? (
+                          <a 
+                            href={meta.policyUrl} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            style={{ color: meta.color || '#1e293b', textDecoration: 'none' }}
+                            onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                            onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                          >
+                            {meta.label}
+                          </a>
+                        ) : (
+                          <span>{meta.label}</span>
+                        )}
+                        <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 'normal' }}>({meta.org})</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 40 }}>
+                        <div style={{ fontSize: 14, color: '#10b981', fontWeight: 'bold', width: 80, textAlign: 'right' }}>{n}</div>
+                        <div style={{ fontSize: 13, color: '#64748b', width: 140, textAlign: 'right' }}>
+                          {crawlerData.lastSeen[bot]
+                            ? new Date(crawlerData.lastSeen[bot]).toLocaleDateString()
+                            : '—'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <p style={{ 
                   margin: '16px 0 0', 
                   fontSize: 12, 
@@ -434,7 +457,44 @@ export default function PageReport() {
                 </p>
               </div>
             </>
-          )}
+            ) : (
+              /* WAF Pass-Through Hint */
+              data?.audit?.site?.flags?.aiBlocked || data?.audit?.site?.aiAccess?.summary?.waf ? (
+                <div style={{
+                  padding: 16,
+                  background: '#fef3c7',
+                  border: '1px solid #fbbf24',
+                  borderRadius: 8,
+                  marginTop: 16,
+                  marginBottom: 32
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
+                    <span style={{ fontSize: 24 }}>⚠️</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>
+                        WAF Detected but No Crawler Traffic
+                      </div>
+                      <div style={{ fontSize: 13, color: '#78350f', marginBottom: 8 }}>
+                        {data.audit.site.aiAccess?.summary?.waf && (
+                          <>We detected <strong>{data.audit.site.aiAccess.summary.waf}</strong> WAF, </>
+                        )}
+                        but haven't seen any real AI bot traffic in the last 30 days.
+                      </div>
+                      <div style={{ fontSize: 12, color: '#78350f' }}>
+                        💡 Make sure your WAF allows AI bots. See{' '}
+                        <a 
+                          href="/docs/robots-ai" 
+                          style={{ color: '#92400e', textDecoration: 'underline' }}
+                        >
+                          robots/WAF configuration guide
+                        </a>.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null
+            )
+          ) : null}
           
           {/* Citations Panel */}
           <h2 style={{ margin: '32px 0 16px', fontSize: '24px', color: '#1e293b' }}>
