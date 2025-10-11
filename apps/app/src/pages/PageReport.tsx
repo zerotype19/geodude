@@ -61,7 +61,7 @@ export default function PageReport() {
     setBraveLoading(true);
     getAudit(auditId)
       .then(audit => {
-        if (audit.site?.braveAI) {
+        if (audit.site?.braveAI?.queries) {
           // Extract pathname from target URL
           let pathname = '/';
           try {
@@ -70,17 +70,14 @@ export default function PageReport() {
             pathname = target.replace(/\/+$/, '') || '/';
           }
           
-          // Filter queries that cite this page
-          const relevantQueries = audit.site.braveAI.queries.filter(q => 
-            q.sources.some(s => {
-              try {
-                const sourcePath = new URL(s.url).pathname.replace(/\/+$/, '') || '/';
-                return sourcePath === pathname;
-              } catch {
-                return false;
-              }
-            })
-          );
+          // Filter queries that cite this page (using domainPaths array)
+          const relevantQueries = audit.site.braveAI.queries.filter(q => {
+            // Check if this query has domainPaths and if any match our pathname
+            return q.domainPaths?.some((path: string) => {
+              const normalizedPath = path.replace(/\/+$/, '') || '/';
+              return normalizedPath === pathname;
+            });
+          });
           
           setBraveQueries(relevantQueries);
         }
