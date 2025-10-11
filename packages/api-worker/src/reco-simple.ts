@@ -309,3 +309,97 @@ async function callGPT(env: any, payload: { url: string; facts: any; words: numb
   return parsed as RecoOutput;
 }
 
+/**
+ * Validate recommendations quality and Schema.org sanity
+ */
+function validateRecommendations(obj: any, requestUrl: string): void {
+  // Basic structure check
+  if (!obj.detected_intent) {
+    throw new Error('Missing detected_intent');
+  }
+  
+  if (!Array.isArray(obj.missing_schemas)) {
+    throw new Error('missing_schemas must be an array');
+  }
+  
+  if (!Array.isArray(obj.suggested_jsonld)) {
+    throw new Error('suggested_jsonld must be an array');
+  }
+  
+  if (!Array.isArray(obj.content_suggestions)) {
+    throw new Error('content_suggestions must be an array');
+  }
+
+  // Schema.org sanity checks
+  for (const ld of obj.suggested_jsonld) {
+    if (!ld['@context']) {
+      throw new Error('JSON-LD missing @context');
+    }
+    
+    if (!ld['@type']) {
+      throw new Error('JSON-LD missing @type');
+    }
+
+    // FAQPage specific validation
+    if (ld['@type'] === 'FAQPage') {
+      if (!Array.isArray(ld.mainEntity) || ld.mainEntity.length === 0) {
+        throw new Error('FAQPage requires non-empty mainEntity array');
+      }
+      
+      for (const q of ld.mainEntity) {
+        if (q['@type'] !== 'Question') {
+          throw new Error('FAQPage mainEntity items must be Question type');
+        }
+        
+        if (!q.name || typeof q.name !== 'string' || q.name.length < 5) {
+          throw new Error('Question.name required (min 5 chars)');
+        }
+        
+        if (!q.acceptedAnswer || 
+            q.acceptedAnswer['@type'] !== 'Answer' || 
+            !q.acceptedAnswer.text || 
+            q.acceptedAnswer.text.length < 10) {
+          throw new Error('Question.acceptedAnswer.text required (min 10 chars)');
+        }
+      }
+    }
+
+    // WebPage specific validation
+    if (ld['@type'] === 'WebPage') {
+      if (ld.name && ld.name.length > 200) {
+        console.warn('[reco] WebPage.name too long (>200 chars), truncating in output');
+      }
+      
+      if (ld.description && ld.description.length > 500) {
+        console.warn('[reco] WebPage.description too long (>500 chars), truncating in output');
+      }
+    }
+
+    // URL validation (if present)
+    if (ld.url) {
+      try {
+        const ldUrl = new URL(ld.url);
+        const reqUrl = new URL(requestUrl);
+        
+        // Warn if domains don't match (not an error, but suspicious)
+        if (ldUrl.hostname !== reqUrl.hostname) {
+          console.warn(`[reco] JSON-LD url domain (${ldUrl.hostname}) differs from request (${reqUrl.hostname})`);
+        }
+      } catch (e) {
+        throw new Error(`Invalid url in JSON-LD: ${ld.url}`);
+      }
+    }
+  }
+
+  // Content suggestions validation
+  for (const sugg of obj.content_suggestions) {
+    if (!sugg.title || !sugg.priority || !sugg.note) {
+      throw new Error('Content suggestions must have title, priority, note');
+    }
+    
+    if (!['High', 'Medium', 'Low'].includes(sugg.priority)) {
+      throw new Error(`Invalid priority: ${sugg.priority}`);
+    }
+  }
+}
+
