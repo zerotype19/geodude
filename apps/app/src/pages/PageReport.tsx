@@ -351,7 +351,7 @@ export default function PageReport() {
                       color: 'white',
                       fontSize: 14
                     }}>
-                      <strong style={{ fontSize: 15 }}>"{q.query}"</strong>
+                      <strong style={{ fontSize: 15 }}>"{q.q}"</strong>
                       <span style={{ 
                         marginLeft: 10, 
                         fontSize: 11, 
@@ -359,7 +359,7 @@ export default function PageReport() {
                         background: 'rgba(255,255,255,0.2)',
                         borderRadius: 4
                       }}>
-                        {q.mode}
+                        {q.api}
                       </span>
                     </li>
                   ))}
