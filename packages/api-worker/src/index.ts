@@ -1408,9 +1408,13 @@ export default {
       }
     }
 
-    // GET /v1/audits/:id/brave/queries - Get Brave AI query logs (Phase F+)
+    // GET /v1/audits/:id/brave/queries - Get Brave AI query logs with pagination & filtering (Phase F+)
     if (path.match(/^\/v1\/audits\/[^/]+\/brave\/queries$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
+      const page = parseInt(url.searchParams.get('page') || '1');
+      const pageSize = Math.min(parseInt(url.searchParams.get('pageSize') || '50'), 200);
+      const bucket = url.searchParams.get('bucket'); // Filter by bucket (e.g., "brand_core")
+      const status = url.searchParams.get('status'); // Filter by status (e.g., "ok", "empty", "rate_limited")
       
       try {
         const audit = await env.DB.prepare(
@@ -1425,11 +1429,41 @@ export default {
         }
         
         const braveData = audit.brave_ai_json ? JSON.parse(audit.brave_ai_json) : { queries: [] };
+        let queries = braveData.queries || [];
+        
+        // Phase F+: Apply filters
+        if (bucket) {
+          queries = queries.filter((q: any) => q.bucket === bucket);
+        }
+        if (status) {
+          queries = queries.filter((q: any) => q.queryStatus === status);
+        }
+        
+        // Phase F+: Compute diagnostics summary
+        const diagnostics = {
+          total: queries.length,
+          ok: queries.filter((q: any) => q.queryStatus === 'ok').length,
+          empty: queries.filter((q: any) => q.queryStatus === 'empty').length,
+          rate_limited: queries.filter((q: any) => q.queryStatus === 'rate_limited').length,
+          error: queries.filter((q: any) => q.queryStatus === 'error').length,
+          timeout: queries.filter((q: any) => q.queryStatus === 'timeout').length,
+        };
+        
+        // Paginate
+        const total = queries.length;
+        const start = (page - 1) * pageSize;
+        const items = queries.slice(start, start + pageSize);
         
         return new Response(
           JSON.stringify({
             ok: true,
-            queries: braveData.queries || []
+            page,
+            pageSize,
+            total,
+            totalPages: Math.ceil(total / pageSize),
+            filters: { bucket, status },
+            diagnostics,
+            items
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -1792,7 +1826,7 @@ export default {
         // Parse AI flags
         const aiFlags = audit.ai_flags_json ? JSON.parse(audit.ai_flags_json as string) : null;
         
-        // Parse Brave AI results (Phase F+ enhanced)
+        // Parse Brave AI results (Phase F+ enhanced with diagnostics)
         let braveAI = null;
         if (audit.brave_ai_json) {
           try {
@@ -1808,14 +1842,37 @@ export default {
               });
             });
             
-            // Count by API type (fixed: uses 'search' and 'summarizer')
+            // Count by API type
             const searchCount = queries.filter((q: any) => q.api === 'search').length;
             const summarizerCount = queries.filter((q: any) => q.api === 'summarizer').length;
             
+            // Phase F+: Enhanced diagnostics summary
+            const diagnostics = {
+              ok: queries.filter((q: any) => q.queryStatus === 'ok').length,
+              empty: queries.filter((q: any) => q.queryStatus === 'empty').length,
+              rate_limited: queries.filter((q: any) => q.queryStatus === 'rate_limited').length,
+              error: queries.filter((q: any) => q.queryStatus === 'error').length,
+              timeout: queries.filter((q: any) => q.queryStatus === 'timeout').length,
+            };
+            
+            // Count successful queries with results
+            const resultsTotal = queries.filter((q: any) => q.ok && (q.sourcesTotal ?? 0) > 0).length;
+            
+            // Get sample queries for header tooltip (top 5 by weight/priority)
+            const querySamples = queries
+              .filter((q: any) => q.ok && (q.sourcesTotal ?? 0) > 0)
+              .sort((a: any, b: any) => (b.weight ?? 0) - (a.weight ?? 0))
+              .slice(0, 5)
+              .map((q: any) => q.q);
+            
             braveAI = {
               queries: queries,  // Full query details for Brave AI modal
-              queriesCount: queries.length,  // Count for chips
+              queriesTotal: queries.length,  // Phase F+: total queries run
+              queriesCount: queries.length,  // Keep for backward compat
+              resultsTotal,  // Phase F+: queries with results
               pagesCited: allDomainPaths.size,
+              diagnostics,  // Phase F+: enhanced diagnostics
+              querySamples,  // Phase F+: sample queries for tooltip
               byApi: {
                 search: searchCount,
                 summarizer: summarizerCount
@@ -1823,7 +1880,16 @@ export default {
             };
           } catch (e) {
             console.error('Failed to parse brave_ai_json:', e);
-            braveAI = { queries: [], queriesCount: 0, pagesCited: 0, byApi: { search: 0, summarizer: 0 } };
+            braveAI = { 
+              queries: [], 
+              queriesTotal: 0,
+              queriesCount: 0, 
+              resultsTotal: 0,
+              pagesCited: 0, 
+              diagnostics: { ok: 0, empty: 0, rate_limited: 0, error: 0, timeout: 0 },
+              querySamples: [],
+              byApi: { search: 0, summarizer: 0 } 
+            };
           }
         }
         
@@ -1908,8 +1974,9 @@ export default {
           } catch (_) {}
         }
 
-        // Build Brave AI answer counts per page path (Phase F+ using domainPaths)
+        // Build Brave AI answer counts per page path AND query lists (Phase F+)
         const braveAnswersByPath = new Map<string, number>();
+        const braveQueriesByPath = new Map<string, string[]>();
         if (audit.brave_ai_json) {
           try {
             const braveData = JSON.parse(audit.brave_ai_json as string);
@@ -1917,7 +1984,17 @@ export default {
             
             for (const query of queries) {
               for (const path of (query.domainPaths || [])) {
+                // Increment count
                 braveAnswersByPath.set(path, (braveAnswersByPath.get(path) || 0) + 1);
+                
+                // Track unique queries per path (Phase F+)
+                if (!braveQueriesByPath.has(path)) {
+                  braveQueriesByPath.set(path, []);
+                }
+                const existingQueries = braveQueriesByPath.get(path)!;
+                if (!existingQueries.includes(query.q)) {
+                  existingQueries.push(query.q);
+                }
               }
             }
           } catch (e) {
@@ -1934,20 +2011,25 @@ export default {
             path = u.pathname.replace(/\/+$/,'') || '/';
           } catch (_) {}
           
+          // Phase F+: Get top 3 citing queries for this page
+          const pathQueries = braveQueriesByPath.get(path) || [];
+          const aiAnswerQueries = pathQueries.slice(0, 3); // Top 3 queries
+          
           return {
             url: p.url,
-            statusCode: p.statusCode ?? null,  // Already camelCase from first mapping
+            statusCode: p.statusCode ?? null,
             title: p.title ?? null,
             h1: p.h1 ?? null,
             hasH1: p.hasH1 ?? false,
             jsonLdCount: p.jsonLdCount ?? 0,
-            faqOnPage: p.faqOnPage ?? null,  // Already properly mapped
-            words: p.words ?? null,  // Already camelCase from first mapping
+            faqOnPage: p.faqOnPage ?? null,
+            words: p.words ?? null,
             snippet: p.snippet ?? null,
             loadTimeMs: p.loadTimeMs ?? null,
             error: p.error ?? null,
             citationCount: countsByPath.get(path) || 0,
             aiAnswers: braveAnswersByPath.get(path) || 0,  // Brave AI answer count
+            aiAnswerQueries,  // Phase F+: Queries that cited this page
             aiHits: hitsByPath[path] || 0,  // Phase G: real crawler hits
           };
         });

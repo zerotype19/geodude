@@ -7,7 +7,7 @@ import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractO
 import { calculateScores } from './score';
 import { renderPage } from './render';
 import { checkCrawlability, probeAiAccess } from './crawl';
-import { runBraveAIQueries, buildSmartQueries, extractPathname, BraveQueryLog, PageData } from './brave/ai';
+import { runBraveAIQueries, buildSmartQueries, extractPathname, BraveQueryLog, PageData, runSmartBraveQueries } from './brave/ai';
 
 interface Env {
   DB: D1Database;
@@ -567,51 +567,55 @@ export async function runAudit(
     
     if (ENABLE_BRAVE) {
       try {
-        console.log('Running Brave AI queries (Phase F+)...');
+        console.log('[brave-f+] Phase F+ "Max" Mode enabled');
         
-        // Prepare config
-        const maxQueries = Number(env.BRAVE_AI_MAX_QUERIES ?? 30);
-        const hardCap = Number(env.BRAVE_AI_HARD_CAP ?? 60);
+        // Phase F+ Config
+        const maxQueries = Number(env.BRAVE_MAX_QUERIES ?? 50);
+        const hardCap = Number(env.BRAVE_AI_HARD_CAP ?? 100);
+        const strategy = (env.BRAVE_QUERY_STRATEGY || 'smart') as 'basic' | 'smart' | 'aggressive';
         const enableCompare = env.BRAVE_AI_ENABLE_COMPARE === 'true';
+        const enableRetry = env.BRAVE_RETRY_5XX === '1';
         const brand = property.display_name || property.domain.replace(/^www\./, '').split('.')[0];
         
-        // Convert pages to minimal format for query builder
+        // Convert pages to minimal format
         const minimalPages: PageData[] = pages.map(p => ({
           path: p.pathname || p.url.replace(property.domain, '').replace(/^https?:\/\/[^/]+/, '') || '/',
           h1: p.h1 || null,
           words: p.word_count || 0
         }));
         
-        // Build smart queries (path-aware, H1-driven, entity intents)
-        const smartQueries = buildSmartQueries({
-          brand,
+        console.log(`[brave-f+] Strategy: ${strategy}, Max queries: ${maxQueries}, Brand: ${brand}`);
+        
+        // Use new smart query system with enhanced diagnostics
+        const result = await runSmartBraveQueries(env.BRAVE_SEARCH_AI!, {
           domain: property.domain,
+          brand,
           pages: minimalPages,
-          extraTerms: [], // Can be extended from request body in future
+          strategy,
           maxQueries,
           hardCap,
-          enableCompare
+          enableCompare,
+          timeoutMs: Number(env.BRAVE_TIMEOUT_MS ?? 7000),
+          concurrency: Number(env.BRAVE_MAX_CONCURRENT ?? 2),
+          enableRetry,
         });
+
+        braveQueryLogs = result.logs;
         
-        console.log(`Generated ${smartQueries.length} smart queries for ${brand}`);
+        // Calculate enhanced diagnostics summary
+        const diagnostics = {
+          ok: braveQueryLogs.filter(l => l.queryStatus === 'ok').length,
+          empty: braveQueryLogs.filter(l => l.queryStatus === 'empty').length,
+          rate_limited: braveQueryLogs.filter(l => l.queryStatus === 'rate_limited').length,
+          error: braveQueryLogs.filter(l => l.queryStatus === 'error').length,
+          timeout: braveQueryLogs.filter(l => l.queryStatus === 'timeout').length,
+        };
         
-        // Run queries (fixed: uses correct Brave Web Search API)
-        braveQueryLogs = await runBraveAIQueries(
-          env.BRAVE_SEARCH_AI!,
-          smartQueries,
-          property.domain,
-          {
-            timeoutMs: Number(env.BRAVE_TIMEOUT_MS ?? 7000),
-            concurrency: Number(env.BRAVE_CONCURRENCY ?? 2)
-          }
-        );
-        
-        // Calculate summary stats
         const totalSources = braveQueryLogs.reduce((sum, log) => sum + (log.sourcesTotal ?? 0), 0);
         const domainSources = braveQueryLogs.reduce((sum, log) => sum + (log.domainSources ?? 0), 0);
         const uniquePaths = Array.from(new Set(braveQueryLogs.flatMap(log => log.domainPaths ?? [])));
         
-        console.log(`Brave AI complete: ${braveQueryLogs.length} queries, ${totalSources} total sources, ${domainSources} from domain, ${uniquePaths.length} unique paths cited`);
+        console.log(`[brave-f+] Complete: ${braveQueryLogs.length} queries | ${diagnostics.ok} OK, ${diagnostics.empty} Empty, ${diagnostics.rate_limited} RL, ${diagnostics.error} Error, ${diagnostics.timeout} Timeout | ${domainSources}/${totalSources} domain sources | ${uniquePaths.length} pages cited`);
       } catch (e) {
         console.error('Brave AI failed:', e instanceof Error ? e.message : String(e));
         braveQueryLogs = []; // Graceful fallback
