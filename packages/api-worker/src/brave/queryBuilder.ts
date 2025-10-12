@@ -3,6 +3,68 @@
  * Generates 30-50 queries across multiple buckets for comprehensive Brave AI coverage
  */
 
+/**
+ * Detect site type based on domain, brand, and page content
+ */
+function detectSiteType(domain: string, brand: string, pages?: PageData[]): 'entertainment' | 'healthcare' | 'ecommerce' | 'generic' {
+  const domainLower = domain.toLowerCase();
+  const brandLower = brand.toLowerCase();
+  
+  // Entertainment keywords
+  const entertainmentKeywords = [
+    'awards', 'radar', 'film', 'movie', 'tv', 'television', 'cinema', 'review', 'entertainment',
+    'oscar', 'emmy', 'golden', 'globes', 'sundance', 'cannes', 'festival', 'premiere',
+    'actor', 'actress', 'director', 'producer', 'screenplay', 'cinematography'
+  ];
+  
+  // Healthcare keywords  
+  const healthcareKeywords = [
+    'health', 'medical', 'doctor', 'patient', 'clinic', 'hospital', 'pharmacy', 'drug',
+    'medicine', 'treatment', 'therapy', 'diagnosis', 'prescription', 'insurance',
+    'cologuard', 'stripe', 'payment', 'billing'
+  ];
+  
+  // E-commerce keywords
+  const ecommerceKeywords = [
+    'shop', 'store', 'buy', 'sell', 'product', 'cart', 'checkout', 'shipping',
+    'pricing', 'price', 'cost', 'purchase', 'order', 'delivery'
+  ];
+  
+  // Check domain and brand
+  const textToCheck = `${domainLower} ${brandLower}`;
+  
+  if (entertainmentKeywords.some(keyword => textToCheck.includes(keyword))) {
+    return 'entertainment';
+  }
+  
+  if (healthcareKeywords.some(keyword => textToCheck.includes(keyword))) {
+    return 'healthcare';
+  }
+  
+  if (ecommerceKeywords.some(keyword => textToCheck.includes(keyword))) {
+    return 'ecommerce';
+  }
+  
+  // Check page content if available
+  if (pages && pages.length > 0) {
+    const pageText = pages.slice(0, 5).map(p => `${p.title || ''} ${p.h1 || ''}`).join(' ').toLowerCase();
+    
+    if (entertainmentKeywords.some(keyword => pageText.includes(keyword))) {
+      return 'entertainment';
+    }
+    
+    if (healthcareKeywords.some(keyword => pageText.includes(keyword))) {
+      return 'healthcare';
+    }
+    
+    if (ecommerceKeywords.some(keyword => pageText.includes(keyword))) {
+      return 'ecommerce';
+    }
+  }
+  
+  return 'generic';
+}
+
 export type QueryBucket =
   | 'brand_core'        // "{brand}", "site:{domain}", "{brand} faq"
   | 'product_how_to'    // "how to use {brand}", "how {brand} works"
@@ -76,24 +138,76 @@ export function buildSmartQueries(opts: QueryBuilderOptions): SmartQuery[] {
     );
   }
 
-  // 3. Jobs to Be Done (smart/aggressive)
+  // 3. Jobs to Be Done (domain-aware)
   if (strategy !== 'basic') {
-    queries.push(
-      { q: `${brand} benefits`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
-      { q: `why use ${brand}`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
-      { q: `${brand} for patients`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' },
-      { q: `${brand} results`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' }
-    );
+    const siteType = detectSiteType(domain, brand, pages);
+    
+    if (siteType === 'entertainment') {
+      queries.push(
+        { q: `${brand} benefits`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
+        { q: `why use ${brand}`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
+        { q: `${brand} for film fans`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' },
+        { q: `${brand} coverage`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' }
+      );
+    } else if (siteType === 'healthcare') {
+      queries.push(
+        { q: `${brand} benefits`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
+        { q: `why use ${brand}`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
+        { q: `${brand} for patients`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' },
+        { q: `${brand} results`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' }
+      );
+    } else if (siteType === 'ecommerce') {
+      queries.push(
+        { q: `${brand} benefits`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
+        { q: `why use ${brand}`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
+        { q: `${brand} for customers`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' },
+        { q: `${brand} features`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' }
+      );
+    } else {
+      queries.push(
+        { q: `${brand} benefits`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
+        { q: `why use ${brand}`, bucket: 'jobs_to_be_done', weight: 3, source: 'template' },
+        { q: `${brand} features`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' },
+        { q: `${brand} results`, bucket: 'jobs_to_be_done', weight: 2, source: 'template' }
+      );
+    }
   }
 
-  // 4. Schema Probes (smart/aggressive)
+  // 4. Schema Probes (domain-aware)
   if (strategy !== 'basic') {
-    queries.push(
-      { q: `faq about ${brand}`, bucket: 'schema_probes', weight: 3, source: 'template' },
-      { q: `is ${brand} covered by insurance`, bucket: 'schema_probes', weight: 3, source: 'template' },
-      { q: `does ${brand} require prescription`, bucket: 'schema_probes', weight: 2, source: 'template' },
-      { q: `${brand} cost`, bucket: 'schema_probes', weight: 3, source: 'template' }
-    );
+    // Detect site type from domain/pages to generate appropriate queries
+    const siteType = detectSiteType(domain, brand, pages);
+    
+    if (siteType === 'entertainment') {
+      queries.push(
+        { q: `faq about ${brand}`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `${brand} reviews`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `${brand} awards`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `${brand} predictions`, bucket: 'schema_probes', weight: 2, source: 'template' }
+      );
+    } else if (siteType === 'healthcare') {
+      queries.push(
+        { q: `faq about ${brand}`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `is ${brand} covered by insurance`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `does ${brand} require prescription`, bucket: 'schema_probes', weight: 2, source: 'template' },
+        { q: `${brand} cost`, bucket: 'schema_probes', weight: 3, source: 'template' }
+      );
+    } else if (siteType === 'ecommerce') {
+      queries.push(
+        { q: `faq about ${brand}`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `${brand} shipping`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `${brand} return policy`, bucket: 'schema_probes', weight: 2, source: 'template' },
+        { q: `${brand} reviews`, bucket: 'schema_probes', weight: 3, source: 'template' }
+      );
+    } else {
+      // Generic fallback
+      queries.push(
+        { q: `faq about ${brand}`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `${brand} reviews`, bucket: 'schema_probes', weight: 3, source: 'template' },
+        { q: `${brand} pricing`, bucket: 'schema_probes', weight: 2, source: 'template' },
+        { q: `${brand} support`, bucket: 'schema_probes', weight: 3, source: 'template' }
+      );
+    }
   }
 
   // 5. Content Seeds (from page titles/H1s)
