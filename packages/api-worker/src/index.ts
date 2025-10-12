@@ -1029,23 +1029,47 @@ export default {
         if (auditRow?.brave_ai_json) {
           try {
             const braveData = JSON.parse(auditRow.brave_ai_json);
-            const queries = braveData.queries || [];
+            const queries = braveData.queries || braveData || []; // Support both old and new formats
             
             // Extract Brave AI sources
             for (const query of queries) {
-              for (const source of (query.sources || [])) {
-                allCitations.push({
-                  engine: 'brave',
-                  query: query.query,
-                  url: source.url,
-                  title: source.title || null,
-                  cited_at: Date.now(), // Use current time for AI sources
-                  type: 'AEO', // Brave AI answers are AEO signals
-                  pagePathname: extractPath(source.url),
-                  provider: 'Brave',
-                  mode: query.mode,
-                  isAIOffered: true
-                });
+              // Phase F+: New format uses `q` and `sourceUrls`
+              const queryText = query.q || query.query; // Support both formats
+              const mode = query.api || query.mode; // Phase F+ uses `api`
+              
+              // New format: sourceUrls is array of strings
+              if (query.sourceUrls && Array.isArray(query.sourceUrls)) {
+                for (const sourceUrl of query.sourceUrls) {
+                  allCitations.push({
+                    engine: 'brave',
+                    query: queryText,
+                    url: sourceUrl,
+                    title: null, // URL-only in new format
+                    cited_at: Date.now(),
+                    type: 'AEO',
+                    pagePathname: extractPath(sourceUrl),
+                    provider: 'Brave',
+                    mode: mode,
+                    isAIOffered: true
+                  });
+                }
+              }
+              // Old format: sources is array of objects with url/title
+              else if (query.sources && Array.isArray(query.sources)) {
+                for (const source of query.sources) {
+                  allCitations.push({
+                    engine: 'brave',
+                    query: queryText,
+                    url: source.url,
+                    title: source.title || null,
+                    cited_at: Date.now(),
+                    type: 'AEO',
+                    pagePathname: extractPath(source.url),
+                    provider: 'Brave',
+                    mode: mode,
+                    isAIOffered: true
+                  });
+                }
               }
             }
           } catch (e) {
