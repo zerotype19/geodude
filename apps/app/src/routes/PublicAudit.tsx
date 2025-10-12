@@ -554,7 +554,7 @@ export default function PublicAudit() {
                 <strong>Your Calculation:</strong> ({audit.scores.crawlability} × 0.4) + ({audit.scores.structured} × 0.3) + ({audit.scores.answerability} × 0.2) + ({audit.scores.trust} × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}</strong>
               </div>
               <div style={{fontSize: 13, color: '#94a3b8', marginTop: 4, fontStyle: 'italic'}}>
-                Note: Component scores are points out of 100, not percentages of the weighted score.
+                Note: Each component's maximum points equal its weight (Crawlability: 42 max, Structured: 30 max, Answerability: 20 max, Trust: 10 max).
               </div>
             </div>
 
@@ -580,7 +580,7 @@ export default function PublicAudit() {
                     }}>40% weight</span>
                   </div>
                   <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.crawlability >= 70 ? '#10b981' : audit.scores.crawlability >= 40 ? '#f59e0b' : '#ef4444'}}>
-                    {audit.scores.crawlability}<span style={{fontSize: 16, color: '#94a3b8'}}>/100</span>
+                    {audit.scores.crawlability}<span style={{fontSize: 16, color: '#94a3b8'}}>/42</span>
                   </span>
                 </div>
                 <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
@@ -610,8 +610,8 @@ export default function PublicAudit() {
                       borderRadius: 4
                     }}>30% weight</span>
                   </div>
-                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.structured >= 70 ? '#10b981' : audit.scores.structured >= 40 ? '#f59e0b' : '#ef4444'}}>
-                    {audit.scores.structured}<span style={{fontSize: 16, color: '#94a3b8'}}>/100</span>
+                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.structured >= 21 ? '#10b981' : audit.scores.structured >= 12 ? '#f59e0b' : '#ef4444'}}>
+                    {audit.scores.structured}<span style={{fontSize: 16, color: '#94a3b8'}}>/30</span>
                   </span>
                 </div>
                 <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
@@ -641,8 +641,8 @@ export default function PublicAudit() {
                       borderRadius: 4
                     }}>20% weight</span>
                   </div>
-                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.answerability >= 70 ? '#10b981' : audit.scores.answerability >= 40 ? '#f59e0b' : '#ef4444'}}>
-                    {audit.scores.answerability}<span style={{fontSize: 16, color: '#94a3b8'}}>/100</span>
+                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.answerability >= 14 ? '#10b981' : audit.scores.answerability >= 8 ? '#f59e0b' : '#ef4444'}}>
+                    {audit.scores.answerability}<span style={{fontSize: 16, color: '#94a3b8'}}>/20</span>
                   </span>
                 </div>
                 <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
@@ -672,8 +672,8 @@ export default function PublicAudit() {
                       borderRadius: 4
                     }}>10% weight</span>
                   </div>
-                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.trust >= 70 ? '#10b981' : audit.scores.trust >= 40 ? '#f59e0b' : '#ef4444'}}>
-                    {audit.scores.trust}<span style={{fontSize: 16, color: '#94a3b8'}}>/100</span>
+                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.trust >= 7 ? '#10b981' : audit.scores.trust >= 4 ? '#f59e0b' : '#ef4444'}}>
+                    {audit.scores.trust}<span style={{fontSize: 16, color: '#94a3b8'}}>/10</span>
                   </span>
                 </div>
                 <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
@@ -693,19 +693,19 @@ export default function PublicAudit() {
               border: '1px solid #bfdbfe',
               borderRadius: 8
             }}>
-              <div style={{fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e40af'}}>📈 Scoring Guide</div>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: 13}}>
+              <div style={{fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e40af'}}>📈 Component Scoring Thresholds</div>
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12, fontSize: 13}}>
                 <div>
-                  <span style={{fontWeight: 600, color: '#10b981'}}>70-100 points:</span>{' '}
-                  <span style={{color: '#475569'}}>Excellent optimization</span>
+                  <div style={{fontWeight: 600, color: '#10b981', marginBottom: 4}}>🟢 Excellent (70%+)</div>
+                  <div style={{color: '#475569', fontSize: 12}}>Crawl: 29+/42 • Struct: 21+/30 • Answer: 14+/20 • Trust: 7+/10</div>
                 </div>
                 <div>
-                  <span style={{fontWeight: 600, color: '#f59e0b'}}>40-69 points:</span>{' '}
-                  <span style={{color: '#475569'}}>Good, room for improvement</span>
+                  <div style={{fontWeight: 600, color: '#f59e0b', marginBottom: 4}}>🟡 Good (40-70%)</div>
+                  <div style={{color: '#475569', fontSize: 12}}>Crawl: 17-28 • Struct: 12-20 • Answer: 8-13 • Trust: 4-6</div>
                 </div>
                 <div>
-                  <span style={{fontWeight: 600, color: '#ef4444'}}>0-39 points:</span>{' '}
-                  <span style={{color: '#475569'}}>Needs attention</span>
+                  <div style={{fontWeight: 600, color: '#ef4444', marginBottom: 4}}>🔴 Needs Work (&lt;40%)</div>
+                  <div style={{color: '#475569', fontSize: 12}}>Crawl: &lt;17 • Struct: &lt;12 • Answer: &lt;8 • Trust: &lt;4</div>
                 </div>
               </div>
               <p style={{fontSize: 13, color: '#475569', marginTop: 12, marginBottom: 0}}>
