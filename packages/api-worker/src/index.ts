@@ -1492,13 +1492,13 @@ export default {
         
         // Fetch audit and property data
         const audit = await env.DB.prepare(
-          'SELECT audits.id, audits.property_id, audits.brave_ai_json, properties.domain, properties.display_name FROM audits JOIN properties ON audits.property_id = properties.id WHERE audits.id = ?'
+          'SELECT audits.id, audits.property_id, audits.brave_ai_json, properties.domain, properties.name FROM audits JOIN properties ON audits.property_id = properties.id WHERE audits.id = ?'
         ).bind(auditId).first<{
           id: string;
           property_id: string;
           brave_ai_json: string | null;
           domain: string;
-          display_name: string | null;
+          name: string | null;
         }>();
         
         if (!audit) {
@@ -1532,7 +1532,7 @@ export default {
         }));
         
         // Generate smart queries
-        const brand = audit.display_name || audit.domain.replace(/^www\./, '').split('.')[0];
+        const brand = audit.name || audit.domain.replace(/^www\./, '').split('.')[0];
         const { buildSmartQueries, runBraveAIQueries } = await import('./brave/ai');
         
         const smartQueries = buildSmartQueries({

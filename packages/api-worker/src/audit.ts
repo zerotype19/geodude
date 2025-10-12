@@ -575,7 +575,7 @@ export async function runAudit(
         const strategy = (env.BRAVE_QUERY_STRATEGY || 'smart') as 'basic' | 'smart' | 'aggressive';
         const enableCompare = env.BRAVE_AI_ENABLE_COMPARE === 'true';
         const enableRetry = env.BRAVE_RETRY_5XX === '1';
-        const brand = property.display_name || property.domain.replace(/^www\./, '').split('.')[0];
+        const brand = property.name || property.domain.replace(/^www\./, '').split('.')[0];
         
         // Convert pages to minimal format
         const minimalPages: PageData[] = pages.map(p => ({
