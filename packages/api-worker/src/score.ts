@@ -177,7 +177,7 @@ function calculateCrawlability(
   }
 
   return { 
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(0, Math.min(42, score)), // Crawlability max is 42 points
     breakdown 
   };
 }
@@ -239,7 +239,7 @@ function calculateStructured(
   }
 
   return { 
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(0, Math.min(30, score)), // Structured Data max is 30 points
     breakdown 
   };
 }
@@ -294,7 +294,7 @@ function calculateAnswerability(
   }
 
   return { 
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(0, Math.min(20, score)), // Answerability max is 20 points
     breakdown 
   };
 }
@@ -352,7 +352,7 @@ function calculateTrust(
   }
 
   return { 
-    score: Math.max(0, Math.min(100, score)),
+    score: Math.max(0, Math.min(10, score)), // Trust max is 10 points
     breakdown 
   };
 }
