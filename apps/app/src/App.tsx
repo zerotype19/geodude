@@ -24,8 +24,7 @@ export default function App() {
       <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <h1 style={{margin:0, fontSize:22}}>Optiview — Dashboard</h1>
         <nav style={{display:"flex",gap:12}}>
-          <Link to="/">Run Audit</Link>
-          <Link to="/onboard">Onboard</Link>
+          <a href="https://api.optiview.ai" target="_blank" rel="noopener noreferrer">Dashboard</a>
         </nav>
       </header>
       <Routes>

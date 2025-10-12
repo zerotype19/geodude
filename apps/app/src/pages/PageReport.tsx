@@ -653,7 +653,7 @@ export default function PageReport() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label 
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b', cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: '#64748b', cursor: 'pointer' }}
                   title="Results are cached for 7 days. Check this to bypass the cache and re-analyze the current page content."
                 >
                   <input
@@ -663,7 +663,7 @@ export default function PageReport() {
                     disabled={recoStatus === 'processing'}
                     style={{ cursor: 'pointer' }}
                   />
-                  <span>⚡ Generate fresh (bypass 7-day cache)</span>
+                  <span>Generate Fresh</span>
                 </label>
               </div>
               {recoStatus === 'error' && (
