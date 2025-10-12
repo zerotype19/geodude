@@ -4,7 +4,7 @@
  * Based on official Brave API documentation
  */
 
-import { uniq, clamp, extractPathname, pLimit } from '../util';
+import { uniq, clamp, extractPathname, pLimit, normalizeUrl, fuzzyTextSimilarity } from '../util';
 import { buildSmartQueries as buildSmartQueriesNew, type SmartQuery, type QueryBucket } from './queryBuilder';
 
 export type BraveMode = 'search' | 'summarizer';
@@ -26,11 +26,14 @@ export interface BraveQueryLog {
   sourcesTotal?: number;
   domainSources?: number;
   domainPaths?: string[];
+  sourceUrls?: string[]; // Phase F++ Gap #1: persist full source URLs for deep linking
   error?: string | null;
   // Phase F+: Enhanced diagnostics
   queryStatus?: QueryStatus;
   queryReason?: QueryReason;
   weight?: number; // Query priority/importance
+  // Phase F++ Gap #6: Better page mapping
+  mapping?: Array<{ path: string; reason: 'path' | 'canonical' | 'title_fuzzy'; confidence?: number }>;
 }
 
 export interface PageData {
@@ -224,6 +227,7 @@ async function callBraveWebSearch(
     let sourcesTotal = 0;
     let domainSources = 0;
     let domainPaths: string[] = [];
+    let sourceUrls: string[] = []; // Phase F++ Gap #1: persist full URLs
 
     if (response.ok) {
       const data = await response.json();
@@ -239,6 +243,7 @@ async function callBraveWebSearch(
       }
 
       sourcesTotal = sources.length;
+      sourceUrls = sources.slice(0, 20); // Store top 20 URLs for deep linking
 
       // Filter to sources from the audited domain
       const normalizedDomain = domain.replace(/^www\./, '');
@@ -266,6 +271,7 @@ async function callBraveWebSearch(
       sourcesTotal,
       domainSources,
       domainPaths,
+      sourceUrls, // Phase F++ Gap #1: include full URLs
       error: response.ok ? null : `HTTP ${status}`
     };
 
@@ -591,3 +597,121 @@ export async function runSmartBraveQueries(
  * @deprecated Use runBraveAIQueries instead
  */
 export { extractPathname };
+
+/**
+ * Phase F++ Gap #6: Enhanced page mapping with canonical/title fuzzy matching
+ * Maps Brave source URLs to audited pages with confidence scores
+ */
+export interface PageMapping {
+  sourceUrl: string;
+  mappedPath: string;
+  reason: 'path' | 'canonical' | 'title_fuzzy';
+  confidence: number; // 0-1
+}
+
+export interface AuditPageData {
+  path: string;
+  url: string;
+  title?: string | null;
+  h1?: string | null;
+  canonical?: string | null;
+}
+
+/**
+ * Map a Brave source URL to the best matching audited page
+ * Falls back through: exact path → canonical → fuzzy title/H1
+ */
+export function mapSourceToPage(
+  sourceUrl: string,
+  auditedPages: AuditPageData[],
+  domain: string
+): PageMapping | null {
+  try {
+    const sourceParsed = new URL(sourceUrl);
+    const sourceHost = sourceParsed.hostname.replace(/^www\./, '');
+    const normalizedDomain = domain.replace(/^www\./, '');
+    
+    // Only map sources from the audited domain
+    if (sourceHost !== normalizedDomain) {
+      return null;
+    }
+    
+    const sourcePath = extractPathname(sourceUrl);
+    
+    // 1. Try exact path match
+    const exactMatch = auditedPages.find(p => {
+      const pagePath = extractPathname(p.url);
+      return pagePath === sourcePath;
+    });
+    
+    if (exactMatch) {
+      return {
+        sourceUrl,
+        mappedPath: extractPathname(exactMatch.url),
+        reason: 'path',
+        confidence: 1.0
+      };
+    }
+    
+    // 2. Try canonical match
+    const canonicalMatch = auditedPages.find(p => {
+      if (!p.canonical) return false;
+      try {
+        const canonicalPath = extractPathname(p.canonical);
+        return canonicalPath === sourcePath;
+      } catch {
+        return false;
+      }
+    });
+    
+    if (canonicalMatch) {
+      return {
+        sourceUrl,
+        mappedPath: extractPathname(canonicalMatch.url),
+        reason: 'canonical',
+        confidence: 0.95
+      };
+    }
+    
+    // 3. Fuzzy title/H1 match (only if title is reasonably long)
+    const sourcePathTokens = sourcePath.split('/').filter(Boolean).join(' ');
+    const candidates: Array<{ page: AuditPageData; score: number }> = [];
+    
+    for (const page of auditedPages) {
+      const pageTitle = page.title || page.h1 || '';
+      if (pageTitle.length < 10) continue; // Skip pages with no meaningful title
+      
+      // Combine title + H1 + path tokens for matching
+      const pageText = [
+        pageTitle,
+        page.h1 || '',
+        extractPathname(page.url).split('/').filter(Boolean).join(' ')
+      ].join(' ');
+      
+      const score = fuzzyTextSimilarity(sourcePathTokens, pageText);
+      
+      if (score > 0.3) { // Minimum threshold
+        candidates.push({ page, score });
+      }
+    }
+    
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => b.score - a.score);
+      const best = candidates[0];
+      
+      return {
+        sourceUrl,
+        mappedPath: extractPathname(best.page.url),
+        reason: 'title_fuzzy',
+        confidence: best.score
+      };
+    }
+    
+    // No match found
+    return null;
+    
+  } catch (error) {
+    console.error('[brave] mapSourceToPage error:', error);
+    return null;
+  }
+}

@@ -950,6 +950,7 @@ export default {
       const providerFilter = url.searchParams.get('provider'); // 'Brave' or null
       const modeFilter = url.searchParams.get('mode') as 'grounding' | 'summarizer' | null;
       const isAIOfferedFilter = url.searchParams.get('isAIOffered') === 'true';
+      const queryFilter = url.searchParams.get('query'); // Phase F++ Gap #1: filter by specific query
 
       try {
         // Get all regular citations from DB
@@ -1029,6 +1030,12 @@ export default {
         }
         if (isAIOfferedFilter) {
           allCitations = allCitations.filter((c: any) => c.isAIOffered === true);
+        }
+        // Phase F++ Gap #1: Filter by specific query
+        if (queryFilter) {
+          allCitations = allCitations.filter((c: any) => 
+            c.query && c.query.toLowerCase().includes(queryFilter.toLowerCase())
+          );
         }
         
         // Calculate counts for all types (before pagination)
@@ -1474,6 +1481,117 @@ export default {
             error: 'Failed to fetch Brave AI queries',
             message: error instanceof Error ? error.message : String(error)
           }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // GET /v1/audits/:id/brave/queries.csv - Export Brave AI queries as CSV (Phase F++ Gap #4)
+    if (path.match(/^\/v1\/audits\/[^/]+\/brave\/queries\.csv$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+      const url = new URL(request.url);
+      const bucket = url.searchParams.get('bucket');
+      const status = url.searchParams.get('status');
+
+      try {
+        const result = await env.DB.prepare(
+          'SELECT brave_ai_json FROM audits WHERE id = ?'
+        ).bind(auditId).first<{ brave_ai_json: string | null }>();
+
+        if (!result) {
+          return new Response('Audit not found', { 
+            status: 404, 
+            headers: { ...corsHeaders, 'Content-Type': 'text/plain' } 
+          });
+        }
+
+        const braveData = result.brave_ai_json ? JSON.parse(result.brave_ai_json) : { queries: [] };
+        let items = braveData.queries || [];
+
+        // Apply filters
+        if (bucket) {
+          items = items.filter((q: any) => q.bucket === bucket);
+        }
+        if (status) {
+          items = items.filter((q: any) => q.queryStatus === status);
+        }
+
+        // Generate CSV
+        const headers = ['Query', 'Bucket', 'Mode', 'Status', 'Results', 'Duration (ms)', 'Timestamp'];
+        const rows = items.map((q: any) => [
+          q.q || '',
+          q.bucket || '',
+          q.api || '',
+          q.queryStatus || 'unknown',
+          q.sourcesTotal || 0,
+          q.durationMs || 0,
+          new Date(q.ts).toISOString()
+        ]);
+
+        const csv = [headers, ...rows]
+          .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+          .join('\n');
+
+        return new Response(csv, {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': `attachment; filename="brave-queries-${auditId}.csv"`
+          }
+        });
+      } catch (error) {
+        return new Response('Export failed', {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'text/plain' }
+        });
+      }
+    }
+
+    // GET /v1/audits/:id/brave/queries.json - Export Brave AI queries as JSON (Phase F++ Gap #4)
+    if (path.match(/^\/v1\/audits\/[^/]+\/brave\/queries\.json$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+      const url = new URL(request.url);
+      const bucket = url.searchParams.get('bucket');
+      const status = url.searchParams.get('status');
+
+      try {
+        const result = await env.DB.prepare(
+          'SELECT brave_ai_json FROM audits WHERE id = ?'
+        ).bind(auditId).first<{ brave_ai_json: string | null }>();
+
+        if (!result) {
+          return new Response(
+            JSON.stringify({ ok: false, error: 'Audit not found' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const braveData = result.brave_ai_json ? JSON.parse(result.brave_ai_json) : { queries: [] };
+        let items = braveData.queries || [];
+
+        // Apply filters
+        if (bucket) {
+          items = items.filter((q: any) => q.bucket === bucket);
+        }
+        if (status) {
+          items = items.filter((q: any) => q.queryStatus === status);
+        }
+
+        return new Response(
+          JSON.stringify({ ok: true, auditId, queries: items }, null, 2),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'Content-Disposition': `attachment; filename="brave-queries-${auditId}.json"`
+            }
+          }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Export failed' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
