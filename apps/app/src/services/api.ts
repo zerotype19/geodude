@@ -23,6 +23,7 @@ export type AuditPage = {
   citationCount: number; // Number of citations referencing this page
   aiAnswers?: number; // Number of Brave AI answer citations referencing this page
   aiAnswerQueries?: string[]; // Phase F+: Top 3 queries that cited this page
+  aiAnswerMappings?: Array<{ reason: 'path' | 'canonical' | 'title_fuzzy'; confidence: number }>; // Phase F++: Mapping metadata
   aiHits?: number; // Phase G: Real AI crawler hits (30d)
 };
 
@@ -406,6 +407,7 @@ export async function getAuditCitations(
     provider?: string; // 'Brave' or null
     mode?: 'grounding' | 'summarizer'; // Brave AI mode filter
     isAIOffered?: boolean; // Filter for AI answer citations
+    query?: string; // Phase F++: Filter by specific query text
   },
   signal?: AbortSignal
 ): Promise<CitationsResponse> {
@@ -417,6 +419,7 @@ export async function getAuditCitations(
   if (opts?.provider) params.set('provider', opts.provider);
   if (opts?.mode) params.set('mode', opts.mode);
   if (opts?.isAIOffered !== undefined) params.set('isAIOffered', String(opts.isAIOffered));
+  if (opts?.query) params.set('query', opts.query); // Phase F++
   
   const queryString = params.toString();
   const url = `${API_BASE}/v1/audits/${auditId}/citations${queryString ? '?' + queryString : ''}`;
