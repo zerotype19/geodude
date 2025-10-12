@@ -1052,23 +1052,25 @@ export default {
               // New format: sourceUrls is array of strings
               if (query.sourceUrls && Array.isArray(query.sourceUrls)) {
                 for (const sourceUrl of query.sourceUrls) {
-                  // Only count sources from the audited domain as AEO
-                  // Others are just context/competitors and shouldn't inflate the count
+                  // ONLY include sources that cite the audited domain
+                  // Skip all competitor/context sources
                   const sourceDomain = new URL(sourceUrl).hostname.replace(/^www\./, '');
                   const isOwnDomain = sourceDomain === auditDomain;
                   
-                  allCitations.push({
-                    engine: 'brave',
-                    query: queryText,
-                    url: sourceUrl,
-                    title: null, // URL-only in new format
-                    cited_at: Date.now(),
-                    type: isOwnDomain ? 'AEO' : 'Organic', // Only own-domain = AEO
-                    pagePathname: extractPath(sourceUrl),
-                    provider: 'Brave',
-                    mode: mode,
-                    isAIOffered: isOwnDomain // Only own-domain is a true AI citation
-                  });
+                  if (isOwnDomain) {
+                    allCitations.push({
+                      engine: 'brave',
+                      query: queryText,
+                      url: sourceUrl,
+                      title: null, // URL-only in new format
+                      cited_at: Date.now(),
+                      type: 'AEO', // All Brave citations of own domain are AEO
+                      pagePathname: extractPath(sourceUrl),
+                      provider: 'Brave',
+                      mode: mode,
+                      isAIOffered: true
+                    });
+                  }
                 }
               }
               // Old format: sources is array of objects with url/title
@@ -1077,18 +1079,20 @@ export default {
                   const sourceDomain = new URL(source.url).hostname.replace(/^www\./, '');
                   const isOwnDomain = sourceDomain === auditDomain;
                   
-                  allCitations.push({
-                    engine: 'brave',
-                    query: queryText,
-                    url: source.url,
-                    title: source.title || null,
-                    cited_at: Date.now(),
-                    type: isOwnDomain ? 'AEO' : 'Organic',
-                    pagePathname: extractPath(source.url),
-                    provider: 'Brave',
-                    mode: mode,
-                    isAIOffered: isOwnDomain
-                  });
+                  if (isOwnDomain) {
+                    allCitations.push({
+                      engine: 'brave',
+                      query: queryText,
+                      url: source.url,
+                      title: source.title || null,
+                      cited_at: Date.now(),
+                      type: 'AEO', // All Brave citations of own domain are AEO
+                      pagePathname: extractPath(source.url),
+                      provider: 'Brave',
+                      mode: mode,
+                      isAIOffered: true
+                    });
+                  }
                 }
               }
             }
