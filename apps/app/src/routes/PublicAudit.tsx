@@ -9,6 +9,13 @@ import Citations from "../components/Citations";
 import BraveQueriesModal from "../components/BraveQueriesModal";
 import { getBotMeta } from "../lib/botMeta";
 
+// Helper function for score color coding
+const getScoreColor = (score: number): string => {
+  if (score > 70) return '#10b981'; // Green - Excellent (>70%)
+  if (score >= 40) return '#f59e0b'; // Orange - Good (40-70%)
+  return '#ef4444'; // Red - Needs Work (<40%)
+};
+
 export default function PublicAudit() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -548,7 +555,7 @@ export default function PublicAudit() {
             }}>
               <div style={{fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#1e293b'}}>Score Formula:</div>
               <div style={{fontSize: 14, color: '#64748b', fontFamily: 'Monaco, monospace'}}>
-                Overall = (Crawlability% × 40%) + (Structured% × 30%) + (Answerability% × 20%) + (Trust% × 10%)
+                Overall = (Crawlability 40%) + (Structured 30%) + (Answerability 20%) + (Trust 10%)
               </div>
               <div style={{fontSize: 14, color: '#64748b', marginTop: 8}}>
                 <strong>Your Calculation:</strong> ({Math.round((audit.scores.crawlabilityPct || (audit.scores.crawlability / 42 * 100)) * 10) / 10}% × 0.4) + ({Math.round((audit.scores.structuredPct || (audit.scores.structured / 30 * 100)) * 10) / 10}% × 0.3) + ({Math.round((audit.scores.answerabilityPct || (audit.scores.answerability / 20 * 100)) * 10) / 10}% × 0.2) + ({Math.round((audit.scores.trustPct || (audit.scores.trust / 10 * 100)) * 10) / 10}% × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</strong>
@@ -579,7 +586,7 @@ export default function PublicAudit() {
                       borderRadius: 4
                     }}>40% weight</span>
                   </div>
-                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.crawlability >= 70 ? '#10b981' : audit.scores.crawlability >= 40 ? '#f59e0b' : '#ef4444'}}>
+                  <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor((audit.scores.crawlability / 42) * 100)}}>
                     {audit.scores.crawlability}<span style={{fontSize: 16, color: '#94a3b8'}}>/42</span>
                   </span>
                 </div>
@@ -610,7 +617,7 @@ export default function PublicAudit() {
                       borderRadius: 4
                     }}>30% weight</span>
                   </div>
-                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.structured >= 21 ? '#10b981' : audit.scores.structured >= 12 ? '#f59e0b' : '#ef4444'}}>
+                  <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor((audit.scores.structured / 30) * 100)}}>
                     {audit.scores.structured}<span style={{fontSize: 16, color: '#94a3b8'}}>/30</span>
                   </span>
                 </div>
@@ -641,7 +648,7 @@ export default function PublicAudit() {
                       borderRadius: 4
                     }}>20% weight</span>
                   </div>
-                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.answerability >= 14 ? '#10b981' : audit.scores.answerability >= 8 ? '#f59e0b' : '#ef4444'}}>
+                  <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor((audit.scores.answerability / 20) * 100)}}>
                     {audit.scores.answerability}<span style={{fontSize: 16, color: '#94a3b8'}}>/20</span>
                   </span>
                 </div>
@@ -672,7 +679,7 @@ export default function PublicAudit() {
                       borderRadius: 4
                     }}>10% weight</span>
                   </div>
-                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.trust >= 7 ? '#10b981' : audit.scores.trust >= 4 ? '#f59e0b' : '#ef4444'}}>
+                  <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor((audit.scores.trust / 10) * 100)}}>
                     {audit.scores.trust}<span style={{fontSize: 16, color: '#94a3b8'}}>/10</span>
                   </span>
                 </div>

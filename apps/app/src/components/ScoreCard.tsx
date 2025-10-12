@@ -4,21 +4,21 @@ export default function ScoreCard({ title, value }: { title: string; value: numb
   
   // Color coding based on score thresholds
   const getScoreColor = (score: number): { bg: string; text: string; border: string } => {
-    if (score >= 70) return { 
+    if (score > 70) return { 
       bg: 'rgba(16, 185, 129, 0.1)', 
       text: '#10b981', 
       border: '#10b981' 
-    }; // Green - Excellent
+    }; // Green - Excellent (>70%)
     if (score >= 40) return { 
       bg: 'rgba(251, 191, 36, 0.1)', 
       text: '#f59e0b', 
       border: '#f59e0b' 
-    }; // Yellow/Orange - Good
+    }; // Orange - Good (40-70%)
     return { 
       bg: 'rgba(239, 68, 68, 0.1)', 
       text: '#ef4444', 
       border: '#ef4444' 
-    }; // Red - Needs Work
+    }; // Red - Needs Work (<40%)
   };
   
   const colors = getScoreColor(pct);

@@ -2278,16 +2278,28 @@ export default {
           if (!scores.breakdown.crawlability) scores.breakdown.crawlability = {} as any;
           scores.breakdown.crawlability.realCrawlerBonus = 2;
           
-          // Apply bonus to crawlability score (capped at 100)
+          // Apply bonus to crawlability score (capped at max points)
           const oldCrawl = scores.crawlability || 0;
-          scores.crawlability = Math.min(100, oldCrawl + 2);
+          scores.crawlability = Math.min(42, oldCrawl + 2); // Cap at 42 max points
           
-          // Recompute total (weighted: 40/30/20/10)
+          // Recompute percentages and total using the CORRECT method
+          const crawlabilityPct = (scores.crawlability / 42) * 100;
+          const structuredPct = (scores.structured / 30) * 100;
+          const answerabilityPct = (scores.answerability / 20) * 100;
+          const trustPct = (scores.trust / 10) * 100;
+          
+          // Update percentage fields
+          scores.crawlabilityPct = Math.round(crawlabilityPct * 100) / 100;
+          scores.structuredPct = Math.round(structuredPct * 100) / 100;
+          scores.answerabilityPct = Math.round(answerabilityPct * 100) / 100;
+          scores.trustPct = Math.round(trustPct * 100) / 100;
+          
+          // Recompute total using PERCENTAGES (correct method)
           scores.total = Math.round(
-            (scores.crawlability * 0.4 +
-             scores.structured * 0.3 +
-             scores.answerability * 0.2 +
-             scores.trust * 0.1) * 100
+            (crawlabilityPct * 0.4 +
+             structuredPct * 0.3 +
+             answerabilityPct * 0.2 +
+             trustPct * 0.1) * 100
           ) / 100;
         }
 
