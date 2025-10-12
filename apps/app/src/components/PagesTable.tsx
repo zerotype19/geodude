@@ -110,12 +110,18 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                   <Link
                     to={`/a/${auditId}?tab=citations&provider=Brave&isAIOffered=true&path=${encodeURIComponent(formatUrl(p.url))}`}
                     style={{ color: '#6366f1', textDecoration: 'underline', cursor: 'pointer' }}
-                    title="View Brave AI citations to this page"
+                    title={
+                      p.aiAnswerQueries && p.aiAnswerQueries.length > 0
+                        ? `Cited by ${p.aiAnswers} Brave AI answer${p.aiAnswers === 1 ? '' : 's'}\n\nTop queries:\n${p.aiAnswerQueries.map(q => `• ${q}`).join('\n')}`
+                        : "View Brave AI citations to this page"
+                    }
                   >
                     {p.aiAnswers}
                   </Link>
                 ) : (
-                  <span>{p.aiAnswers ?? 0}</span>
+                  <span title={p.aiAnswers === 0 ? "No Brave AI answers cited this page (yet)" : undefined}>
+                    {p.aiAnswers ?? 0}
+                  </span>
                 )}
               </td>
               <td style={{ textAlign: 'right' }} className="tabular-nums">

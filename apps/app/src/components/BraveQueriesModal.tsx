@@ -1,224 +1,348 @@
 /**
- * Brave AI Queries Modal (Phase F+)
- * Shows detailed query logs with run-more functionality
+ * Phase F+ Brave Queries Modal
+ * Shows all Brave AI queries with diagnostics, filtering, and pagination
  */
 
-import { useEffect, useState } from 'react';
-import { getBraveQueries, runMoreBrave, BraveQueryLog, getAudit } from '../services/api';
+import { useEffect, useState, useRef } from 'react';
+import { getBraveQueries, type BraveQueryLog, type QueryBucket, type QueryStatus, type BraveQueriesResponse } from '../services/api';
 
-interface Props {
+type Props = {
   auditId: string;
+  isOpen: boolean;
   onClose: () => void;
-  onUpdate?: () => void; // Callback to refresh parent audit data
-}
+};
 
-export default function BraveQueriesModal({ auditId, onClose, onUpdate }: Props) {
-  const [loading, setLoading] = useState(true);
-  const [logs, setLogs] = useState<BraveQueryLog[]>([]);
-  const [extraTerms, setExtraTerms] = useState('');
-  const [running, setRunning] = useState(false);
+export function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
+  const [data, setData] = useState<BraveQueriesResponse | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [page, setPage] = useState(1);
+  const [bucket, setBucket] = useState<QueryBucket | null>(null);
+  const [status, setStatus] = useState<QueryStatus | null>(null);
+  
+  const modalRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  async function load() {
+  // Fetch queries when modal opens or filters change
+  useEffect(() => {
+    if (!isOpen) return;
+    
     setLoading(true);
     setError(null);
-    try {
-      const res = await getBraveQueries(auditId);
-      setLogs(res.queries ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load queries');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function runMore(count: number = 10) {
-    if (running) return;
     
-    setRunning(true);
-    setError(null);
-    
-    try {
-      const terms = extraTerms
-        .split(/[,\n]/)
-        .map(s => s.trim())
-        .filter(Boolean);
-      
-      await runMoreBrave(auditId, count, terms);
-      setExtraTerms('');
-      await load();
-      
-      // Notify parent to refresh audit data (updates header chip)
-      if (onUpdate) onUpdate();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to run more queries');
-    } finally {
-      setRunning(false);
-    }
-  }
+    getBraveQueries(auditId, {
+      page,
+      pageSize: 50,
+      bucket,
+      status,
+    })
+      .then(setData)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [auditId, isOpen, page, bucket, status]);
 
+  // Escape key handler
   useEffect(() => {
-    load();
-  }, [auditId]);
+    if (!isOpen) return;
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
 
-  const total = logs.length;
-  const uniquePaths = Array.from(new Set(logs.flatMap(l => l.domainPaths ?? []))).length;
-  const searchLogs = logs.filter(l => l.api === 'search');
-  const summarizerLogs = logs.filter(l => l.api === 'summarizer');
+  // Focus trap
+  useEffect(() => {
+    if (!isOpen || !modalRef.current) return;
+    
+    const focusableEls = modalRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstEl = focusableEls[0];
+    const lastEl = focusableEls[focusableEls.length - 1];
+    
+    firstEl?.focus();
+    
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      
+      if (e.shiftKey) {
+        if (document.activeElement === firstEl) {
+          e.preventDefault();
+          lastEl?.focus();
+        }
+      } else {
+        if (document.activeElement === lastEl) {
+          e.preventDefault();
+          firstEl?.focus();
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleTab);
+    return () => window.removeEventListener('keydown', handleTab);
+  }, [isOpen, loading]);
+
+  if (!isOpen) return null;
+
+  const buckets: Array<{ value: QueryBucket | null; label: string }> = [
+    { value: null, label: 'All' },
+    { value: 'brand_core', label: 'Brand' },
+    { value: 'product_how_to', label: 'How-to' },
+    { value: 'jobs_to_be_done', label: 'Jobs' },
+    { value: 'schema_probes', label: 'Schema' },
+    { value: 'content_seeds', label: 'Content' },
+    { value: 'competitive', label: 'Competitive' },
+  ];
+
+  const statuses: Array<{ value: QueryStatus | null; label: string }> = [
+    { value: null, label: 'All' },
+    { value: 'ok', label: 'OK' },
+    { value: 'empty', label: 'No Answer' },
+    { value: 'rate_limited', label: 'Rate-Limited' },
+    { value: 'error', label: 'Error' },
+    { value: 'timeout', label: 'Timeout' },
+  ];
+
+  const getStatusColor = (s?: QueryStatus) => {
+    switch (s) {
+      case 'ok':
+        return 'bg-emerald-100 text-emerald-700';
+      case 'empty':
+        return 'bg-gray-100 text-gray-600';
+      case 'rate_limited':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'error':
+        return 'bg-red-100 text-red-700';
+      case 'timeout':
+        return 'bg-orange-100 text-orange-700';
+      default:
+        return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const getBucketColor = (b?: string) => {
+    switch (b) {
+      case 'brand_core':
+        return 'bg-blue-100 text-blue-700';
+      case 'product_how_to':
+        return 'bg-purple-100 text-purple-700';
+      case 'jobs_to_be_done':
+        return 'bg-green-100 text-green-700';
+      case 'schema_probes':
+        return 'bg-indigo-100 text-indigo-700';
+      case 'content_seeds':
+        return 'bg-pink-100 text-pink-700';
+      case 'competitive':
+        return 'bg-orange-100 text-orange-700';
+      default:
+        return 'bg-gray-100 text-gray-600';
+    }
+  };
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4"
-      onClick={onClose}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div 
-        className="bg-white w-full max-w-6xl max-h-[90vh] rounded-lg shadow-xl overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+      <div
+        ref={modalRef}
+        className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        style={{ margin: '20px' }}
       >
         {/* Header */}
-        <div className="border-b border-gray-200 px-6 py-4 bg-white">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-semibold text-gray-900">🤖 Brave AI Query Log</h2>
-            <button 
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-4 text-sm text-gray-600">
-            <span>Total: <strong className="text-gray-900">{total}</strong> queries</span>
-            <span>•</span>
-            <span>Pages cited: <strong className="text-emerald-600">{uniquePaths}</strong></span>
-            <span>•</span>
-            <span>Web Search: <strong className="text-blue-600">{searchLogs.length}</strong></span>
-            {summarizerLogs.length > 0 && (
-              <>
-                <span>•</span>
-                <span>Summarizer: <strong className="text-purple-600">{summarizerLogs.length}</strong></span>
-              </>
-            )}
-          </div>
+        <div className="border-b border-gray-200 p-6 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Brave AI Queries</h2>
+          <button
+            ref={closeButtonRef}
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+            aria-label="Close modal"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        {/* Run More Section */}
-        <div className="border-b border-gray-200 px-6 py-3 bg-white">
-          <div className="flex items-center gap-3">
-            <input
-              value={extraTerms}
-              onChange={(e) => setExtraTerms(e.target.value)}
-              placeholder="Add custom terms (comma or line separated)"
-              className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 bg-white"
-              disabled={running}
-            />
-            <button
-              onClick={() => runMore(10)}
-              disabled={running}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 px-4 py-1.5 rounded text-sm font-medium text-white whitespace-nowrap"
-            >
-              {running ? 'Running...' : 'Run +10 More'}
-            </button>
-          </div>
-          {error && (
-            <p className="mt-2 text-xs text-red-600">⚠️ {error}</p>
-          )}
-        </div>
-
-        {/* Query Log Table */}
-        <div className="flex-1 overflow-auto bg-white">
-          {loading ? (
-            <div className="text-center py-12 text-gray-500">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-3"></div>
-              <p>Loading queries...</p>
-            </div>
-          ) : logs.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="text-lg mb-2">No queries yet</p>
-              <p className="text-sm">Add custom terms above and click "Run +10 More" to start</p>
-            </div>
-          ) : (
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
-                <tr className="text-gray-700 text-left text-xs">
-                  <th className="py-1.5 px-2 font-medium">Query</th>
-                  <th className="py-1.5 px-2 font-medium">API</th>
-                  <th className="py-1.5 px-2 font-medium">Status</th>
-                  <th className="py-1.5 px-2 font-medium text-right">Duration</th>
-                  <th className="py-1.5 px-2 font-medium text-right">Sources</th>
-                  <th className="py-1.5 px-2 font-medium text-right">Yours</th>
-                  <th className="py-1.5 px-2 font-medium">Your Paths</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log, idx) => (
-                  <tr 
-                    key={idx} 
-                    className="border-b border-gray-100 hover:bg-gray-50"
+        {/* Filters */}
+        <div className="border-b border-gray-200 p-4 bg-gray-50">
+          <div className="flex flex-wrap gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Bucket</label>
+              <div className="flex flex-wrap gap-1">
+                {buckets.map((b) => (
+                  <button
+                    key={b.value || 'all'}
+                    onClick={() => {
+                      setBucket(b.value);
+                      setPage(1);
+                    }}
+                    className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                      bucket === b.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
                   >
-                    <td className="py-1.5 px-2 text-gray-900 max-w-xs truncate text-xs" title={log.q}>
-                      {log.q}
-                    </td>
-                    <td className="py-1.5 px-2">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${
-                        log.api === 'search' 
-                          ? 'bg-blue-100 text-blue-700' 
-                          : 'bg-purple-100 text-purple-700'
-                      }`}>
-                        {log.api}
-                      </span>
-                    </td>
-                    <td className="py-1.5 px-2 text-xs whitespace-nowrap">
-                      {log.ok ? (
-                        <span className="text-emerald-600 font-medium">{log.status ?? 'OK'}</span>
-                      ) : (
-                        <span className="text-red-600 font-medium" title={log.error || undefined}>
-                          {log.status || 'ERR'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-1.5 px-2 text-right text-gray-600 tabular-nums text-xs whitespace-nowrap">
-                      {log.durationMs ? `${log.durationMs}ms` : '—'}
-                    </td>
-                    <td className="py-1.5 px-2 text-right text-gray-900 tabular-nums text-xs">
-                      {log.sourcesTotal ?? 0}
-                    </td>
-                    <td className="py-1.5 px-2 text-right tabular-nums text-xs">
-                      <span className={log.domainSources && log.domainSources > 0 ? 'text-emerald-600 font-semibold' : 'text-gray-400'}>
-                        {log.domainSources ?? 0}
-                      </span>
-                    </td>
-                    <td className="py-1.5 px-2">
-                      {log.domainPaths && log.domainPaths.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {log.domainPaths.map((path, pidx) => (
-                            <span 
-                              key={pidx}
-                              className="inline-block bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap"
-                            >
-                              {path}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-xs">—</span>
-                      )}
-                    </td>
-                  </tr>
+                    {b.label}
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Status</label>
+              <div className="flex flex-wrap gap-1">
+                {statuses.map((s) => (
+                  <button
+                    key={s.value || 'all'}
+                    onClick={() => {
+                      setStatus(s.value);
+                      setPage(1);
+                    }}
+                    className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                      status === s.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Diagnostics summary */}
+          {data?.diagnostics && (
+            <div className="mt-3 flex gap-4 text-xs text-gray-600">
+              <span>
+                <strong className="text-emerald-600">{data.diagnostics.ok}</strong> OK
+              </span>
+              <span>•</span>
+              <span>
+                <strong className="text-gray-600">{data.diagnostics.empty}</strong> No Answer
+              </span>
+              <span>•</span>
+              <span>
+                <strong className="text-yellow-600">{data.diagnostics.rate_limited}</strong> RL
+              </span>
+              <span>•</span>
+              <span>
+                <strong className="text-red-600">{data.diagnostics.error}</strong> Error
+              </span>
+              <span>•</span>
+              <span>
+                <strong className="text-orange-600">{data.diagnostics.timeout}</strong> Timeout
+              </span>
+            </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-3 bg-gray-50 text-sm text-gray-600">
-          Using Brave <a href="https://api.search.brave.com" target="_blank" rel="noopener" className="text-blue-600 hover:underline">Web Search API</a> with rate limiting protection
-          {total > 0 && ` • ${total} ${total === 1 ? 'query' : 'queries'} executed`}
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading && (
+            <div className="text-center py-12 text-gray-500">
+              <div className="animate-spin inline-block w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full"></div>
+              <p className="mt-2">Loading queries...</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
+          {!loading && !error && data && data.items.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              {data.total === 0 ? (
+                <p>No Brave queries ran for this audit.</p>
+              ) : (
+                <p>No queries match your filters.</p>
+              )}
+            </div>
+          )}
+
+          {!loading && !error && data && data.items.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left">
+                    <th className="pb-2 pr-3 font-semibold text-gray-700">Query</th>
+                    <th className="pb-2 px-3 font-semibold text-gray-700">Bucket</th>
+                    <th className="pb-2 px-3 font-semibold text-gray-700">Mode</th>
+                    <th className="pb-2 px-3 font-semibold text-gray-700 text-right">Results</th>
+                    <th className="pb-2 px-3 font-semibold text-gray-700">Status</th>
+                    <th className="pb-2 pl-3 font-semibold text-gray-700 text-right">ms</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.items.map((query, idx) => (
+                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 pr-3 text-gray-900">{query.q}</td>
+                      <td className="py-2 px-3">
+                        {query.bucket && (
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getBucketColor(query.bucket)}`}>
+                            {query.bucket.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-gray-600 text-xs">{query.api}</td>
+                      <td className="py-2 px-3 text-right text-gray-700 tabular-nums">{query.sourcesTotal ?? 0}</td>
+                      <td className="py-2 px-3">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(query.queryStatus)}`}>
+                          {query.queryStatus || 'unknown'}
+                        </span>
+                      </td>
+                      <td className="py-2 pl-3 text-right text-gray-600 text-xs tabular-nums">{query.durationMs ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+
+        {/* Footer with pagination */}
+        {data && data.total > 0 && (
+          <div className="border-t border-gray-200 p-4 flex items-center justify-between bg-gray-50">
+            <div className="text-sm text-gray-600">
+              Showing {(page - 1) * data.pageSize + 1}–{Math.min(page * data.pageSize, data.total)} of {data.total}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  page === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                disabled={page === data.totalPages}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  page === data.totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-

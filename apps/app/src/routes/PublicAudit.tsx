@@ -395,6 +395,83 @@ export default function PublicAudit() {
               {Object.keys(audit.site.crawlers.byBot).length > 4 && ' • …'}
             </div>
           )}
+          
+          {/* Phase F+: Brave AI Queries Chip */}
+          {audit.site?.braveAI && (audit.site.braveAI.queriesTotal ?? 0) > 0 && (
+            <button
+              onClick={() => setShowBraveModal(true)}
+              style={{
+                marginTop: 8,
+                fontSize: 11,
+                padding: '6px 12px',
+                borderRadius: 12,
+                background: 'rgba(139,92,246,.15)',
+                color: '#8b5cf6',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 600,
+                transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(139,92,246,.25)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(139,92,246,.15)';
+              }}
+              title={`Brave AI: ${audit.site.braveAI.resultsTotal ?? 0}/${audit.site.braveAI.queriesTotal ?? 0} queries with results${
+                audit.site.braveAI.diagnostics
+                  ? `\n\nBreakdown:\n• ${audit.site.braveAI.diagnostics.ok} OK\n• ${audit.site.braveAI.diagnostics.empty} No Answer\n• ${audit.site.braveAI.diagnostics.rate_limited} Rate-Limited\n• ${audit.site.braveAI.diagnostics.error} Error\n• ${audit.site.braveAI.diagnostics.timeout} Timeout${
+                      audit.site.braveAI.querySamples && audit.site.braveAI.querySamples.length > 0
+                        ? `\n\nSample queries:\n${audit.site.braveAI.querySamples.slice(0, 5).map(q => `• ${q}`).join('\n')}`
+                        : ''
+                    }`
+                  : ''
+              }`}
+            >
+              <span>🤖 Brave AI:</span>
+              <span style={{ fontWeight: 'bold' }}>
+                {audit.site.braveAI.resultsTotal ?? 0}/{audit.site.braveAI.queriesTotal ?? 0}
+              </span>
+              
+              {/* Status dots */}
+              {audit.site.braveAI.diagnostics && (
+                <span style={{ display: 'inline-flex', gap: 3, marginLeft: 2 }}>
+                  {audit.site.braveAI.diagnostics.ok > 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} title={`${audit.site.braveAI.diagnostics.ok} OK`} />
+                  )}
+                  {audit.site.braveAI.diagnostics.empty > 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#9ca3af' }} title={`${audit.site.braveAI.diagnostics.empty} Empty`} />
+                  )}
+                  {audit.site.braveAI.diagnostics.rate_limited > 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} title={`${audit.site.braveAI.diagnostics.rate_limited} Rate-Limited`} />
+                  )}
+                  {audit.site.braveAI.diagnostics.error > 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} title={`${audit.site.braveAI.diagnostics.error} Error`} />
+                  )}
+                </span>
+              )}
+              
+              <span style={{ fontSize: 9 }}>▸</span>
+            </button>
+          )}
+          
+          {/* Disabled state when no queries */}
+          {audit.site?.braveAI && (audit.site.braveAI.queriesTotal ?? 0) === 0 && (
+            <div style={{
+              marginTop: 8,
+              fontSize: 11,
+              padding: '6px 12px',
+              borderRadius: 12,
+              background: 'rgba(156,163,175,.1)',
+              color: '#9ca3af',
+              display: 'inline-block',
+            }}>
+              <span>🤖 Brave AI —</span>
+            </div>
+          )}
         </div>
         
         <div style={{ flex: 1 }}>
@@ -505,14 +582,8 @@ export default function PublicAudit() {
       {showBraveModal && audit && (
         <BraveQueriesModal 
           auditId={audit.id}
+          isOpen={showBraveModal}
           onClose={() => setShowBraveModal(false)}
-          onUpdate={async () => {
-            // Refresh audit data after running more queries
-            if (id) {
-              const refreshed = await getAudit(id);
-              setAudit(refreshed);
-            }
-          }}
         />
       )}
     </>

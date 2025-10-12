@@ -22,6 +22,7 @@ export type AuditPage = {
   error?: string | null;
   citationCount: number; // Number of citations referencing this page
   aiAnswers?: number; // Number of Brave AI answer citations referencing this page
+  aiAnswerQueries?: string[]; // Phase F+: Top 3 queries that cited this page
   aiHits?: number; // Phase G: Real AI crawler hits (30d)
 };
 
@@ -75,11 +76,16 @@ export type AiAccess = {
   baselineStatus: number;
 };
 
-// Phase F+ enhanced types (fixed: correct API names)
+// Phase F+ enhanced types
+export type QueryStatus = 'ok' | 'empty' | 'rate_limited' | 'error' | 'timeout';
+export type QueryBucket = 'brand_core' | 'product_how_to' | 'jobs_to_be_done' | 'schema_probes' | 'content_seeds' | 'competitive';
+
 export type BraveQueryLog = {
   provider: 'brave';
   api: 'search' | 'summarizer';
   q: string;
+  bucket?: QueryBucket;
+  weight?: number;
   ts: number;
   ok: boolean;
   status?: number;
@@ -88,11 +94,26 @@ export type BraveQueryLog = {
   domainSources?: number;
   domainPaths?: string[];
   error?: string | null;
+  queryStatus?: QueryStatus;
+  queryReason?: string;
+};
+
+export type BraveAIDiagnostics = {
+  ok: number;
+  empty: number;
+  rate_limited: number;
+  error: number;
+  timeout: number;
 };
 
 export type BraveAIMeta = {
-  queries: number;
+  queries?: BraveQueryLog[]; // Full query logs for modal
+  queriesTotal?: number; // Phase F+: Total queries run
+  queriesCount?: number; // Backward compat
+  resultsTotal?: number; // Phase F+: Queries with results
   pagesCited: number;
+  diagnostics?: BraveAIDiagnostics; // Phase F+
+  querySamples?: string[]; // Phase F+: Sample queries for tooltip
   byApi: {
     search: number;
     summarizer: number;
@@ -405,9 +426,37 @@ export async function getAuditCitations(
   return res.json() as Promise<CitationsResponse>;
 }
 
-// Phase F+ Brave AI query logs
-export async function getBraveQueries(auditId: string): Promise<{ ok: boolean; queries: BraveQueryLog[] }> {
-  const res = await fetch(`${API_BASE}/v1/audits/${auditId}/brave/queries`);
+// Phase F+ Brave AI query logs with pagination & filtering
+export type BraveQueriesResponse = {
+  ok: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  filters?: { bucket?: string | null; status?: string | null };
+  diagnostics: BraveAIDiagnostics;
+  items: BraveQueryLog[];
+};
+
+export async function getBraveQueries(
+  auditId: string,
+  opts?: {
+    page?: number;
+    pageSize?: number;
+    bucket?: QueryBucket | null;
+    status?: QueryStatus | null;
+  }
+): Promise<BraveQueriesResponse> {
+  const params = new URLSearchParams();
+  if (opts?.page) params.set('page', String(opts.page));
+  if (opts?.pageSize) params.set('pageSize', String(opts.pageSize));
+  if (opts?.bucket) params.set('bucket', opts.bucket);
+  if (opts?.status) params.set('status', opts.status);
+  
+  const queryString = params.toString();
+  const url = `${API_BASE}/v1/audits/${auditId}/brave/queries${queryString ? '?' + queryString : ''}`;
+  
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`getBraveQueries failed: ${res.status}`);
   return res.json();
 }
