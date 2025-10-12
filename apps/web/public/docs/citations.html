@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding Citations & AEO/GEO - Optiview</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 { color: #1a1a1a; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
+        h2 { color: #2563eb; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+        h3 { color: #1f2937; margin-top: 25px; }
+        .card { background: #f9fafb; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #3b82f6; }
+        .badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 0.9em; font-weight: 600; margin: 4px; }
+        .badge-aeo { background: #ede9fe; color: #6b21a8; }
+        .badge-geo { background: #dbeafe; color: #1e40af; }
+        .badge-organic { background: #d1fae5; color: #065f46; }
+        code { background: #e5e7eb; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 0.9em; }
+        pre { background: #1f2937; color: #f9fafb; padding: 15px; border-radius: 6px; overflow-x: auto; }
+        a { color: #3b82f6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .example { background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981; }
+        .example h4 { margin-top: 0; color: #1f2937; }
+        .highlight { background: #dbeafe; padding: 15px; border-left: 4px solid #3b82f6; margin: 20px 0; border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th { background: #f3f4f6; font-weight: 600; }
+        footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; }
+        .flow-diagram { background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Understanding Citations & AEO/GEO</h1>
+    <p>A comprehensive guide to how Optiview tracks and measures your visibility in AI search engines.</p>
+
+    <div class="highlight">
+        <strong>TL;DR:</strong> <span class="badge badge-aeo">AEO</span> = AI engines citing YOUR site. 
+        <span class="badge badge-geo">GEO</span> = Google/Bing AI citing YOUR site. 
+        <span class="badge badge-organic">Organic</span> = Traditional search + competitor references.
+    </div>
+
+    <h2>What Are Citations?</h2>
+    <p>A <strong>citation</strong> is when an AI search engine includes a link to a website as a source for its answer. Citations are the new "ranking" in the AI search era.</p>
+
+    <div class="card">
+        <h3>Example: Traditional Search vs. AI Search</h3>
+        <p><strong>Traditional Google Search:</strong></p>
+        <p>User searches "what is cologuard" → Google shows 10 blue links → User clicks #1</p>
+        <p><strong>AI Search (Brave AI, ChatGPT, Perplexity):</strong></p>
+        <p>User asks "what is cologuard" → AI generates answer → AI cites 3-5 sources → User reads answer (may or may not click)</p>
+        <p><strong>Key Difference:</strong> In AI search, being <em>cited in the answer</em> is more valuable than ranking #1 in traditional results.</p>
+    </div>
+
+    <h2>The Three Citation Types</h2>
+
+    <h3><span class="badge badge-aeo">AEO</span> Answer Engine Optimization</h3>
+    <div class="card">
+        <p><strong>Definition:</strong> Citations from pure AI answer engines that generate responses using LLMs.</p>
+        <p><strong>Sources:</strong></p>
+        <ul>
+            <li>✅ <strong>Brave AI</strong> (currently tracked)</li>
+            <li>🔜 ChatGPT Search</li>
+            <li>🔜 Perplexity AI</li>
+            <li>🔜 You.com AI</li>
+            <li>🔜 Claude with search</li>
+        </ul>
+        <p><strong>How It Works:</strong></p>
+        <ol>
+            <li>User asks question to AI engine</li>
+            <li>AI searches web, generates answer</li>
+            <li>AI includes citations to sources</li>
+            <li>We detect when YOUR domain is cited</li>
+        </ol>
+        <p><strong>Why It Matters:</strong> AEO citations show you're being recommended by AI as an authoritative source. This is the future of search discovery.</p>
+    </div>
+
+    <h3><span class="badge badge-geo">GEO</span> Generative Engine Optimization</h3>
+    <div class="card">
+        <p><strong>Definition:</strong> Citations from traditional search engines that added AI features.</p>
+        <p><strong>Sources (coming soon):</strong></p>
+        <ul>
+            <li>🔜 Google AI Overviews</li>
+            <li>🔜 Bing Copilot</li>
+            <li>🔜 Google SGE (Search Generative Experience)</li>
+        </ul>
+        <p><strong>How It Works:</strong></p>
+        <ol>
+            <li>User searches on Google/Bing</li>
+            <li>AI Overview box appears at top of results</li>
+            <li>Overview cites 2-4 sources</li>
+            <li>We detect when YOUR domain is in the overview</li>
+        </ol>
+        <p><strong>Why It Matters:</strong> GEO citations have massive reach (billions of Google users). Being in AI Overviews is the new "ranking #1".</p>
+    </div>
+
+    <h3><span class="badge badge-organic">Organic</span> Traditional SEO</h3>
+    <div class="card">
+        <p><strong>Definition:</strong> Regular search citations plus competitor/reference sites.</p>
+        <p><strong>Includes:</strong></p>
+        <ul>
+            <li>Traditional search engine results (Googlebot, Bingbot crawls)</li>
+            <li>Competitor sites cited alongside yours in AI answers</li>
+            <li>Reference sites (Wikipedia, news, industry authorities)</li>
+        </ul>
+        <p><strong>Why It Matters:</strong> Shows the competitive landscape. Which competitors are AI engines citing? What topics do you need to cover better?</p>
+    </div>
+
+    <h2>How Citation Counts Work</h2>
+
+    <div class="card">
+        <h3>The Math Explained</h3>
+        <p>Understanding why 30 queries can result in 312 citations:</p>
+        <div class="flow-diagram">
+30 Brave AI Queries Run
+├─ Query 1: "site:cologuard.com"
+│  └─ Returns 10 sources → 10 cite cologuard.com ✓
+├─ Query 2: "cologuard"
+│  └─ Returns 10 sources → 1 cites cologuard.com, 9 cite competitors ✓
+├─ Query 3: "cologuard faq"
+│  └─ Returns 10 sources → 4 cite cologuard.com, 6 cite others ✓
+└─ ... (27 more queries)
+───────────────────────────────────────────────────────
+Total Sources from Brave AI: ~300
+
+Breakdown by Domain:
+├─ 91 sources cite cologuard.com → <span class="badge badge-aeo">AEO: 91</span>
+└─ 209 sources cite other sites → <span class="badge badge-organic">Organic: 209</span>
+
+Plus Traditional Search:
+└─ 12 regular search citations → <span class="badge badge-organic">Organic: +12</span>
+
+<strong>Final Count: 91 AEO + 221 Organic = 312 Total</strong>
+        </div>
+    </div>
+
+    <div class="example">
+        <h4>Real Example: Cologuard Audit</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Query</th>
+                    <th>Total Sources</th>
+                    <th>Your Domain</th>
+                    <th>Competitors</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>site:cologuard.com</td>
+                    <td>10</td>
+                    <td>10</td>
+                    <td>0</td>
+                </tr>
+                <tr>
+                    <td>cologuard faq</td>
+                    <td>10</td>
+                    <td>4</td>
+                    <td>6</td>
+                </tr>
+                <tr>
+                    <td>cologuard alternatives</td>
+                    <td>10</td>
+                    <td>0</td>
+                    <td>10</td>
+                </tr>
+                <tr>
+                    <td>how cologuard works</td>
+                    <td>10</td>
+                    <td>4</td>
+                    <td>6</td>
+                </tr>
+            </tbody>
+        </table>
+        <p><strong>Insight:</strong> You dominate branded queries but lose to competitors on "alternatives". Opportunity to create comparison content!</p>
+    </div>
+
+    <h2>How Optiview Tracks Citations</h2>
+
+    <h3>1. Smart Query Generation</h3>
+    <p>For each audit, we run 30 carefully crafted queries across 6 buckets:</p>
+    <ul>
+        <li><strong>Brand Core</strong> (4 queries): Your brand name, site:domain.com</li>
+        <li><strong>Product How-To</strong> (3 queries): How to use, how it works</li>
+        <li><strong>Jobs to Be Done</strong> (4 queries): Benefits, why use, for patients</li>
+        <li><strong>Schema Probes</strong> (7 queries): FAQ, eligibility, coverage, cost</li>
+        <li><strong>Content Seeds</strong> (10 queries): Page titles as questions</li>
+        <li><strong>Competitive</strong> (2 queries): Alternatives, comparisons</li>
+    </ul>
+
+    <h3>2. Source Collection</h3>
+    <p>Each query returns ~10 sources from Brave AI. We collect:</p>
+    <ul>
+        <li>Source URL</li>
+        <li>Which query found it</li>
+        <li>Position in results</li>
+        <li>Whether it matches your domain</li>
+    </ul>
+
+    <h3>3. Citation Classification</h3>
+    <p>For each source, we determine:</p>
+    <pre>if (source.domain === your_domain) {
+  type = "AEO"  // You're being cited!
+} else {
+  type = "Organic"  // Competitor or reference site
+}</pre>
+
+    <h3>4. Results Display</h3>
+    <p>In the Citations tab, you see:</p>
+    <ul>
+        <li><strong>All (312)</strong>: Every source from every query</li>
+        <li><strong>AEO (91)</strong>: Only sources citing YOUR domain</li>
+        <li><strong>GEO (0)</strong>: Google/Bing AI (coming soon)</li>
+        <li><strong>Organic (221)</strong>: Competitors + traditional search</li>
+    </ul>
+
+    <h2>Interpreting Your Citation Data</h2>
+
+    <div class="card">
+        <h3>What's a "Good" AEO Count?</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>AEO Citations</th>
+                    <th>Assessment</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>0-20</td>
+                    <td>🔴 Poor</td>
+                    <td>Critical: Optimize basics (robots.txt, structured data, content)</td>
+                </tr>
+                <tr>
+                    <td>20-50</td>
+                    <td>🟡 Moderate</td>
+                    <td>Improve: Add FAQ schemas, expand content, target more queries</td>
+                </tr>
+                <tr>
+                    <td>50-100</td>
+                    <td>🟢 Good</td>
+                    <td>Maintain: Keep creating quality content, monitor competitors</td>
+                </tr>
+                <tr>
+                    <td>100+</td>
+                    <td>🟢 Excellent</td>
+                    <td>Lead: You're dominating AI search for your niche!</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>Key Metrics to Watch</h3>
+        <ul>
+            <li><strong>Domain-Hit Rate:</strong> % of queries that cited your domain at least once. Higher = broader topic coverage.</li>
+            <li><strong>Pages Cited:</strong> Number of unique pages cited. Higher = more of your content is valuable to AI.</li>
+            <li><strong>Avg Citations Per Page:</strong> AEO count ÷ Pages Cited. Higher = certain pages are being cited multiple times.</li>
+            <li><strong>Zero-Result Queries:</strong> Queries that didn't cite you. These are optimization opportunities!</li>
+        </ul>
+    </div>
+
+    <h2>Using Citation Data to Improve</h2>
+
+    <h3>1. Find Content Gaps</h3>
+    <p>Look at queries with "View (0)" in the Brave AI modal. These are topics where:</p>
+    <ul>
+        <li>AI couldn't find relevant content on your site</li>
+        <li>Competitors are dominating</li>
+        <li>You have an opportunity to create new content</li>
+    </ul>
+
+    <h3>2. Optimize High-Performing Pages</h3>
+    <p>In the Pages tab, sort by "AI (Brave)" to see which pages are cited most. Make these even better:</p>
+    <ul>
+        <li>Add more detailed answers</li>
+        <li>Include FAQ schema</li>
+        <li>Add How-To schema</li>
+        <li>Link to related content</li>
+    </ul>
+
+    <h3>3. Study Competitor Citations</h3>
+    <p>Filter Citations to <span class="badge badge-organic">Organic</span> to see which competitors AI engines cite. Learn from them:</p>
+    <ul>
+        <li>What topics are they covering that you're not?</li>
+        <li>How are they structuring their content?</li>
+        <li>What schemas are they using?</li>
+    </ul>
+
+    <h3>4. Track Progress Over Time</h3>
+    <p>Re-run audits monthly to see if your AEO count improves. Look for:</p>
+    <ul>
+        <li>Increasing AEO citations (your content is resonating with AI)</li>
+        <li>More pages cited (broader content coverage)</li>
+        <li>Higher domain-hit rate (answering more query types)</li>
+    </ul>
+
+    <h2>Technical: Viewing Raw Citation Data</h2>
+
+    <p>Click the <strong>"📊 View API"</strong> button in the Citations tab, or access directly:</p>
+    <pre>GET https://api.optiview.ai/v1/audits/{audit_id}/citations?pageSize=500</pre>
+
+    <p>Response includes:</p>
+    <pre>{
+  "total": 312,
+  "counts": {
+    "AEO": 91,
+    "GEO": 0,
+    "Organic": 221
+  },
+  "items": [
+    {
+      "url": "https://www.cologuard.com/faq",
+      "title": "Frequently Asked Questions",
+      "query": "cologuard faq",
+      "type": "AEO",
+      "provider": "Brave",
+      "mode": "search"
+    },
+    ...
+  ]
+}</pre>
+
+    <div class="highlight">
+        <strong>🎯 Next Steps:</strong>
+        <ol>
+            <li>Run an audit at <a href="https://app.optiview.ai">app.optiview.ai</a></li>
+            <li>Review your AEO/GEO/Organic breakdown</li>
+            <li>Click "View" on queries with low domain citations</li>
+            <li>Create content to fill gaps</li>
+            <li>Re-run audit to track improvements</li>
+        </ol>
+    </div>
+
+    <footer>
+        <p><a href="/">← Back to Optiview Home</a> | <a href="https://app.optiview.ai">Run an Audit</a></p>
+        <p>See also: <a href="/docs/faq.html">FAQ</a> | <a href="/docs/audit.html">Audit Checks</a> | <a href="/docs/bots.html">AI Bots</a> | <a href="/docs/security.html">Security & Privacy</a></p>
+        <p><small>Last updated: October 2025</small></p>
+    </footer>
+</body>
+</html>
+
