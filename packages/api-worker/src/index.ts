@@ -1021,17 +1021,18 @@ export default {
           isAIOffered: false
         }));
         
-        // Fetch Brave AI citations from brave_ai_json
+        // Fetch Brave AI citations from brave_ai_json + domain for filtering
         const auditRow = await env.DB.prepare(
-          'SELECT brave_ai_json FROM audits WHERE id = ?'
-        ).bind(auditId).first<{ brave_ai_json: string | null }>();
+          'SELECT a.brave_ai_json, p.domain FROM audits a JOIN properties p ON a.property_id = p.id WHERE a.id = ?'
+        ).bind(auditId).first<{ brave_ai_json: string | null; domain: string }>();
         
         if (auditRow?.brave_ai_json) {
           try {
             const braveData = JSON.parse(auditRow.brave_ai_json);
             const queries = braveData.queries || braveData || []; // Support both old and new formats
+            const auditDomain = auditRow.domain.replace(/^www\./, ''); // Normalize domain
             
-            // Extract Brave AI sources
+            // Extract Brave AI sources - ONLY count sources that cite the audited domain as AEO
             for (const query of queries) {
               // Phase F+: New format uses `q` and `sourceUrls`
               const queryText = query.q || query.query; // Support both formats
@@ -1040,34 +1041,42 @@ export default {
               // New format: sourceUrls is array of strings
               if (query.sourceUrls && Array.isArray(query.sourceUrls)) {
                 for (const sourceUrl of query.sourceUrls) {
+                  // Only count sources from the audited domain as AEO
+                  // Others are just context/competitors and shouldn't inflate the count
+                  const sourceDomain = new URL(sourceUrl).hostname.replace(/^www\./, '');
+                  const isOwnDomain = sourceDomain === auditDomain;
+                  
                   allCitations.push({
                     engine: 'brave',
                     query: queryText,
                     url: sourceUrl,
                     title: null, // URL-only in new format
                     cited_at: Date.now(),
-                    type: 'AEO',
+                    type: isOwnDomain ? 'AEO' : 'Organic', // Only own-domain = AEO
                     pagePathname: extractPath(sourceUrl),
                     provider: 'Brave',
                     mode: mode,
-                    isAIOffered: true
+                    isAIOffered: isOwnDomain // Only own-domain is a true AI citation
                   });
                 }
               }
               // Old format: sources is array of objects with url/title
               else if (query.sources && Array.isArray(query.sources)) {
                 for (const source of query.sources) {
+                  const sourceDomain = new URL(source.url).hostname.replace(/^www\./, '');
+                  const isOwnDomain = sourceDomain === auditDomain;
+                  
                   allCitations.push({
                     engine: 'brave',
                     query: queryText,
                     url: source.url,
                     title: source.title || null,
                     cited_at: Date.now(),
-                    type: 'AEO',
+                    type: isOwnDomain ? 'AEO' : 'Organic',
                     pagePathname: extractPath(source.url),
                     provider: 'Brave',
                     mode: mode,
-                    isAIOffered: true
+                    isAIOffered: isOwnDomain
                   });
                 }
               }
