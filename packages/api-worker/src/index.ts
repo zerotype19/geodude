@@ -2092,15 +2092,20 @@ export default {
           } catch (_) {}
         }
 
-        // Build Brave AI answer counts per page path AND query lists (Phase F+)
+        // Build Brave AI answer counts per page path AND query lists (Phase F+/F++)
         const braveAnswersByPath = new Map<string, number>();
         const braveQueriesByPath = new Map<string, string[]>();
+        const braveQueryMappingsByPath = new Map<string, Array<{ query: string; reason: string; confidence: number }>>();
+        
         if (audit.brave_ai_json) {
           try {
             const braveData = JSON.parse(audit.brave_ai_json as string);
             const queries = braveData.queries || [];
             
             for (const query of queries) {
+              // Get mappings if available (Phase F++)
+              const mappings = query.mapping || [];
+              
               for (const path of (query.domainPaths || [])) {
                 // Increment count
                 braveAnswersByPath.set(path, (braveAnswersByPath.get(path) || 0) + 1);
@@ -2112,6 +2117,26 @@ export default {
                 const existingQueries = braveQueriesByPath.get(path)!;
                 if (!existingQueries.includes(query.q)) {
                   existingQueries.push(query.q);
+                }
+                
+                // Track mapping metadata (Phase F++)
+                if (!braveQueryMappingsByPath.has(path)) {
+                  braveQueryMappingsByPath.set(path, []);
+                }
+                const mapping = mappings.find((m: any) => m.mappedPath === path);
+                if (mapping) {
+                  braveQueryMappingsByPath.get(path)!.push({
+                    query: query.q,
+                    reason: mapping.reason || 'path',
+                    confidence: mapping.confidence || 1.0
+                  });
+                } else {
+                  // Default to path match if no mapping metadata
+                  braveQueryMappingsByPath.get(path)!.push({
+                    query: query.q,
+                    reason: 'path',
+                    confidence: 1.0
+                  });
                 }
               }
             }
@@ -2133,6 +2158,13 @@ export default {
           const pathQueries = braveQueriesByPath.get(path) || [];
           const aiAnswerQueries = pathQueries.slice(0, 3); // Top 3 queries
           
+          // Phase F++: Get mapping metadata for these queries
+          const pathMappings = braveQueryMappingsByPath.get(path) || [];
+          const aiAnswerMappings = aiAnswerQueries.map(q => {
+            const mapping = pathMappings.find(m => m.query === q);
+            return mapping ? { reason: mapping.reason, confidence: mapping.confidence } : { reason: 'path', confidence: 1.0 };
+          });
+          
           return {
             url: p.url,
             statusCode: p.statusCode ?? null,
@@ -2148,6 +2180,7 @@ export default {
             citationCount: countsByPath.get(path) || 0,
             aiAnswers: braveAnswersByPath.get(path) || 0,  // Brave AI answer count
             aiAnswerQueries,  // Phase F+: Queries that cited this page
+            aiAnswerMappings,  // Phase F++: Mapping metadata (reason + confidence)
             aiHits: hitsByPath[path] || 0,  // Phase G: real crawler hits
           };
         });
