@@ -80,30 +80,36 @@ export function calculateScores(
   structured?: StructuredData,
   crawlersTotal30d?: number  // Phase G: real AI crawler hits
 ): Scores {
-  // Calculate each pillar (returns 0-100)
-  const crawlabilityScore = calculateCrawlability(pages, issues, crawlability, crawlersTotal30d);
-  const structuredScore = calculateStructured(pages, issues, structured);
-  const answerabilityScore = calculateAnswerability(pages, issues);
-  const trustScore = calculateTrust(pages, issues);
+  // Calculate each pillar (returns points out of their max)
+  const crawlabilityResult = calculateCrawlability(pages, issues, crawlability, crawlersTotal30d);
+  const structuredResult = calculateStructured(pages, issues, structured);
+  const answerabilityResult = calculateAnswerability(pages, issues);
+  const trustResult = calculateTrust(pages, issues);
 
-  // Weighted overall score (40/30/20/10)
+  // Convert points to percentages (0-100%)
+  const crawlabilityPct = (crawlabilityResult.score / 42) * 100; // max 42 points
+  const structuredPct = (structuredResult.score / 30) * 100;     // max 30 points
+  const answerabilityPct = (answerabilityResult.score / 20) * 100; // max 20 points
+  const trustPct = (trustResult.score / 10) * 100;               // max 10 points
+
+  // Weighted overall score (40/30/20/10) - now using percentages
   const overall = 
-    crawlabilityScore.score * 0.4 +
-    structuredScore.score * 0.3 +
-    answerabilityScore.score * 0.2 +
-    trustScore.score * 0.1;
+    crawlabilityPct * 0.4 +
+    structuredPct * 0.3 +
+    answerabilityPct * 0.2 +
+    trustPct * 0.1;
 
   return {
     overall: Math.round(overall * 100) / 100,
-    crawlability: Math.round(crawlabilityScore.score * 100) / 100,
-    structured: Math.round(structuredScore.score * 100) / 100,
-    answerability: Math.round(answerabilityScore.score * 100) / 100,
-    trust: Math.round(trustScore.score * 100) / 100,
+    crawlability: Math.round(crawlabilityResult.score * 100) / 100,
+    structured: Math.round(structuredResult.score * 100) / 100,
+    answerability: Math.round(answerabilityResult.score * 100) / 100,
+    trust: Math.round(trustResult.score * 100) / 100,
     breakdown: {
-      crawlability: crawlabilityScore.breakdown,
-      structured: structuredScore.breakdown,
-      answerability: answerabilityScore.breakdown,
-      trust: trustScore.breakdown,
+      crawlability: crawlabilityResult.breakdown,
+      structured: structuredResult.breakdown,
+      answerability: answerabilityResult.breakdown,
+      trust: trustResult.breakdown,
     },
   };
 }
