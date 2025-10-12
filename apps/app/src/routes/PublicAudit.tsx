@@ -520,9 +520,8 @@ export default function PublicAudit() {
           <button
             key={tab}
             onClick={() => {
-              const params = new URLSearchParams(location.search);
-              params.set('tab', tab);
-              navigate(`${location.pathname}?${params.toString()}`, { replace: false });
+              // Clean navigation: only keep tab param, remove query/provider/path filters
+              navigate(`${location.pathname}?tab=${tab}`, { replace: false });
             }}
             className={`tab-button ${activeTab === tab ? 'active' : ''}`}
           >
