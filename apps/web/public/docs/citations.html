@@ -115,27 +115,27 @@
 
     <div class="card">
         <h3>The Math Explained</h3>
-        <p>Understanding why 30 queries can result in 312 citations:</p>
+        <p>Understanding how citation counts work:</p>
         <div class="flow-diagram">
 30 Brave AI Queries Run
 ├─ Query 1: "site:yoursite.com"
 │  └─ Returns 10 sources → 10 cite yoursite.com ✓
 ├─ Query 2: "your brand"
-│  └─ Returns 10 sources → 1 cites yoursite.com, 9 cite competitors ✓
+│  └─ Returns 10 sources → 1 cites yoursite.com, 9 cite competitors
 ├─ Query 3: "your brand faq"
-│  └─ Returns 10 sources → 4 cite yoursite.com, 6 cite others ✓
+│  └─ Returns 10 sources → 4 cite yoursite.com, 6 cite others
 └─ ... (27 more queries)
 ───────────────────────────────────────────────────────
-Total Sources from Brave AI: ~300
+Total Sources Analyzed: ~300 (yours + competitors)
 
-Breakdown by Domain:
-├─ 91 sources cite yoursite.com → <span class="badge badge-aeo">AEO: 91</span>
-└─ 209 sources cite other sites → <span class="badge badge-organic">Organic: 209</span>
+<strong>What We Count:</strong>
+├─ 15 sources cite yoursite.com → <span class="badge badge-aeo">AEO: 15</span>
+└─ 285 competitor sources → <em>Ignored (not counted)</em>
 
-Plus Traditional Search:
-└─ 12 regular search citations → <span class="badge badge-organic">Organic: +12</span>
+<strong>Final Citation Count: 15 AEO</strong>
 
-<strong>Final Count: 91 AEO + 221 Organic = 312 Total</strong>
+<strong>Key Point:</strong> We ONLY count sources that cite YOUR domain.
+Competitor results are analyzed but not included in your citation count.
         </div>
     </div>
 
@@ -147,7 +147,7 @@ Plus Traditional Search:
                     <th>Query</th>
                     <th>Total Sources</th>
                     <th>Your Domain</th>
-                    <th>Competitors</th>
+                    <th>Your Citations</th>
                 </tr>
             </thead>
             <tbody>
@@ -155,29 +155,30 @@ Plus Traditional Search:
                     <td>site:yoursite.com</td>
                     <td>10</td>
                     <td>10</td>
-                    <td>0</td>
+                    <td><span class="badge badge-aeo">10</span></td>
                 </tr>
                 <tr>
                     <td>your brand faq</td>
                     <td>10</td>
                     <td>4</td>
-                    <td>6</td>
+                    <td><span class="badge badge-aeo">4</span></td>
                 </tr>
                 <tr>
                     <td>your brand alternatives</td>
                     <td>10</td>
                     <td>0</td>
-                    <td>10</td>
+                    <td><span class="badge badge-aeo">0</span> (opportunity!)</td>
                 </tr>
                 <tr>
                     <td>how your product works</td>
                     <td>10</td>
-                    <td>4</td>
-                    <td>6</td>
+                    <td>1</td>
+                    <td><span class="badge badge-aeo">1</span></td>
                 </tr>
             </tbody>
         </table>
-        <p><strong>Insight:</strong> You dominate branded queries but lose to competitors on "alternatives". Opportunity to create comparison content!</p>
+        <p><strong>Total Citations: 15 AEO</strong> (only counting your domain)</p>
+        <p><strong>Insight:</strong> You dominate branded queries but lose to competitors on "alternatives". The 6 competitor sources on that query are not counted—they show you where to improve!</p>
     </div>
 
     <h2>How Optiview Tracks Citations</h2>
@@ -308,11 +309,11 @@ Plus Traditional Search:
 
     <p>Response includes:</p>
     <pre>{
-  "total": 312,
+  "total": 15,
   "counts": {
-    "AEO": 91,
+    "AEO": 15,
     "GEO": 0,
-    "Organic": 221
+    "Organic": 0
   },
   "items": [
     {
@@ -321,11 +322,20 @@ Plus Traditional Search:
       "query": "your brand faq",
       "type": "AEO",
       "provider": "Brave",
-      "mode": "search"
+      "mode": "search",
+      "isAIOffered": true
+    },
+    {
+      "url": "https://www.yoursite.com/",
+      "query": "site:yoursite.com",
+      "type": "AEO",
+      "provider": "Brave",
+      "isAIOffered": true
     },
     ...
   ]
 }</pre>
+    <p><strong>Note:</strong> Only sources that cite YOUR domain are included. Competitor sources are filtered out.</p>
 
     <div class="highlight">
         <strong>🎯 Next Steps:</strong>
