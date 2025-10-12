@@ -252,7 +252,7 @@ export default function PublicAudit() {
                   {audit.site.flags.blockedBy === 'robots' ? 'Fix robots.txt' : `Configure ${audit.site.flags.wafName || 'WAF'}`}
                 </a>
                 <a
-                  href={`/v1/debug/ai-access/${audit.id}`}
+                  href={`https://api.optiview.ai/v1/debug/ai-access/${audit.id}`}
                   target="_blank"
                   rel="noreferrer"
                   style={{
