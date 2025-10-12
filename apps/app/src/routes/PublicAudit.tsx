@@ -533,8 +533,182 @@ export default function PublicAudit() {
       <div className="tab-content">
         {activeTab === 'scores' && (
           <div>
-            <h3 style={{marginTop:0}}>Score Breakdown</h3>
-            <p style={{color: '#64748b'}}>Overall score: {Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</p>
+            <h3 style={{marginTop:0, fontSize: 20, fontWeight: 600}}>Score Breakdown</h3>
+            <p style={{color: '#64748b', fontSize: 15, marginBottom: 32}}>
+              Your overall score is calculated from four weighted components. Each component evaluates different aspects of your site's AI optimization.
+            </p>
+
+            {/* Score Formula */}
+            <div style={{
+              background: '#f8fafc',
+              padding: 20,
+              borderRadius: 8,
+              marginBottom: 32,
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#1e293b'}}>Score Formula:</div>
+              <div style={{fontSize: 14, color: '#64748b', fontFamily: 'Monaco, monospace'}}>
+                Overall = (Crawlability × 40%) + (Structured × 30%) + (Answerability × 20%) + (Trust × 10%)
+              </div>
+              <div style={{fontSize: 14, color: '#64748b', marginTop: 8}}>
+                <strong>Your Score:</strong> ({audit.scores.crawlability}% × 0.4) + ({audit.scores.structured}% × 0.3) + ({audit.scores.answerability}% × 0.2) + ({audit.scores.trust}% × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</strong>
+              </div>
+            </div>
+
+            {/* Component Breakdowns */}
+            <div style={{display: 'grid', gap: 24}}>
+              {/* Crawlability */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 20
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>🤖 Crawlability</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      background: '#f3f4f6',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>40% weight</span>
+                  </div>
+                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.crawlability >= 70 ? '#10b981' : audit.scores.crawlability >= 40 ? '#f59e0b' : '#ef4444'}}>
+                    {audit.scores.crawlability}%
+                  </span>
+                </div>
+                <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                  Can AI bots access your content? We check robots.txt permissions, sitemap presence, and whether major AI crawlers (GPTBot, ClaudeBot, PerplexityBot, CCBot, etc.) are allowed.
+                </p>
+                <div style={{fontSize: 13, color: '#475569'}}>
+                  <strong>What we check:</strong> robots.txt validation, sitemap.xml reference, AI bot permissions, crawler access logs
+                </div>
+              </div>
+
+              {/* Structured Data */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 20
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>📊 Structured Data</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      background: '#f3f4f6',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>30% weight</span>
+                  </div>
+                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.structured >= 70 ? '#10b981' : audit.scores.structured >= 40 ? '#f59e0b' : '#ef4444'}}>
+                    {audit.scores.structured}%
+                  </span>
+                </div>
+                <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                  Do you have JSON-LD, FAQ schemas, and rich snippets? AI engines use structured data to understand your content and provide accurate answers.
+                </p>
+                <div style={{fontSize: 13, color: '#475569'}}>
+                  <strong>What we check:</strong> JSON-LD blocks, FAQPage schema, Organization/Article/Product schemas, schema.org compliance
+                </div>
+              </div>
+
+              {/* Answerability */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 20
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>💬 Answerability</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      background: '#f3f4f6',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>20% weight</span>
+                  </div>
+                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.answerability >= 70 ? '#10b981' : audit.scores.answerability >= 40 ? '#f59e0b' : '#ef4444'}}>
+                    {audit.scores.answerability}%
+                  </span>
+                </div>
+                <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                  How well does your content answer user questions? We check for clear titles, H1 tags, and sufficient content depth (minimum 100 words recommended).
+                </p>
+                <div style={{fontSize: 13, color: '#475569'}}>
+                  <strong>What we check:</strong> Page titles, H1 tags, word count, content clarity, snippet quality
+                </div>
+              </div>
+
+              {/* Trust */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 20
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>🔒 Trust</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      background: '#f3f4f6',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>10% weight</span>
+                  </div>
+                  <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.trust >= 70 ? '#10b981' : audit.scores.trust >= 40 ? '#f59e0b' : '#ef4444'}}>
+                    {audit.scores.trust}%
+                  </span>
+                </div>
+                <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                  Are your pages accessible and performant? We check for 200 OK status codes, fast load times, and the absence of broken links or server errors.
+                </p>
+                <div style={{fontSize: 13, color: '#475569'}}>
+                  <strong>What we check:</strong> HTTP status codes, page load times, broken links, error detection, accessibility
+                </div>
+              </div>
+            </div>
+
+            {/* Scoring Guide */}
+            <div style={{
+              marginTop: 32,
+              padding: 20,
+              background: '#f0f9ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: 8
+            }}>
+              <div style={{fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e40af'}}>📈 Scoring Guide</div>
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: 13}}>
+                <div>
+                  <span style={{fontWeight: 600, color: '#10b981'}}>70-100%:</span>{' '}
+                  <span style={{color: '#475569'}}>Excellent optimization</span>
+                </div>
+                <div>
+                  <span style={{fontWeight: 600, color: '#f59e0b'}}>40-69%:</span>{' '}
+                  <span style={{color: '#475569'}}>Good, room for improvement</span>
+                </div>
+                <div>
+                  <span style={{fontWeight: 600, color: '#ef4444'}}>0-39%:</span>{' '}
+                  <span style={{color: '#475569'}}>Needs attention</span>
+                </div>
+              </div>
+              <p style={{fontSize: 13, color: '#475569', marginTop: 12, marginBottom: 0}}>
+                💡 <strong>Tip:</strong> Check the Issues tab for specific recommendations on how to improve each component score. See <a href="https://optiview.ai/docs/audit" target="_blank" rel="noopener" style={{color: '#3b82f6'}}>full audit methodology</a>.
+              </p>
+            </div>
           </div>
         )}
         {activeTab === 'issues' && (
