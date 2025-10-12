@@ -809,8 +809,8 @@ export default {
           } else {
             propertyId = `prop_${Date.now()}_${domain.replace(/\./g, '_')}`;
             await env.DB.prepare(
-              'INSERT INTO properties (id, project_id, domain, name) VALUES (?, ?, ?, ?)'
-            ).bind(propertyId, 'demo', domain, domain).run();
+              'INSERT INTO properties (id, project_id, domain) VALUES (?, ?, ?)'
+            ).bind(propertyId, 'demo', domain).run();
           }
           
           authResult = { valid: true, projectId: 'demo' };
