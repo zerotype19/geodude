@@ -150,6 +150,47 @@ export default function Citations({ auditId }: Props) {
 
   return (
     <div>
+      {/* Explanation banner */}
+      <div style={{
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        padding: '12px 16px',
+        marginBottom: 16,
+        fontSize: 13,
+        color: '#475569',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 16
+      }}>
+        <div>
+          <strong style={{ color: '#1e293b' }}>How Citation Counts Work:</strong>
+          {' '}Each Brave AI query returns ~10 sources. 
+          <strong style={{ color: '#8b5cf6' }}> AEO ({fullCounts.AEO})</strong> = sources citing YOUR domain.
+          {' '}<strong style={{ color: '#10b981' }}>Organic ({fullCounts.Organic})</strong> = competitor/reference sites + traditional search citations.
+          {' '}Click a query's "View" link in the Brave AI modal to see its sources.
+        </div>
+        <a 
+          href={`https://api.optiview.ai/v1/audits/${auditId}/citations?pageSize=500`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 12,
+            color: '#6366f1',
+            textDecoration: 'none',
+            whiteSpace: 'nowrap',
+            fontWeight: 500,
+            padding: '4px 8px',
+            borderRadius: 4,
+            background: 'white',
+            border: '1px solid #e2e8f0'
+          }}
+        >
+          📊 View API
+        </a>
+      </div>
+      
       {/* Combined clickable filter pills with counts */}
       <div style={{ 
         display: 'flex', 
@@ -168,6 +209,7 @@ export default function Citations({ auditId }: Props) {
             fontWeight: typeFilter === null ? 600 : 500,
             transition: 'all 0.2s'
           }}
+          title="All citations from AI engines and search results"
         >
           All ({totalCitations})
         </button>
@@ -182,6 +224,7 @@ export default function Citations({ auditId }: Props) {
             fontWeight: typeFilter === 'AEO' ? 600 : 500,
             transition: 'all 0.2s'
           }}
+          title="Answer Engine Optimization: Times YOUR domain was cited in AI-generated answers (Brave AI, ChatGPT, Perplexity, etc.)"
         >
           AEO ({fullCounts.AEO})
         </button>
@@ -196,6 +239,7 @@ export default function Citations({ auditId }: Props) {
             fontWeight: typeFilter === 'GEO' ? 600 : 500,
             transition: 'all 0.2s'
           }}
+          title="Generative Engine Optimization: Citations from Google AI Overviews, Bing Copilot, and other search engine AI features"
         >
           GEO ({fullCounts.GEO})
         </button>
@@ -210,6 +254,7 @@ export default function Citations({ auditId }: Props) {
             fontWeight: typeFilter === 'Organic' ? 600 : 500,
             transition: 'all 0.2s'
           }}
+          title="Traditional SEO: Regular search citations plus competitor/reference sites cited alongside yours in AI answers"
         >
           Organic ({fullCounts.Organic})
         </button>

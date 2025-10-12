@@ -164,7 +164,12 @@ export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
       >
         {/* Header */}
         <div className="border-b border-gray-200 p-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Brave AI Queries</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Brave AI Queries</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Each query returns ~10 sources. Click "View" to see them in the Citations tab.
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             {/* Phase F++: Export buttons */}
             <div className="flex gap-2 mr-4">
