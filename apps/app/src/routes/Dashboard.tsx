@@ -36,10 +36,23 @@ export default function Dashboard() {
       const stored = localStorage.getItem('recentAudits');
       if (stored) {
         const parsed = JSON.parse(stored);
-        setRecentAudits(parsed);
+        // Filter out invalid entries (missing id, url, or timestamp)
+        const valid = parsed.filter((a: any) => 
+          a && 
+          typeof a.id === 'string' && 
+          typeof a.url === 'string' && 
+          typeof a.timestamp === 'number' && 
+          a.timestamp > 0
+        );
+        setRecentAudits(valid);
+        // Clean up localStorage if we filtered anything out
+        if (valid.length !== parsed.length) {
+          localStorage.setItem('recentAudits', JSON.stringify(valid));
+        }
       }
     } catch {
       setRecentAudits([]);
+      localStorage.removeItem('recentAudits');
     }
   }, []);
 
