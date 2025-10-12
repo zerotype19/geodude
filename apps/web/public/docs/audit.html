@@ -61,14 +61,15 @@
 
     <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
         <h3 style="margin-top: 0;">How Scoring Works</h3>
-        <p>Your overall score (0-100) is calculated from four weighted components:</p>
+        <p>Your overall score (0-100%) is calculated from four weighted components. Each component is first converted to a percentage (points/max × 100), then weighted:</p>
         <ul style="margin-bottom: 10px;">
-            <li><strong>Crawlability:</strong> 40% weight (max 42 points)</li>
-            <li><strong>Structured Data:</strong> 30% weight (max 30 points)</li>
-            <li><strong>Answerability:</strong> 20% weight (max 20 points)</li>
-            <li><strong>Trust:</strong> 10% weight (max 10 points)</li>
+            <li><strong>Crawlability:</strong> 40% weight (max 42 points) → e.g., 40/42 = 95.2%</li>
+            <li><strong>Structured Data:</strong> 30% weight (max 30 points) → e.g., 11/30 = 36.7%</li>
+            <li><strong>Answerability:</strong> 20% weight (max 20 points) → e.g., 19.65/20 = 98.3%</li>
+            <li><strong>Trust:</strong> 10% weight (max 10 points) → e.g., 9.49/10 = 94.9%</li>
         </ul>
-        <p style="margin-bottom: 0; font-size: 14px; color: #1e40af;"><strong>Formula:</strong> Overall = (Crawlability × 40%) + (Structured × 30%) + (Answerability × 20%) + (Trust × 10%)</p>
+        <p style="margin-bottom: 10px; font-size: 14px; color: #1e40af;"><strong>Formula:</strong> Overall = (Crawl% × 0.4) + (Struct% × 0.3) + (Answer% × 0.2) + (Trust% × 0.1)</p>
+        <p style="margin-bottom: 0; font-size: 13px; color: #64748b; font-style: italic;">Example: (95.2% × 0.4) + (36.7% × 0.3) + (98.3% × 0.2) + (94.9% × 0.1) = 78.2% overall</p>
     </div>
 
     <div class="check-category">

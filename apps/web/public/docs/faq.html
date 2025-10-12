@@ -236,16 +236,21 @@
 
     <div class="faq-item">
         <h3>How is the overall score calculated?</h3>
-        <p>Your score is a weighted average of four components. <strong>Each component's maximum points equals its weight:</strong></p>
+        <p>Your overall score (0-100%) is a weighted average of four components. <strong>Each component is first converted to a percentage, then weighted:</strong></p>
         <ul>
-            <li><strong>Crawlability (40% weight, max 42 points):</strong> robots.txt (10pts) + AI bot access (20pts) + sitemap (10pts) + real crawler bonus (2pts)</li>
-            <li><strong>Structured Data (30% weight, max 30 points):</strong> JSON-LD coverage (15pts) + FAQ schema (10pts) + schema variety (5pts)</li>
-            <li><strong>Answerability (20% weight, max 20 points):</strong> Titles (7pts) + H1 tags (7pts) + content depth (6pts)</li>
-            <li><strong>Trust (10% weight, max 10 points):</strong> HTTP 2xx status (7pts) + load performance (3pts)</li>
+            <li><strong>Crawlability (40% weight):</strong> robots.txt + AI bot access + sitemap + real crawler bonus → max 42 points</li>
+            <li><strong>Structured Data (30% weight):</strong> JSON-LD coverage + FAQ schema + schema variety → max 30 points</li>
+            <li><strong>Answerability (20% weight):</strong> Titles + H1 tags + content depth → max 20 points</li>
+            <li><strong>Trust (10% weight):</strong> HTTP 2xx status + load performance → max 10 points</li>
         </ul>
-        <p><strong>Formula:</strong> Overall = (Crawlability × 0.4) + (Structured × 0.3) + (Answerability × 0.2) + (Trust × 0.1)</p>
-        <p><strong>Example:</strong> If you score 40/42 crawl, 15/30 structured, 18/20 answer, 8/10 trust → Overall = (40×0.4) + (15×0.3) + (18×0.2) + (8×0.1) = 16+4.5+3.6+0.8 = <strong>24.9</strong></p>
-        <p><em>Note: Component scores are shown as points earned (e.g., "40/42") not percentages, which makes it clearer how close you are to the maximum.</em></p>
+        <p><strong>Formula:</strong> Overall = (Crawl% × 0.4) + (Struct% × 0.3) + (Answer% × 0.2) + (Trust% × 0.1)</p>
+        <p><strong>Example:</strong> If you score 40/42 crawl (95.2%), 11/30 struct (36.7%), 19.65/20 answer (98.3%), 9.49/10 trust (94.9%):</p>
+        <p style="font-family: monospace; background: #f3f4f6; padding: 10px; border-radius: 6px;">
+            Overall = (95.2% × 0.4) + (36.7% × 0.3) + (98.3% × 0.2) + (94.9% × 0.1)<br>
+            = 38.08 + 11.01 + 19.66 + 9.49<br>
+            = <strong style="color: #10b981;">78.2%</strong>
+        </p>
+        <p><em>Note: In the UI, component scores show both raw points (40/42) AND percentages (95%), with color coding: 🟢 Green (70%+), 🟡 Yellow (40-69%), 🔴 Red (<40%).</em></p>
     </div>
 
     <div class="faq-item">
