@@ -425,14 +425,18 @@ export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
                       </td>
                       <td className="py-2 px-3 text-right text-gray-600 text-xs tabular-nums">{query.durationMs ?? '—'}</td>
                       <td className="py-2 pl-3">
-                        {query.sourcesTotal > 0 && (
+                        {(query.domainSources ?? 0) > 0 ? (
                           <a
                             href={`/a/${auditId}?tab=citations&provider=Brave&query=${encodeURIComponent(query.q)}`}
                             className="text-xs text-blue-600 hover:underline"
-                            title="View citations from this query"
+                            title={`View ${query.domainSources} citation${query.domainSources === 1 ? '' : 's'} from this query`}
                           >
-                            View ({query.sourcesTotal})
+                            View ({query.domainSources})
                           </a>
+                        ) : (
+                          <span className="text-xs text-gray-400" title={`This query returned ${query.sourcesTotal ?? 0} sources, but none cited your domain`}>
+                            —
+                          </span>
                         )}
                       </td>
                     </tr>
