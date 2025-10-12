@@ -11,13 +11,13 @@ import AdvancedRunDrawer from "../components/AdvancedRunDrawer";
 
 export default function Dashboard() {
   const { apiKey, save, clear } = useApiKey();
-  const [propertyId, setPropertyId] = useState("prop_demo");
+  const [url, setUrl] = useState(""); // Demo mode: just enter a URL
   const [loading, setLoading] = useState(false);
   const [audit, setAudit] = useState<Audit | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations'>('scores');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [recentAudits, setRecentAudits] = useState<string[]>([]);
+  const [recentAudits, setRecentAudits] = useState<Array<{id: string; url: string; timestamp: number}>>([]);
   const [advancedOpts, setAdvancedOpts] = useState<{
     maxPages?: number;
     include?: string[];
@@ -37,11 +37,6 @@ export default function Dashboard() {
       if (stored) {
         const parsed = JSON.parse(stored);
         setRecentAudits(parsed);
-      } else {
-        // Pre-populate with a known test audit for convenience
-        const defaultAudits = ['aud_1760106208554_tfmderif4'];
-        setRecentAudits(defaultAudits);
-        localStorage.setItem('recentAudits', JSON.stringify(defaultAudits));
       }
     } catch {
       setRecentAudits([]);
@@ -53,10 +48,21 @@ export default function Dashboard() {
     setLoading(true);
     setShowAdvanced(false);
     
+    // Normalize URL
+    let normalizedUrl = url.trim();
+    if (normalizedUrl && !normalizedUrl.match(/^https?:\/\//i)) {
+      normalizedUrl = 'https://' + normalizedUrl;
+    }
+    
+    if (!normalizedUrl) {
+      setError("Please enter a URL");
+      setLoading(false);
+      return;
+    }
+    
     try {
       const { id } = await startAudit({
-        property_id: propertyId,
-        apiKey,
+        url: normalizedUrl, // Demo mode: pass URL directly, no property_id needed
         maxPages: advancedOpts.maxPages,
         filters: {
           include: advancedOpts.include,
@@ -66,11 +72,12 @@ export default function Dashboard() {
       const full = await getAudit(id);
       setAudit(full);
       
-      // Save to recent audits
+      // Save to recent audits with metadata
       try {
         const stored = localStorage.getItem('recentAudits');
-        const existing = stored ? JSON.parse(stored) : [];
-        const updated = [id, ...existing.filter((aid: string) => aid !== id)].slice(0, 10); // Keep last 10
+        const existing: Array<{id: string; url: string; timestamp: number}> = stored ? JSON.parse(stored) : [];
+        const newAudit = { id, url: normalizedUrl, timestamp: Date.now() };
+        const updated = [newAudit, ...existing.filter((a) => a.id !== id)].slice(0, 20); // Keep last 20
         localStorage.setItem('recentAudits', JSON.stringify(updated));
         setRecentAudits(updated);
       } catch {}
@@ -100,63 +107,57 @@ export default function Dashboard() {
 
   return (
     <>
-      <h1>Optiview — Dashboard</h1>
+      <h1>Optiview — AI SEO Audit</h1>
       
       <div className="card">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: '#475569' }}>API Key</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input 
-                placeholder="prj_live_..." 
-                value={apiKey} 
-                onChange={e => save(e.target.value)} 
-                style={{
-                  flex: 1,
-                  fontFamily: 'Monaco, Consolas, monospace'
-                }}
-              />
-              <button 
-                onClick={clear}
-                style={{
-                  background: '#f1f5f9',
-                  color: '#475569'
-                }}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: '#475569' }}>Property ID</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input 
-                value={propertyId} 
-                onChange={e => setPropertyId(e.target.value)} 
-                style={{
-                  flex: 1,
-                  fontFamily: 'Monaco, Consolas, monospace'
-                }}
-              />
-              <button 
-                onClick={runAudit} 
-                disabled={!apiKey || loading}
-              >
-                {loading ? "Running..." : "Run Audit"}
-              </button>
-              <button 
-                onClick={() => setShowAdvanced(true)} 
-                disabled={!apiKey || loading}
-                style={{
-                  background: (!apiKey || loading) ? '#f8fafc' : 'white',
-                  color: (!apiKey || loading) ? '#cbd5e1' : '#475569',
-                  border: '1px solid #e2e8f0'
-                }}
-              >
-                Advanced...
-              </button>
-            </div>
-          </div>
+        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: '#475569' }}>
+          Enter a website URL to audit
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input 
+            placeholder="cologuard.com or https://www.example.com" 
+            value={url} 
+            onChange={e => setUrl(e.target.value)} 
+            onKeyDown={e => e.key === 'Enter' && !loading && runAudit()}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              fontSize: 16,
+              border: '2px solid #e2e8f0',
+              borderRadius: 8
+            }}
+          />
+          <button 
+            onClick={runAudit} 
+            disabled={loading}
+            style={{
+              padding: '12px 24px',
+              fontSize: 16,
+              fontWeight: 600,
+              background: loading ? '#94a3b8' : '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? "Running..." : "Run Audit"}
+          </button>
+          <button 
+            onClick={() => setShowAdvanced(true)} 
+            disabled={loading}
+            style={{
+              padding: '12px 16px',
+              fontSize: 14,
+              background: loading ? '#f8fafc' : 'white',
+              color: loading ? '#cbd5e1' : '#475569',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Advanced...
+          </button>
         </div>
         {audit?.id && (
           <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6 }}>
@@ -184,37 +185,41 @@ export default function Dashboard() {
         <h2 style={{ margin: '0 0 16px', fontSize: 18 }}>Recent Audits</h2>
         {recentAudits.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {recentAudits.map((auditId) => (
+            {recentAudits.map((audit) => (
               <Link
-                key={auditId}
-                to={`/a/${auditId}`}
+                key={audit.id}
+                to={`/a/${audit.id}`}
                 style={{
                   padding: '12px 16px',
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',
                   borderRadius: 6,
                   textDecoration: 'none',
-                  color: '#3b82f6',
-                  fontSize: 14,
-                  fontFamily: 'Monaco, Consolas, monospace',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f1f5f9';
-                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.background = '#e0e7ff';
+                  e.currentTarget.style.borderColor = '#c7d2fe';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = '#f8fafc';
                   e.currentTarget.style.borderColor = '#e2e8f0';
                 }}
               >
-                <span>{auditId}</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
+                <div>
+                  <div style={{ color: '#3b82f6', fontSize: 15, fontWeight: 500, marginBottom: 4 }}>
+                    {audit.url}
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: 12, fontFamily: 'Monaco, Consolas, monospace' }}>
+                    {audit.id}
+                  </div>
+                </div>
+                <div style={{ color: '#64748b', fontSize: 12 }}>
+                  {new Date(audit.timestamp).toLocaleDateString()} {new Date(audit.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </Link>
             ))}
           </div>

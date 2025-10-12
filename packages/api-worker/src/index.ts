@@ -766,48 +766,12 @@ export default {
       }
     }
 
-    // POST /v1/audits/start - Start a new audit (requires auth)
+    // POST /v1/audits/start - Start a new audit (DEMO MODE: no auth required if URL provided)
     if (path === '/v1/audits/start' && request.method === 'POST') {
-      // Check API key
-      const apiKey = request.headers.get('x-api-key');
-      const authResult = await validateApiKey(apiKey, env);
-
-      if (!authResult.valid) {
-        return new Response(
-          JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
-          {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-
-      // Check rate limit
-      const rateLimit = await checkRateLimit(authResult.projectId!, env);
-      
-      if (!rateLimit.allowed) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Rate limit exceeded', 
-            message: `Daily limit of ${rateLimit.limit} audits reached. Current count: ${rateLimit.count}`,
-            retry_after: '24 hours'
-          }),
-          {
-            status: 429,
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json',
-              'X-RateLimit-Limit': rateLimit.limit.toString(),
-              'X-RateLimit-Remaining': '0',
-              'Retry-After': '86400',
-            },
-          }
-        );
-      }
-
       try {
         const body = await request.json() as { 
-          property_id: string;
+          property_id?: string;
+          url?: string; // Demo mode: URL directly
           maxPages?: number;
           filters?: {
             include?: string[];
@@ -815,12 +779,101 @@ export default {
           };
         };
         
-        if (!body.property_id) {
+        // Demo mode: If URL is provided, skip auth
+        let propertyId: string;
+        let authResult: any = { valid: false, projectId: 'demo' };
+        
+        if (body.url) {
+          // DEMO MODE: Create ephemeral property from URL
+          let domain: string;
+          try {
+            const urlObj = new URL(body.url.match(/^https?:\/\//i) ? body.url : `https://${body.url}`);
+            domain = urlObj.hostname.replace(/^www\./, '');
+          } catch (e) {
+            return new Response(
+              JSON.stringify({ error: 'Invalid URL format' }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+          
+          // Create or find demo property
+          const existingProp = await env.DB.prepare(
+            'SELECT id FROM properties WHERE domain = ? AND project_id = ?'
+          ).bind(domain, 'demo').first<{ id: string }>();
+          
+          if (existingProp) {
+            propertyId = existingProp.id;
+          } else {
+            propertyId = `prop_${Date.now()}_${domain.replace(/\./g, '_')}`;
+            await env.DB.prepare(
+              'INSERT INTO properties (id, project_id, domain, name) VALUES (?, ?, ?, ?)'
+            ).bind(propertyId, 'demo', domain, domain).run();
+          }
+          
+          authResult = { valid: true, projectId: 'demo' };
+        } else if (body.property_id) {
+          // Standard mode: Require API key
+          const apiKey = request.headers.get('x-api-key');
+          authResult = await validateApiKey(apiKey, env);
+
+          if (!authResult.valid) {
+            return new Response(
+              JSON.stringify({ error: 'Unauthorized', message: 'Valid x-api-key header required' }),
+              {
+                status: 401,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+          
+          // Verify property belongs to this project
+          const property = await env.DB.prepare(
+            'SELECT id FROM properties WHERE id = ? AND project_id = ?'
+          ).bind(body.property_id, authResult.projectId).first();
+
+          if (!property) {
+            return new Response(
+              JSON.stringify({ error: 'Property not found or access denied' }),
+              {
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
+          
+          propertyId = body.property_id;
+        } else {
           return new Response(
-            JSON.stringify({ error: 'property_id is required' }),
+            JSON.stringify({ error: 'Either url or property_id is required' }),
             {
               status: 400,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+        
+        // Check rate limit (demo gets higher limit)
+        const rateLimit = await checkRateLimit(authResult.projectId!, env, authResult.projectId === 'demo' ? 100 : undefined);
+        
+        if (!rateLimit.allowed) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Rate limit exceeded', 
+              message: `Daily limit of ${rateLimit.limit} audits reached. Current count: ${rateLimit.count}`,
+              retry_after: '24 hours'
+            }),
+            {
+              status: 429,
+              headers: { 
+                ...corsHeaders, 
+                'Content-Type': 'application/json',
+                'X-RateLimit-Limit': rateLimit.limit.toString(),
+                'X-RateLimit-Remaining': '0',
+                'Retry-After': '86400',
+              },
             }
           );
         }
@@ -863,22 +916,7 @@ export default {
           );
         }
 
-        // Verify property belongs to this project
-        const property = await env.DB.prepare(
-          'SELECT id FROM properties WHERE id = ? AND project_id = ?'
-        ).bind(body.property_id, authResult.projectId).first();
-
-        if (!property) {
-          return new Response(
-            JSON.stringify({ error: 'Property not found or access denied' }),
-            {
-              status: 404,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            }
-          );
-        }
-
-        const auditId = await runAudit(body.property_id, env, {
+        const auditId = await runAudit(propertyId, env, {
           maxPages,
           filters: {
             include: includePatterns as RegExp[],

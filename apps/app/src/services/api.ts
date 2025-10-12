@@ -218,22 +218,34 @@ export type Audit = {
 };
 
 export async function startAudit(opts: {
-  property_id: string;
-  apiKey: string;
+  property_id?: string;
+  url?: string; // Demo mode: pass URL directly
+  apiKey?: string;
   maxPages?: number;
   filters?: {
     include?: string[];
     exclude?: string[];
   };
 }): Promise<{ id: string }> {
-  const { property_id, apiKey, maxPages, filters } = opts;
+  const { property_id, url, apiKey, maxPages, filters } = opts;
+  
+  // Demo mode: use URL directly
+  const body: any = { maxPages, filters };
+  if (url) {
+    body.url = url;
+  } else if (property_id) {
+    body.property_id = property_id;
+  }
+  
+  const headers: any = { "content-type": "application/json" };
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+  }
+  
   const res = await fetch(`${API_BASE}/v1/audits/start`, {
     method: "POST",
-    headers: { 
-      "content-type": "application/json", 
-      "x-api-key": apiKey 
-    },
-    body: JSON.stringify({ property_id, maxPages, filters })
+    headers,
+    body: JSON.stringify(body)
   });
   
   if (!res.ok) {
