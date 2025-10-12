@@ -272,7 +272,7 @@ export default function PublicAudit() {
         <ScoreCard title="Overall" value={audit.scores.total}/>
         
         <div style={{ flex: 1 }}>
-          <ScoreCard title="Crawlability" value={audit.scores.crawlability}/>
+          <ScoreCard title="Crawlability" value={audit.scores.crawlabilityPct || (audit.scores.crawlability / 42 * 100)}/>
           {audit.scores.breakdown?.crawlability && (
             <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <span style={{
@@ -446,7 +446,7 @@ export default function PublicAudit() {
         </div>
         
         <div style={{ flex: 1 }}>
-          <ScoreCard title="Structured" value={audit.scores.structured}/>
+          <ScoreCard title="Structured" value={audit.scores.structuredPct || (audit.scores.structured / 30 * 100)}/>
           {audit.scores.breakdown?.structured && (
             <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {/* FAQ Page (URL heuristic) */}
@@ -503,8 +503,8 @@ export default function PublicAudit() {
           )}
         </div>
         
-        <ScoreCard title="Answerability" value={audit.scores.answerability}/>
-        <ScoreCard title="Trust" value={audit.scores.trust}/>
+        <ScoreCard title="Answerability" value={audit.scores.answerabilityPct || (audit.scores.answerability / 20 * 100)}/>
+        <ScoreCard title="Trust" value={audit.scores.trustPct || (audit.scores.trust / 10 * 100)}/>
       </div>
 
       {audit.entity_recommendations && (
@@ -548,13 +548,13 @@ export default function PublicAudit() {
             }}>
               <div style={{fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#1e293b'}}>Score Formula:</div>
               <div style={{fontSize: 14, color: '#64748b', fontFamily: 'Monaco, monospace'}}>
-                Overall = (Crawlability × 40%) + (Structured × 30%) + (Answerability × 20%) + (Trust × 10%)
+                Overall = (Crawlability% × 40%) + (Structured% × 30%) + (Answerability% × 20%) + (Trust% × 10%)
               </div>
               <div style={{fontSize: 14, color: '#64748b', marginTop: 8}}>
-                <strong>Your Calculation:</strong> ({audit.scores.crawlability} × 0.4) + ({audit.scores.structured} × 0.3) + ({audit.scores.answerability} × 0.2) + ({audit.scores.trust} × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}</strong>
+                <strong>Your Calculation:</strong> ({Math.round((audit.scores.crawlabilityPct || (audit.scores.crawlability / 42 * 100)) * 10) / 10}% × 0.4) + ({Math.round((audit.scores.structuredPct || (audit.scores.structured / 30 * 100)) * 10) / 10}% × 0.3) + ({Math.round((audit.scores.answerabilityPct || (audit.scores.answerability / 20 * 100)) * 10) / 10}% × 0.2) + ({Math.round((audit.scores.trustPct || (audit.scores.trust / 10 * 100)) * 10) / 10}% × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</strong>
               </div>
               <div style={{fontSize: 13, color: '#94a3b8', marginTop: 4, fontStyle: 'italic'}}>
-                Note: Each component's maximum points equal its weight (Crawlability: 42 max, Structured: 30 max, Answerability: 20 max, Trust: 10 max).
+                Note: Component scores are converted to percentages (0-100%) before applying weights. Raw points: Crawlability {audit.scores.crawlability}/42, Structured {audit.scores.structured}/30, Answerability {audit.scores.answerability}/20, Trust {audit.scores.trust}/10.
               </div>
             </div>
 

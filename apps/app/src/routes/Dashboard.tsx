@@ -249,10 +249,10 @@ export default function Dashboard() {
         <>
           <div className="row">
             <ScoreCard title="Overall" value={audit.scores.total}/>
-            <ScoreCard title="Crawlability" value={audit.scores.crawlability}/>
-            <ScoreCard title="Structured" value={audit.scores.structured}/>
-            <ScoreCard title="Answerability" value={audit.scores.answerability}/>
-            <ScoreCard title="Trust" value={audit.scores.trust}/>
+            <ScoreCard title="Crawlability" value={audit.scores.crawlabilityPct || (audit.scores.crawlability / 42 * 100)}/>
+            <ScoreCard title="Structured" value={audit.scores.structuredPct || (audit.scores.structured / 30 * 100)}/>
+            <ScoreCard title="Answerability" value={audit.scores.answerabilityPct || (audit.scores.answerability / 20 * 100)}/>
+            <ScoreCard title="Trust" value={audit.scores.trustPct || (audit.scores.trust / 10 * 100)}/>
           </div>
 
           {audit.entity_recommendations && (

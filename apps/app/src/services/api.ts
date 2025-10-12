@@ -155,11 +155,15 @@ export type SiteMeta = {
 };
 
 export type Scores = { 
-  total: number; 
-  crawlability: number; 
-  structured: number; 
-  answerability: number; 
-  trust: number;
+  total: number;                  // 0-100% (weighted overall)
+  crawlability: number;           // raw points (0-42)
+  structured: number;             // raw points (0-30)
+  answerability: number;          // raw points (0-20)
+  trust: number;                  // raw points (0-10)
+  crawlabilityPct?: number;       // percentage (0-100%)
+  structuredPct?: number;         // percentage (0-100%)
+  answerabilityPct?: number;      // percentage (0-100%)
+  trustPct?: number;              // percentage (0-100%)
   breakdown?: ScoresBreakdown;
 };
 

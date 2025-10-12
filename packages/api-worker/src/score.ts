@@ -44,11 +44,15 @@ interface StructuredData {
 }
 
 export interface Scores {
-  overall: number;
-  crawlability: number;
-  structured: number;
-  answerability: number;
-  trust: number;
+  overall: number;              // 0-100% (weighted)
+  crawlability: number;         // raw points (0-42)
+  structured: number;           // raw points (0-30)
+  answerability: number;        // raw points (0-20)
+  trust: number;                // raw points (0-10)
+  crawlabilityPct: number;      // percentage (0-100%)
+  structuredPct: number;        // percentage (0-100%)
+  answerabilityPct: number;     // percentage (0-100%)
+  trustPct: number;             // percentage (0-100%)
   breakdown: {
     crawlability: {
       robotsPresent: number;
@@ -105,6 +109,10 @@ export function calculateScores(
     structured: Math.round(structuredResult.score * 100) / 100,
     answerability: Math.round(answerabilityResult.score * 100) / 100,
     trust: Math.round(trustResult.score * 100) / 100,
+    crawlabilityPct: Math.round(crawlabilityPct * 100) / 100,
+    structuredPct: Math.round(structuredPct * 100) / 100,
+    answerabilityPct: Math.round(answerabilityPct * 100) / 100,
+    trustPct: Math.round(trustPct * 100) / 100,
     breakdown: {
       crawlability: crawlabilityResult.breakdown,
       structured: structuredResult.breakdown,
