@@ -256,8 +256,9 @@ button[class*='tab'] {
 }
 
 .tab-button:hover {
-  color: #475569;
-  background: #f8fafc;
+  color: #1e293b;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .tab-button.active {
