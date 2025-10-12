@@ -59,8 +59,21 @@
     <h1>Audit Checks</h1>
     <p>Optiview performs comprehensive audits to ensure your website is optimized for AI crawlers and search engines. Here's what we check:</p>
 
+    <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+        <h3 style="margin-top: 0;">How Scoring Works</h3>
+        <p>Your overall score (0-100) is calculated from four weighted components:</p>
+        <ul style="margin-bottom: 10px;">
+            <li><strong>Crawlability:</strong> 40% weight (max 42 points)</li>
+            <li><strong>Structured Data:</strong> 30% weight (max 30 points)</li>
+            <li><strong>Answerability:</strong> 20% weight (max 20 points)</li>
+            <li><strong>Trust:</strong> 10% weight (max 10 points)</li>
+        </ul>
+        <p style="margin-bottom: 0; font-size: 14px; color: #1e40af;"><strong>Formula:</strong> Overall = (Crawlability × 40%) + (Structured × 30%) + (Answerability × 20%) + (Trust × 10%)</p>
+    </div>
+
     <div class="check-category">
-        <h2>🤖 Crawlability (40% of score)</h2>
+        <h2>🤖 Crawlability (40% weight, max 42 points)</h2>
+        <p style="font-size: 14px; color: #6b7280; margin: 5px 0 10px 0;">10 points for robots.txt + 20 points for AI bot access + 10 points for sitemap + 2 bonus for real crawler hits</p>
         <div class="check-item">
             <strong>robots.txt Validation:</strong> Checks if robots.txt exists and allows AI crawlers (GPTBot, ClaudeBot, PerplexityBot, CCBot, etc.)
         </div>
@@ -73,38 +86,41 @@
     </div>
 
     <div class="check-category">
-        <h2>📊 Structured Data (30% of score)</h2>
+        <h2>📊 Structured Data (30% weight, max 30 points)</h2>
+        <p style="font-size: 14px; color: #6b7280; margin: 5px 0 10px 0;">15 points for JSON-LD coverage (50%+ of pages) + 10 points for FAQ schema + 5 points for schema variety</p>
         <div class="check-item">
-            <strong>JSON-LD Detection:</strong> Scans pages for JSON-LD structured data blocks (any type)
+            <strong>JSON-LD Detection:</strong> Scans pages for JSON-LD structured data blocks (any type). Full points at 100% coverage.
         </div>
         <div class="check-item">
-            <strong>FAQ Schema:</strong> Checks specifically for FAQPage schema markup
+            <strong>FAQ Schema:</strong> Checks specifically for FAQPage schema markup (10 points for both page + schema, 5 for one)
         </div>
         <div class="check-item">
-            <strong>Rich Snippets:</strong> Identifies other schema types (Organization, Article, Product, etc.)
-        </div>
-    </div>
-
-    <div class="check-category">
-        <h2>💬 Answerability (20% of score)</h2>
-        <div class="check-item">
-            <strong>Page Titles:</strong> Verifies each page has a descriptive title tag
-        </div>
-        <div class="check-item">
-            <strong>H1 Tags:</strong> Checks for clear, singular H1 headings on each page
-        </div>
-        <div class="check-item">
-            <strong>Content Depth:</strong> Measures word count to ensure sufficient content (minimum 100 words recommended)
+            <strong>Rich Snippets:</strong> Identifies other schema types (Organization, Article, Product, Breadcrumb, WebSite)
         </div>
     </div>
 
     <div class="check-category">
-        <h2>🔒 Trust (10% of score)</h2>
+        <h2>💬 Answerability (20% weight, max 20 points)</h2>
+        <p style="font-size: 14px; color: #6b7280; margin: 5px 0 10px 0;">7 points for titles + 7 points for H1 tags + 6 points for content depth (all at 80%+ coverage)</p>
+        <div class="check-item">
+            <strong>Page Titles:</strong> Verifies each page has a descriptive title tag (≥80% of pages)
+        </div>
+        <div class="check-item">
+            <strong>H1 Tags:</strong> Checks for clear, singular H1 headings on each page (≥80% of pages)
+        </div>
+        <div class="check-item">
+            <strong>Content Depth:</strong> Measures word count to ensure sufficient content (≥120 words on ≥80% of pages)
+        </div>
+    </div>
+
+    <div class="check-category">
+        <h2>🔒 Trust (10% weight, max 10 points)</h2>
+        <p style="font-size: 14px; color: #6b7280; margin: 5px 0 10px 0;">7 points for 2xx status codes (≥80% of pages) + 3 points for fast load times (median &lt;3s)</p>
         <div class="check-item">
             <strong>Page Accessibility:</strong> Ensures pages return 200 OK status codes
         </div>
         <div class="check-item">
-            <strong>Load Performance:</strong> Tracks page load times to identify slow pages
+            <strong>Load Performance:</strong> Tracks page load times to identify slow pages (median ≤3 seconds = full points)
         </div>
         <div class="check-item">
             <strong>Error Detection:</strong> Identifies broken links, 404s, and server errors

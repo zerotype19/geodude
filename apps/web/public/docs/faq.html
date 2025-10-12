@@ -236,14 +236,16 @@
 
     <div class="faq-item">
         <h3>How is the overall score calculated?</h3>
-        <p>Your score is a weighted average of four factors:</p>
+        <p>Your score is a weighted average of four components. <strong>Each component's maximum points equals its weight:</strong></p>
         <ul>
-            <li><strong>Crawlability (40%):</strong> Can AI bots access your content? (robots.txt, sitemap, bot permissions)</li>
-            <li><strong>Structured Data (30%):</strong> Do you have JSON-LD, FAQ schemas, rich snippets?</li>
-            <li><strong>Answerability (20%):</strong> Clear titles, H1s, sufficient content depth?</li>
-            <li><strong>Trust (10%):</strong> Fast load times, no errors, accessible pages?</li>
+            <li><strong>Crawlability (40% weight, max 42 points):</strong> robots.txt (10pts) + AI bot access (20pts) + sitemap (10pts) + real crawler bonus (2pts)</li>
+            <li><strong>Structured Data (30% weight, max 30 points):</strong> JSON-LD coverage (15pts) + FAQ schema (10pts) + schema variety (5pts)</li>
+            <li><strong>Answerability (20% weight, max 20 points):</strong> Titles (7pts) + H1 tags (7pts) + content depth (6pts)</li>
+            <li><strong>Trust (10% weight, max 10 points):</strong> HTTP 2xx status (7pts) + load performance (3pts)</li>
         </ul>
-        <p><strong>Example:</strong> 80% crawlability, 50% structured, 75% answerability, 90% trust → Overall: (0.4×80 + 0.3×50 + 0.2×75 + 0.1×90) = 71%</p>
+        <p><strong>Formula:</strong> Overall = (Crawlability × 0.4) + (Structured × 0.3) + (Answerability × 0.2) + (Trust × 0.1)</p>
+        <p><strong>Example:</strong> If you score 40/42 crawl, 15/30 structured, 18/20 answer, 8/10 trust → Overall = (40×0.4) + (15×0.3) + (18×0.2) + (8×0.1) = 16+4.5+3.6+0.8 = <strong>24.9</strong></p>
+        <p><em>Note: Component scores are shown as points earned (e.g., "40/42") not percentages, which makes it clearer how close you are to the maximum.</em></p>
     </div>
 
     <div class="faq-item">
