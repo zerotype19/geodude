@@ -271,8 +271,20 @@ export async function runAudit(
     // Step 2: Get URLs to crawl (fallback to just homepage if no sitemap)
     let urlsToCrawl: string[] = [baseUrl];
     
-    // Step 2a: Fetch sitemap URLs (supports sitemap index)
-    let sitemapUrls = await fetchSitemapUrls(`${baseUrl}/sitemap.xml`, env.USER_AGENT, maxPages * 2);
+    // Step 2a: Fetch sitemap URLs (use URLs from robots.txt, fallback to /sitemap.xml)
+    let sitemapUrls: string[] = [];
+    
+    if (crawlabilityData.sitemapUrls.length > 0) {
+      // Use sitemap URLs discovered from robots.txt
+      for (const sitemapUrl of crawlabilityData.sitemapUrls) {
+        const urls = await fetchSitemapUrls(sitemapUrl, env.USER_AGENT, maxPages * 2);
+        sitemapUrls.push(...urls);
+        if (sitemapUrls.length >= maxPages * 2) break;
+      }
+    } else {
+      // Fallback to standard /sitemap.xml location
+      sitemapUrls = await fetchSitemapUrls(`${baseUrl}/sitemap.xml`, env.USER_AGENT, maxPages * 2);
+    }
     
     if (sitemapUrls.length > 0) {
       console.log(`Fetched ${sitemapUrls.length} URLs from sitemap`);

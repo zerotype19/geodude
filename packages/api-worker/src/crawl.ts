@@ -288,6 +288,7 @@ export async function checkCrawlability(baseUrl: string): Promise<{
   robotsFound: boolean;
   sitemapFound: boolean;
   aiBotsAllowed: Record<string, boolean>;
+  sitemapUrls: string[];
 }> {
   const robots = await checkRobotsTxt(baseUrl);
   const sitemap = await checkSitemap(robots.sitemapUrls);
@@ -296,6 +297,7 @@ export async function checkCrawlability(baseUrl: string): Promise<{
     robotsFound: robots.found,
     sitemapFound: sitemap.found,
     aiBotsAllowed: robots.aiBotsAllowed,
+    sitemapUrls: robots.sitemapUrls,
   };
 }
 
