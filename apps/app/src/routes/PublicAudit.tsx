@@ -551,7 +551,10 @@ export default function PublicAudit() {
                 Overall = (Crawlability × 40%) + (Structured × 30%) + (Answerability × 20%) + (Trust × 10%)
               </div>
               <div style={{fontSize: 14, color: '#64748b', marginTop: 8}}>
-                <strong>Your Score:</strong> ({audit.scores.crawlability}% × 0.4) + ({audit.scores.structured}% × 0.3) + ({audit.scores.answerability}% × 0.2) + ({audit.scores.trust}% × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</strong>
+                <strong>Your Calculation:</strong> ({audit.scores.crawlability} × 0.4) + ({audit.scores.structured} × 0.3) + ({audit.scores.answerability} × 0.2) + ({audit.scores.trust} × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}</strong>
+              </div>
+              <div style={{fontSize: 13, color: '#94a3b8', marginTop: 4, fontStyle: 'italic'}}>
+                Note: Component scores are points out of 100, not percentages of the weighted score.
               </div>
             </div>
 
@@ -577,7 +580,7 @@ export default function PublicAudit() {
                     }}>40% weight</span>
                   </div>
                   <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.crawlability >= 70 ? '#10b981' : audit.scores.crawlability >= 40 ? '#f59e0b' : '#ef4444'}}>
-                    {audit.scores.crawlability}%
+                    {audit.scores.crawlability}<span style={{fontSize: 16, color: '#94a3b8'}}>/100</span>
                   </span>
                 </div>
                 <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
@@ -608,7 +611,7 @@ export default function PublicAudit() {
                     }}>30% weight</span>
                   </div>
                   <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.structured >= 70 ? '#10b981' : audit.scores.structured >= 40 ? '#f59e0b' : '#ef4444'}}>
-                    {audit.scores.structured}%
+                    {audit.scores.structured}<span style={{fontSize: 16, color: '#94a3b8'}}>/100</span>
                   </span>
                 </div>
                 <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
@@ -639,7 +642,7 @@ export default function PublicAudit() {
                     }}>20% weight</span>
                   </div>
                   <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.answerability >= 70 ? '#10b981' : audit.scores.answerability >= 40 ? '#f59e0b' : '#ef4444'}}>
-                    {audit.scores.answerability}%
+                    {audit.scores.answerability}<span style={{fontSize: 16, color: '#94a3b8'}}>/100</span>
                   </span>
                 </div>
                 <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
@@ -670,7 +673,7 @@ export default function PublicAudit() {
                     }}>10% weight</span>
                   </div>
                   <span style={{fontSize: 24, fontWeight: 700, color: audit.scores.trust >= 70 ? '#10b981' : audit.scores.trust >= 40 ? '#f59e0b' : '#ef4444'}}>
-                    {audit.scores.trust}%
+                    {audit.scores.trust}<span style={{fontSize: 16, color: '#94a3b8'}}>/100</span>
                   </span>
                 </div>
                 <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
@@ -693,15 +696,15 @@ export default function PublicAudit() {
               <div style={{fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e40af'}}>📈 Scoring Guide</div>
               <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: 13}}>
                 <div>
-                  <span style={{fontWeight: 600, color: '#10b981'}}>70-100%:</span>{' '}
+                  <span style={{fontWeight: 600, color: '#10b981'}}>70-100 points:</span>{' '}
                   <span style={{color: '#475569'}}>Excellent optimization</span>
                 </div>
                 <div>
-                  <span style={{fontWeight: 600, color: '#f59e0b'}}>40-69%:</span>{' '}
+                  <span style={{fontWeight: 600, color: '#f59e0b'}}>40-69 points:</span>{' '}
                   <span style={{color: '#475569'}}>Good, room for improvement</span>
                 </div>
                 <div>
-                  <span style={{fontWeight: 600, color: '#ef4444'}}>0-39%:</span>{' '}
+                  <span style={{fontWeight: 600, color: '#ef4444'}}>0-39 points:</span>{' '}
                   <span style={{color: '#475569'}}>Needs attention</span>
                 </div>
               </div>
