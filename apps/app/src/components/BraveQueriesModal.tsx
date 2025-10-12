@@ -12,7 +12,7 @@ type Props = {
   onClose: () => void;
 };
 
-export function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
+export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
   const [data, setData] = useState<BraveQueriesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
