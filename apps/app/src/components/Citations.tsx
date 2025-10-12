@@ -76,6 +76,7 @@ export default function Citations({ auditId }: Props) {
     // Check for Brave AI filter from URL
     const provider = params.get('provider') || undefined;
     const isAIOffered = params.get('isAIOffered') === 'true' ? true : undefined;
+    const query = params.get('query') || undefined; // Phase F++: Read query filter from URL
     
     getAuditCitations(auditId, {
       type: typeFilter || undefined,
@@ -83,7 +84,8 @@ export default function Citations({ auditId }: Props) {
       page,
       pageSize,
       provider,
-      isAIOffered
+      isAIOffered,
+      query // Phase F++: Pass query filter to API
     })
       .then((data) => {
         setCitations(data.items);
@@ -104,6 +106,14 @@ export default function Citations({ auditId }: Props) {
 
   const handleClearPathFilter = () => {
     setPathFilter('');
+    setPage(1);
+  };
+  
+  // Phase F++: Handle clearing query filter
+  const handleClearQueryFilter = () => {
+    const newParams = new URLSearchParams(location.search);
+    newParams.delete('query');
+    navigate(`${location.pathname}?${newParams.toString()}`, { replace: true });
     setPage(1);
   };
 
@@ -252,6 +262,38 @@ export default function Citations({ auditId }: Props) {
             }}
           >
             🤖 Brave AI Only
+          </button>
+        </div>
+      )}
+
+      {/* Phase F++: Query filter chip */}
+      {params.get('query') && (
+        <div style={{ 
+          marginBottom: 16, 
+          padding: '8px 12px', 
+          background: '#ede9fe', 
+          borderRadius: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          border: '1px solid #c4b5fd'
+        }}>
+          <span style={{ fontSize: 14, color: '#5b21b6' }}>
+            🔍 Query: <strong>"{params.get('query')}"</strong>
+          </span>
+          <button
+            onClick={handleClearQueryFilter}
+            style={{
+              padding: '4px 8px',
+              fontSize: 12,
+              cursor: 'pointer',
+              background: '#f5f3ff',
+              color: '#6b21a8',
+              border: '1px solid #c4b5fd',
+              borderRadius: 4
+            }}
+          >
+            ✕ Clear
           </button>
         </div>
       )}
