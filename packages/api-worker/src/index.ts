@@ -510,6 +510,42 @@ export default {
       return handleBotLogsIngest(request, env);
     }
 
+    // POST /admin/audits/:id/fail - Manually fail a stuck audit (admin only)
+    if (path.match(/^\/admin\/audits\/[^/]+\/fail$/) && request.method === 'POST') {
+      const auditId = path.split('/')[3];
+      
+      try {
+        // Update audit status to failed
+        await env.DB.prepare(
+          `UPDATE audits 
+           SET status = 'failed', 
+               error = 'Manual intervention - audit was stuck',
+               completed_at = datetime('now')
+           WHERE id = ?`
+        ).bind(auditId).run();
+        
+        return new Response(
+          JSON.stringify({ 
+            ok: true, 
+            message: `Audit ${auditId} marked as failed`,
+            auditId 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({ 
+            ok: false, 
+            error: error instanceof Error ? error.message : String(error) 
+          }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    }
+
     // GET /v1/audits/:id/crawlers - Get AI crawler summary for audit (Phase G)
     if (path.match(/^\/v1\/audits\/[^/]+\/crawlers$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
