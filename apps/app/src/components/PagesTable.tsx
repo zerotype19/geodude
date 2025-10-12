@@ -111,9 +111,19 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                     to={`/a/${auditId}?tab=citations&provider=Brave&isAIOffered=true&path=${encodeURIComponent(formatUrl(p.url))}`}
                     style={{ color: '#6366f1', textDecoration: 'underline', cursor: 'pointer' }}
                     title={
-                      p.aiAnswerQueries && p.aiAnswerQueries.length > 0
-                        ? `Cited by ${p.aiAnswers} Brave AI answer${p.aiAnswers === 1 ? '' : 's'}\n\nTop queries:\n${p.aiAnswerQueries.map(q => `• ${q}`).join('\n')}`
-                        : "View Brave AI citations to this page"
+                      p.aiAnswerQueries?.length
+                        ? `Cited by ${p.aiAnswers} Brave AI answer${p.aiAnswers === 1 ? '' : 's'}\n\nTop queries:\n${
+                            p.aiAnswerQueries
+                              .map((q: string, idx: number) => {
+                                const m = p.aiAnswerMappings?.[idx];
+                                const via = m?.reason
+                                  ? (m.reason === 'title_fuzzy' ? 'title match' : m.reason)
+                                  : '';
+                                return `• ${q}${via ? ` (via ${via})` : ''}`;
+                              })
+                              .join('\n')
+                          }`
+                        : 'No Brave AI answers cited this page (yet)'
                     }
                   >
                     {p.aiAnswers}

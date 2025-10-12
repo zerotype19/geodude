@@ -36,6 +36,10 @@ export default function PageReport() {
   const [braveQueries, setBraveQueries] = useState<BraveAIQuery[]>([]);
   const [braveLoading, setBraveLoading] = useState(false);
   
+  // Phase F++: Cited & Near-Miss Brave queries
+  const [citedQueries, setCitedQueries] = useState<Array<{ query: string; sourceCount: number }>>([]);
+  const [nearMissQueries, setNearMissQueries] = useState<Array<{ query: string; totalSources: number }>>([]);
+  
   // Phase G: crawler data
   const [crawlerData, setCrawlerData] = useState<any>(null);
   
@@ -119,6 +123,38 @@ export default function PageReport() {
         console.error('Failed to load citations:', err);
       })
       .finally(() => setCitationsLoading(false));
+  }, [auditId, target]);
+  
+  // Phase F++: Fetch cited & near-miss Brave queries for this page
+  useEffect(() => {
+    if (!auditId || !target) return;
+
+    // Extract pathname from target URL
+    let pagePathname = '/';
+    try {
+      pagePathname = new URL(target).pathname.replace(/\/+$/, '') || '/';
+    } catch {
+      pagePathname = target.replace(/\/+$/, '') || '/';
+    }
+
+    fetch(`https://api.optiview.ai/v1/audits/${auditId}/brave/queries?pageSize=200`)
+      .then(res => res.json())
+      .then(data => {
+        const items = data.items || [];
+
+        const cited = items
+          .filter((q: any) => (q.domainPaths || []).includes(pagePathname) && q.queryStatus === 'ok')
+          .map((q: any) => ({ query: q.q, sourceCount: q.sourcesTotal }));
+
+        const nearMiss = items
+          .filter((q: any) => q.queryStatus === 'ok' && q.sourcesTotal > 0 && !(q.domainPaths || []).includes(pagePathname))
+          .map((q: any) => ({ query: q.q, totalSources: q.sourcesTotal }))
+          .slice(0, 5);
+
+        setCitedQueries(cited);
+        setNearMissQueries(nearMiss);
+      })
+      .catch(err => console.error('Brave queries fetch failed:', err));
   }, [auditId, target]);
   
   // Fetch recommendations when tab is active
@@ -1050,6 +1086,56 @@ export default function PageReport() {
               <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>
                 Consider adding clearer headings or more structured content.
               </p>
+            </div>
+          )}
+          
+          {/* Phase F++: Brave AI Query Performance */}
+          {(citedQueries.length > 0 || nearMissQueries.length > 0) && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Brave AI Query Performance</h3>
+
+              {citedQueries.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-emerald-700 mb-2">✓ Cited Queries ({citedQueries.length})</h4>
+                  <p className="text-sm text-gray-600 mb-3">These Brave AI queries cited this page:</p>
+                  <div className="space-y-2">
+                    {citedQueries.map((q, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-sm">
+                        <span className="text-emerald-600">•</span>
+                        <span className="flex-1">"{q.query}" <span className="text-gray-500">({q.sourceCount} sources)</span></span>
+                        <a
+                          href={`/a/${auditId}?tab=citations&provider=Brave&query=${encodeURIComponent(q.query)}`}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          View
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {nearMissQueries.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-yellow-700 mb-2">⚠ Near-Miss Queries ({nearMissQueries.length})</h4>
+                  <p className="text-sm text-gray-600 mb-3">
+                    These queries returned results but didn't cite your page. Consider:
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-1 mb-3">
+                    <li>Add FAQ schema if the query contains "faq"/"questions".</li>
+                    <li>Strengthen H1/H2 to match the query intent terms.</li>
+                    <li>Add a concise section that directly answers the query.</li>
+                  </ul>
+                  <div className="space-y-2">
+                    {nearMissQueries.map((q, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-sm">
+                        <span className="text-yellow-600">•</span>
+                        <span className="flex-1">"{q.query}" <span className="text-gray-500">({q.totalSources} sources, 0 yours)</span></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
