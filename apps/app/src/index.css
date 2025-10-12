@@ -227,11 +227,25 @@ pre code {
   padding: 0;
 }
 
-/* Tab buttons */
+/* Tab buttons - aggressive reset to prevent browser defaults */
 button.tab-button,
 button[class*='tab'] {
-  /* Tab buttons keep their specific styling */
   font-family: inherit;
+  /* Remove all browser default button styling */
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  width: auto;
+  overflow: visible;
+  outline: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  /* Remove focus ring */
+  -webkit-tap-highlight-color: transparent;
+  /* Remove any default box-shadow */
+  box-shadow: none;
 }
 
 .tabs-container {
@@ -253,12 +267,31 @@ button[class*='tab'] {
   transition: all 0.2s;
   position: relative;
   box-shadow: inset 0 -1px 0 0 #e2e8f0;
+  /* Override browser defaults */
+  outline: none !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
 }
 
 .tab-button:hover {
-  color: #1e293b;
-  background: white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  color: #1e293b !important;
+  background: white !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  outline: none !important;
+}
+
+.tab-button:focus {
+  outline: none !important;
+  color: #1e293b !important;
+  background: white !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.tab-button:active {
+  outline: none !important;
+  color: #1e293b !important;
+  background: white !important;
 }
 
 .tab-button.active {
