@@ -347,35 +347,6 @@ export default function PublicAudit() {
             </div>
           )}
           
-          {/* Brave AI chip (Phase F+ clickable) */}
-          {audit.site?.braveAI && (
-            <div style={{ marginTop: 8 }}>
-              <button
-                onClick={() => setShowBraveModal(true)}
-                style={{
-                  fontSize: 11,
-                  padding: '4px 8px',
-                  borderRadius: 12,
-                  background: 'rgba(99,102,241,.2)',
-                  color: '#6366f1',
-                  display: 'inline-block',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(99,102,241,.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(99,102,241,.2)';
-                }}
-                title="Click to view Brave AI query details"
-              >
-                🤖 Brave AI: {audit.site.braveAI.queriesCount || audit.site.braveAI.queries?.length || 0} queries · {audit.site.braveAI.pagesCited} pages cited
-              </button>
-            </div>
-          )}
-          
           {/* Phase G: Real AI crawler traffic (30d) */}
           {audit.site?.crawlers && audit.site.crawlers.total > 0 && (
             <div style={{ marginTop: 8, fontSize: 11, color: '#6b7280' }}>
