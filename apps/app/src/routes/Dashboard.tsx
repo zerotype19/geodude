@@ -201,12 +201,14 @@ export default function Dashboard() {
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#e0e7ff';
-                  e.currentTarget.style.borderColor = '#c7d2fe';
+                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = '#f8fafc';
                   e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
                 <div>
