@@ -21,6 +21,13 @@ export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
   const [bucket, setBucket] = useState<QueryBucket | null>(null);
   const [status, setStatus] = useState<QueryStatus | null>(null);
   
+  // Phase F++: Custom queries & rate limit detection
+  const [customQueries, setCustomQueries] = useState('');
+  const recentRateLimits = data?.items.filter(q => 
+    q.queryStatus === 'rate_limited' && Date.now() - (q.ts || 0) < 3600000
+  ).length || 0;
+  const isRateLimited = recentRateLimits > 5;
+  
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -158,17 +165,75 @@ export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
         {/* Header */}
         <div className="border-b border-gray-200 p-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">Brave AI Queries</h2>
-          <button
-            ref={closeButtonRef}
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-            aria-label="Close modal"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Phase F++: Export buttons */}
+            <div className="flex gap-2 mr-4">
+              <a
+                href={`https://api.optiview.ai/v1/audits/${auditId}/brave/queries.csv${bucket ? `?bucket=${bucket}` : ''}${status ? `${bucket ? '&' : '?'}status=${status}` : ''}`}
+                download
+                className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+              >
+                Export CSV
+              </a>
+              <a
+                href={`https://api.optiview.ai/v1/audits/${auditId}/brave/queries.json${bucket ? `?bucket=${bucket}` : ''}${status ? `${bucket ? '&' : '?'}status=${status}` : ''}`}
+                download
+                className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+              >
+                Export JSON
+              </a>
+            </div>
+            <button
+              ref={closeButtonRef}
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+              aria-label="Close modal"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* Phase F++: Metrics Bar */}
+        {data && (
+          <div className="px-6 py-3 bg-blue-50 border-b border-blue-100">
+            <div className="flex gap-6 text-sm">
+              <div>
+                <span className="text-gray-700">Answer Rate:</span>
+                <span className="ml-2 font-bold text-emerald-600">
+                  {Math.round((data.diagnostics.ok / data.total) * 100)}%
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-700">Domain-Hit Rate:</span>
+                <span className="ml-2 font-bold text-blue-600">
+                  {Math.round((data.items.filter(q => (q.domainSources || 0) > 0).length / data.total) * 100)}%
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-700">Pages Cited:</span>
+                <span className="ml-2 font-bold text-purple-600">
+                  {new Set(data.items.flatMap(q => q.domainPaths || [])).size}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              {['brand_core','product_how_to','jobs_to_be_done','schema_probes','content_seeds','competitive'].map(b => {
+                const bucketItems = data.items.filter(q => q.bucket === b);
+                const answered = bucketItems.filter(q => q.queryStatus === 'ok').length;
+                if (!bucketItems.length) return null;
+                return (
+                  <span key={b} className="text-xs px-2 py-1 rounded font-medium bg-gray-100 text-gray-700">
+                    {b.replace(/_/g,' ')}: {answered}/{bucketItems.length}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="border-b border-gray-200 p-4 bg-gray-50">
@@ -244,6 +309,54 @@ export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
           )}
         </div>
 
+        {/* Phase F++: Run +10 More & Custom Queries */}
+        <div className="border-b border-gray-200 p-4 bg-blue-50">
+          <div className="flex items-start gap-4">
+            <button
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  const res = await fetch(`https://api.optiview.ai/v1/audits/${auditId}/brave/run-more`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      add: 10,
+                      extraTerms: customQueries.split('\n').map(q => q.trim()).filter(Boolean)
+                    })
+                  });
+                  const out = await res.json();
+                  if (out.ok) {
+                    setPage(1); // refresh
+                    alert(`✓ Added ${out.added} new queries`);
+                  } else {
+                    alert(`⚠ ${out.error || 'Failed to run more queries'}`);
+                  }
+                } catch (e: any) {
+                  alert(`✗ ${e.message}`);
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading || isRateLimited}
+              className="px-4 py-2 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={isRateLimited ? `Rate limit detected (${recentRateLimits} recent 429s)` : 'Run 10 additional smart queries'}
+            >
+              {loading ? 'Running...' : isRateLimited ? '⚠ Rate Limited' : 'Run +10 More'}
+            </button>
+
+            <div className="flex-1">
+              <label className="text-xs font-medium text-gray-700 block mb-1">Custom queries (one per line):</label>
+              <textarea
+                value={customQueries}
+                onChange={e => setCustomQueries(e.target.value)}
+                rows={3}
+                placeholder="cologuard insurance coverage&#10;cologuard Medicare&#10;cologuard doctor recommendation"
+                className="w-full p-2 text-xs border border-gray-300 rounded resize-none font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {loading && (
@@ -279,7 +392,8 @@ export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
                     <th className="pb-2 px-3 font-semibold text-gray-700">Mode</th>
                     <th className="pb-2 px-3 font-semibold text-gray-700 text-right">Results</th>
                     <th className="pb-2 px-3 font-semibold text-gray-700">Status</th>
-                    <th className="pb-2 pl-3 font-semibold text-gray-700 text-right">ms</th>
+                    <th className="pb-2 px-3 font-semibold text-gray-700 text-right">ms</th>
+                    <th className="pb-2 pl-3 font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -296,11 +410,31 @@ export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
                       <td className="py-2 px-3 text-gray-600 text-xs">{query.api}</td>
                       <td className="py-2 px-3 text-right text-gray-700 tabular-nums">{query.sourcesTotal ?? 0}</td>
                       <td className="py-2 px-3">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(query.queryStatus)}`}>
+                        <span 
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(query.queryStatus)}`}
+                          title={
+                            query.queryStatus === 'rate_limited' ? `Brave free tier limit hit. Lower queries to 20-30 or upgrade to paid plan. (${recentRateLimits} recent 429s)` :
+                            query.queryStatus === 'empty' ? 'Brave returned no answer block for this query. Try broader or how-to variants.' :
+                            query.queryStatus === 'timeout' ? `Query exceeded 7s timeout. Check network or increase BRAVE_TIMEOUT_MS.` :
+                            query.queryStatus === 'error' ? `HTTP error: ${query.error || 'Unknown'}` :
+                            'Query succeeded and returned results'
+                          }
+                        >
                           {query.queryStatus || 'unknown'}
                         </span>
                       </td>
-                      <td className="py-2 pl-3 text-right text-gray-600 text-xs tabular-nums">{query.durationMs ?? '—'}</td>
+                      <td className="py-2 px-3 text-right text-gray-600 text-xs tabular-nums">{query.durationMs ?? '—'}</td>
+                      <td className="py-2 pl-3">
+                        {query.sourcesTotal > 0 && (
+                          <a
+                            href={`/a/${auditId}?tab=citations&provider=Brave&query=${encodeURIComponent(query.q)}`}
+                            className="text-xs text-blue-600 hover:underline"
+                            title="View citations from this query"
+                          >
+                            View ({query.sourcesTotal})
+                          </a>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
