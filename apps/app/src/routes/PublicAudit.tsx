@@ -7,6 +7,7 @@ import PagesTable from "../components/PagesTable";
 import EntityRecommendations from "../components/EntityRecommendations";
 import Citations from "../components/Citations";
 import BraveQueriesModal from "../components/BraveQueriesModal";
+import AIDebugModal from "../components/AIDebugModal";
 import { getBotMeta } from "../lib/botMeta";
 
 // Helper function for score color coding
@@ -25,6 +26,7 @@ export default function PublicAudit() {
   const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations'>('scores');
   const [rerunning, setRerunning] = useState(false);
   const [showBraveModal, setShowBraveModal] = useState(false);
+  const [showDebugModal, setShowDebugModal] = useState(false);
   
   const hasApiKey = useMemo(() => !!localStorage.getItem('ov_api_key'), []);
 
@@ -251,24 +253,22 @@ export default function PublicAudit() {
                 >
                   {audit.site.flags.blockedBy === 'robots' ? 'Fix robots.txt' : `Configure ${audit.site.flags.wafName || 'WAF'}`}
                 </a>
-                <a
-                  href={`https://api.optiview.ai/v1/debug/ai-access/${audit.id}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  onClick={() => setShowDebugModal(true)}
                   style={{
                     padding: '8px 16px',
                     background: 'white',
                     color: '#991b1b',
                     border: '1px solid #fca5a5',
                     borderRadius: 6,
-                    textDecoration: 'none',
                     fontSize: 14,
                     fontWeight: 500,
+                    cursor: 'pointer',
                     display: 'inline-block',
                   }}
                 >
                   View Debug Info
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -719,6 +719,15 @@ export default function PublicAudit() {
           auditId={audit.id}
           isOpen={showBraveModal}
           onClose={() => setShowBraveModal(false)}
+        />
+      )}
+
+      {/* AI Debug Modal */}
+      {showDebugModal && audit && (
+        <AIDebugModal 
+          auditId={audit.id}
+          isOpen={showDebugModal}
+          onClose={() => setShowDebugModal(false)}
         />
       )}
     </>
