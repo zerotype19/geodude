@@ -799,6 +799,17 @@ export default {
             );
           }
           
+          // Ensure demo project exists (required for FK constraint)
+          const demoProject = await env.DB.prepare(
+            'SELECT id FROM projects WHERE id = ?'
+          ).bind('demo').first<{ id: string }>();
+          
+          if (!demoProject) {
+            await env.DB.prepare(
+              'INSERT INTO projects (id, name, api_key) VALUES (?, ?, ?)'
+            ).bind('demo', 'Demo Project', 'demo_key_' + Date.now()).run();
+          }
+          
           // Create or find demo property
           const existingProp = await env.DB.prepare(
             'SELECT id FROM properties WHERE domain = ? AND project_id = ?'
