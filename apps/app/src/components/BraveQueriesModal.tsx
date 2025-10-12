@@ -355,7 +355,7 @@ export default function BraveQueriesModal({ auditId, isOpen, onClose }: Props) {
                 value={customQueries}
                 onChange={e => setCustomQueries(e.target.value)}
                 rows={3}
-                placeholder="cologuard insurance coverage&#10;cologuard Medicare&#10;cologuard doctor recommendation"
+                placeholder="your product insurance coverage&#10;your product pricing&#10;your product customer reviews"
                 className="w-full p-2 text-xs border border-gray-300 rounded resize-none font-mono"
               />
             </div>

@@ -51,9 +51,9 @@
     <div class="card">
         <h3>Example: Traditional Search vs. AI Search</h3>
         <p><strong>Traditional Google Search:</strong></p>
-        <p>User searches "what is cologuard" → Google shows 10 blue links → User clicks #1</p>
+        <p>User searches "what is YourProduct" → Google shows 10 blue links → User clicks #1</p>
         <p><strong>AI Search (Brave AI, ChatGPT, Perplexity):</strong></p>
-        <p>User asks "what is cologuard" → AI generates answer → AI cites 3-5 sources → User reads answer (may or may not click)</p>
+        <p>User asks "what is YourProduct" → AI generates answer → AI cites 3-5 sources → User reads answer (may or may not click)</p>
         <p><strong>Key Difference:</strong> In AI search, being <em>cited in the answer</em> is more valuable than ranking #1 in traditional results.</p>
     </div>
 
@@ -118,18 +118,18 @@
         <p>Understanding why 30 queries can result in 312 citations:</p>
         <div class="flow-diagram">
 30 Brave AI Queries Run
-├─ Query 1: "site:cologuard.com"
-│  └─ Returns 10 sources → 10 cite cologuard.com ✓
-├─ Query 2: "cologuard"
-│  └─ Returns 10 sources → 1 cites cologuard.com, 9 cite competitors ✓
-├─ Query 3: "cologuard faq"
-│  └─ Returns 10 sources → 4 cite cologuard.com, 6 cite others ✓
+├─ Query 1: "site:yoursite.com"
+│  └─ Returns 10 sources → 10 cite yoursite.com ✓
+├─ Query 2: "your brand"
+│  └─ Returns 10 sources → 1 cites yoursite.com, 9 cite competitors ✓
+├─ Query 3: "your brand faq"
+│  └─ Returns 10 sources → 4 cite yoursite.com, 6 cite others ✓
 └─ ... (27 more queries)
 ───────────────────────────────────────────────────────
 Total Sources from Brave AI: ~300
 
 Breakdown by Domain:
-├─ 91 sources cite cologuard.com → <span class="badge badge-aeo">AEO: 91</span>
+├─ 91 sources cite yoursite.com → <span class="badge badge-aeo">AEO: 91</span>
 └─ 209 sources cite other sites → <span class="badge badge-organic">Organic: 209</span>
 
 Plus Traditional Search:
@@ -140,7 +140,7 @@ Plus Traditional Search:
     </div>
 
     <div class="example">
-        <h4>Real Example: Cologuard Audit</h4>
+        <h4>Real Example: Sample Audit</h4>
         <table>
             <thead>
                 <tr>
@@ -152,25 +152,25 @@ Plus Traditional Search:
             </thead>
             <tbody>
                 <tr>
-                    <td>site:cologuard.com</td>
+                    <td>site:yoursite.com</td>
                     <td>10</td>
                     <td>10</td>
                     <td>0</td>
                 </tr>
                 <tr>
-                    <td>cologuard faq</td>
+                    <td>your brand faq</td>
                     <td>10</td>
                     <td>4</td>
                     <td>6</td>
                 </tr>
                 <tr>
-                    <td>cologuard alternatives</td>
+                    <td>your brand alternatives</td>
                     <td>10</td>
                     <td>0</td>
                     <td>10</td>
                 </tr>
                 <tr>
-                    <td>how cologuard works</td>
+                    <td>how your product works</td>
                     <td>10</td>
                     <td>4</td>
                     <td>6</td>
@@ -316,9 +316,9 @@ Plus Traditional Search:
   },
   "items": [
     {
-      "url": "https://www.cologuard.com/faq",
+      "url": "https://www.yoursite.com/faq",
       "title": "Frequently Asked Questions",
-      "query": "cologuard faq",
+      "query": "your brand faq",
       "type": "AEO",
       "provider": "Brave",
       "mode": "search"

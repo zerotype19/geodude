@@ -115,7 +115,7 @@ export default function Dashboard() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input 
-            placeholder="cologuard.com or https://www.example.com" 
+            placeholder="yoursite.com or https://www.example.com" 
             value={url} 
             onChange={e => setUrl(e.target.value)} 
             onKeyDown={e => e.key === 'Enter' && !loading && runAudit()}
