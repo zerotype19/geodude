@@ -14,6 +14,7 @@ import { handleCitations } from './routes/citations';
 import { handleBotLogsIngest, handleGetCrawlers } from './bots/routes';
 import { createVisibilityRoutes } from './routes/visibility';
 import { processRun } from './routes/visibility-processor';
+import { createVisibilityAnalyticsRoutes } from './routes/visibility-analytics';
 
 interface Env {
   DB: D1Database;
@@ -53,6 +54,8 @@ interface Env {
   VIS_CONNECT_RETRIES?: string;
   VIS_RATE_PER_PROJECT?: string;
   VIS_DAILY_COST_CAP_USD?: string;
+  // Phase 5 Analytics
+  FEATURE_PHASE5_ANALYTICS?: string;
   // Additional API Keys (secrets)
   PERPLEXITY_API_KEY?: string;
   CLAUDE_API_KEY?: string;
@@ -155,6 +158,20 @@ export default {
         console.log('Nightly backup completed');
       } catch (error) {
         console.error('Nightly backup failed:', error);
+      }
+      return;
+    }
+    
+    // 04:00 UTC - Phase 5 Nightly Rollup
+    if (hour === 4 && env.FEATURE_PHASE5_ANALYTICS === 'true') {
+      console.log('Phase 5 nightly rollup started at', new Date().toISOString());
+      try {
+        const { NightlyRollupService } = await import('./services/visibility/nightly-rollup');
+        const rollupService = new NightlyRollupService(env);
+        await rollupService.runNightlyRollup();
+        console.log('Phase 5 nightly rollup completed');
+      } catch (error) {
+        console.error('Phase 5 nightly rollup failed:', error);
       }
       return;
     }
@@ -2641,6 +2658,12 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         return visibilityRoutes.rebuildMetrics(request);
       }
 
+    }
+
+    // Phase 5 Analytics routes
+    if (path.startsWith('/api/visibility/') && env.FEATURE_PHASE5_ANALYTICS === 'true') {
+      const analyticsRoutes = createVisibilityAnalyticsRoutes(env);
+      return analyticsRoutes.fetch(request);
     }
 
     // CORS preflight for visibility endpoints
