@@ -16,243 +16,390 @@
         .feature-card h4 { color: #1e40af; margin-top: 0; }
         .badge { display: inline-block; background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px; }
         .badge.new { background: #f59e0b; }
+        .badge.live { background: #ef4444; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         .highlight { background: #dbeafe; padding: 15px; border-radius: 6px; margin: 15px 0; }
         .demo-button { display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 10px 0; }
-        .demo-button:hover { background: #1e40af; }
         .back-link { display: inline-block; margin-top: 30px; color: #3b82f6; text-decoration: none; }
         .back-link:hover { text-decoration: underline; }
+        .nav-links { text-align: center; margin-bottom: 30px; }
+        .nav-links a { color: #3b82f6; text-decoration: none; margin: 0 15px; }
+        .nav-links a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; border: 1px solid #e5e7eb; text-align: left; }
+        th { background: #f8fafc; font-weight: 600; }
+        .assistant-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin: 2px; }
+        .perplexity { background: #4338ca; color: white; }
+        .chatgpt { background: #16a34a; color: white; }
+        .claude { background: #ea580c; color: white; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
-        .stat-card { background: white; padding: 20px; border-radius: 8px; text-align: center; border: 1px solid #e5e7eb; }
-        .stat-number { font-size: 2em; font-weight: bold; color: #3b82f6; }
-        .stat-label { color: #64748b; font-size: 0.9em; margin-top: 5px; }
+        .stat-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; text-align: center; }
+        .stat-number { font-size: 2em; font-weight: bold; color: #1e40af; }
+        .stat-label { color: #64748b; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Visibility Intelligence</h1>
-        <p>The first working LLM-visibility tracker spanning Perplexity, ChatGPT Search, and Claude</p>
+        <h1>🚀 Visibility Intelligence</h1>
+        <p>The first real-time AI assistant citation tracking and visibility scoring platform</p>
+        <span class="badge live">LIVE</span>
     </div>
 
-    <div class="section">
+    <div class="nav-links">
+        <a href="#overview">Overview</a> •
+        <a href="#assistants">AI Assistants</a> •
+        <a href="#scoring">Visibility Scoring</a> •
+        <a href="#features">Features</a> •
+        <a href="#api">API & Data</a> •
+        <a href="#use-cases">Use Cases</a>
+    </div>
+
+    <div class="section" id="overview">
         <h2>What is Visibility Intelligence?</h2>
-        <p>Visibility Intelligence is Optiview's revolutionary feature that tracks how AI assistants reference your content when answering user queries. Unlike traditional SEO that focuses on search engine rankings, Visibility Intelligence reveals where your content is discoverable <em>inside</em> generative AI engines.</p>
-        
+        <p>Visibility Intelligence is Optiview's breakthrough feature that tracks how AI assistants reference your content when answering user queries. Unlike traditional SEO tools that only analyze search engine optimization, we monitor real citations from AI platforms to give you insights into your "AI findability."</p>
+
         <div class="highlight">
-            <strong>🎯 The Big Picture:</strong> As AI assistants become the primary way users discover information, traditional SEO metrics become less relevant. Visibility Intelligence provides the missing piece—real-time tracking of how AI assistants cite your content across multiple platforms.
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>How It Works</h2>
-        
-        <div class="feature-card">
-            <h4>🔍 Real-Time Citation Tracking</h4>
-            <p><span class="badge">LIVE</span> Live API integrations with Perplexity, ChatGPT Search, and Claude</p>
-            <p>Our system makes real API calls to AI assistants and captures citations as they happen. We process actual AI responses and extract URLs using both native API responses and heuristic parsing for maximum accuracy.</p>
+            <h4>🎯 The Problem We Solve</h4>
+            <p>Traditional SEO tools can't measure how often AI assistants like ChatGPT, Perplexity, or Claude cite your content. With the rise of AI-powered search, this visibility gap leaves businesses blind to a crucial ranking factor.</p>
         </div>
 
-        <div class="feature-card">
-            <h4>📊 0-100 Visibility Scoring</h4>
-            <p><span class="badge">ALGORITHM</span> Advanced scoring based on citation frequency, domain diversity, and recency</p>
-            <p>Each domain receives a 0-100 visibility score calculated from:</p>
-            <ul>
-                <li><strong>Citation Frequency (50%):</strong> How often your domain appears in AI responses</li>
-                <li><strong>Domain Diversity (30%):</strong> Number of unique domains cited (normalized against the assistant's total)</li>
-                <li><strong>Recency (20%):</strong> How recently your content was cited (fresher = higher score)</li>
-            </ul>
-        </div>
+        <h3>How It Works</h3>
+        <ol>
+            <li><strong>Multi-Assistant Monitoring:</strong> We track citations from Perplexity, ChatGPT Search, and Claude</li>
+            <li><strong>Real-Time Data Collection:</strong> Live API integration captures citations as they happen</li>
+            <li><strong>Intelligent Scoring:</strong> Generate 0-100 visibility scores based on citation frequency, domain diversity, and recency</li>
+            <li><strong>Competitive Analysis:</strong> See how you rank against competitors in AI search results</li>
+        </ol>
 
-        <div class="feature-card">
-            <h4>🏆 Weekly Competitive Rankings</h4>
-            <p><span class="badge">COMPETITIVE</span> Share-of-voice analysis showing your position relative to competitors</p>
-            <p>See where you rank among all cited domains for each AI assistant, with metrics including:</p>
-            <ul>
-                <li><strong>Domain Rank:</strong> Your position (1-100) among all cited domains</li>
-                <li><strong>Mentions Count:</strong> Total citations received during the week</li>
-                <li><strong>Share Percentage:</strong> Your citations as a % of total citations</li>
-                <li><strong>Rank Change:</strong> Week-over-week position movement</li>
-            </ul>
-        </div>
-
-        <div class="feature-card">
-            <h4>⚡ Real-Time Filtering & Analysis</h4>
-            <p><span class="badge new">NEW</span> Switch between AI assistants to see unique citation ecosystems</p>
-            <p>Filter data by assistant to understand how each AI platform references your content differently. Export filtered data for analysis and reporting.</p>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>AI Assistant Ecosystems</h2>
-        <p>Each AI assistant forms its own unique ecosystem of citations with distinct preferences and patterns:</p>
-        
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-number">90+</div>
-                <div class="stat-label">Perplexity Citations</div>
+                <div class="stat-number">3</div>
+                <div class="stat-label">AI Assistants Tracked</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">10+</div>
-                <div class="stat-label">ChatGPT Citations</div>
+                <div class="stat-number">24/7</div>
+                <div class="stat-label">Real-Time Monitoring</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">10+</div>
-                <div class="stat-label">Claude Citations</div>
+                <div class="stat-number">100</div>
+                <div class="stat-label">Max Visibility Score</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number">75+</div>
-                <div class="stat-label">Unique Domains</div>
+                <div class="stat-number">∞</div>
+                <div class="stat-label">Citation History</div>
             </div>
-        </div>
-
-        <div class="feature-card">
-            <h4>🔍 Perplexity AI Ecosystem</h4>
-            <p><strong>Citation Style:</strong> Direct source links with context</p>
-            <p><strong>Content Preferences:</strong> SEO-optimized content, marketing resources, search-related sites, technical documentation</p>
-            <p><strong>Sample Domains:</strong> searchengineland.com, conductor.com, microsoft.com, aioseo.com</p>
-            <p><strong>Our Tracking:</strong> Native API integration captures structured citations with titles, URLs, and snippets</p>
-        </div>
-
-        <div class="feature-card">
-            <h4>🤖 ChatGPT Search Ecosystem</h4>
-            <p><strong>Citation Style:</strong> Contextual references integrated into conversational responses</p>
-            <p><strong>Content Preferences:</strong> AI/tech platforms, development tools, educational content, programming resources</p>
-            <p><strong>Sample Domains:</strong> openai.com, github.com, google.com, anthropic.com</p>
-            <p><strong>Our Tracking:</strong> Heuristic URL extraction from response text and tool calls</p>
-        </div>
-
-        <div class="feature-card">
-            <h4>🧠 Claude Ecosystem</h4>
-            <p><strong>Citation Style:</strong> Markdown-style links and structured references</p>
-            <p><strong>Content Preferences:</strong> Development tools, programming resources, technical guides, documentation</p>
-            <p><strong>Sample Domains:</strong> anthropic.com, github.com, stackoverflow.com, developer.mozilla.org</p>
-            <p><strong>Our Tracking:</strong> Enhanced parsing for both standard URLs and Markdown [text](url) format</p>
         </div>
     </div>
 
-    <div class="section">
-        <h2>Key Features & Capabilities</h2>
-        
+    <div class="section" id="assistants">
+        <h2>AI Assistants We Track</h2>
+        <p>Our platform monitors citations from the three most important AI search platforms:</p>
+
         <div class="feature-card">
-            <h4>📊 Multi-Assistant Dashboard</h4>
-            <p>Switch between Perplexity, ChatGPT Search, and Claude views to see how each AI assistant references your content. Real-time filtering updates both rankings and recent citations instantly.</p>
+            <h4><span class="assistant-badge perplexity">Perplexity</span></h4>
+            <p>Real-time search with citations from across the web. Perplexity provides the most comprehensive citation data with direct links to sources.</p>
+            <ul>
+                <li><strong>Citation Quality:</strong> High - provides direct source links</li>
+                <li><strong>Coverage:</strong> Wide range of topics and industries</li>
+                <li><strong>Update Frequency:</strong> Real-time</li>
+                <li><strong>Data Type:</strong> Native API with structured citations</li>
+            </ul>
         </div>
 
         <div class="feature-card">
-            <h4>📈 CSV Export & Analysis</h4>
-            <p>Download filtered visibility data for any assistant. Export rankings, citations, and scores for external analysis and reporting.</p>
+            <h4><span class="assistant-badge chatgpt">ChatGPT Search</span></h4>
+            <p>OpenAI's search-enabled ChatGPT that provides web search results with citations. Currently in beta but growing rapidly.</p>
+            <ul>
+                <li><strong>Citation Quality:</strong> Medium - heuristic extraction from responses</li>
+                <li><strong>Coverage:</strong> Expanding coverage of topics</li>
+                <li><strong>Update Frequency:</strong> Real-time</li>
+                <li><strong>Data Type:</strong> Heuristic URL extraction from responses</li>
+            </ul>
         </div>
 
         <div class="feature-card">
-            <h4>🎯 Domain Score Drawer</h4>
-            <p>Click any domain to see detailed visibility scores, drift percentages, and citation history. Understand exactly how visible your content is across AI platforms.</p>
+            <h4><span class="assistant-badge claude">Claude</span></h4>
+            <p>Anthropic's Claude with web search capabilities. Provides thoughtful, well-sourced answers with citation references.</p>
+            <ul>
+                <li><strong>Citation Quality:</strong> Medium - heuristic extraction from responses</li>
+                <li><strong>Coverage:</strong> Strong in research and analysis topics</li>
+                <li><strong>Update Frequency:</strong> Real-time</li>
+                <li><strong>Data Type:</strong> Heuristic URL extraction from responses</li>
+            </ul>
         </div>
 
-        <div class="feature-card">
-            <h4>⚡ Real-Time Updates</h4>
-            <p>Visibility data updates in real-time as AI assistants generate new citations. Our system processes new citations every 5 minutes and generates daily scores and weekly rankings.</p>
-        </div>
-
-        <div class="feature-card">
-            <h4>🔍 Recent Citations Feed</h4>
-            <p>See the latest citations from all AI assistants with timestamps, source types, and context. Filter by assistant to understand citation patterns and opportunities.</p>
-        </div>
-
-        <div class="feature-card">
-            <h4>📊 Competitive Intelligence</h4>
-            <p>Compare your visibility against competitors across all AI platforms. See who's winning in each AI ecosystem and identify optimization opportunities.</p>
-        </div>
+        <h3>Citation Data Structure</h3>
+        <p>For each citation, we capture:</p>
+        <ul>
+            <li><strong>Source URL:</strong> The page being cited</li>
+            <li><strong>Citation Title:</strong> Title or snippet from the source</li>
+            <li><strong>Assistant:</strong> Which AI platform made the citation</li>
+            <li><strong>Source Type:</strong> Native API vs. heuristic extraction</li>
+            <li><strong>Timestamp:</strong> When the citation occurred</li>
+            <li><strong>Query Context:</strong> The user query that triggered the citation</li>
+        </ul>
     </div>
 
-    <div class="section">
-        <h2>Technical Implementation</h2>
-        
+    <div class="section" id="scoring">
+        <h2>Visibility Scoring System</h2>
+        <p>Our proprietary algorithm generates 0-100 visibility scores based on multiple factors:</p>
+
+        <h3>Scoring Components</h3>
         <div class="feature-card">
-            <h4>🔌 Live API Integrations</h4>
-            <p>Direct integrations with Perplexity, OpenAI ChatGPT, and Anthropic Claude APIs ensure we capture real citations as they happen, not simulated data.</p>
+            <h4>Citation Frequency (40%)</h4>
+            <p>How often your domain appears in AI assistant responses</p>
+            <ul>
+                <li>Raw citation count per assistant</li>
+                <li>Citation rate (citations per query)</li>
+                <li>Consistency across different query types</li>
+            </ul>
         </div>
 
         <div class="feature-card">
-            <h4>⚙️ Advanced Citation Parsing</h4>
-            <p>Our system uses both native API responses and heuristic parsing to extract URLs from AI responses, including support for Markdown-style links that Claude often uses.</p>
+            <h4>Domain Diversity (30%)</h4>
+            <p>Variety of pages from your domain being cited</p>
+            <ul>
+                <li>Number of unique pages cited</li>
+                <li>Distribution across different content types</li>
+                <li>Homepage vs. deep page citations</li>
+            </ul>
         </div>
 
         <div class="feature-card">
-            <h4>🔄 Automated Processing Pipeline</h4>
-            <p>5-minute cron jobs process citation queues, daily rollups generate scores and rankings, and weekly analysis provides competitive intelligence.</p>
+            <h4>Recency (20%)</h4>
+            <p>How recent your citations are</p>
+            <ul>
+                <li>Citations from the last 7 days (highest weight)</li>
+                <li>Citations from the last 30 days</li>
+                <li>Historical citation trends</li>
+            </ul>
         </div>
 
         <div class="feature-card">
-            <h4>💰 Cost Management</h4>
-            <p>Built-in rate limiting and $10/day cost cap ensure sustainable operation while maximizing citation coverage across all AI assistants.</p>
+            <h4>Assistant Coverage (10%)</h4>
+            <p>How many different AI assistants cite your content</p>
+            <ul>
+                <li>Bonus for appearing in multiple assistants</li>
+                <li>Consistency across platforms</li>
+                <li>Platform-specific optimization opportunities</li>
+            </ul>
         </div>
-    </div>
 
-    <div class="section">
-        <h2>Why Visibility Intelligence Matters</h2>
-        
         <div class="highlight">
-            <h3>🚀 The Future of Content Discovery</h3>
-            <p>AI assistants are becoming the primary way users discover information. Traditional SEO focuses on search engine rankings, but Visibility Intelligence reveals where your content is discoverable inside AI-powered conversations.</p>
+            <h4>Score Interpretation</h4>
+            <ul>
+                <li><strong>90-100:</strong> 🟢 Excellent - Strong AI visibility across all platforms</li>
+                <li><strong>70-89:</strong> 🟢 Good - Regular citations with room for improvement</li>
+                <li><strong>50-69:</strong> 🟡 Moderate - Some AI visibility, optimization needed</li>
+                <li><strong>30-49:</strong> 🟡 Low - Limited AI citations, significant gaps</li>
+                <li><strong>0-29:</strong> 🔴 Very Low - Minimal AI visibility, urgent optimization needed</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section" id="features">
+        <h2>Key Features</h2>
+
+        <h3>Real-Time Dashboard</h3>
+        <p>Access your visibility data through an intuitive dashboard that shows:</p>
+        <ul>
+            <li><strong>Live Rankings:</strong> See how you rank against competitors in real-time</li>
+            <li><strong>Citation Feed:</strong> Recent citations with full context and links</li>
+            <li><strong>Trend Analysis:</strong> Visibility score changes over time</li>
+            <li><strong>Assistant Breakdown:</strong> Performance by AI platform</li>
+        </ul>
+
+        <h3>Competitive Intelligence</h3>
+        <div class="feature-card">
+            <h4>Multi-Vector Authority (MVA) Index</h4>
+            <p>Our proprietary competitive analysis metric that compares your AI visibility against industry benchmarks:</p>
+            <ul>
+                <li>Industry-specific scoring</li>
+                <li>Competitor comparison tables</li>
+                <li>Market share analysis</li>
+                <li>Optimization opportunity identification</li>
+            </ul>
         </div>
 
-        <h3>📊 Business Impact</h3>
+        <h3>Data Export & API</h3>
+        <p>Access your data programmatically or export for analysis:</p>
         <ul>
-            <li><strong>Early Mover Advantage:</strong> Be among the first to optimize for AI visibility</li>
-            <li><strong>Multi-Platform Strategy:</strong> Optimize for each AI ecosystem's unique preferences</li>
-            <li><strong>Competitive Intelligence:</strong> See where competitors appear in AI responses</li>
-            <li><strong>Content Optimization:</strong> Understand what content AI assistants prefer to cite</li>
-            <li><strong>ROI Measurement:</strong> Track visibility improvements and their impact on traffic</li>
+            <li><strong>CSV Export:</strong> Download rankings and citation data</li>
+            <li><strong>REST API:</strong> Programmatic access to all data</li>
+            <li><strong>Webhook Integration:</strong> Real-time notifications for new citations</li>
+            <li><strong>Raw Data Access:</strong> Full citation payloads and metadata</li>
         </ul>
 
-        <h3>🎯 Strategic Advantages</h3>
+        <h3>Alerting & Monitoring</h3>
+        <p>Stay informed about your AI visibility:</p>
         <ul>
-            <li><strong>Comprehensive Coverage:</strong> Track visibility across all major AI platforms</li>
-            <li><strong>Real-Time Insights:</strong> See citation changes as they happen</li>
-            <li><strong>Actionable Data:</strong> Export and analyze data for optimization decisions</li>
-            <li><strong>Competitive Benchmarking:</strong> Compare performance against industry leaders</li>
-            <li><strong>Future-Proof Strategy:</strong> Prepare for the AI-first web</li>
+            <li><strong>Citation Alerts:</strong> Notifications when you're cited</li>
+            <li><strong>Ranking Changes:</strong> Alerts for significant position shifts</li>
+            <li><strong>Competitor Monitoring:</strong> Track competitor visibility changes</li>
+            <li><strong>Performance Anomalies:</strong> Detect unusual citation patterns</li>
         </ul>
+    </div>
+
+    <div class="section" id="api">
+        <h2>API & Data Access</h2>
+        <p>Visibility Intelligence data is available through our comprehensive API:</p>
+
+        <h3>Key Endpoints</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint</th>
+                    <th>Purpose</th>
+                    <th>Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>GET /api/visibility/rankings</code></td>
+                    <td>Domain rankings by assistant</td>
+                    <td>Top domains, mentions, share percentage</td>
+                </tr>
+                <tr>
+                    <td><code>GET /api/visibility/citations</code></td>
+                    <td>Recent citations</td>
+                    <td>Citation details, URLs, timestamps</td>
+                </tr>
+                <tr>
+                    <td><code>GET /api/visibility/score</code></td>
+                    <td>Visibility scores</td>
+                    <td>0-100 scores by assistant and overall</td>
+                </tr>
+                <tr>
+                    <td><code>GET /api/visibility/drift</code></td>
+                    <td>Trend analysis</td>
+                    <td>Score changes over time</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Data Formats</h3>
+        <div class="feature-card">
+            <h4>Citation Data Example</h4>
+            <pre style="background: #f1f5f9; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 12px;">
+{
+  "url": "https://example.com/article",
+  "title": "How to Optimize for AI Search",
+  "assistant": "perplexity",
+  "source_type": "native",
+  "occurred_at": "2025-01-13T10:30:00Z",
+  "snippet": "AI search optimization requires...",
+  "query_context": "how to optimize for AI search engines"
+}</pre>
+        </div>
+
+        <h3>Rate Limits & Usage</h3>
+        <ul>
+            <li><strong>Free Tier:</strong> 100 requests/day</li>
+            <li><strong>Pro Tier:</strong> 1,000 requests/day</li>
+            <li><strong>Enterprise:</strong> Custom limits</li>
+            <li><strong>Real-time Updates:</strong> Data refreshed every 15 minutes</li>
+        </ul>
+    </div>
+
+    <div class="section" id="use-cases">
+        <h2>Use Cases & Applications</h2>
+
+        <h3>Content Marketing</h3>
+        <div class="feature-card">
+            <h4>AI-Optimized Content Strategy</h4>
+            <p>Use citation data to inform your content strategy:</p>
+            <ul>
+                <li>Identify high-performing content types</li>
+                <li>Discover content gaps through competitor analysis</li>
+                <li>Optimize existing content for AI citation</li>
+                <li>Track ROI of AI-focused content efforts</li>
+            </ul>
+        </div>
+
+        <h3>SEO & Marketing</h3>
+        <div class="feature-card">
+            <h4>AI-First SEO Optimization</h4>
+            <p>Traditional SEO tools miss AI visibility. Use our data to:</p>
+            <ul>
+                <li>Optimize for AI assistant queries</li>
+                <li>Improve structured data for AI consumption</li>
+                <li>Monitor AI-specific ranking factors</li>
+                <li>Measure AI SEO campaign effectiveness</li>
+            </ul>
+        </div>
+
+        <h3>Competitive Intelligence</h3>
+        <div class="feature-card">
+            <h4>Market Position Analysis</h4>
+            <p>Understand your position in AI search:</p>
+            <ul>
+                <li>Compare AI visibility against competitors</li>
+                <li>Identify market opportunities</li>
+                <li>Track competitor content strategies</li>
+                <li>Benchmark industry performance</li>
+            </ul>
+        </div>
+
+        <h3>Business Intelligence</h3>
+        <div class="feature-card">
+            <h4>AI Impact Measurement</h4>
+            <p>Quantify your AI search presence:</p>
+            <ul>
+                <li>Measure brand awareness in AI platforms</li>
+                <li>Track thought leadership in AI search</li>
+                <li>Monitor industry authority signals</li>
+                <li>Report AI visibility metrics to stakeholders</li>
+            </ul>
+        </div>
     </div>
 
     <div class="section">
         <h2>Getting Started</h2>
-        <p>Ready to discover your AI visibility footprint?</p>
-        
-        <div style="text-align: center; margin: 30px 0;">
-            <a href="https://app.optiview.ai/insights/visibility" class="demo-button">🚀 Launch Visibility Intelligence</a>
-        </div>
+        <p>Visibility Intelligence is available to all Optiview users:</p>
 
-        <h3>📋 Quick Start Guide</h3>
+        <h3>For New Users</h3>
         <ol>
-            <li><strong>Access the Dashboard:</strong> Navigate to the Visibility Intelligence tab</li>
-            <li><strong>Explore Assistant Views:</strong> Switch between Perplexity, ChatGPT, and Claude</li>
-            <li><strong>Review Your Rankings:</strong> See where you rank among all cited domains</li>
-            <li><strong>Analyze Recent Citations:</strong> Check the latest citations from AI assistants</li>
-            <li><strong>Export Data:</strong> Download CSV files for detailed analysis</li>
-            <li><strong>Track Improvements:</strong> Monitor visibility changes over time</li>
+            <li>Run your first audit at <a href="https://app.optiview.ai" style="color: #3b82f6;">app.optiview.ai</a></li>
+            <li>Navigate to the "Visibility Intelligence" tab in your audit report</li>
+            <li>View your current AI visibility scores and rankings</li>
+            <li>Explore recent citations and competitive analysis</li>
         </ol>
 
-        <h3>🎯 Optimization Tips</h3>
-        <ul>
-            <li><strong>Content Strategy:</strong> Create comprehensive, authoritative content that directly answers questions</li>
-            <li><strong>Technical SEO:</strong> Ensure AI bots can crawl your content without restrictions</li>
-            <li><strong>Structured Data:</strong> Implement JSON-LD markup for better AI understanding</li>
-            <li><strong>FAQ Optimization:</strong> Structure content with clear question-answer pairs</li>
-            <li><strong>Regular Monitoring:</strong> Track citation patterns and adjust strategy accordingly</li>
-        </ul>
-    </div>
+        <h3>For Existing Users</h3>
+        <ol>
+            <li>Visibility Intelligence is automatically enabled</li>
+            <li>Data collection begins immediately after audit completion</li>
+            <li>Check back daily for updated scores and new citations</li>
+            <li>Use the CSV export for deeper analysis</li>
+        </ol>
 
-    <div class="section">
-        <h2>🚀 The Future is Here</h2>
-        <p>Visibility Intelligence represents the next evolution in SEO. As AI assistants become the primary way users discover content, traditional search engine optimization becomes just one piece of the puzzle.</p>
-        
         <div class="highlight">
-            <p><strong>Optiview Visibility Intelligence v1.0</strong> is the first working LLM-visibility tracker spanning Perplexity, ChatGPT Search, and Claude. Join the future of content discovery and optimization.</p>
+            <h4>💡 Pro Tips</h4>
+            <ul>
+                <li>Check your visibility scores weekly to track trends</li>
+                <li>Focus on improving content that gets cited most often</li>
+                <li>Use competitor analysis to identify optimization opportunities</li>
+                <li>Monitor citation patterns to understand AI query behavior</li>
+            </ul>
         </div>
-
-        <p>Ready to see how visible your content is across AI platforms? <a href="https://app.optiview.ai/insights/visibility" style="color: #3b82f6; font-weight: 600;">Launch Visibility Intelligence now →</a></p>
     </div>
 
-    <a href="https://app.optiview.ai" class="back-link">← Back to Optiview Dashboard</a>
+    <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f8fafc; border-radius: 12px;">
+        <h3 style="color: #1e40af; margin-top: 0;">Ready to Track Your AI Visibility?</h3>
+        <p>Start monitoring how AI assistants reference your content today</p>
+        <a href="https://app.optiview.ai" class="demo-button">Run Free Audit</a>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; color: #64748b; font-size: 14px;">
+        <a href="https://optiview.ai" class="back-link">← Back to Optiview Home</a> • 
+        <a href="https://app.optiview.ai" class="back-link">Run an Audit</a>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+        <p>See also: <a href="https://optiview.ai/docs/faq.html" style="color: #6b7280;">FAQ</a> | 
+        <a href="https://optiview.ai/docs/citations.html" style="color: #6b7280;">Citations Guide</a> | 
+        <a href="https://optiview.ai/docs/audit.html" style="color: #6b7280;">Audit Checks</a></p>
+        <p>Last updated: October 2025 (Visibility Intelligence v1.0)</p>
+    </div>
 </body>
 </html>
