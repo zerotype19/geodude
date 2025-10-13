@@ -13,6 +13,7 @@ import { warmCitations } from './citations-warm';
 import { handleCitations } from './routes/citations';
 import { handleBotLogsIngest, handleGetCrawlers } from './bots/routes';
 import { createVisibilityRoutes } from './routes/visibility';
+import { processRun } from './routes/visibility-processor';
 
 interface Env {
   DB: D1Database;
@@ -109,6 +110,20 @@ async function checkCitationsBudget(env: Env): Promise<boolean> {
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const hour = new Date().getUTCHours();
+    
+    // Process visibility queue every 5 minutes (any hour)
+    if (env.FEATURE_ASSISTANT_VISIBILITY === 'true') {
+      console.log('[VisibilityProcessor] Processing queue...');
+      try {
+        // Process up to 2 runs per tick
+        const batch = 2;
+        for (let i = 0; i < batch; i++) {
+          ctx.waitUntil(processRun(env, ctx));
+        }
+      } catch (error) {
+        console.error('[VisibilityProcessor] Error processing queue:', error);
+      }
+    }
     
     // 03:00 UTC - Nightly backup
     if (hour === 3) {
@@ -2598,6 +2613,22 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       
       if (path === '/api/visibility/ga4-config' && request.method === 'GET') {
         return visibilityRoutes.generateGA4Config(request);
+      }
+
+      // Processor routes
+      if (path === '/api/visibility/process-next' && request.method === 'POST') {
+        const result = await processRun(env, ctx);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (path.match(/^\/api\/visibility\/runs\/[^/]+\/process$/) && request.method === 'POST') {
+        const runId = path.split('/')[4];
+        const result = await processRun(env, ctx, runId);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
     }
 

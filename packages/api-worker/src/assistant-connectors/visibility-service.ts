@@ -182,4 +182,90 @@ export class AssistantVisibilityService implements VisibilityService {
       rank: row.rank
     }));
   }
+
+  async getNextQueuedRun(): Promise<AssistantRun | null> {
+    const result = await this.db.prepare(
+      `SELECT id, project_id, assistant, run_started_at, run_duration_ms, status
+       FROM assistant_runs 
+       WHERE status = 'queued' 
+       ORDER BY run_started_at ASC 
+       LIMIT 1`
+    ).first();
+
+    return result as AssistantRun | null;
+  }
+
+  async getRun(runId: string): Promise<AssistantRun | null> {
+    const result = await this.db.prepare(
+      `SELECT id, project_id, assistant, run_started_at, run_duration_ms, status
+       FROM assistant_runs 
+       WHERE id = ?`
+    ).bind(runId).first();
+
+    return result as AssistantRun | null;
+  }
+
+  async markRunRunning(runId: string): Promise<void> {
+    await this.db.prepare(
+      `UPDATE assistant_runs 
+       SET status = 'running' 
+       WHERE id = ? AND status = 'queued'`
+    ).bind(runId).run();
+  }
+
+  async markRunDone(runId: string, status: 'success' | 'error', error?: string): Promise<void> {
+    const now = new Date().toISOString();
+    await this.db.prepare(
+      `UPDATE assistant_runs 
+       SET status = ?, run_duration_ms = ?, error = ?
+       WHERE id = ?`
+    ).bind(status, null, error || null, runId).run();
+  }
+
+  async getPromptsForRun(runId: string): Promise<AssistantPrompt[]> {
+    const result = await this.db.prepare(
+      `SELECT id, run_id, prompt_text, intent_tag, locale
+       FROM assistant_prompts 
+       WHERE run_id = ?`
+    ).bind(runId).all();
+
+    return result.results as AssistantPrompt[];
+  }
+
+  async saveAssistantOutput(promptId: string, rawPayload: string): Promise<void> {
+    const outputId = `output_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
+    
+    await this.db.prepare(
+      `INSERT INTO assistant_outputs (id, prompt_id, raw_payload, parse_version, parsed_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).bind(outputId, promptId, '1.0', now, now).run();
+  }
+
+  async saveCitation(projectId: string, citation: {
+    source_url: string;
+    source_domain: string;
+    title: string;
+    snippet: string;
+    rank: number;
+  }, promptId?: string): Promise<void> {
+    const citationId = `cite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
+    
+    await this.db.prepare(
+      `INSERT INTO ai_citations (id, project_id, prompt_id, rank, source_url, source_domain, title, snippet, is_own_domain, occurred_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      citationId, 
+      projectId, 
+      promptId || null, 
+      citation.rank, 
+      citation.source_url, 
+      citation.source_domain, 
+      citation.title, 
+      citation.snippet, 
+      0, // is_own_domain
+      now
+    ).run();
+  }
 }
