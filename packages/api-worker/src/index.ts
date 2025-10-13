@@ -1304,31 +1304,15 @@ export default {
         console.log(`[page] Looking for page: ${normalized} in audit ${auditId}`);
 
         // 1) Find the exact page row (search by full URL first, then pathname)
-        // For very long URLs, avoid complex LIKE patterns that cause SQLite errors
-        let pageRow;
-        
-        if (normalized.length > 200) {
-          // For very long URLs, use exact matches only to avoid pattern complexity
-          pageRow = await env.DB.prepare(
-            `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
-                    word_count, rendered_words, snippet
-             FROM audit_pages
-             WHERE audit_id = ? AND (url = ? OR url = ?)
-             ORDER BY (url = ?) DESC, (url = ?) DESC
-             LIMIT 1`
-          ).bind(auditId, rawU, normalized, rawU, normalized).first();
-        } else {
-          // For shorter URLs, use LIKE pattern with proper escaping
-          const escapedNormalized = normalized.replace(/[%_\\]/g, '\\$&');
-          pageRow = await env.DB.prepare(
-            `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
-                    word_count, rendered_words, snippet
-             FROM audit_pages
-             WHERE audit_id = ? AND (url = ? OR url = ? OR url LIKE '%' || ?)
-             ORDER BY (url = ?) DESC, (url = ?) DESC
-             LIMIT 1`
-          ).bind(auditId, rawU, normalized, escapedNormalized, rawU, normalized).first();
-        }
+        // Simplified approach: avoid LIKE patterns entirely to prevent SQLite complexity errors
+        const pageRow = await env.DB.prepare(
+          `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
+                  word_count, rendered_words, snippet
+           FROM audit_pages
+           WHERE audit_id = ? AND (url = ? OR url = ?)
+           ORDER BY (url = ?) DESC, (url = ?) DESC
+           LIMIT 1`
+        ).bind(auditId, rawU, normalized, rawU, normalized).first();
         
         console.log(`[page] Found page row:`, !!pageRow, `(searched for: "${normalized}")`);
 
