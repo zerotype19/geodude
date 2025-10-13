@@ -20,10 +20,18 @@ export interface Env {
   GA4_REGEX_SNIPPET_URL?: string;
 }
 
-export async function processRun(env: Env, ctx: ExecutionContext, runId?: string) {
+export async function processRun(env: Env, ctx?: ExecutionContext, runId?: string) {
   console.log(`[VisibilityProcessor] Start processing run: ${runId || 'next queued'}, visibility: ${env.FEATURE_ASSISTANT_VISIBILITY}`);
   
   try {
+    // Guard against missing dependencies
+    if (!env.DB) {
+      throw new Error('Database not available');
+    }
+    if (!env.PROMPT_PACKS) {
+      throw new Error('PROMPT_PACKS KV not available');
+    }
+    
     const visibilityService = new AssistantVisibilityService(env.DB, env.PROMPT_PACKS);
     
     // Get the run to process
@@ -66,6 +74,16 @@ export async function processRun(env: Env, ctx: ExecutionContext, runId?: string
     }
 
     try {
+      // Check for timeout (30 minutes)
+      const runAge = Date.now() - new Date(run.run_started_at).getTime();
+      const timeoutMs = 30 * 60 * 1000; // 30 minutes
+      
+      if (runAge > timeoutMs) {
+        console.warn(`[VisibilityProcessor] Run ${run.id} timed out after ${Math.round(runAge / 1000 / 60)} minutes`);
+        await visibilityService.markRunDone(run.id, "error", `timeout after ${Math.round(runAge / 1000 / 60)} minutes`);
+        return { ok: false, runId: run.id, status: "error", error: "timeout" };
+      }
+
       // Get prompts for this run
       const prompts = await visibilityService.getPromptsForRun(run.id);
       console.log(`[VisibilityProcessor] Found ${prompts.length} prompts for run ${run.id}`);
@@ -115,7 +133,19 @@ export async function processRun(env: Env, ctx: ExecutionContext, runId?: string
 
       // Mark as success
       await visibilityService.markRunDone(run.id, "success");
-      console.log(`[VisibilityProcessor] Marked run ${run.id} as success`);
+      
+      // Count outputs and citations for logging
+      const outputCount = await visibilityService.db.prepare(
+        `SELECT COUNT(*) as count FROM assistant_outputs WHERE prompt_id IN (
+          SELECT id FROM assistant_prompts WHERE run_id = ?
+        )`
+      ).bind(run.id).first();
+      
+      const citationCount = await visibilityService.db.prepare(
+        `SELECT COUNT(*) as count FROM ai_citations WHERE project_id = ? AND occurred_at >= datetime('now', '-1 hour')`
+      ).bind(run.project_id).first();
+      
+      console.log(`[VisibilityProcessor] Done {runId: ${run.id}, outputs: ${outputCount?.count || 0}, citations: ${citationCount?.count || 0}}`);
 
       return { ok: true, runId: run.id, status: "success" };
     } catch (e) {
@@ -133,14 +163,22 @@ export async function processRun(env: Env, ctx: ExecutionContext, runId?: string
 
 async function isProjectEnabled(env: Env, projectId: string): Promise<boolean> {
   try {
+    if (!env.PROMPT_PACKS) {
+      console.warn('[VisibilityProcessor] PROMPT_PACKS not available, allowing project');
+      return true; // Allow if KV not available
+    }
+    
     const enabledProjects = await env.PROMPT_PACKS.get('enabled_projects');
-    if (!enabledProjects) return false;
+    if (!enabledProjects) {
+      console.warn('[VisibilityProcessor] No enabled_projects key found, allowing project');
+      return true; // Allow if no allowlist
+    }
     
     const projects = JSON.parse(enabledProjects);
     return Array.isArray(projects) && projects.includes(projectId);
   } catch (error) {
     console.error('[VisibilityProcessor] Error checking allowlist:', error);
-    return false;
+    return true; // Allow on error to prevent blocking
   }
 }
 
