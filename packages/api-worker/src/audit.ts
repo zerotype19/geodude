@@ -662,13 +662,13 @@ export async function runAudit(
       pages.length,
       urlsToCrawl.length,
       issues.length,
-      JSON.stringify(aiAccess),
-      JSON.stringify(aiFlags),
+      aiAccess ? JSON.stringify(aiAccess) : null,
+      aiFlags ? JSON.stringify(aiFlags) : null,
       braveQueryLogs.length > 0 ? JSON.stringify({ queries: braveQueryLogs }) : null,
       auditId
     ).run();
     
-    console.log('Audit saved. AI access JSON length:', JSON.stringify(aiAccess).length);
+    console.log('Audit saved. AI access JSON length:', aiAccess ? JSON.stringify(aiAccess).length : 0);
 
     // Save pages
     for (const page of pages) {
