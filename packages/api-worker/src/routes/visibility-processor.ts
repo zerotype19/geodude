@@ -4,6 +4,7 @@
  */
 
 import { AssistantVisibilityService } from '../assistant-connectors/visibility-service';
+import { getEnabledConnector } from '../services/visibility/connectors';
 import { MVAService } from '../assistant-connectors/mva-service';
 
 export interface Env {
@@ -99,26 +100,37 @@ export async function processRun(env: Env, ctx?: ExecutionContext, runId?: strin
         console.log(`[VisibilityProcessor] Processing prompt: ${prompt.id}`);
         
         try {
-          let payload = "";
-          
-          // Simulate assistant response (replace with actual connectors)
-          if (run.assistant === "perplexity") {
-            payload = await simulatePerplexityResponse(prompt.prompt_text);
-          } else if (run.assistant === "chatgpt_search") {
-            payload = await simulateChatGPTResponse(prompt.prompt_text);
-          } else if (run.assistant === "copilot") {
-            payload = await simulateCopilotResponse(prompt.prompt_text);
-          } else {
-            console.warn(`[VisibilityProcessor] Unknown assistant: ${run.assistant}`);
+          // Get enabled connector for this assistant
+          const connector = getEnabledConnector(run.assistant, env);
+          if (!connector) {
+            console.warn(`[VisibilityProcessor] Connector disabled or unknown: ${run.assistant}`);
             continue;
           }
+
+          // Call live connector
+          console.log(`[VisibilityProcessor] Calling ${run.assistant} connector...`);
+          const { answer, sources, raw } = await connector.ask(prompt.prompt_text, env);
+          
+          // Create normalized payload for backward compatibility
+          const payload = JSON.stringify({
+            answer,
+            sources,
+            raw
+          });
 
           // Save assistant output
           await visibilityService.saveAssistantOutput(prompt.id, payload);
           console.log(`[VisibilityProcessor] Saved output for prompt ${prompt.id}`);
 
-          // Parse citations from payload
-          const citations = parseCitations(payload, run.assistant);
+          // Parse citations from sources (already normalized)
+          const citations = sources.map((source, index) => ({
+            source_url: source.url,
+            source_domain: new URL(source.url).hostname,
+            title: source.title || `Citation ${index + 1}`,
+            snippet: source.snippet || "",
+            rank: index + 1
+          }));
+          
           console.log(`[VisibilityProcessor] Parsed ${citations.length} citations from prompt ${prompt.id}`);
 
           // Save citations
@@ -182,102 +194,4 @@ async function isProjectEnabled(env: Env, projectId: string): Promise<boolean> {
   }
 }
 
-async function simulatePerplexityResponse(prompt: string): Promise<string> {
-  // Simulate Perplexity response with citations
-  return JSON.stringify({
-    answer: `Based on the query "${prompt}", here are the key insights:`,
-    sources: [
-      {
-        title: "Generative Engine Optimization Guide",
-        url: "https://example.com/geo-guide",
-        snippet: "GEO is the practice of optimizing content for AI assistants..."
-      },
-      {
-        title: "AI Citation Best Practices",
-        url: "https://example.com/ai-citations",
-        snippet: "Proper citation formatting helps AI assistants understand content..."
-      }
-    ],
-    timestamp: new Date().toISOString()
-  });
-}
-
-async function simulateChatGPTResponse(prompt: string): Promise<string> {
-  // Simulate ChatGPT Search response
-  return JSON.stringify({
-    response: `Regarding "${prompt}", the key points are:`,
-    references: [
-      {
-        title: "Answer Engine Optimization",
-        url: "https://example.com/aeo-guide",
-        excerpt: "AEO focuses on optimizing for AI-powered search engines..."
-      }
-    ],
-    timestamp: new Date().toISOString()
-  });
-}
-
-async function simulateCopilotResponse(prompt: string): Promise<string> {
-  // Simulate Copilot response
-  return JSON.stringify({
-    content: `For the question "${prompt}", consider these resources:`,
-    links: [
-      {
-        title: "AI Assistant Optimization",
-        url: "https://example.com/ai-optimization",
-        description: "Comprehensive guide to AI assistant optimization..."
-      }
-    ],
-    timestamp: new Date().toISOString()
-  });
-}
-
-function parseCitations(payload: string, assistant: string): Array<{
-  source_url: string;
-  source_domain: string;
-  title: string;
-  snippet: string;
-  rank: number;
-}> {
-  try {
-    const data = JSON.parse(payload);
-    const citations = [];
-    
-    if (assistant === "perplexity" && data.sources) {
-      data.sources.forEach((source: any, index: number) => {
-        citations.push({
-          source_url: source.url,
-          source_domain: new URL(source.url).hostname,
-          title: source.title,
-          snippet: source.snippet,
-          rank: index + 1
-        });
-      });
-    } else if (assistant === "chatgpt_search" && data.references) {
-      data.references.forEach((ref: any, index: number) => {
-        citations.push({
-          source_url: ref.url,
-          source_domain: new URL(ref.url).hostname,
-          title: ref.title,
-          snippet: ref.excerpt,
-          rank: index + 1
-        });
-      });
-    } else if (assistant === "copilot" && data.links) {
-      data.links.forEach((link: any, index: number) => {
-        citations.push({
-          source_url: link.url,
-          source_domain: new URL(link.url).hostname,
-          title: link.title,
-          snippet: link.description,
-          rank: index + 1
-        });
-      });
-    }
-    
-    return citations;
-  } catch (error) {
-    console.error('[VisibilityProcessor] Error parsing citations:', error);
-    return [];
-  }
-}
+// Note: Old simulation functions removed - now using live connectors

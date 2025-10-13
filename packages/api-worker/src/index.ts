@@ -45,6 +45,19 @@ interface Env {
   VISIBILITY_RATE_LIMIT_PER_PROJECT?: string;
   ALLOWED_ANSWER_ENGINES?: string;
   GA4_REGEX_SNIPPET_URL?: string;
+  // Live Connectors (Phase 4 - Sprint 1)
+  FEATURE_VIS_PERPLEXITY?: string;
+  FEATURE_VIS_CHATGPT?: string;
+  FEATURE_VIS_CLAUDE?: string;
+  VIS_CONNECT_TIMEOUT_MS?: string;
+  VIS_CONNECT_RETRIES?: string;
+  VIS_RATE_PER_PROJECT?: string;
+  // Additional API Keys (secrets)
+  PERPLEXITY_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
+  // Optional org IDs
+  PERPLEXITY_ORG_ID?: string;
+  OPENAI_ORG_ID?: string;
 }
 
 // Helper: Validate API key
