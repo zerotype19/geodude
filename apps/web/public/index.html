@@ -14,31 +14,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Optiview - AI SEO Platform & Visibility Intelligence</title>
-    <meta name="description" content="The first AI-powered SEO platform that tracks visibility across traditional search engines and AI assistants like Perplexity, ChatGPT Search, and Claude. Get comprehensive audits and real-time AI citation tracking.">
+    <meta name="description" content="AI SEO audit tool that helps you optimize your website for AI search engines and answer engines. Track citations from Perplexity, ChatGPT Search, and Claude.">
     <meta name="keywords" content="AI SEO, visibility intelligence, Perplexity tracking, ChatGPT citations, Claude AI, SEO audit, AI optimization">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://optiview.ai/">
     <meta property="og:title" content="Optiview - AI SEO Platform & Visibility Intelligence">
-    <meta property="og:description" content="Track how AI assistants reference your content. The first platform to monitor visibility across Perplexity, ChatGPT Search, and Claude with real-time citations and 0-100 scores.">
+    <meta property="og:description" content="AI SEO audit tool that helps you optimize your website for AI search engines and answer engines. Track citations from Perplexity, ChatGPT Search, and Claude.">
     <meta property="og:image" content="https://optiview.ai/og-image.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://optiview.ai/">
     <meta property="twitter:title" content="Optiview - AI SEO Platform & Visibility Intelligence">
-    <meta property="twitter:description" content="Track how AI assistants reference your content. The first platform to monitor visibility across Perplexity, ChatGPT Search, and Claude with real-time citations and 0-100 scores.">
+    <meta property="twitter:description" content="AI SEO audit tool that helps you optimize your website for AI search engines and answer engines. Track citations from Perplexity, ChatGPT Search, and Claude.">
     <meta property="twitter:image" content="https://optiview.ai/og-image.png">
-
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-CY45NV4CNE');
-    </script>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -49,7 +40,7 @@
             background: #ffffff;
         }
         
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
         
         /* Header */
         .header { 
@@ -83,71 +74,53 @@
             padding: 80px 0; 
             text-align: center;
         }
-        .hero h1 { font-size: 3.5rem; font-weight: 800; margin-bottom: 24px; line-height: 1.1; }
-        .hero p { font-size: 1.25rem; margin-bottom: 32px; opacity: 0.9; max-width: 600px; margin-left: auto; margin-right: auto; }
+        .hero h1 { font-size: 3rem; font-weight: 700; margin-bottom: 24px; line-height: 1.2; }
+        .hero p { font-size: 1.2rem; margin-bottom: 32px; opacity: 0.9; max-width: 600px; margin-left: auto; margin-right: auto; }
         .hero-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
         .hero-button { 
             background: white; 
             color: #3b82f6; 
             padding: 16px 32px; 
-            border-radius: 12px; 
+            border-radius: 8px; 
             text-decoration: none; 
             font-weight: 600;
             font-size: 1.1rem;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform 0.2s;
         }
-        .hero-button:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        .hero-button.secondary { 
-            background: transparent; 
-            color: white; 
-            border: 2px solid white; 
-        }
-        .hero-button.secondary:hover { background: white; color: #3b82f6; }
+        .hero-button:hover { transform: translateY(-2px); }
         
         /* Features Section */
         .features { padding: 80px 0; background: #f8fafc; }
         .section-title { text-align: center; margin-bottom: 60px; }
         .section-title h2 { font-size: 2.5rem; font-weight: 700; color: #1f2937; margin-bottom: 16px; }
-        .section-title p { font-size: 1.2rem; color: #6b7280; max-width: 600px; margin: 0 auto; }
+        .section-title p { font-size: 1.1rem; color: #6b7280; max-width: 600px; margin: 0 auto; }
         
         .features-grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
-            gap: 40px; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 30px; 
             margin-top: 60px;
         }
         .feature-card { 
             background: white; 
-            padding: 40px; 
-            border-radius: 16px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             border: 1px solid #e5e7eb;
-            transition: transform 0.2s, box-shadow 0.2s;
         }
-        .feature-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
-        .feature-icon { font-size: 3rem; margin-bottom: 20px; }
-        .feature-card h3 { font-size: 1.5rem; font-weight: 600; color: #1f2937; margin-bottom: 16px; }
-        .feature-card p { color: #6b7280; margin-bottom: 20px; }
-        .feature-badge { 
-            display: inline-block; 
-            background: #10b981; 
-            color: white; 
-            padding: 4px 12px; 
-            border-radius: 20px; 
-            font-size: 0.875rem; 
-            font-weight: 600;
-        }
+        .feature-icon { font-size: 2.5rem; margin-bottom: 16px; }
+        .feature-card h3 { font-size: 1.3rem; font-weight: 600; color: #1f2937; margin-bottom: 12px; }
+        .feature-card p { color: #6b7280; margin-bottom: 16px; }
         
         /* Stats Section */
-        .stats { padding: 60px 0; background: white; }
+        .stats { padding: 60px 0; background: white; text-align: center; }
         .stats-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
             gap: 40px; 
-            text-align: center;
         }
         .stat-item { }
-        .stat-number { font-size: 3rem; font-weight: 800; color: #3b82f6; margin-bottom: 8px; }
+        .stat-number { font-size: 2.5rem; font-weight: 700; color: #3b82f6; margin-bottom: 8px; }
         .stat-label { color: #6b7280; font-weight: 500; }
         
         /* AI Assistants Section */
@@ -162,41 +135,46 @@
             background: white; 
             padding: 30px; 
             border-radius: 12px; 
-            text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             border: 1px solid #e5e7eb;
+            text-align: center;
         }
         .assistant-icon { font-size: 2.5rem; margin-bottom: 16px; }
-        .assistant-card h3 { font-size: 1.25rem; font-weight: 600; color: #1f2937; margin-bottom: 12px; }
-        .assistant-card p { color: #6b7280; font-size: 0.9rem; }
+        .assistant-card h3 { font-size: 1.3rem; font-weight: 600; color: #1f2937; margin-bottom: 12px; }
+        .assistant-card p { color: #6b7280; }
         
         /* CTA Section */
         .cta { 
-            background: linear-gradient(135deg, #1f2937 0%, #111827 100%); 
-            color: white; 
             padding: 80px 0; 
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); 
+            color: white; 
             text-align: center;
         }
-        .cta h2 { font-size: 2.5rem; font-weight: 700; margin-bottom: 24px; }
+        .cta h2 { font-size: 2.5rem; font-weight: 700; margin-bottom: 16px; }
         .cta p { font-size: 1.2rem; margin-bottom: 32px; opacity: 0.9; max-width: 600px; margin-left: auto; margin-right: auto; }
+        .cta-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
         
         /* Footer */
-        .footer { background: #1f2937; color: white; padding: 60px 0 40px; }
-        .footer-content { 
+        .footer { 
+            background: #1f2937; 
+            color: #9ca3af; 
+            padding: 60px 0 40px; 
+            text-align: center;
+        }
+        .footer-links { 
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
             gap: 40px; 
             margin-bottom: 40px;
         }
-        .footer-section h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 20px; }
+        .footer-section h4 { color: white; font-weight: 600; margin-bottom: 16px; }
         .footer-section ul { list-style: none; }
         .footer-section li { margin-bottom: 8px; }
-        .footer-section a { color: #d1d5db; text-decoration: none; transition: color 0.2s; }
+        .footer-section a { color: #9ca3af; text-decoration: none; }
         .footer-section a:hover { color: white; }
         .footer-bottom { 
             border-top: 1px solid #374151; 
             padding-top: 20px; 
-            text-align: center; 
             color: #9ca3af;
         }
         
@@ -218,9 +196,8 @@
                 <a href="/" class="logo">Optiview</a>
                 <div class="nav-links">
                     <a href="#features">Features</a>
-                    <a href="#ai-assistants">AI Assistants</a>
-                    <a href="#pricing">Pricing</a>
-                    <a href="/docs/faq.html">Docs</a>
+                    <a href="/docs/faq.html">FAQ</a>
+                    <a href="/docs/visibility.html">Visibility Intelligence</a>
                     <a href="https://app.optiview.ai" class="cta-button">Launch App</a>
                 </div>
             </nav>
@@ -230,11 +207,11 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="container">
-            <h1>The First AI SEO Platform with Visibility Intelligence</h1>
-            <p>Track how AI assistants like Perplexity, ChatGPT Search, and Claude reference your content. Get comprehensive SEO audits plus real-time AI citation tracking with 0-100 visibility scores.</p>
+            <h1>AI SEO Platform with Visibility Intelligence</h1>
+            <p>Track how AI assistants like Perplexity, ChatGPT Search, and Claude reference your content. Get comprehensive SEO audits plus AI citation tracking.</p>
             <div class="hero-buttons">
                 <a href="https://app.optiview.ai" class="hero-button">Start Free Audit</a>
-                <a href="#features" class="hero-button secondary">Learn More</a>
+                <a href="/docs/faq.html" class="hero-button">Learn More</a>
             </div>
         </div>
     </section>
@@ -243,46 +220,33 @@
     <section class="features" id="features">
         <div class="container">
             <div class="section-title">
-                <h2>Comprehensive AI SEO Platform</h2>
-                <p>Traditional SEO meets AI visibility intelligence for the future of content discovery</p>
+                <h2>AI SEO & Visibility Intelligence</h2>
+                <p>Comprehensive audits and AI assistant citation tracking for the future of content discovery</p>
             </div>
             
             <div class="features-grid">
                 <div class="feature-card">
                     <div class="feature-icon">🔍</div>
-                    <div class="feature-badge">NEW</div>
                     <h3>Visibility Intelligence</h3>
-                    <p>Track how AI assistants reference your content across Perplexity, ChatGPT Search, and Claude. Get real-time citations, 0-100 visibility scores, and competitive rankings.</p>
+                    <p>Track citations from Perplexity, ChatGPT Search, and Claude. See how AI assistants reference your content with real-time citation data.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">📊</div>
-                    <h3>5-Pillar SEO Audits</h3>
-                    <p>Comprehensive audits covering crawlability, structured data, answerability, trust signals, and AI visibility. Advanced detectors for render parity, schema fitness, and E-E-A-T analysis.</p>
+                    <h3>SEO Audits</h3>
+                    <p>Comprehensive audits covering crawlability, structured data, answerability, and trust signals. Identify issues that impact both traditional search and AI crawling.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">🤖</div>
                     <h3>AI Assistant Tracking</h3>
-                    <p>Monitor citations from Perplexity, ChatGPT Search, and Claude with live API integrations. Understand each AI's unique citation patterns and optimize accordingly.</p>
+                    <p>Monitor citations from multiple AI assistants with live API integrations. Understand each AI's citation patterns and optimize accordingly.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">📈</div>
-                    <h3>Real-Time Analytics</h3>
-                    <p>Live visibility scores, weekly rankings, and trend analysis. Export data, track competitive positioning, and measure ROI from AI optimization efforts.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Performance Monitoring</h3>
-                    <p>Track Core Web Vitals, page speed, and technical SEO health. Identify issues that impact both traditional search and AI assistant crawling.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🔒</div>
-                    <h3>Enterprise Security</h3>
-                    <p>Bank-grade security with AES-256 encryption, GDPR compliance, and secure API integrations. Your data is protected with industry-leading security measures.</p>
+                    <h3>Analytics & Rankings</h3>
+                    <p>View visibility scores, weekly rankings, and trend analysis. Export data and track competitive positioning across AI platforms.</p>
                 </div>
             </div>
         </div>
@@ -297,46 +261,46 @@
                     <div class="stat-label">AI Assistants Tracked</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">100+</div>
-                    <div class="stat-label">Daily Citations</div>
+                    <div class="stat-number">Beta</div>
+                    <div class="stat-label">Currently Free</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">99.9%</div>
-                    <div class="stat-label">Uptime</div>
+                    <div class="stat-number">120</div>
+                    <div class="stat-label">Max Pages Audited</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">0-100</div>
-                    <div class="stat-label">Visibility Scores</div>
+                    <div class="stat-number">50</div>
+                    <div class="stat-label">AI Queries Per Audit</div>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- AI Assistants Section -->
-    <section class="ai-assistants" id="ai-assistants">
+    <section class="ai-assistants">
         <div class="container">
             <div class="section-title">
-                <h2>Track AI Assistant Citations</h2>
-                <p>Each AI assistant forms its own unique ecosystem of citations with distinct preferences and patterns</p>
+                <h2>AI Assistant Citation Tracking</h2>
+                <p>Monitor how different AI assistants reference your content</p>
             </div>
             
             <div class="assistants-grid">
                 <div class="assistant-card">
                     <div class="assistant-icon">🔍</div>
                     <h3>Perplexity AI</h3>
-                    <p>Direct source links with context. Prefers SEO-optimized content, marketing resources, and technical documentation. Native API integration captures structured citations.</p>
+                    <p>Native API integration captures structured citations with direct source links and context.</p>
                 </div>
                 
                 <div class="assistant-card">
                     <div class="assistant-icon">🤖</div>
                     <h3>ChatGPT Search</h3>
-                    <p>Contextual references in conversational responses. Favors AI/tech platforms, development tools, and educational content. Heuristic URL extraction from responses.</p>
+                    <p>Heuristic URL extraction from conversational responses and contextual references.</p>
                 </div>
                 
                 <div class="assistant-card">
                     <div class="assistant-icon">🧠</div>
                     <h3>Claude (Anthropic)</h3>
-                    <p>Markdown-style links and structured references. Cites development tools, programming resources, and technical guides. Enhanced parsing for Markdown format.</p>
+                    <p>Enhanced parsing for Markdown-style links and structured references in responses.</p>
                 </div>
             </div>
         </div>
@@ -345,11 +309,11 @@
     <!-- CTA Section -->
     <section class="cta">
         <div class="container">
-            <h2>Ready to Optimize for AI?</h2>
-            <p>Join the future of content discovery. Start tracking your AI visibility across all major platforms today.</p>
-            <div class="hero-buttons">
-                <a href="https://app.optiview.ai" class="hero-button">Launch Optiview</a>
-                <a href="/docs/visibility.html" class="hero-button secondary">Learn About Visibility Intelligence</a>
+            <h2>Ready to Track Your AI Visibility?</h2>
+            <p>Start monitoring how AI assistants reference your content. Free during beta.</p>
+            <div class="cta-buttons">
+                <a href="https://app.optiview.ai" class="hero-button">Start Free Audit</a>
+                <a href="/docs/visibility.html" class="hero-button">Learn About Visibility Intelligence</a>
             </div>
         </div>
     </section>
@@ -357,9 +321,9 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <div class="footer-content">
+            <div class="footer-links">
                 <div class="footer-section">
-                    <h3>Product</h3>
+                    <h4>Product</h4>
                     <ul>
                         <li><a href="/docs/visibility.html">Visibility Intelligence</a></li>
                         <li><a href="/docs/audit.html">SEO Audits</a></li>
@@ -367,60 +331,27 @@
                         <li><a href="/docs/bots.html">AI Bots</a></li>
                     </ul>
                 </div>
-                
                 <div class="footer-section">
-                    <h3>Resources</h3>
+                    <h4>Resources</h4>
                     <ul>
                         <li><a href="/docs/faq.html">FAQ</a></li>
                         <li><a href="/docs/security.html">Security</a></li>
-                        <li><a href="/status.html">Status</a></li>
-                        <li><a href="mailto:support@optiview.ai">Support</a></li>
+                        <li><a href="/status">Status</a></li>
                     </ul>
                 </div>
-                
                 <div class="footer-section">
-                    <h3>Company</h3>
+                    <h4>Company</h4>
                     <ul>
-                        <li><a href="mailto:hello@optiview.ai">Contact</a></li>
-                        <li><a href="mailto:security@optiview.ai">Security</a></li>
-                        <li><a href="/docs/privacy.html">Privacy</a></li>
-                        <li><a href="/docs/terms.html">Terms</a></li>
+                        <li><a href="/docs/security.html">Security</a></li>
+                        <li><a href="/docs/security.html">Privacy</a></li>
+                        <li><a href="/docs/faq.html">Contact</a></li>
                     </ul>
                 </div>
             </div>
-            
             <div class="footer-bottom">
-                <p>&copy; 2025 Optiview. All rights reserved. The first AI SEO platform with Visibility Intelligence.</p>
+                <p>© 2025 Optiview. All rights reserved. AI SEO platform with Visibility Intelligence.</p>
             </div>
         </div>
     </footer>
-
-    <script>
-        // Smooth scrolling for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
-        });
-
-        // Add scroll effect to header
-        window.addEventListener('scroll', function() {
-            const header = document.querySelector('.header');
-            if (window.scrollY > 100) {
-                header.style.background = 'rgba(255, 255, 255, 0.95)';
-                header.style.backdropFilter = 'blur(10px)';
-            } else {
-                header.style.background = 'white';
-                header.style.backdropFilter = 'none';
-            }
-        });
-    </script>
 </body>
 </html>
