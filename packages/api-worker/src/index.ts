@@ -185,7 +185,7 @@ export default {
     }
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -2621,6 +2621,10 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       
       if (path === '/api/visibility/ga4-config' && request.method === 'GET') {
         return visibilityRoutes.generateGA4Config(request);
+      }
+
+      if (path === '/api/visibility/metrics/rebuild' && request.method === 'POST') {
+        return visibilityRoutes.rebuildMetrics(request);
       }
 
     }

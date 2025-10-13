@@ -123,7 +123,7 @@ export async function processRun(env: Env, ctx?: ExecutionContext, runId?: strin
 
           // Save citations
           for (const citation of citations) {
-            await visibilityService.saveCitation(run.project_id, citation, prompt.id);
+            await visibilityService.saveCitation(run.project_id, citation, prompt.id, run.assistant);
           }
         } catch (promptError) {
           console.error(`[VisibilityProcessor] Error processing prompt ${prompt.id}:`, promptError);
