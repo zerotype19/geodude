@@ -23,7 +23,7 @@ export default function PublicAudit() {
   const location = useLocation();
   const [audit, setAudit] = useState<Audit | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations'>('scores');
+  const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations' | 'visibility'>('scores');
   const [rerunning, setRerunning] = useState(false);
   const [showBraveModal, setShowBraveModal] = useState(false);
   const [showDebugModal, setShowDebugModal] = useState(false);
@@ -34,7 +34,7 @@ export default function PublicAudit() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
-    if (tabParam === 'citations' || tabParam === 'scores' || tabParam === 'issues' || tabParam === 'pages') {
+    if (tabParam === 'citations' || tabParam === 'scores' || tabParam === 'issues' || tabParam === 'pages' || tabParam === 'visibility') {
       setActiveTab(tabParam);
     }
   }, [location.search]);
@@ -516,6 +516,16 @@ export default function PublicAudit() {
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
+        {import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
+          <button
+            onClick={() => {
+              navigate(`${location.pathname}?tab=visibility`, { replace: false });
+            }}
+            className={`tab-button ${activeTab === 'visibility' ? 'active' : ''}`}
+          >
+            🚀 Visibility Intelligence
+          </button>
+        )}
       </div>
 
       <div className="tab-content">
@@ -710,6 +720,71 @@ export default function PublicAudit() {
         )}
         {activeTab === 'citations' && (
           <Citations auditId={id!} citations={audit.citations}/>
+        )}
+        {activeTab === 'visibility' && import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
+          <div>
+            <h3 style={{ marginTop: 0 }}>AI Visibility Intelligence</h3>
+            <p style={{ color: '#64748b', marginBottom: 24 }}>
+              Track how AI assistants like Perplexity, ChatGPT Search, and Claude reference your content with real-time citations and visibility scores.
+            </p>
+            <div style={{ 
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', 
+              color: 'white', 
+              padding: '24px', 
+              borderRadius: '12px',
+              textAlign: 'center',
+              marginBottom: '24px'
+            }}>
+              <h4 style={{ margin: '0 0 12px', fontSize: '18px' }}>🚀 Visibility Intelligence v1.0</h4>
+              <p style={{ margin: '0 0 20px', opacity: 0.9 }}>
+                Real-time tracking across Perplexity, ChatGPT Search, and Claude with 0-100 visibility scores and competitive rankings.
+              </p>
+              <a 
+                href={`/insights/visibility?domain=${encodeURIComponent(audit.domain || audit.url)}`}
+                style={{ 
+                  display: 'inline-block',
+                  background: 'white', 
+                  color: '#3b82f6', 
+                  padding: '12px 24px', 
+                  borderRadius: '8px', 
+                  textDecoration: 'none', 
+                  fontWeight: '600',
+                  fontSize: '16px'
+                }}
+              >
+                Open Visibility Dashboard →
+              </a>
+            </div>
+            
+            <div style={{ 
+              background: '#f8fafc', 
+              border: '1px solid #e2e8f0', 
+              borderRadius: '8px', 
+              padding: '20px',
+              marginBottom: '20px'
+            }}>
+              <h4 style={{ margin: '0 0 12px', color: '#1e40af' }}>🎯 What You'll See:</h4>
+              <ul style={{ margin: 0, paddingLeft: '20px', color: '#374151' }}>
+                <li><strong>Real-Time Citations:</strong> See how AI assistants reference your content</li>
+                <li><strong>Visibility Scores:</strong> 0-100 scores based on citation frequency and recency</li>
+                <li><strong>Competitive Rankings:</strong> Your position vs competitors in each AI ecosystem</li>
+                <li><strong>Multi-Assistant Tracking:</strong> Perplexity, ChatGPT Search, and Claude insights</li>
+                <li><strong>Export & Analysis:</strong> CSV downloads for detailed analysis</li>
+              </ul>
+            </div>
+
+            <div style={{ 
+              background: '#fef3c7', 
+              border: '1px solid #f59e0b', 
+              borderRadius: '8px', 
+              padding: '16px'
+            }}>
+              <p style={{ margin: 0, color: '#92400e' }}>
+                <strong>💡 Pro Tip:</strong> Each AI assistant forms its own unique ecosystem of citations. 
+                Perplexity favors SEO content, ChatGPT Search cites tech platforms, and Claude references development resources.
+              </p>
+            </div>
+          </div>
         )}
       </div>
       

@@ -313,3 +313,17 @@ button[class*='tab'] {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
+/* Row layout for horizontal score cards */
+.row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .row {
+    flex-direction: column;
+  }
+}
+
