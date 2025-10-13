@@ -2615,21 +2615,41 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         return visibilityRoutes.generateGA4Config(request);
       }
 
-      // Processor routes
-      if (path === '/api/visibility/process-next' && request.method === 'POST') {
-        const result = await processRun(env, ctx);
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+    }
 
-      if (path.match(/^\/api\/visibility\/runs\/[^/]+\/process$/) && request.method === 'POST') {
-        const runId = path.split('/')[4];
-        const result = await processRun(env, ctx, runId);
-        return new Response(JSON.stringify(result), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+    // CORS preflight for visibility endpoints
+    if (request.method === 'OPTIONS' && path.startsWith('/api/visibility')) {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'content-type, authorization'
+        }
+      });
+    }
+
+    // Processor routes (outside visibility block, before fallbacks)
+    if (path === '/api/visibility/process-next' && request.method === 'POST') {
+      const result = await processRun(env, ctx);
+      return new Response(JSON.stringify(result), {
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+
+    if (path.match(/^\/api\/visibility\/runs\/[^/]+\/process$/) && request.method === 'POST') {
+      const runId = path.split('/')[4];
+      const result = await processRun(env, ctx, runId);
+      return new Response(JSON.stringify(result), {
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
     }
 
     // Legacy endpoints - return 410 Gone

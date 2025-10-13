@@ -195,6 +195,27 @@ export class AssistantVisibilityService implements VisibilityService {
     return result as AssistantRun | null;
   }
 
+  async claimNextQueuedRun(): Promise<AssistantRun | null> {
+    // Atomically claim the next queued run
+    const result = await this.db.prepare(
+      `UPDATE assistant_runs
+       SET status = 'running'
+       WHERE id = (
+         SELECT id FROM assistant_runs
+         WHERE status = 'queued'
+         ORDER BY run_started_at ASC
+         LIMIT 1
+       ) AND status = 'queued'
+       RETURNING id, project_id, assistant, run_started_at, run_duration_ms, status`
+    ).first();
+
+    if (!result) {
+      return null;
+    }
+
+    return result as AssistantRun;
+  }
+
   async getRun(runId: string): Promise<AssistantRun | null> {
     const result = await this.db.prepare(
       `SELECT id, project_id, assistant, run_started_at, run_duration_ms, status

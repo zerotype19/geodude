@@ -21,7 +21,7 @@ export interface Env {
 }
 
 export async function processRun(env: Env, ctx: ExecutionContext, runId?: string) {
-  console.log(`[VisibilityProcessor] Processing run: ${runId || 'next queued'}`);
+  console.log(`[VisibilityProcessor] Start processing run: ${runId || 'next queued'}, visibility: ${env.FEATURE_ASSISTANT_VISIBILITY}`);
   
   try {
     const visibilityService = new AssistantVisibilityService(env.DB, env.PROMPT_PACKS);
@@ -30,59 +30,86 @@ export async function processRun(env: Env, ctx: ExecutionContext, runId?: string
     let run;
     if (runId) {
       run = await visibilityService.getRun(runId);
+      if (!run) {
+        console.log(`[VisibilityProcessor] Run ${runId} not found`);
+        return { ok: false, error: "run not found" };
+      }
     } else {
-      run = await visibilityService.getNextQueuedRun();
-    }
-    
-    if (!run) {
-      console.log('[VisibilityProcessor] No queued runs found');
-      return { ok: true, msg: "no queued runs" };
+      // Atomically claim the next queued run
+      run = await visibilityService.claimNextQueuedRun();
+      if (!run) {
+        console.log('[VisibilityProcessor] No queued runs found');
+        return { ok: true, msg: "no queued runs" };
+      }
     }
 
-    console.log(`[VisibilityProcessor] Found run: ${run.id}, project: ${run.project_id}`);
+    console.log(`[VisibilityProcessor] Processing run: ${run.id}, project: ${run.project_id}`);
 
     // Allowlist + flag guard
     const enabled = await isProjectEnabled(env, run.project_id);
-    if (env.FEATURE_ASSISTANT_VISIBILITY !== 'true' || !enabled) {
-      console.log(`[VisibilityProcessor] Run blocked - visibility: ${env.FEATURE_ASSISTANT_VISIBILITY}, enabled: ${enabled}`);
-      return { ok: false, error: "visibility disabled or project not allowlisted" };
+    console.log(`[VisibilityProcessor] Project ${run.project_id} enabled: ${enabled}`);
+    
+    if (env.FEATURE_ASSISTANT_VISIBILITY !== 'true') {
+      console.warn(`[VisibilityProcessor] Feature disabled - visibility: ${env.FEATURE_ASSISTANT_VISIBILITY}`);
+      if (!runId) {
+        await visibilityService.markRunDone(run.id, "error", "visibility feature disabled");
+      }
+      return { ok: false, error: "visibility feature disabled" };
     }
-
-    // Mark as running
-    await visibilityService.markRunRunning(run.id);
-    console.log(`[VisibilityProcessor] Marked run ${run.id} as running`);
+    
+    if (!enabled) {
+      console.warn(`[VisibilityProcessor] Project not allowlisted - project: ${run.project_id}`);
+      if (!runId) {
+        await visibilityService.markRunDone(run.id, "error", "project not allowlisted");
+      }
+      return { ok: false, error: "project not allowlisted" };
+    }
 
     try {
       // Get prompts for this run
       const prompts = await visibilityService.getPromptsForRun(run.id);
       console.log(`[VisibilityProcessor] Found ${prompts.length} prompts for run ${run.id}`);
 
+      if (prompts.length === 0) {
+        console.warn(`[VisibilityProcessor] No prompts found for run ${run.id}`);
+        await visibilityService.markRunDone(run.id, "error", "no prompts found");
+        return { ok: false, runId: run.id, status: "error", error: "no prompts found" };
+      }
+
       // Process each prompt
       for (const prompt of prompts) {
         console.log(`[VisibilityProcessor] Processing prompt: ${prompt.id}`);
         
-        let payload = "";
-        
-        // Simulate assistant response (replace with actual connectors)
-        if (run.assistant === "perplexity") {
-          payload = await simulatePerplexityResponse(prompt.prompt_text);
-        } else if (run.assistant === "chatgpt_search") {
-          payload = await simulateChatGPTResponse(prompt.prompt_text);
-        } else if (run.assistant === "copilot") {
-          payload = await simulateCopilotResponse(prompt.prompt_text);
-        }
+        try {
+          let payload = "";
+          
+          // Simulate assistant response (replace with actual connectors)
+          if (run.assistant === "perplexity") {
+            payload = await simulatePerplexityResponse(prompt.prompt_text);
+          } else if (run.assistant === "chatgpt_search") {
+            payload = await simulateChatGPTResponse(prompt.prompt_text);
+          } else if (run.assistant === "copilot") {
+            payload = await simulateCopilotResponse(prompt.prompt_text);
+          } else {
+            console.warn(`[VisibilityProcessor] Unknown assistant: ${run.assistant}`);
+            continue;
+          }
 
-        // Save assistant output
-        await visibilityService.saveAssistantOutput(prompt.id, payload);
-        console.log(`[VisibilityProcessor] Saved output for prompt ${prompt.id}`);
+          // Save assistant output
+          await visibilityService.saveAssistantOutput(prompt.id, payload);
+          console.log(`[VisibilityProcessor] Saved output for prompt ${prompt.id}`);
 
-        // Parse citations from payload
-        const citations = parseCitations(payload, run.assistant);
-        console.log(`[VisibilityProcessor] Parsed ${citations.length} citations from prompt ${prompt.id}`);
+          // Parse citations from payload
+          const citations = parseCitations(payload, run.assistant);
+          console.log(`[VisibilityProcessor] Parsed ${citations.length} citations from prompt ${prompt.id}`);
 
-        // Save citations
-        for (const citation of citations) {
-          await visibilityService.saveCitation(run.project_id, citation, prompt.id);
+          // Save citations
+          for (const citation of citations) {
+            await visibilityService.saveCitation(run.project_id, citation, prompt.id);
+          }
+        } catch (promptError) {
+          console.error(`[VisibilityProcessor] Error processing prompt ${prompt.id}:`, promptError);
+          // Continue with other prompts
         }
       }
 
@@ -93,12 +120,14 @@ export async function processRun(env: Env, ctx: ExecutionContext, runId?: string
       return { ok: true, runId: run.id, status: "success" };
     } catch (e) {
       console.error(`[VisibilityProcessor] Error processing run ${run.id}:`, e);
-      await visibilityService.markRunDone(run.id, "error", String(e));
-      return { ok: false, runId: run.id, status: "error", error: String(e) };
+      const errorMessage = e instanceof Error ? e.stack || e.message : String(e);
+      await visibilityService.markRunDone(run.id, "error", errorMessage);
+      return { ok: false, runId: run.id, status: "error", error: errorMessage };
     }
   } catch (error) {
     console.error('[VisibilityProcessor] Fatal error:', error);
-    return { ok: false, error: String(error) };
+    const errorMessage = error instanceof Error ? error.stack || error.message : String(error);
+    return { ok: false, error: errorMessage };
   }
 }
 
