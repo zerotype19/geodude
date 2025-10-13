@@ -132,6 +132,13 @@ export default {
                 if (env.FEATURE_ASSISTANT_VISIBILITY === 'true') {
                   console.log('[VisibilityProcessor] Processing queue...');
                   try {
+                    // Circuit breaker: Skip processing if browser service is down
+                    const browserHealth = await env.HEURISTICS.get('browser_service_health');
+                    if (browserHealth === 'down') {
+                      console.log('[VisibilityProcessor] Browser service marked as down, skipping queue processing');
+                      return;
+                    }
+                    
                     // Recovery: Reset stuck runs (30+ minutes) - more aggressive
                     await env.DB.prepare(
                       `UPDATE assistant_runs 
@@ -147,7 +154,14 @@ export default {
                     }
                   } catch (error) {
                     console.error('[VisibilityProcessor] Error processing queue:', error);
+                    
+                    // Mark browser service as down if we get consistent CPU exceeded errors
+                    if (error instanceof Error && (error.message.includes('exceededCpu') || error.message.includes('503'))) {
+                      console.warn('[VisibilityProcessor] CPU exceeded or 503 error, marking browser service as down');
+                      await env.HEURISTICS.put('browser_service_health', 'down', { expirationTtl: 3600 }); // 1 hour
+                    }
                   }
+                  return;
                 }
     
     // 03:00 UTC - Nightly backup
@@ -253,6 +267,61 @@ export default {
       });
     }
 
+    // Visibility health check endpoint (public)
+    if (path === '/api/health/visibility') {
+      try {
+        // Get today's scores count
+        const scoresResult = await env.DB.prepare(`
+          SELECT COUNT(*) as count FROM ai_visibility_scores WHERE day = date('now')
+        `).first();
+
+        // Get this week's rankings count
+        const rankingsResult = await env.DB.prepare(`
+          SELECT COUNT(*) as count FROM ai_visibility_rankings 
+          WHERE week_start >= date('now', '-7 days')
+        `).first();
+
+        // Get last rollup time
+        const lastRollupResult = await env.DB.prepare(`
+          SELECT MAX(created_at) as last_rollup FROM ai_visibility_scores
+        `).first();
+
+        // Get enabled assistants
+        const assistantsResult = await env.DB.prepare(`
+          SELECT DISTINCT assistant FROM ai_citations 
+          WHERE occurred_at >= datetime('now', '-7 days') AND assistant IS NOT NULL
+        `).all();
+
+        const health = {
+          status: 'healthy',
+          scores_today: (scoresResult as any)?.count || 0,
+          rankings_week_rows: (rankingsResult as any)?.count || 0,
+          last_rollup_at: (lastRollupResult as any)?.last_rollup || null,
+          assistants_enabled: assistantsResult.results?.map((r: any) => r.assistant) || [],
+          timestamp: new Date().toISOString()
+        };
+
+        return new Response(JSON.stringify(health), {
+          status: 200,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=60' // 1 minute cache
+          }
+        });
+      } catch (error) {
+        console.error('[Health] Error in visibility health check:', error);
+        return new Response(JSON.stringify({ 
+          status: 'unhealthy',
+          error: 'Health check failed',
+          timestamp: new Date().toISOString()
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // robots.txt endpoint (public) - Block all crawlers from API endpoints
     if (path === '/robots.txt') {
       const robotsTxt = `User-agent: *
@@ -271,6 +340,39 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           'Cache-Control': 'public, max-age=86400' // Cache for 24 hours
         },
       });
+    }
+
+    // Browser service recovery endpoint (admin only)
+    if (path === '/api/admin/browser-recovery' && request.method === 'POST') {
+      try {
+        // Clear the browser service down flag
+        await env.HEURISTICS.delete('browser_service_health');
+        
+        // Test browser service
+        const testBrowser = await env.BROWSER.launch({
+          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+        await testBrowser.close();
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: 'Browser service recovered and tested successfully',
+          timestamp: new Date().toISOString()
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('[BrowserRecovery] Browser service still unavailable:', error);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Browser service still unavailable',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }), {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // Handle common crawler requests for non-existent endpoints

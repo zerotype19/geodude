@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-10-13T19:52:59.570Z",
+  "checks": {
+    "rollup_freshness": true,
+    "assistant_coverage": true,
+    "cost_guardrails": true,
+    "error_rates": true,
+    "ui_performance": true
+  },
+  "overall_status": "HEALTHY"
+}

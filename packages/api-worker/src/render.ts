@@ -75,6 +75,25 @@ function detectFaqOnPage(document: any): boolean {
   return false;
 }
 
+// Browser service health check
+async function isBrowserServiceAvailable(env: any): Promise<boolean> {
+  try {
+    // Quick test to see if browser service responds
+    const testBrowser = await puppeteer.launch(env.BROWSER);
+    await testBrowser.close();
+    return true;
+  } catch (error: any) {
+    const errorMsg = error?.message || String(error);
+    if (errorMsg.includes('503') || errorMsg.includes('No browser available')) {
+      console.warn('[render] Browser service unavailable (503/No browser available), skipping browser rendering');
+      return false;
+    }
+    // Don't throw other errors, just return false
+    console.warn('[render] Browser service check failed:', errorMsg);
+    return false;
+  }
+}
+
 export async function renderPage(
   env: any,
   url: string,
@@ -82,8 +101,11 @@ export async function renderPage(
 ): Promise<RenderResult> {
   const force = opts?.force;
 
-  // Try Browser first unless forced to html
-  if (force !== 'html' && env.BROWSER) {
+  // Check browser service availability before attempting
+  const browserAvailable = force !== 'html' && env.BROWSER && await isBrowserServiceAvailable(env);
+
+  // Try Browser first unless forced to html or browser unavailable
+  if (browserAvailable) {
     const startTime = Date.now();
     try {
       console.log(`[render] attempting browser mode for ${url}`);

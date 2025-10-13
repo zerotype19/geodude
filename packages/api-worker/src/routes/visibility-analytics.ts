@@ -67,6 +67,21 @@ export function createVisibilityAnalyticsRoutes(env: Env) {
           return await handleRecentCitations(request, env, corsHeaders);
         }
         
+        // GET /api/health/visibility
+        if (path === '/api/health/visibility') {
+          return await handleHealthCheck(request, env, corsHeaders);
+        }
+        
+        // GET /api/visibility/cost (admin)
+        if (path === '/api/visibility/cost') {
+          return await handleCostCheck(request, env, corsHeaders);
+        }
+        
+        // GET /api/visibility/rankings/export?assistant=x&period=y&format=csv
+        if (path === '/api/visibility/rankings/export') {
+          return await handleRankingsExport(request, env, corsHeaders);
+        }
+        
         return new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -126,10 +141,14 @@ async function handleVisibilityScore(request: Request, env: Env, corsHeaders: Re
         }
       }
       
-      return new Response(JSON.stringify({ domain, day, scores }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    return new Response(JSON.stringify({ domain, day, scores }), {
+      status: 200,
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=120' // 2 minute cache
+      }
+    });
     } else {
       // Get score for specific assistant
       const score = await scorer.calculateVisibilityScore(domain, assistant, day);
@@ -195,7 +214,11 @@ async function handleVisibilityRankings(request: Request, env: Env, corsHeaders:
       rankings: result.results || [] 
     }), {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=120' // 2 minute cache
+      }
     });
   } catch (error) {
     console.error('[VisibilityAnalytics] Error fetching rankings:', error);
@@ -409,11 +432,207 @@ async function handleRecentCitations(request: Request, env: Env, corsHeaders: Re
     
     return new Response(JSON.stringify(result.results || []), {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=60' // 1 minute cache for recent data
+      }
     });
   } catch (error) {
     console.error('[VisibilityAnalytics] Error fetching recent citations:', error);
     return new Response(JSON.stringify({ error: 'Failed to fetch recent citations' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleHealthCheck(request: Request, env: Env, corsHeaders: Record<string, string>) {
+  try {
+    // Get today's scores count
+    const scoresResult = await env.DB.prepare(`
+      SELECT COUNT(*) as count FROM ai_visibility_scores WHERE day = date('now')
+    `).first();
+
+    // Get this week's rankings count
+    const rankingsResult = await env.DB.prepare(`
+      SELECT COUNT(*) as count FROM ai_visibility_rankings 
+      WHERE week_start >= date('now', '-7 days')
+    `).first();
+
+    // Get last rollup time
+    const lastRollupResult = await env.DB.prepare(`
+      SELECT MAX(created_at) as last_rollup FROM ai_visibility_scores
+    `).first();
+
+    // Get enabled assistants
+    const assistantsResult = await env.DB.prepare(`
+      SELECT DISTINCT assistant FROM ai_citations 
+      WHERE occurred_at >= datetime('now', '-7 days') AND assistant IS NOT NULL
+    `).all();
+
+    const health = {
+      status: 'healthy',
+      scores_today: (scoresResult as any)?.count || 0,
+      rankings_week_rows: (rankingsResult as any)?.count || 0,
+      last_rollup_at: (lastRollupResult as any)?.last_rollup || null,
+      assistants_enabled: assistantsResult.results?.map((r: any) => r.assistant) || [],
+      timestamp: new Date().toISOString()
+    };
+
+    return new Response(JSON.stringify(health), {
+      status: 200,
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=60' // 1 minute cache
+      }
+    });
+  } catch (error) {
+    console.error('[VisibilityAnalytics] Error in health check:', error);
+    return new Response(JSON.stringify({ 
+      status: 'unhealthy',
+      error: 'Health check failed',
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleCostCheck(request: Request, env: Env, corsHeaders: Record<string, string>) {
+  try {
+    // Get today's cost from KV
+    const costData = await env.HEURISTICS.get('VIS_COST_DAILY');
+    const cost = costData ? JSON.parse(costData) : {};
+
+    // Get today's run counts by assistant
+    const runsResult = await env.DB.prepare(`
+      SELECT assistant, COUNT(*) as runs, COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed
+      FROM assistant_runs 
+      WHERE created_at >= date('now')
+      GROUP BY assistant
+    `).all();
+
+    const costInfo = {
+      daily_cost_usd: cost.total || 0,
+      cost_by_assistant: cost.by_assistant || {},
+      runs_today: runsResult.results || [],
+      cost_cap_usd: 10, // From env
+      timestamp: new Date().toISOString()
+    };
+
+    return new Response(JSON.stringify(costInfo), {
+      status: 200,
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=300' // 5 minute cache
+      }
+    });
+  } catch (error) {
+    console.error('[VisibilityAnalytics] Error in cost check:', error);
+    return new Response(JSON.stringify({ 
+      error: 'Failed to fetch cost data',
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleRankingsExport(request: Request, env: Env, corsHeaders: Record<string, string>) {
+  const url = new URL(request.url);
+  const assistant = url.searchParams.get('assistant') || 'all';
+  const period = url.searchParams.get('period') || '7d';
+  const format = url.searchParams.get('format') || 'csv';
+  const limit = parseInt(url.searchParams.get('limit') || '100');
+  
+  try {
+    // Convert period to SQLite date modifier
+    let dateModifier = '-7 days';
+    if (period === '30d') {
+      dateModifier = '-30 days';
+    } else if (period === '7d') {
+      dateModifier = '-7 days';
+    }
+    
+    let query: string;
+    let params: any[];
+    
+    if (assistant === 'all') {
+      query = `
+        SELECT week_start, assistant, domain, domain_rank, mentions_count, share_pct, rank_change
+        FROM ai_visibility_rankings 
+        WHERE week_start >= date('now', '${dateModifier}')
+        ORDER BY week_start DESC, assistant, domain_rank
+        LIMIT ?
+      `;
+      params = [limit];
+    } else {
+      query = `
+        SELECT week_start, assistant, domain, domain_rank, mentions_count, share_pct, rank_change
+        FROM ai_visibility_rankings 
+        WHERE assistant = ? 
+          AND week_start >= date('now', '${dateModifier}')
+        ORDER BY week_start DESC, domain_rank
+        LIMIT ?
+      `;
+      params = [assistant, limit];
+    }
+    
+    const result = await env.DB.prepare(query).bind(...params).all();
+    
+    if (format === 'csv') {
+      // Generate CSV
+      const headers = ['Week', 'Assistant', 'Domain', 'Rank', 'Mentions', 'Share %', 'Rank Change'];
+      const csvRows = [headers.join(',')];
+      
+      for (const row of result.results as any[]) {
+        const csvRow = [
+          row.week_start,
+          row.assistant,
+          `"${row.domain}"`, // Quote domains to handle commas
+          row.domain_rank,
+          row.mentions_count,
+          row.share_pct?.toFixed(2) || '0.00',
+          row.rank_change || '0'
+        ];
+        csvRows.push(csvRow.join(','));
+      }
+      
+      const csvContent = csvRows.join('\n');
+      const filename = `visibility-rankings-${assistant}-${period}-${new Date().toISOString().split('T')[0]}.csv`;
+      
+      return new Response(csvContent, {
+        status: 200,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Cache-Control': 'public, max-age=120' // 2 minute cache
+        }
+      });
+    } else {
+      // Return JSON (fallback)
+      return new Response(JSON.stringify({ 
+        assistant, 
+        period, 
+        rankings: result.results || [] 
+      }), {
+        status: 200,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=120' // 2 minute cache
+        }
+      });
+    }
+  } catch (error) {
+    console.error('[VisibilityAnalytics] Error exporting rankings:', error);
+    return new Response(JSON.stringify({ error: 'Failed to export rankings' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
