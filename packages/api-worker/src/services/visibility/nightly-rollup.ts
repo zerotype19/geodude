@@ -13,16 +13,19 @@ export class NightlyRollupService {
     console.log('[NightlyRollup] Starting nightly visibility rollup...');
     
     const today = new Date().toISOString().split('T')[0];
-    const assistants = ['perplexity', 'chatgpt_search', 'claude'];
     
     try {
-      // Process visibility scores for each assistant
-      for (const assistant of assistants) {
-        await this.processAssistant(assistant, today);
-      }
+      // Use the new RollupExecutor for consistent logic
+      const { RollupExecutor } = await import('./rollup-executor');
+      const executor = new RollupExecutor(this.env);
       
-      // Calculate weekly rankings
-      await this.calculateRankings(today);
+      // Execute the rollup
+      const result = await executor.executeDailyRollup(today);
+      console.log(`[NightlyRollup] Created ${result.scoresCreated} scores and ${result.rankingsCreated} rankings`);
+      
+      if (result.errors.length > 0) {
+        console.warn('[NightlyRollup] Rollup completed with errors:', result.errors);
+      }
       
       // Generate alerts
       await this.generateAlerts(today);

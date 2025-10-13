@@ -57,6 +57,11 @@ export function createVisibilityAnalyticsRoutes(env: Env) {
           return await handleAlerts(request, env, corsHeaders);
         }
         
+        // POST /api/visibility/rollup?day=YYYY-MM-DD
+        if (path === '/api/visibility/rollup') {
+          return await handleRollup(request, env, corsHeaders);
+        }
+        
         return new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -323,6 +328,43 @@ async function handleAlerts(request: Request, env: Env, corsHeaders: Record<stri
   } catch (error) {
     console.error('[VisibilityAnalytics] Error fetching alerts:', error);
     return new Response(JSON.stringify({ error: 'Failed to fetch alerts' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleRollup(request: Request, env: Env, corsHeaders: Record<string, string>) {
+  const url = new URL(request.url);
+  const day = url.searchParams.get('day') || new Date().toISOString().split('T')[0];
+  
+  try {
+    // Import RollupExecutor dynamically
+    const { RollupExecutor } = await import('../services/visibility/rollup-executor');
+    const executor = new RollupExecutor(env);
+    
+    // Execute rollup
+    const result = await executor.executeDailyRollup(day);
+    
+    // Get status after rollup
+    const status = await executor.getRollupStatus(day);
+    
+    return new Response(JSON.stringify({ 
+      success: true,
+      day,
+      rollup: result,
+      status
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[VisibilityAnalytics] Error during rollup:', error);
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: 'Failed to execute rollup',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
