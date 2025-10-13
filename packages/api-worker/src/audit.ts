@@ -654,14 +654,14 @@ export async function runAudit(
            completed_at = datetime('now')
        WHERE id = ?`
     ).bind(
-      scores.overall,
-      scores.crawlability,
-      scores.structured,
-      scores.answerability,
-      scores.trust,
-      pages.length,
-      urlsToCrawl.length,
-      issues.length,
+      scores.overall ?? 0,
+      scores.crawlability ?? 0,
+      scores.structured ?? 0,
+      scores.answerability ?? 0,
+      scores.trust ?? 0,
+      pages.length ?? 0,
+      urlsToCrawl.length ?? 0,
+      issues.length ?? 0,
       aiAccess ? JSON.stringify(aiAccess) : null,
       aiFlags ? JSON.stringify(aiFlags) : null,
       braveQueryLogs.length > 0 ? JSON.stringify({ queries: braveQueryLogs }) : null,
@@ -678,18 +678,18 @@ export async function runAudit(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         auditId,
-        page.url,
-        page.status_code,
-        page.title,
-        page.h1,
+        page.url ?? '',
+        page.status_code ?? 0,
+        page.title ?? null,
+        page.h1 ?? null,
         page.has_h1 ? 1 : 0,
         page.jsonld_count ?? 0,
         page.faq_present ? 1 : 0,
-        page.word_count,
-        page.rendered_words,
-        page.snippet,
-        page.load_time_ms,
-        page.error
+        page.word_count ?? 0,
+        page.rendered_words ?? null,
+        page.snippet ?? null,
+        page.load_time_ms ?? 0,
+        page.error ?? null
       ).run();
     }
 
@@ -701,11 +701,11 @@ export async function runAudit(
          VALUES (?, ?, ?, ?, ?, ?)`
       ).bind(
         auditId,
-        issue.page_url,
-        issue.issue_type,
-        issue.severity,
-        issue.message,
-        issue.details || null
+        issue.page_url ?? null,
+        issue.issue_type ?? '',
+        issue.severity ?? 'info',
+        issue.message ?? '',
+        issue.details ?? null
       ).run();
     }
 
