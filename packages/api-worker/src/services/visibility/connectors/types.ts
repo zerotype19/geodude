@@ -43,7 +43,7 @@ export interface Env {
   // API Keys (secrets)
   PERPLEXITY_API_KEY?: string;
   OPENAI_API_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
+  CLAUDE_API_KEY?: string;
   
   // Optional org IDs
   PERPLEXITY_ORG_ID?: string;

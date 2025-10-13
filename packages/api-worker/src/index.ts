@@ -55,7 +55,7 @@ interface Env {
   VIS_DAILY_COST_CAP_USD?: string;
   // Additional API Keys (secrets)
   PERPLEXITY_API_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
+  CLAUDE_API_KEY?: string;
   // Optional org IDs
   PERPLEXITY_ORG_ID?: string;
   OPENAI_ORG_ID?: string;
