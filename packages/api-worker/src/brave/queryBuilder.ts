@@ -27,7 +27,8 @@ function detectSiteType(domain: string, brand: string, pages?: PageData[]): 'ent
   // E-commerce keywords
   const ecommerceKeywords = [
     'shop', 'store', 'buy', 'sell', 'product', 'cart', 'checkout', 'shipping',
-    'pricing', 'price', 'cost', 'purchase', 'order', 'delivery'
+    'pricing', 'price', 'cost', 'purchase', 'order', 'delivery', 'commerce',
+    'ecommerce', 'retail', 'platform', 'software', 'saas', 'cpg', 'omnichannel'
   ];
   
   // Check domain and brand
