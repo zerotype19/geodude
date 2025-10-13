@@ -260,7 +260,7 @@ export class AssistantVisibilityService implements VisibilityService {
     await this.db.prepare(
       `INSERT INTO assistant_outputs (id, prompt_id, raw_payload, parse_version, parsed_at)
        VALUES (?, ?, ?, ?, ?)`
-    ).bind(outputId, promptId, '1.0', now, now).run();
+    ).bind(outputId, promptId, rawPayload, '1.0', now).run();
   }
 
   async saveCitation(projectId: string, citation: {
