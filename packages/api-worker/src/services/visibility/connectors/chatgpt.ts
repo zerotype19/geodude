@@ -63,7 +63,8 @@ export const ChatGPTSearchConnector: AssistantConnector = {
         sources = uniqueUrls.map(url => ({
           url: url,
           title: undefined, // ChatGPT doesn't provide titles in basic API
-          snippet: undefined
+          snippet: undefined,
+          source_type: 'heuristic' as const
         }));
         
       } catch (parseError) {

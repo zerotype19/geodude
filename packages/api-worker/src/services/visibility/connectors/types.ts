@@ -10,6 +10,7 @@ export type ConnectorResult = {
     title?: string;
     url: string;
     snippet?: string;
+    source_type?: 'native' | 'heuristic';
   }>;
   raw: string;
 };

@@ -62,7 +62,8 @@ export const ClaudeConnector: AssistantConnector = {
         sources = uniqueUrls.map(url => ({
           url: url,
           title: undefined, // Claude doesn't provide titles in basic API
-          snippet: undefined
+          snippet: undefined,
+          source_type: 'heuristic' as const
         }));
         
       } catch (parseError) {

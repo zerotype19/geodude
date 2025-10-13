@@ -71,7 +71,12 @@ export const PerplexityConnector: AssistantConnector = {
           }))
         ];
         
-        sources = allSources.filter((source: any) => source.url); // Only keep items with URLs
+        sources = allSources
+          .filter((source: any) => source.url) // Only keep items with URLs
+          .map((source: any) => ({
+            ...source,
+            source_type: 'native' as const
+          }));
         
       } catch (parseError) {
         console.warn('[PerplexityConnector] Parse error, keeping raw response:', parseError);

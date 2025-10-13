@@ -52,6 +52,7 @@ interface Env {
   VIS_CONNECT_TIMEOUT_MS?: string;
   VIS_CONNECT_RETRIES?: string;
   VIS_RATE_PER_PROJECT?: string;
+  VIS_DAILY_COST_CAP_USD?: string;
   // Additional API Keys (secrets)
   PERPLEXITY_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;

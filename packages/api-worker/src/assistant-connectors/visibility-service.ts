@@ -269,13 +269,14 @@ export class AssistantVisibilityService implements VisibilityService {
     title: string;
     snippet: string;
     rank: number;
+    source_type?: string;
   }, promptId?: string, assistant?: string): Promise<void> {
     const citationId = `cite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
     
     await this.db.prepare(
-      `INSERT INTO ai_citations (id, project_id, prompt_id, rank, source_url, source_domain, title, snippet, is_own_domain, occurred_at, assistant)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO ai_citations (id, project_id, prompt_id, rank, source_url, source_domain, title, snippet, is_own_domain, occurred_at, assistant, source_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       citationId, 
       projectId, 
@@ -287,7 +288,8 @@ export class AssistantVisibilityService implements VisibilityService {
       citation.snippet, 
       0, // is_own_domain
       now,
-      assistant || 'unknown'
+      assistant || 'unknown',
+      citation.source_type || 'native' // Added source_type
     ).run();
   }
 }

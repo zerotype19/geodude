@@ -5,6 +5,7 @@
 
 import { AssistantVisibilityService } from '../assistant-connectors/visibility-service';
 import { getEnabledConnector } from '../services/visibility/connectors';
+import { canonicalizeUrl, extractDomain } from '../services/visibility/url-canonicalizer';
 import { MVAService } from '../assistant-connectors/mva-service';
 
 export interface Env {
@@ -125,20 +126,16 @@ export async function processRun(env: Env, ctx?: ExecutionContext, runId?: strin
 
           // Parse citations from sources (already normalized)
           const citations = sources.map((source, index) => {
-            let domain = "";
-            try {
-              domain = new URL(source.url).hostname;
-            } catch (error) {
-              console.warn(`[VisibilityProcessor] Invalid URL: ${source.url}`);
-              domain = source.url.split('/')[2] || source.url; // Fallback extraction
-            }
+            const canonicalUrl = canonicalizeUrl(source.url);
+            const domain = extractDomain(source.url);
             
             return {
-              source_url: source.url,
+              source_url: canonicalUrl,
               source_domain: domain,
               title: source.title || `Citation ${index + 1}`,
               snippet: source.snippet || "",
-              rank: index + 1
+              rank: index + 1,
+              source_type: source.source_type || 'native'
             };
           });
           
