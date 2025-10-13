@@ -1,163 +1,416 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-CY45NV4CNE');
-    </script>
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audit Checks - Optiview</title>
+    <title>Audit Checks - Optiview AI SEO Platform</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            color: #333;
-        }
-        h1 { color: #1a1a1a; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
-        h2 { color: #2563eb; margin-top: 30px; }
-        .check-category { background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 15px 0; }
-        .check-item { margin: 10px 0; }
-        .check-item strong { color: #1f2937; }
-        a { color: #3b82f6; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        .header { text-align: center; margin-bottom: 40px; padding: 30px; background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; border-radius: 12px; }
+        .header h1 { margin: 0; font-size: 2.5em; }
+        .header p { margin: 10px 0 0; opacity: 0.9; font-size: 1.1em; }
+        .section { margin-bottom: 40px; padding: 25px; background: #f8fafc; border-radius: 12px; border-left: 4px solid #3b82f6; }
+        .section h2 { color: #1e40af; margin-top: 0; }
+        .section h3 { color: #374151; margin-top: 25px; }
+        .feature-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 15px 0; }
+        .feature-card h4 { color: #1e40af; margin-top: 0; }
+        .badge { display: inline-block; background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px; }
+        .badge.warning { background: #f59e0b; }
+        .badge.critical { background: #ef4444; }
+        .highlight { background: #dbeafe; padding: 15px; border-radius: 6px; margin: 15px 0; }
+        .demo-button { display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 10px 0; }
+        .back-link { display: inline-block; margin-top: 30px; color: #3b82f6; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .nav-links { text-align: center; margin-bottom: 30px; }
+        .nav-links a { color: #3b82f6; text-decoration: none; margin: 0 15px; }
+        .nav-links a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; border: 1px solid #e5e7eb; text-align: left; }
+        th { background: #f8fafc; font-weight: 600; }
+        pre { background: #f1f5f9; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 14px; }
     </style>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What does Optiview audit?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Optiview audits your website for AI crawler readiness by checking robots.txt configuration, sitemap presence, structured data (JSON-LD), FAQ schemas, page titles, H1 tags, content depth, and overall crawlability."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How does the scoring system work?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Our scoring model uses four weighted factors: Crawlability (40%), Structured Data (30%), Answerability (20%), and Trust (10%). Each factor is scored 0-1, and the overall score is a weighted average of these components."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How many pages does Optiview crawl?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Optiview crawls up to 30 pages per audit, starting with URLs from your sitemap.xml or homepage. We rate-limit crawling to 1 request per second to be respectful of your server resources."
-          }
-        }
-      ]
-    }
-    </script>
 </head>
 <body>
-    <h1>Audit Checks</h1>
-    <p>Optiview performs comprehensive audits to ensure your website is optimized for AI crawlers and search engines. Here's what we check:</p>
+    <div class="header">
+        <h1>Audit Checks</h1>
+        <p>Comprehensive AI SEO audits to ensure your website is optimized for AI crawlers and search engines</p>
+    </div>
 
-    <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
-        <h3 style="margin-top: 0;">How Scoring Works</h3>
+    <div class="nav-links">
+        <a href="#scoring">How Scoring Works</a> •
+        <a href="#crawlability">Crawlability</a> •
+        <a href="#structured">Structured Data</a> •
+        <a href="#answerability">Answerability</a> •
+        <a href="#trust">Trust</a> •
+        <a href="#issues">Issue Severity</a>
+    </div>
+
+    <div class="section" id="scoring">
+        <h2>How Scoring Works</h2>
         <p>Your overall score (0-100%) is calculated from four weighted components. Each component is first converted to a percentage (points/max × 100), then weighted:</p>
-        <ul style="margin-bottom: 10px;">
-            <li><strong>Crawlability:</strong> 40% weight (max 42 points) → e.g., 40/42 = 95.2%</li>
-            <li><strong>Structured Data:</strong> 30% weight (max 30 points) → e.g., 11/30 = 36.7%</li>
-            <li><strong>Answerability:</strong> 20% weight (max 20 points) → e.g., 19.65/20 = 98.3%</li>
-            <li><strong>Trust:</strong> 10% weight (max 10 points) → e.g., 9.49/10 = 94.9%</li>
+        
+        <div class="feature-card">
+            <h4>Crawlability: 40% weight</h4>
+            <p>Max 42 points → e.g., 40/42 = 95.2%</p>
+            <ul>
+                <li>robots.txt validation and AI bot permissions</li>
+                <li>sitemap.xml presence and accessibility</li>
+                <li>AI crawler access verification</li>
+                <li>Real crawler bonus for live bot visits</li>
+            </ul>
+        </div>
+
+        <div class="feature-card">
+            <h4>Structured Data: 30% weight</h4>
+            <p>Max 30 points → e.g., 11/30 = 36.7%</p>
+            <ul>
+                <li>JSON-LD coverage and validation</li>
+                <li>FAQ schema implementation</li>
+                <li>Schema variety and richness</li>
+                <li>Google Rich Results compatibility</li>
+            </ul>
+        </div>
+
+        <div class="feature-card">
+            <h4>Answerability: 20% weight</h4>
+            <p>Max 20 points → e.g., 19.65/20 = 98.3%</p>
+            <ul>
+                <li>Title tag optimization</li>
+                <li>H1 tag presence and quality</li>
+                <li>Content depth and structure</li>
+                <li>Question-answer format readiness</li>
+            </ul>
+        </div>
+
+        <div class="feature-card">
+            <h4>Trust: 10% weight</h4>
+            <p>Max 10 points → e.g., 9.49/10 = 94.9%</p>
+            <ul>
+                <li>HTTP 2xx status codes</li>
+                <li>Page load performance</li>
+                <li>Security headers and SSL</li>
+                <li>Content accessibility</li>
+            </ul>
+        </div>
+
+        <div class="highlight">
+            <h4>Formula:</h4>
+            <p><strong>Overall = (Crawl% × 0.4) + (Struct% × 0.3) + (Answer% × 0.2) + (Trust% × 0.1)</strong></p>
+            <p><em>Note: In the UI, component scores show both raw points (40/42) AND percentages (95%), with color coding: 🟢 Green (70%+), 🟡 Yellow (40-69%), 🔴 Red (<40%).</em></p>
+        </div>
+    </div>
+
+    <div class="section" id="crawlability">
+        <h2>Crawlability (40% Weight)</h2>
+        <p>Ensures AI crawlers can discover and access your content. This is the foundation of AI SEO.</p>
+
+        <h3>What We Check:</h3>
+        <ul>
+            <li><strong>robots.txt Analysis:</strong> Validates syntax and AI bot permissions</li>
+            <li><strong>Sitemap Discovery:</strong> Checks for sitemap.xml and validates URLs</li>
+            <li><strong>AI Bot Access:</strong> Tests actual crawler access to key pages</li>
+            <li><strong>Real Crawler Bonus:</strong> Points for confirmed bot visits</li>
         </ul>
-        <p style="margin-bottom: 10px; font-size: 14px; color: #1e40af;"><strong>Formula:</strong> Overall = (Crawl% × 0.4) + (Struct% × 0.3) + (Answer% × 0.2) + (Trust% × 0.1)</p>
-        <p style="margin-bottom: 0; font-size: 13px; color: #64748b; font-style: italic;">Example: (95.2% × 0.4) + (36.7% × 0.3) + (98.3% × 0.2) + (94.9% × 0.1) = 78.2% overall</p>
+
+        <h3>AI Bots We Test:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Bot</th>
+                    <th>Purpose</th>
+                    <th>User-Agent</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>GPTBot</td>
+                    <td>OpenAI / ChatGPT</td>
+                    <td>GPTBot</td>
+                </tr>
+                <tr>
+                    <td>ClaudeBot</td>
+                    <td>Anthropic / Claude</td>
+                    <td>ClaudeBot</td>
+                </tr>
+                <tr>
+                    <td>PerplexityBot</td>
+                    <td>Perplexity AI</td>
+                    <td>PerplexityBot</td>
+                </tr>
+                <tr>
+                    <td>CCBot</td>
+                    <td>Common Crawl</td>
+                    <td>CCBot</td>
+                </tr>
+                <tr>
+                    <td>Google-Extended</td>
+                    <td>Google Bard / Gemini</td>
+                    <td>Google-Extended</td>
+                </tr>
+                <tr>
+                    <td>Bytespider</td>
+                    <td>ByteDance / TikTok AI</td>
+                    <td>Bytespider</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Common Issues:</h3>
+        <ul>
+            <li><span class="badge critical">Critical:</span> robots.txt blocks AI bots</li>
+            <li><span class="badge critical">Critical:</span> Missing or invalid sitemap.xml</li>
+            <li><span class="badge warning">Warning:</span> Slow response times (>3s)</li>
+            <li><span class="badge warning">Warning:</span> HTTP errors (4xx, 5xx)</li>
+        </ul>
     </div>
 
-    <div class="check-category">
-        <h2>🤖 Crawlability (40% weight, max 42 points)</h2>
-        <p style="font-size: 14px; color: #6b7280; margin: 5px 0 10px 0;">10 points for robots.txt + 20 points for AI bot access + 10 points for sitemap + 2 bonus for real crawler hits</p>
-        <div class="check-item">
-            <strong>robots.txt Validation:</strong> Checks if robots.txt exists and allows AI crawlers (GPTBot, ClaudeBot, PerplexityBot, CCBot, etc.)
+    <div class="section" id="structured">
+        <h2>Structured Data (30% Weight)</h2>
+        <p>Validates JSON-LD structured data that helps AI engines understand your content.</p>
+
+        <h3>What We Check:</h3>
+        <ul>
+            <li><strong>JSON-LD Validation:</strong> Syntax and schema.org compliance</li>
+            <li><strong>FAQ Schema:</strong> FAQPage markup for Q&A content</li>
+            <li><strong>Organization Schema:</strong> Business entity information</li>
+            <li><strong>Schema Variety:</strong> Multiple schema types for rich content</li>
+        </ul>
+
+        <h3>Schema Types We Detect:</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0;">
+            <div class="feature-card">
+                <h4>FAQPage</h4>
+                <p>Question and answer pairs</p>
+            </div>
+            <div class="feature-card">
+                <h4>Organization</h4>
+                <p>Business entity data</p>
+            </div>
+            <div class="feature-card">
+                <h4>Product</h4>
+                <p>Product information</p>
+            </div>
+            <div class="feature-card">
+                <h4>Article</h4>
+                <p>News and blog content</p>
+            </div>
+            <div class="feature-card">
+                <h4>HowTo</h4>
+                <p>Step-by-step instructions</p>
+            </div>
+            <div class="feature-card">
+                <h4>Recipe</h4>
+                <p>Cooking instructions</p>
+            </div>
         </div>
-        <div class="check-item">
-            <strong>Sitemap Presence:</strong> Verifies that sitemap.xml is referenced in robots.txt and accessible
+
+        <h3>Detection Method:</h3>
+        <p>We use real browser rendering (not just HTML parsing) to detect structured data the same way Google and AI engines do:</p>
+        <ul>
+            <li>Renders pages with headless Chromium</li>
+            <li>Executes JavaScript to catch dynamic schemas</li>
+            <li>Validates JSON-LD syntax and schema.org compliance</li>
+            <li>Verifies Google Rich Results compatibility</li>
+        </ul>
+
+        <h3>Common Issues:</h3>
+        <ul>
+            <li><span class="badge critical">Critical:</span> No structured data found</li>
+            <li><span class="badge warning">Warning:</span> Invalid JSON-LD syntax</li>
+            <li><span class="badge warning">Warning:</span> Missing FAQ schema on Q&A pages</li>
+            <li><span class="badge warning">Warning:</span> Incomplete Organization schema</li>
+        </ul>
+    </div>
+
+    <div class="section" id="answerability">
+        <h2>Answerability (20% Weight)</h2>
+        <p>Measures how well your content can answer user questions and appear in AI-generated responses.</p>
+
+        <h3>What We Check:</h3>
+        <ul>
+            <li><strong>Title Tags:</strong> Presence, length, and question format</li>
+            <li><strong>H1 Tags:</strong> Single H1 per page with descriptive text</li>
+            <li><strong>Content Depth:</strong> Sufficient content to answer questions</li>
+            <li><strong>Question Format:</strong> Content structured for Q&A</li>
+        </ul>
+
+        <h3>Optimization Tips:</h3>
+        <div class="feature-card">
+            <h4>Title Tag Best Practices</h4>
+            <ul>
+                <li>Include target keywords naturally</li>
+                <li>Use question format when appropriate ("How to...", "What is...")</li>
+                <li>Keep under 60 characters for optimal display</li>
+                <li>Make each title unique across your site</li>
+            </ul>
         </div>
-        <div class="check-item">
-            <strong>AI Bot Permissions:</strong> Ensures major AI crawlers are not blocked by Disallow rules
+
+        <div class="feature-card">
+            <h4>H1 Tag Guidelines</h4>
+            <ul>
+                <li>One H1 per page (required)</li>
+                <li>Descriptive and keyword-rich</li>
+                <li>Different from the title tag</li>
+                <li>Clear and user-friendly</li>
+            </ul>
+        </div>
+
+        <h3>Common Issues:</h3>
+        <ul>
+            <li><span class="badge critical">Critical:</span> Missing title tags</li>
+            <li><span class="badge critical">Critical:</span> No H1 tags found</li>
+            <li><span class="badge warning">Warning:</span> Thin content (<300 words)</li>
+            <li><span class="badge warning">Warning:</span> Duplicate title tags</li>
+        </ul>
+    </div>
+
+    <div class="section" id="trust">
+        <h2>Trust (10% Weight)</h2>
+        <p>Evaluates technical health and user experience factors that affect AI engine confidence.</p>
+
+        <h3>What We Check:</h3>
+        <ul>
+            <li><strong>HTTP Status:</strong> 2xx response codes for all pages</li>
+            <li><strong>Load Performance:</strong> Page speed and Core Web Vitals</li>
+            <li><strong>Security Headers:</strong> HTTPS, security headers</li>
+            <li><strong>Accessibility:</strong> Basic accessibility compliance</li>
+        </ul>
+
+        <h3>Performance Metrics:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Good</th>
+                    <th>Needs Improvement</th>
+                    <th>Poor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Largest Contentful Paint (LCP)</td>
+                    <td>≤ 2.5s</td>
+                    <td>2.5s - 4.0s</td>
+                    <td>> 4.0s</td>
+                </tr>
+                <tr>
+                    <td>First Input Delay (FID)</td>
+                    <td>≤ 100ms</td>
+                    <td>100ms - 300ms</td>
+                    <td>> 300ms</td>
+                </tr>
+                <tr>
+                    <td>Cumulative Layout Shift (CLS)</td>
+                    <td>≤ 0.1</td>
+                    <td>0.1 - 0.25</td>
+                    <td>> 0.25</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Common Issues:</h3>
+        <ul>
+            <li><span class="badge critical">Critical:</span> HTTP 4xx/5xx errors</li>
+            <li><span class="badge warning">Warning:</span> Slow page load (>3s)</li>
+            <li><span class="badge warning">Warning:</span> Missing HTTPS</li>
+            <li><span class="badge warning">Warning:</span> Poor Core Web Vitals</li>
+        </ul>
+    </div>
+
+    <div class="section" id="issues">
+        <h2>Issue Severity Levels</h2>
+        <p>Issues are categorized by severity to help you prioritize fixes:</p>
+
+        <div class="feature-card">
+            <h4><span class="badge critical">Critical</span></h4>
+            <p>Major issues that prevent AI crawlers from accessing content or significantly impact visibility:</p>
+            <ul>
+                <li>robots.txt blocks AI bots</li>
+                <li>Missing sitemap.xml</li>
+                <li>HTTP 4xx/5xx errors</li>
+                <li>No structured data found</li>
+                <li>Missing title or H1 tags</li>
+            </ul>
+        </div>
+
+        <div class="feature-card">
+            <h4><span class="badge warning">Warning</span></h4>
+            <p>Important but non-blocking issues that affect optimization and user experience:</p>
+            <ul>
+                <li>Invalid JSON-LD syntax</li>
+                <li>Missing FAQ schema on Q&A pages</li>
+                <li>Thin content (<300 words)</li>
+                <li>Slow page load times</li>
+                <li>Duplicate title tags</li>
+            </ul>
+        </div>
+
+        <div class="feature-card">
+            <h4><span class="badge">Info</span></h4>
+            <p>Optimization opportunities and minor improvements:</p>
+            <ul>
+                <li>Missing meta descriptions</li>
+                <li>Opportunities for additional schema types</li>
+                <li>Content length recommendations</li>
+                <li>Performance optimization suggestions</li>
+            </ul>
         </div>
     </div>
 
-    <div class="check-category">
-        <h2>📊 Structured Data (30% weight, max 30 points)</h2>
-        <p style="font-size: 14px; color: #6b7280; margin: 5px 0 10px 0;">15 points for JSON-LD coverage (50%+ of pages) + 10 points for FAQ schema + 5 points for schema variety</p>
-        <div class="check-item">
-            <strong>JSON-LD Detection:</strong> Scans pages for JSON-LD structured data blocks (any type). Full points at 100% coverage.
-        </div>
-        <div class="check-item">
-            <strong>FAQ Schema:</strong> Checks specifically for FAQPage schema markup (10 points for both page + schema, 5 for one)
-        </div>
-        <div class="check-item">
-            <strong>Rich Snippets:</strong> Identifies other schema types (Organization, Article, Product, Breadcrumb, WebSite)
-        </div>
+    <div class="section">
+        <h2>Audit Process</h2>
+        <p>Our audit process is designed to be thorough yet efficient:</p>
+
+        <h3>Discovery Phase</h3>
+        <ul>
+            <li>Analyze robots.txt and sitemap.xml</li>
+            <li>Discover pages from sitemap and internal links</li>
+            <li>Prioritize important pages (linked from multiple sources)</li>
+            <li>Scale automatically for sites up to 120 pages</li>
+        </ul>
+
+        <h3>Analysis Phase</h3>
+        <ul>
+            <li>Test AI bot access to key pages</li>
+            <li>Validate structured data with real browser rendering</li>
+            <li>Measure page performance and Core Web Vitals</li>
+            <li>Check technical SEO factors</li>
+        </ul>
+
+        <h3>Reporting Phase</h3>
+        <ul>
+            <li>Calculate component scores and overall score</li>
+            <li>Categorize issues by severity</li>
+            <li>Generate actionable recommendations</li>
+            <li>Provide detailed explanations and code examples</li>
+        </ul>
+
+        <h3>Our Audit Bot</h3>
+        <p>We use a respectful, compliant crawler:</p>
+        <ul>
+            <li><strong>User-Agent:</strong> OptiviewAuditBot/1.0 (+https://www.optiview.ai)</li>
+            <li><strong>Rate Limit:</strong> 1 request per second</li>
+            <li><strong>Robots.txt Compliance:</strong> We obey Disallow rules</li>
+            <li><strong>Respectful Crawling:</strong> Minimal server impact</li>
+        </ul>
     </div>
 
-    <div class="check-category">
-        <h2>💬 Answerability (20% weight, max 20 points)</h2>
-        <p style="font-size: 14px; color: #6b7280; margin: 5px 0 10px 0;">7 points for titles + 7 points for H1 tags + 6 points for content depth (all at 80%+ coverage)</p>
-        <div class="check-item">
-            <strong>Page Titles:</strong> Verifies each page has a descriptive title tag (≥80% of pages)
-        </div>
-        <div class="check-item">
-            <strong>H1 Tags:</strong> Checks for clear, singular H1 headings on each page (≥80% of pages)
-        </div>
-        <div class="check-item">
-            <strong>Content Depth:</strong> Measures word count to ensure sufficient content (≥120 words on ≥80% of pages)
-        </div>
+    <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f8fafc; border-radius: 12px;">
+        <h3 style="color: #1e40af; margin-top: 0;">Ready to Audit Your Site?</h3>
+        <p>Get comprehensive AI SEO insights in minutes</p>
+        <a href="https://app.optiview.ai" class="demo-button">Run Free Audit</a>
     </div>
 
-    <div class="check-category">
-        <h2>🔒 Trust (10% weight, max 10 points)</h2>
-        <p style="font-size: 14px; color: #6b7280; margin: 5px 0 10px 0;">7 points for 2xx status codes (≥80% of pages) + 3 points for fast load times (median &lt;3s)</p>
-        <div class="check-item">
-            <strong>Page Accessibility:</strong> Ensures pages return 200 OK status codes
-        </div>
-        <div class="check-item">
-            <strong>Load Performance:</strong> Tracks page load times to identify slow pages (median ≤3 seconds = full points)
-        </div>
-        <div class="check-item">
-            <strong>Error Detection:</strong> Identifies broken links, 404s, and server errors
-        </div>
+    <div style="text-align: center; margin-top: 40px; color: #64748b; font-size: 14px;">
+        <a href="https://optiview.ai" class="back-link">← Back to Optiview Home</a> • 
+        <a href="https://app.optiview.ai" class="back-link">Run an Audit</a>
     </div>
 
-    <h2>Audit Limits & Guardrails</h2>
-    <ul>
-        <li><strong>Max Pages:</strong> 30 pages per audit</li>
-        <li><strong>Rate Limit:</strong> 1 request per second (respectful crawling)</li>
-        <li><strong>User-Agent:</strong> OptiviewAuditBot/1.0 (+https://www.optiview.ai)</li>
-        <li><strong>Robots.txt Compliance:</strong> We obey Disallow rules in robots.txt</li>
-    </ul>
-
-    <h2>Issue Severity Levels</h2>
-    <ul>
-        <li><strong>Critical:</strong> Major issues that prevent AI crawlers from accessing content (e.g., blocked in robots.txt, missing sitemap)</li>
-        <li><strong>Warning:</strong> Important but non-blocking issues (e.g., missing JSON-LD, thin content)</li>
-        <li><strong>Info:</strong> Optimization opportunities (e.g., slow load times, minor formatting issues)</li>
-    </ul>
-
-    <footer>
-        <p><a href="/">← Back to Optiview Home</a> | <a href="https://app.optiview.ai">Run an Audit</a></p>
-        <p>See also: <a href="/docs/faq.html">FAQ</a> | <a href="/docs/citations.html">Citations Guide</a> | <a href="/docs/bots.html">AI Bots</a> | <a href="/docs/security.html">Security & Privacy</a></p>
-        <p><small>Last updated: October 2025</small></p>
-    </footer>
+    <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+        <p>See also: <a href="https://optiview.ai/docs/faq.html" style="color: #6b7280;">FAQ</a> | 
+        <a href="https://optiview.ai/docs/bots.html" style="color: #6b7280;">AI Bots</a> | 
+        <a href="https://optiview.ai/docs/security.html" style="color: #6b7280;">Security & Privacy</a></p>
+        <p>Last updated: October 2025</p>
+    </div>
 </body>
 </html>
-

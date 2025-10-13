@@ -1,101 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-CY45NV4CNE');
-    </script>
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Frequently Asked Questions - Optiview</title>
+    <title>FAQ - Optiview AI SEO Platform</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-            color: #333;
-        }
-        h1 { color: #1a1a1a; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }
-        h2 { color: #2563eb; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
-        h3 { color: #1f2937; margin-top: 25px; }
-        .faq-item { background: #f9fafb; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #3b82f6; }
-        .faq-item h3 { margin-top: 0; color: #1f2937; }
-        .faq-item p { margin-bottom: 10px; }
-        code { background: #e5e7eb; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 0.9em; }
-        pre { background: #1f2937; color: #f9fafb; padding: 15px; border-radius: 6px; overflow-x: auto; }
-        a { color: #3b82f6; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .toc { background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .toc ul { list-style: none; padding-left: 0; }
-        .toc li { margin: 8px 0; }
-        .highlight { background: #dbeafe; padding: 15px; border-left: 4px solid #3b82f6; margin: 20px 0; border-radius: 6px; }
-        footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: 600; margin-left: 8px; }
-        .badge-aeo { background: #ede9fe; color: #6b21a8; }
-        .badge-geo { background: #dbeafe; color: #1e40af; }
-        .badge-organic { background: #d1fae5; color: #065f46; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        .header { text-align: center; margin-bottom: 40px; padding: 30px; background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; border-radius: 12px; }
+        .header h1 { margin: 0; font-size: 2.5em; }
+        .header p { margin: 10px 0 0; opacity: 0.9; font-size: 1.1em; }
+        .section { margin-bottom: 40px; padding: 25px; background: #f8fafc; border-radius: 12px; border-left: 4px solid #3b82f6; }
+        .section h2 { color: #1e40af; margin-top: 0; }
+        .section h3 { color: #374151; margin-top: 25px; }
+        .feature-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 15px 0; }
+        .feature-card h4 { color: #1e40af; margin-top: 0; }
+        .badge { display: inline-block; background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px; }
+        .badge.new { background: #f59e0b; }
+        .highlight { background: #dbeafe; padding: 15px; border-radius: 6px; margin: 15px 0; }
+        .demo-button { display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 10px 0; }
+        .back-link { display: inline-block; margin-top: 30px; color: #3b82f6; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .nav-links { text-align: center; margin-bottom: 30px; }
+        .nav-links a { color: #3b82f6; text-decoration: none; margin: 0 15px; }
+        .nav-links a:hover { text-decoration: underline; }
     </style>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is Optiview?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Optiview is an AI SEO audit tool that helps you optimize your website for AI search engines and answer engines like Brave AI, ChatGPT, Perplexity, and Google AI Overviews. We analyze your site's crawlability, structured data, and answerability to ensure you're visible in AI-generated search results."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What's the difference between AEO and GEO?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "AEO (Answer Engine Optimization) refers to pure AI answer engines like Brave AI, ChatGPT, and Perplexity. GEO (Generative Engine Optimization) refers to traditional search engines with AI features, like Google AI Overviews and Bing Copilot. Both are important for modern SEO strategy."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How do citation counts work?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Each Brave AI query returns approximately 10 sources. AEO citations are when those sources cite YOUR domain. Organic citations include competitor/reference sites plus traditional search citations. For example, 30 queries returning 300 total sources might result in 91 AEO citations (your domain) and 221 Organic citations (other sites + traditional search)."
-          }
-        }
-      ]
-    }
-    </script>
 </head>
 <body>
-    <h1>Frequently Asked Questions</h1>
-    <p>Everything you need to know about Optiview's AI SEO audits, citation tracking, and optimization recommendations.</p>
-
-    <div class="toc">
-        <strong>Quick Navigation:</strong>
-        <ul>
-            <li><a href="#getting-started">Getting Started</a></li>
-            <li><a href="#citations">Citations & AEO/GEO</a></li>
-            <li><a href="#brave-ai">Brave AI Integration</a></li>
-            <li><a href="#audits">Audits & Scoring</a></li>
-            <li><a href="#bots">AI Bots & Crawlers</a></li>
-            <li><a href="#privacy">Privacy & Security</a></li>
-            <li><a href="#technical">Technical Details</a></li>
-        </ul>
+    <div class="header">
+        <h1>Frequently Asked Questions</h1>
+        <p>Everything you need to know about Optiview's AI SEO audits, citation tracking, and optimization recommendations.</p>
     </div>
 
-    <h2 id="getting-started">Getting Started</h2>
+    <div class="nav-links">
+        <a href="#getting-started">Getting Started</a> •
+        <a href="#citations">Citations & AEO/GEO</a> •
+        <a href="#brave-ai">Brave AI Integration</a> •
+        <a href="#audits">Audits & Scoring</a> •
+        <a href="#ai-bots">AI Bots & Crawlers</a> •
+        <a href="#privacy">Privacy & Security</a> •
+        <a href="#technical">Technical Details</a>
+    </div>
 
-    <div class="faq-item">
+    <div class="section" id="getting-started">
+        <h2>Getting Started</h2>
+        
         <h3>What is Optiview?</h3>
         <p>Optiview is an AI SEO audit tool that helps you optimize your website for AI search engines and answer engines. We analyze:</p>
         <ul>
@@ -105,53 +53,54 @@
             <li>🔍 <strong>Citation Performance</strong>: How often AI engines cite your pages</li>
         </ul>
         <p>Our goal is to help you rank in AI-generated search results from engines like Brave AI, ChatGPT, Perplexity, and Google AI Overviews.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>How do I get started?</h3>
         <p>Getting started is simple:</p>
         <ol>
-            <li>Go to <a href="https://app.optiview.ai">app.optiview.ai</a></li>
+            <li>Go to <a href="https://app.optiview.ai" style="color: #3b82f6;">app.optiview.ai</a></li>
             <li>Enter your website URL (e.g., <code>yoursite.com</code>)</li>
             <li>Click "Run Audit"</li>
             <li>Wait 2-5 minutes for the audit to complete</li>
             <li>Review your scores, issues, and citations</li>
         </ol>
         <p><strong>No account required for demo audits!</strong> You can run an audit immediately to see what we find.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>How much does Optiview cost?</h3>
         <p><strong>Currently free during beta!</strong> We're offering unlimited audits while we refine the tool. Pricing will be announced soon, but early users will get special discounts.</p>
     </div>
 
-    <h2 id="citations">Citations & AEO/GEO</h2>
-
-    <div class="faq-item">
+    <div class="section" id="citations">
+        <h2>Citations & AEO/GEO</h2>
+        
         <h3>What's the difference between AEO, GEO, and Organic citations?</h3>
-        <p><strong><span class="badge badge-aeo">AEO</span> Answer Engine Optimization</strong></p>
-        <ul>
-            <li>Citations from pure AI answer engines (Brave AI, ChatGPT, Perplexity, You.com)</li>
-            <li>Times YOUR domain was cited in AI-generated answers</li>
-            <li>Example: User asks Brave AI "What is YourProduct?" → Answer cites yoursite.com</li>
-        </ul>
+        
+        <div class="feature-card">
+            <h4>AEO Answer Engine Optimization</h4>
+            <ul>
+                <li>Citations from pure AI answer engines (Brave AI, ChatGPT, Perplexity, You.com)</li>
+                <li>Times YOUR domain was cited in AI-generated answers</li>
+                <li>Example: User asks Brave AI "What is YourProduct?" → Answer cites yoursite.com</li>
+            </ul>
+        </div>
 
-        <p><strong><span class="badge badge-geo">GEO</span> Generative Engine Optimization</strong></p>
-        <ul>
-            <li>Citations from traditional search engines with AI features</li>
-            <li>Google AI Overviews, Bing Copilot (coming soon)</li>
-            <li>Example: Google search shows AI Overview at top citing your site</li>
-        </ul>
+        <div class="feature-card">
+            <h4>GEO Generative Engine Optimization</h4>
+            <ul>
+                <li>Citations from traditional search engines with AI features</li>
+                <li>Google AI Overviews, Bing Copilot (coming soon)</li>
+                <li>Example: Google search shows AI Overview at top citing your site</li>
+            </ul>
+        </div>
 
-        <p><strong><span class="badge badge-organic">Organic</span> Traditional SEO</strong></p>
-        <ul>
-            <li>Regular search engine citations</li>
-            <li>Competitor/reference sites cited alongside yours in AI answers</li>
-            <li>Example: Brave AI cites Mayo Clinic, WebMD, etc. when answering health questions</li>
-        </ul>
-    </div>
+        <div class="feature-card">
+            <h4>Organic Traditional SEO</h4>
+            <ul>
+                <li>Regular search engine citations</li>
+                <li>Competitor/reference sites cited alongside yours in AI answers</li>
+                <li>Example: Brave AI cites Mayo Clinic, WebMD, etc. when answering health questions</li>
+            </ul>
+        </div>
 
-    <div class="faq-item">
         <h3>How do citation counts work?</h3>
         <p><strong>The Math:</strong></p>
         <p>Each Brave AI query returns ~10 sources. Our audit runs 50 smart queries across different topics (brand terms, how-to, FAQ, product info, etc.).</p>
@@ -160,16 +109,17 @@
             <li><strong>We only count sources that cite YOUR domain</strong></li>
             <li>All other sources (competitors, reference sites) are ignored</li>
         </ul>
-        <p><strong>Example:</strong></p>
-        <ul>
-            <li>50 queries return 500 total sources (yours + competitors)</li>
-            <li>12 sources cite your domain → <span class="badge badge-aeo">12 AEO citations</span></li>
-            <li>288 competitor sources → <em>Not counted</em></li>
-        </ul>
-        <p><strong>Key Point:</strong> Citation counts show how many times AI engines <strong>actually cited YOUR site</strong>, not how many results they returned overall.</p>
-    </div>
 
-    <div class="faq-item">
+        <div class="highlight">
+            <p><strong>Example:</strong></p>
+            <ul>
+                <li>50 queries return 500 total sources (yours + competitors)</li>
+                <li>12 sources cite your domain → 12 AEO citations</li>
+                <li>288 competitor sources → <em>Not counted</em></li>
+            </ul>
+            <p><strong>Key Point:</strong> Citation counts show how many times AI engines <strong>actually cited YOUR site</strong>, not how many results they returned overall.</p>
+        </div>
+
         <h3>What's a "good" AEO citation count?</h3>
         <p>This depends on your industry, site size, and brand recognition. Here are rough benchmarks:</p>
         <ul>
@@ -180,24 +130,22 @@
         </ul>
         <p><strong>Remember:</strong> These numbers are from 50 queries. A larger site with more queries will naturally get more citations. Focus on <em>citation rate</em> (citations per query) rather than absolute numbers.</p>
         <p><strong>What matters most:</strong> Are you being cited for your <em>most important</em> pages and topics? Quality > quantity.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>Can I see the raw API data?</h3>
         <p>Yes! Click the <strong>"📊 View API"</strong> button at the top of the Citations tab to see the raw JSON response with all citation data.</p>
         <p>You can also access it directly:</p>
-        <pre>https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/citations?pageSize=500</pre>
-        
+        <p><code>https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/citations?pageSize=500</code></p>
         <p>You can also export your Brave AI query diagnostics:</p>
-        <pre>https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.csv
-https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
-        
+        <ul>
+            <li><code>https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.csv</code></li>
+            <li><code>https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</code></li>
+        </ul>
         <p>These endpoints let you download all queries, statuses, and mapping reasons (path, canonical, fuzzy) for offline analysis.</p>
     </div>
 
-    <h2 id="brave-ai">Brave AI Integration</h2>
-
-    <div class="faq-item">
+    <div class="section" id="brave-ai">
+        <h2>Brave AI Integration</h2>
+        
         <h3>How does the Brave AI integration work?</h3>
         <p>For each audit, we run 30 "smart queries" designed to test how AI engines answer questions about your brand:</p>
         <ul>
@@ -209,9 +157,7 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
             <li><strong>Competitive</strong> (e.g., "[brand] alternatives", "[brand] vs [competitor]")</li>
         </ul>
         <p>Each query returns up to 10 sources. We analyze which sources cite your domain and which cite competitors.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>What is the Brave AI Queries modal?</h3>
         <p>The Brave AI modal shows diagnostic details for all queries run during your audit:</p>
         <ul>
@@ -223,9 +169,7 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
             <li><strong>Actions</strong>: "View (N)" link to see citations in Citations tab</li>
         </ul>
         <p>Click any "View" link to filter the Citations tab to just that query's sources.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>Why do some queries show "View (0)" or "View (1)"?</h3>
         <p>The number shows how many sources from that query cited YOUR domain specifically. Possible reasons for low counts:</p>
         <ul>
@@ -235,9 +179,7 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
             <li>AI engine preferred authoritative third-party sources (medical sites, news, etc.)</li>
         </ul>
         <p>Use these "near-miss" queries to identify content gaps and optimization opportunities.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>Can I run custom Brave AI queries?</h3>
         <p>Yes! In the Brave AI modal:</p>
         <ol>
@@ -248,9 +190,9 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
         <p><strong>Note:</strong> Custom queries count against Brave's rate limits. If you see rate-limited errors, wait an hour or reduce query count.</p>
     </div>
 
-    <h2 id="audits">Audits & Scoring</h2>
-
-    <div class="faq-item">
+    <div class="section" id="audits">
+        <h2>Audits & Scoring</h2>
+        
         <h3>How is the overall score calculated?</h3>
         <p>Your overall score (0-100%) is a weighted average of four components. <strong>Each component is first converted to a percentage, then weighted:</strong></p>
         <ul>
@@ -260,16 +202,15 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
             <li><strong>Trust (10% weight):</strong> HTTP 2xx status + load performance → max 10 points</li>
         </ul>
         <p><strong>Formula:</strong> Overall = (Crawl% × 0.4) + (Struct% × 0.3) + (Answer% × 0.2) + (Trust% × 0.1)</p>
-        <p><strong>Example:</strong> If you score 40/42 crawl (95.2%), 11/30 struct (36.7%), 19.65/20 answer (98.3%), 9.49/10 trust (94.9%):</p>
-        <p style="font-family: monospace; background: #f3f4f6; padding: 10px; border-radius: 6px;">
-            Overall = (95.2% × 0.4) + (36.7% × 0.3) + (98.3% × 0.2) + (94.9% × 0.1)<br>
-            = 38.08 + 11.01 + 19.66 + 9.49<br>
-            = <strong style="color: #10b981;">78.2%</strong>
-        </p>
-        <p><em>Note: In the UI, component scores show both raw points (40/42) AND percentages (95%), with color coding: 🟢 Green (70%+), 🟡 Yellow (40-69%), 🔴 Red (<40%).</em></p>
-    </div>
 
-    <div class="faq-item">
+        <div class="highlight">
+            <p><strong>Example:</strong> If you score 40/42 crawl (95.2%), 11/30 struct (36.7%), 19.65/20 answer (98.3%), 9.49/10 trust (94.9%):</p>
+            <p>Overall = (95.2% × 0.4) + (36.7% × 0.3) + (98.3% × 0.2) + (94.9% × 0.1)<br>
+            = 38.08 + 11.01 + 19.66 + 9.49<br>
+            = <strong>78.2%</strong></p>
+            <p><em>Note: In the UI, component scores show both raw points (40/42) AND percentages (95%), with color coding: 🟢 Green (70%+), 🟡 Yellow (40-69%), 🔴 Red (<40%).</em></p>
+        </div>
+
         <h3>How many pages does Optiview audit?</h3>
         <p>We audit up to <strong>120 pages</strong> per site by default (automatically scaled for larger sitemaps). You can adjust this in the "Advanced" settings when starting an audit.</p>
         <p>Pages are discovered from:</p>
@@ -278,9 +219,7 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
             <li>Internal links from your homepage</li>
             <li>Priority is given to important pages (linked from multiple places)</li>
         </ul>
-    </div>
 
-    <div class="faq-item">
         <h3>How long does an audit take?</h3>
         <p>Typical audit timeline:</p>
         <ul>
@@ -289,15 +228,11 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
             <li><strong>Large sites (60-120 pages):</strong> 5-10 minutes</li>
         </ul>
         <p>Most of the time is spent running Brave AI queries (up to 50 queries with built-in rate-limit handling to avoid 429 errors).</p>
-    </div>
 
-    <div class="faq-item">
         <h3>Can I re-run an audit?</h3>
         <p>Yes! Click the <strong>"🔄 Re-run Audit"</strong> button at the top of any audit report. This creates a fresh audit using the same settings.</p>
         <p><strong>Tip:</strong> Re-run after making changes to see if your score improves!</p>
-    </div>
 
-    <div class="faq-item">
         <h3>What are "Issues" and how do I fix them?</h3>
         <p>Issues are specific problems we found during the audit. Severity levels:</p>
         <ul>
@@ -313,12 +248,11 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
         </ul>
     </div>
 
-    <h2 id="bots">AI Bots & Crawlers</h2>
-
-    <div class="faq-item">
+    <div class="section" id="ai-bots">
+        <h2>AI Bots & Crawlers</h2>
+        
         <h3>Which AI bots does Optiview track?</h3>
         <p>We track all major AI crawlers:</p>
-        <p>Crawler visits are automatically cross-linked with your audit's Crawlability score to confirm live access.</p>
         <ul>
             <li>🤖 <strong>GPTBot</strong> (OpenAI / ChatGPT)</li>
             <li>🧠 <strong>ClaudeBot</strong> (Anthropic / Claude)</li>
@@ -328,10 +262,9 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
             <li>🕷️ <strong>Bytespider</strong> (ByteDance / TikTok AI)</li>
             <li>Plus traditional bots: Googlebot, Bingbot</li>
         </ul>
-        <p>See the full list at <a href="/docs/bots.html">AI Bots We Track</a>.</p>
-    </div>
+        <p>Crawler visits are automatically cross-linked with your audit's Crawlability score to confirm live access.</p>
+        <p>See the full list at <a href="https://optiview.ai/docs/bots.html" style="color: #3b82f6;">AI Bots We Track</a>.</p>
 
-    <div class="faq-item">
         <h3>Should I block AI bots?</h3>
         <p><strong>Generally, no.</strong> Blocking AI bots prevents your content from appearing in AI search results. However, you might want to block them if:</p>
         <ul>
@@ -340,14 +273,14 @@ https://api.optiview.ai/v1/audits/YOUR_AUDIT_ID/brave/queries.json</pre>
             <li>You want to prevent AI from regurgitating your content</li>
         </ul>
         <p>To block, add to your robots.txt:</p>
-        <pre>User-agent: GPTBot
+        <pre style="background: #f1f5f9; padding: 15px; border-radius: 6px; overflow-x: auto;">
+User-agent: GPTBot
 Disallow: /</pre>
-    </div>
 
-    <div class="faq-item">
         <h3>How do I allow AI bots?</h3>
         <p>Make sure your robots.txt explicitly allows them:</p>
-        <pre>User-agent: GPTBot
+        <pre style="background: #f1f5f9; padding: 15px; border-radius: 6px; overflow-x: auto;">
+User-agent: GPTBot
 Allow: /
 
 User-agent: ClaudeBot
@@ -364,9 +297,9 @@ Allow: /</pre>
         <p>Or simply don't block them (bots are allowed by default unless explicitly disallowed).</p>
     </div>
 
-    <h2 id="privacy">Privacy & Security</h2>
-
-    <div class="faq-item">
+    <div class="section" id="privacy">
+        <h2>Privacy & Security</h2>
+        
         <h3>Does Optiview store my visitors' data?</h3>
         <p><strong>No personally identifiable information (PII) is stored.</strong> We only track AI bot visits with:</p>
         <ul>
@@ -382,9 +315,7 @@ Allow: /</pre>
             <li>Names, emails, or any PII</li>
             <li>Session data or tracking IDs</li>
         </ul>
-    </div>
 
-    <div class="faq-item">
         <h3>Is Optiview GDPR compliant?</h3>
         <p><strong>Yes!</strong> Our privacy-first design means:</p>
         <ul>
@@ -394,9 +325,7 @@ Allow: /</pre>
             <li>Cloudflare infrastructure (GDPR-compliant, EU data residency)</li>
         </ul>
         <p>Since we don't store PII, there's no personal data to delete or export.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>How does Optiview respect robots.txt?</h3>
         <p>Our audit bot (<code>OptiviewAuditBot/1.0</code>) strictly follows robots.txt rules:</p>
         <ul>
@@ -406,13 +335,14 @@ Allow: /</pre>
             <li>Clear User-Agent identification</li>
         </ul>
         <p>To block our bot, add to robots.txt:</p>
-        <pre>User-agent: OptiviewAuditBot
+        <pre style="background: #f1f5f9; padding: 15px; border-radius: 6px; overflow-x: auto;">
+User-agent: OptiviewAuditBot
 Disallow: /</pre>
     </div>
 
-    <h2 id="technical">Technical Details</h2>
-
-    <div class="faq-item">
+    <div class="section" id="technical">
+        <h2>Technical Details</h2>
+        
         <h3>What technology powers Optiview?</h3>
         <ul>
             <li><strong>Infrastructure:</strong> Cloudflare Workers (edge computing)</li>
@@ -422,9 +352,7 @@ Disallow: /</pre>
             <li><strong>Frontend:</strong> React + Vite + TypeScript</li>
         </ul>
         <p>Everything runs on Cloudflare's global edge network for speed and reliability.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>How accurate is the structured data detection?</h3>
         <p>Very accurate! We:</p>
         <ul>
@@ -435,74 +363,78 @@ Disallow: /</pre>
             <li>Identify all schema types (FAQPage, Organization, Product, etc.)</li>
         </ul>
         <p>We detect structured data the same way Google and AI engines do.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>Can I use Optiview's API programmatically?</h3>
         <p>Yes! Our API is available at <code>https://api.optiview.ai</code>. Key endpoints:</p>
-        <pre>POST /v1/audits/start
-GET /v1/audits/:id
-GET /v1/audits/:id/citations
-GET /v1/audits/:id/brave/queries
-GET /v1/audits/:id/pages/:pageId/recommendations</pre>
+        <ul>
+            <li><code>POST /v1/audits/start</code></li>
+            <li><code>GET /v1/audits/:id</code></li>
+            <li><code>GET /v1/audits/:id/citations</code></li>
+            <li><code>GET /v1/audits/:id/brave/queries</code></li>
+            <li><code>GET /v1/audits/:id/pages/:pageId/recommendations</code></li>
+        </ul>
         <p>Contact us for API documentation and rate limits.</p>
-    </div>
 
-    <div class="faq-item">
         <h3>What's the difference between Optiview and traditional SEO tools?</h3>
-        <table style="width: 100%; margin: 15px 0;">
-            <thead>
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <thead style="background: #f8fafc;">
                 <tr>
-                    <th>Feature</th>
-                    <th>Traditional SEO Tools</th>
-                    <th>Optiview</th>
+                    <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left;">Feature</th>
+                    <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left;">Traditional SEO Tools</th>
+                    <th style="padding: 12px; border: 1px solid #e5e7eb; text-align: left;">Optiview</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td>Focus</td>
-                    <td>Google/Bing rankings</td>
-                    <td>AI search engines</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>Focus</strong></td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">Google/Bing rankings</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">AI search engines</td>
                 </tr>
                 <tr>
-                    <td>Metrics</td>
-                    <td>Keywords, backlinks</td>
-                    <td>Citations, answerability</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>Metrics</strong></td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">Keywords, backlinks</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">Citations, answerability</td>
                 </tr>
                 <tr>
-                    <td>Bot Tracking</td>
-                    <td>Googlebot only</td>
-                    <td>All AI bots (GPTBot, Claude, etc.)</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>Bot Tracking</strong></td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">Googlebot only</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">All AI bots (GPTBot, Claude, etc.)</td>
                 </tr>
                 <tr>
-                    <td>Structured Data</td>
-                    <td>Basic validation</td>
-                    <td>AI-optimized schemas (FAQ, How-To, etc.)</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>Structured Data</strong></td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">Basic validation</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">AI-optimized schemas (FAQ, How-To, etc.)</td>
                 </tr>
                 <tr>
-                    <td>Citations</td>
-                    <td>Not tracked</td>
-                    <td>AEO, GEO, Organic breakdowns</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>Citations</strong></td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">Not tracked</td>
+                    <td style="padding: 12px; border: 1px solid #e5e7eb;">AEO, GEO, Organic breakdowns</td>
                 </tr>
             </tbody>
         </table>
         <p><strong>Optiview is purpose-built for the AI search era.</strong></p>
     </div>
 
-    <div class="highlight">
-        <strong>Still have questions?</strong> We're here to help!
-        <ul style="margin: 10px 0 0 0;">
-            <li>📚 <a href="/docs/audit.html">Audit Checks Documentation</a></li>
-            <li>🤖 <a href="/docs/bots.html">AI Bots We Track</a></li>
-            <li>🔒 <a href="/docs/security.html">Security & Privacy</a></li>
-        </ul>
+    <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f8fafc; border-radius: 12px;">
+        <h3 style="color: #1e40af; margin-top: 0;">Still have questions?</h3>
+        <p>We're here to help!</p>
+        <div style="margin: 20px 0;">
+            <a href="https://optiview.ai/docs/audit.html" class="demo-button" style="margin: 5px;">📚 Audit Checks Documentation</a>
+            <a href="https://optiview.ai/docs/bots.html" class="demo-button" style="margin: 5px;">🤖 AI Bots We Track</a>
+            <a href="https://optiview.ai/docs/security.html" class="demo-button" style="margin: 5px;">🔒 Security & Privacy</a>
+        </div>
     </div>
 
-    <footer>
-        <p><a href="/">← Back to Optiview Home</a> | <a href="https://app.optiview.ai">Run an Audit</a></p>
-        <p>See also: <a href="/docs/audit.html">Audit Checks</a> | <a href="/docs/bots.html">AI Bots</a> | <a href="/docs/security.html">Security & Privacy</a></p>
-        <p><small>Last updated: October 2025 (Phase F++ release)</small></p>
-    </footer>
+    <div style="text-align: center; margin-top: 40px; color: #64748b; font-size: 14px;">
+        <a href="https://optiview.ai" class="back-link">← Back to Optiview Home</a> • 
+        <a href="https://app.optiview.ai" class="back-link">Run an Audit</a>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+        <p>See also: <a href="https://optiview.ai/docs/audit.html" style="color: #6b7280;">Audit Checks</a> | 
+        <a href="https://optiview.ai/docs/bots.html" style="color: #6b7280;">AI Bots</a> | 
+        <a href="https://optiview.ai/docs/security.html" style="color: #6b7280;">Security & Privacy</a></p>
+        <p>Last updated: October 2025 (Phase F++ release)</p>
+    </div>
 </body>
 </html>
-

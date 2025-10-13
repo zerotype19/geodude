@@ -1,150 +1,416 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optiview - AI SEO Platform & Visibility Intelligence</title>
+    <meta name="description" content="The first AI-powered SEO platform that tracks visibility across traditional search engines and AI assistants like Perplexity, ChatGPT Search, and Claude. Get comprehensive audits and real-time AI citation tracking.">
+    <meta name="keywords" content="AI SEO, visibility intelligence, Perplexity tracking, ChatGPT citations, Claude AI, SEO audit, AI optimization">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://optiview.ai/">
+    <meta property="og:title" content="Optiview - AI SEO Platform & Visibility Intelligence">
+    <meta property="og:description" content="Track how AI assistants reference your content. The first platform to monitor visibility across Perplexity, ChatGPT Search, and Claude with real-time citations and 0-100 scores.">
+    <meta property="og:image" content="https://optiview.ai/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://optiview.ai/">
+    <meta property="twitter:title" content="Optiview - AI SEO Platform & Visibility Intelligence">
+    <meta property="twitter:description" content="Track how AI assistants reference your content. The first platform to monitor visibility across Perplexity, ChatGPT Search, and Claude with real-time citations and 0-100 scores.">
+    <meta property="twitter:image" content="https://optiview.ai/og-image.png">
+
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-CY45NV4CNE');
+    </script>
 
-      gtag('config', 'G-CY45NV4CNE');
-    </script>
-    
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Optiview - AI Optimization for Websites</title>
-    <meta name="description" content="Optimize your website for AI discovery. Understand how AI crawlers see your content and improve your visibility.">
-    <link rel="canonical" href="https://www.optiview.ai/">
-    
-    <!-- Organization Schema -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "Optiview",
-      "url": "https://www.optiview.ai",
-      "logo": "https://www.optiview.ai/logo.png",
-      "description": "AI optimization platform helping websites improve their discoverability by AI crawlers and assistants",
-      "foundingDate": "2024",
-      "sameAs": []
-    }
-    </script>
-    
-    <!-- FAQ Schema -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [{
-        "@type": "Question",
-        "name": "What is Optiview?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "Optiview is an AI optimization platform that helps websites understand and improve how they appear to AI crawlers like ChatGPT, Claude, and Perplexity."
-        }
-      }, {
-        "@type": "Question",
-        "name": "How does AI crawling differ from traditional SEO?",
-        "acceptedAnswer": {
-          "@type": "Answer",
-          "text": "AI crawlers prioritize structured data, clear content hierarchy, and answerable content formats. Traditional SEO focuses on keywords and backlinks, while AI optimization focuses on semantic understanding and data structure."
-        }
-      }]
-    }
-    </script>
-    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            line-height: 1.6; 
+            color: #1f2937;
+            background: #ffffff;
         }
-        .container {
-            background: white;
-            padding: 60px 40px;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 600px;
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        
+        /* Header */
+        .header { 
+            background: white; 
+            border-bottom: 1px solid #e5e7eb; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; }
+        .logo { font-size: 24px; font-weight: 700; color: #3b82f6; text-decoration: none; }
+        .nav-links { display: flex; gap: 24px; align-items: center; }
+        .nav-links a { color: #6b7280; text-decoration: none; font-weight: 500; transition: color 0.2s; }
+        .nav-links a:hover { color: #3b82f6; }
+        .cta-button { 
+            background: #3b82f6; 
+            color: white; 
+            padding: 10px 20px; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .cta-button:hover { background: #1e40af; }
+        
+        /* Hero Section */
+        .hero { 
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); 
+            color: white; 
+            padding: 80px 0; 
             text-align: center;
         }
-        h1 { 
-            font-size: 3rem;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        p { 
-            font-size: 1.2rem;
-            color: #666;
-            margin-bottom: 30px;
-        }
-        .badge {
-            display: inline-block;
-            padding: 8px 16px;
-            background: #f0f0f0;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            color: #666;
-        }
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
-        }
-        .footer a {
-            color: #667eea;
-            text-decoration: none;
-            margin: 0 8px;
-            font-size: 0.9rem;
-        }
-        .footer a:hover {
-            text-decoration: underline;
-        }
-        .cta-button {
-            display: inline-block;
-            margin: 20px 0 10px;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
+        .hero h1 { font-size: 3.5rem; font-weight: 800; margin-bottom: 24px; line-height: 1.1; }
+        .hero p { font-size: 1.25rem; margin-bottom: 32px; opacity: 0.9; max-width: 600px; margin-left: auto; margin-right: auto; }
+        .hero-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
+        .hero-button { 
+            background: white; 
+            color: #3b82f6; 
+            padding: 16px 32px; 
+            border-radius: 12px; 
+            text-decoration: none; 
             font-weight: 600;
-            transition: transform 0.2s;
+            font-size: 1.1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        .cta-button:hover {
-            transform: translateY(-2px);
-            text-decoration: none;
+        .hero-button:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .hero-button.secondary { 
+            background: transparent; 
+            color: white; 
+            border: 2px solid white; 
+        }
+        .hero-button.secondary:hover { background: white; color: #3b82f6; }
+        
+        /* Features Section */
+        .features { padding: 80px 0; background: #f8fafc; }
+        .section-title { text-align: center; margin-bottom: 60px; }
+        .section-title h2 { font-size: 2.5rem; font-weight: 700; color: #1f2937; margin-bottom: 16px; }
+        .section-title p { font-size: 1.2rem; color: #6b7280; max-width: 600px; margin: 0 auto; }
+        
+        .features-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); 
+            gap: 40px; 
+            margin-top: 60px;
+        }
+        .feature-card { 
+            background: white; 
+            padding: 40px; 
+            border-radius: 16px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #e5e7eb;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .feature-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .feature-icon { font-size: 3rem; margin-bottom: 20px; }
+        .feature-card h3 { font-size: 1.5rem; font-weight: 600; color: #1f2937; margin-bottom: 16px; }
+        .feature-card p { color: #6b7280; margin-bottom: 20px; }
+        .feature-badge { 
+            display: inline-block; 
+            background: #10b981; 
+            color: white; 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 0.875rem; 
+            font-weight: 600;
+        }
+        
+        /* Stats Section */
+        .stats { padding: 60px 0; background: white; }
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 40px; 
+            text-align: center;
+        }
+        .stat-item { }
+        .stat-number { font-size: 3rem; font-weight: 800; color: #3b82f6; margin-bottom: 8px; }
+        .stat-label { color: #6b7280; font-weight: 500; }
+        
+        /* AI Assistants Section */
+        .ai-assistants { padding: 80px 0; background: #f8fafc; }
+        .assistants-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+            gap: 30px; 
+            margin-top: 60px;
+        }
+        .assistant-card { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid #e5e7eb;
+        }
+        .assistant-icon { font-size: 2.5rem; margin-bottom: 16px; }
+        .assistant-card h3 { font-size: 1.25rem; font-weight: 600; color: #1f2937; margin-bottom: 12px; }
+        .assistant-card p { color: #6b7280; font-size: 0.9rem; }
+        
+        /* CTA Section */
+        .cta { 
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%); 
+            color: white; 
+            padding: 80px 0; 
+            text-align: center;
+        }
+        .cta h2 { font-size: 2.5rem; font-weight: 700; margin-bottom: 24px; }
+        .cta p { font-size: 1.2rem; margin-bottom: 32px; opacity: 0.9; max-width: 600px; margin-left: auto; margin-right: auto; }
+        
+        /* Footer */
+        .footer { background: #1f2937; color: white; padding: 60px 0 40px; }
+        .footer-content { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 40px; 
+            margin-bottom: 40px;
+        }
+        .footer-section h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 20px; }
+        .footer-section ul { list-style: none; }
+        .footer-section li { margin-bottom: 8px; }
+        .footer-section a { color: #d1d5db; text-decoration: none; transition: color 0.2s; }
+        .footer-section a:hover { color: white; }
+        .footer-bottom { 
+            border-top: 1px solid #374151; 
+            padding-top: 20px; 
+            text-align: center; 
+            color: #9ca3af;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .hero p { font-size: 1.1rem; }
+            .nav-links { display: none; }
+            .features-grid { grid-template-columns: 1fr; }
+            .assistants-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Optiview</h1>
-        <p>AI Optimization Platform</p>
-        <p>Helping websites optimize for AI discovery and improve their visibility to AI crawlers and assistants.</p>
-        <a href="https://app.optiview.ai" class="cta-button">Launch Free Audit →</a>
-        <div class="footer">
-            <a href="https://app.optiview.ai">Run Audit</a> |
-            <a href="/docs/faq.html">FAQ</a> |
-            <a href="/docs/citations.html">Citations Guide</a> |
-            <a href="/docs/audit.html">Audit Checks</a> |
-            <a href="/docs/bots.html">AI Bots</a> |
-            <a href="/docs/security.html">Security & Privacy</a>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <nav class="nav">
+                <a href="/" class="logo">Optiview</a>
+                <div class="nav-links">
+                    <a href="#features">Features</a>
+                    <a href="#ai-assistants">AI Assistants</a>
+                    <a href="#pricing">Pricing</a>
+                    <a href="/docs/faq.html">Docs</a>
+                    <a href="https://app.optiview.ai" class="cta-button">Launch App</a>
+                </div>
+            </nav>
         </div>
-        <div style="margin-top: 15px; font-size: 0.85rem; color: #999;">
-            <a href="/status.html" style="color: #999;">System Status</a>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>The First AI SEO Platform with Visibility Intelligence</h1>
+            <p>Track how AI assistants like Perplexity, ChatGPT Search, and Claude reference your content. Get comprehensive SEO audits plus real-time AI citation tracking with 0-100 visibility scores.</p>
+            <div class="hero-buttons">
+                <a href="https://app.optiview.ai" class="hero-button">Start Free Audit</a>
+                <a href="#features" class="hero-button secondary">Learn More</a>
+            </div>
         </div>
-    </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-title">
+                <h2>Comprehensive AI SEO Platform</h2>
+                <p>Traditional SEO meets AI visibility intelligence for the future of content discovery</p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <div class="feature-badge">NEW</div>
+                    <h3>Visibility Intelligence</h3>
+                    <p>Track how AI assistants reference your content across Perplexity, ChatGPT Search, and Claude. Get real-time citations, 0-100 visibility scores, and competitive rankings.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>5-Pillar SEO Audits</h3>
+                    <p>Comprehensive audits covering crawlability, structured data, answerability, trust signals, and AI visibility. Advanced detectors for render parity, schema fitness, and E-E-A-T analysis.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI Assistant Tracking</h3>
+                    <p>Monitor citations from Perplexity, ChatGPT Search, and Claude with live API integrations. Understand each AI's unique citation patterns and optimize accordingly.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3>Real-Time Analytics</h3>
+                    <p>Live visibility scores, weekly rankings, and trend analysis. Export data, track competitive positioning, and measure ROI from AI optimization efforts.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Performance Monitoring</h3>
+                    <p>Track Core Web Vitals, page speed, and technical SEO health. Identify issues that impact both traditional search and AI assistant crawling.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Enterprise Security</h3>
+                    <p>Bank-grade security with AES-256 encryption, GDPR compliance, and secure API integrations. Your data is protected with industry-leading security measures.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">AI Assistants Tracked</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100+</div>
+                    <div class="stat-label">Daily Citations</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">99.9%</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">0-100</div>
+                    <div class="stat-label">Visibility Scores</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Assistants Section -->
+    <section class="ai-assistants" id="ai-assistants">
+        <div class="container">
+            <div class="section-title">
+                <h2>Track AI Assistant Citations</h2>
+                <p>Each AI assistant forms its own unique ecosystem of citations with distinct preferences and patterns</p>
+            </div>
+            
+            <div class="assistants-grid">
+                <div class="assistant-card">
+                    <div class="assistant-icon">🔍</div>
+                    <h3>Perplexity AI</h3>
+                    <p>Direct source links with context. Prefers SEO-optimized content, marketing resources, and technical documentation. Native API integration captures structured citations.</p>
+                </div>
+                
+                <div class="assistant-card">
+                    <div class="assistant-icon">🤖</div>
+                    <h3>ChatGPT Search</h3>
+                    <p>Contextual references in conversational responses. Favors AI/tech platforms, development tools, and educational content. Heuristic URL extraction from responses.</p>
+                </div>
+                
+                <div class="assistant-card">
+                    <div class="assistant-icon">🧠</div>
+                    <h3>Claude (Anthropic)</h3>
+                    <p>Markdown-style links and structured references. Cites development tools, programming resources, and technical guides. Enhanced parsing for Markdown format.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <h2>Ready to Optimize for AI?</h2>
+            <p>Join the future of content discovery. Start tracking your AI visibility across all major platforms today.</p>
+            <div class="hero-buttons">
+                <a href="https://app.optiview.ai" class="hero-button">Launch Optiview</a>
+                <a href="/docs/visibility.html" class="hero-button secondary">Learn About Visibility Intelligence</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>Product</h3>
+                    <ul>
+                        <li><a href="/docs/visibility.html">Visibility Intelligence</a></li>
+                        <li><a href="/docs/audit.html">SEO Audits</a></li>
+                        <li><a href="/docs/citations.html">Citations Guide</a></li>
+                        <li><a href="/docs/bots.html">AI Bots</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h3>Resources</h3>
+                    <ul>
+                        <li><a href="/docs/faq.html">FAQ</a></li>
+                        <li><a href="/docs/security.html">Security</a></li>
+                        <li><a href="/status.html">Status</a></li>
+                        <li><a href="mailto:support@optiview.ai">Support</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h3>Company</h3>
+                    <ul>
+                        <li><a href="mailto:hello@optiview.ai">Contact</a></li>
+                        <li><a href="mailto:security@optiview.ai">Security</a></li>
+                        <li><a href="/docs/privacy.html">Privacy</a></li>
+                        <li><a href="/docs/terms.html">Terms</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2025 Optiview. All rights reserved. The first AI SEO platform with Visibility Intelligence.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add scroll effect to header
+        window.addEventListener('scroll', function() {
+            const header = document.querySelector('.header');
+            if (window.scrollY > 100) {
+                header.style.background = 'rgba(255, 255, 255, 0.95)';
+                header.style.backdropFilter = 'blur(10px)';
+            } else {
+                header.style.background = 'white';
+                header.style.backdropFilter = 'none';
+            }
+        });
+    </script>
 </body>
 </html>
-
