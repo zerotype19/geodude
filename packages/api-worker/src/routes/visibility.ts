@@ -14,6 +14,7 @@ export interface VisibilityRoutes {
   getMVAMetrics: (request: Request) => Promise<Response>;
   generateCloudflareConfig: (request: Request) => Promise<Response>;
   generateGA4Config: (request: Request) => Promise<Response>;
+  rebuildMetrics: (request: Request) => Promise<Response>;
 }
 
 export function createVisibilityRoutes(
@@ -268,6 +269,70 @@ export function createVisibilityRoutes(
       } catch (error) {
         return new Response(JSON.stringify({ 
           error: 'Failed to generate GA4 config',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    },
+
+    async rebuildMetrics(request: Request): Promise<Response> {
+      try {
+        const url = new URL(request.url);
+        const projectId = url.searchParams.get('projectId');
+        
+        if (!projectId) {
+          return new Response(JSON.stringify({ error: 'projectId required' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Calculate metrics for today
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Get citations for today
+        const citations = await db.prepare(
+          `SELECT assistant, COUNT(*) as mentions_count, COUNT(DISTINCT source_url) as unique_urls
+           FROM ai_citations 
+           WHERE project_id = ? AND occurred_at >= ? AND occurred_at < ?
+           GROUP BY assistant`
+        ).bind(projectId, `${today} 00:00:00`, `${today} 23:59:59`).all();
+
+        // Calculate MVA (simplified)
+        const mvaDaily = citations.results.length > 0 ? 
+          citations.results.reduce((sum, row) => sum + (row.mentions_count * 0.1), 0) : 0;
+
+        // Store metrics
+        for (const row of citations.results) {
+          await db.prepare(
+            `INSERT OR REPLACE INTO ai_visibility_metrics 
+             (day, project_id, assistant, mentions_count, unique_urls, mva_daily, impression_estimate, competitor_domains)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            today,
+            projectId,
+            row.assistant,
+            row.mentions_count,
+            row.unique_urls,
+            mvaDaily,
+            mvaDaily * 100, // Simple impression estimate
+            JSON.stringify([]) // No competitor domains for now
+          ).run();
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          projectId,
+          day: today,
+          metrics: citations.results
+        }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({ 
+          error: 'Failed to rebuild metrics',
           details: error instanceof Error ? error.message : String(error)
         }), {
           status: 500,

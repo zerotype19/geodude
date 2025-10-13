@@ -189,12 +189,90 @@ async function finalMonitoring() {
     // 7. Feature Flags Status
     console.log('\n🚩 7. Feature Flags Status');
     console.log('-'.repeat(25));
-    console.log('   🧠 E-E-A-T Scoring: ENABLED (Step B)');
-    console.log('   👁️  Assistant Visibility: DISABLED (Step C)');
-    console.log('   📊 Status: Monitoring 48-hour validation period');
+    try {
+      const healthResponse = await fetch('https://geodude-api.kevin-mcgovern.workers.dev/api/health');
+      const healthData = await healthResponse.json();
+      
+      // Check if visibility API is available (indicates feature flag is on)
+      const visibilityResponse = await fetch('https://geodude-api.kevin-mcgovern.workers.dev/api/visibility/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true })
+      });
+      
+      const visibilityEnabled = visibilityResponse.status !== 404;
+      
+      console.log('   🧠 E-E-A-T Scoring: ENABLED (Step B)');
+      console.log(`   👁️  Assistant Visibility: ${visibilityEnabled ? 'ENABLED (Step C)' : 'DISABLED (Step C)'}`);
+      console.log(`   📊 Status: ${visibilityEnabled ? 'Step C - Assistant Visibility Active' : 'Monitoring 48-hour validation period'}`);
+    } catch (error) {
+      console.log('   ❌ Could not check feature flags:', error.message);
+      console.log('   🧠 E-E-A-T Scoring: ENABLED (Step B)');
+      console.log('   👁️  Assistant Visibility: UNKNOWN');
+      console.log('   📊 Status: Monitoring 48-hour validation period');
+    }
+
+    // 8. Alert Conditions Check
+    console.log('\n🚨 8. Alert Conditions Check');
+    console.log('-'.repeat(30));
+    let alertCount = 0;
     
-    // 8. Summary and Next Steps
-    console.log('\n📋 8. Summary and Next Steps');
+    try {
+      // Check queued runs > 10 for > 30 min
+      const queuedResult = execSync(`wrangler d1 execute optiview_db --command "SELECT COUNT(*) FROM assistant_runs WHERE status='queued' AND run_started_at < datetime('now','-30 minutes');" --remote`, { encoding: 'utf8' });
+      const queuedData = parseWranglerOutput(queuedResult);
+      const queuedCount = queuedData[0]?.results?.[0]?.['COUNT(*)'] || 0;
+      
+      if (queuedCount > 10) {
+        console.log(`   ⚠️  ALERT: ${queuedCount} runs queued > 30 minutes`);
+        alertCount++;
+      } else {
+        console.log(`   ✅ Queued runs: ${queuedCount} (within limits)`);
+      }
+      
+      // Check outputs last 1h
+      const outputsResult = execSync(`wrangler d1 execute optiview_db --command "SELECT COUNT(*) FROM assistant_outputs WHERE parsed_at >= datetime('now','-1 hour');" --remote`, { encoding: 'utf8' });
+      const outputsData = parseWranglerOutput(outputsResult);
+      const outputsCount = outputsData[0]?.results?.[0]?.['COUNT(*)'] || 0;
+      
+      // Check successful runs last 1h
+      const successRunsResult = execSync(`wrangler d1 execute optiview_db --command "SELECT COUNT(*) FROM assistant_runs WHERE status='success' AND run_started_at >= datetime('now','-1 hour');" --remote`, { encoding: 'utf8' });
+      const successRunsData = parseWranglerOutput(successRunsResult);
+      const successRunsCount = successRunsData[0]?.results?.[0]?.['COUNT(*)'] || 0;
+      
+      if (outputsCount === 0 && successRunsCount > 0) {
+        console.log(`   ⚠️  ALERT: No outputs in last hour but ${successRunsCount} successful runs`);
+        alertCount++;
+      } else {
+        console.log(`   ✅ Outputs last hour: ${outputsCount}, successful runs: ${successRunsCount}`);
+      }
+      
+      // Check citations last 6h
+      const citationsResult = execSync(`wrangler d1 execute optiview_db --command "SELECT COUNT(*) FROM ai_citations WHERE occurred_at >= datetime('now','-6 hours');" --remote`, { encoding: 'utf8' });
+      const citationsData = parseWranglerOutput(citationsResult);
+      const citationsCount = citationsData[0]?.results?.[0]?.['COUNT(*)'] || 0;
+      
+      if (citationsCount === 0 && outputsCount > 0) {
+        console.log(`   ⚠️  ALERT: No citations in last 6 hours but ${outputsCount} outputs`);
+        alertCount++;
+      } else {
+        console.log(`   ✅ Citations last 6h: ${citationsCount}`);
+      }
+      
+      if (alertCount === 0) {
+        console.log('   ✅ All alert conditions clear');
+      } else {
+        console.log(`   🚨 ${alertCount} alert conditions triggered`);
+        process.exit(1); // Exit non-zero for alerts
+      }
+      
+    } catch (error) {
+      console.log('   ❌ Error checking alert conditions:', error.message);
+      process.exit(1);
+    }
+    
+    // 9. Summary and Next Steps
+    console.log('\n📋 9. Summary and Next Steps');
     console.log('-'.repeat(25));
     console.log('   🎯 Current Status: Step B - E-E-A-T Beta');
     console.log('   ⏰ Validation Period: 48 hours');

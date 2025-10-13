@@ -13,6 +13,7 @@ import { warmCitations } from './citations-warm';
 import { handleCitations } from './routes/citations';
 import { handleBotLogsIngest, handleGetCrawlers } from './bots/routes';
 import { createVisibilityRoutes } from './routes/visibility';
+import { processRun } from './routes/visibility-processor';
 
 interface Env {
   DB: D1Database;
@@ -44,6 +45,20 @@ interface Env {
   VISIBILITY_RATE_LIMIT_PER_PROJECT?: string;
   ALLOWED_ANSWER_ENGINES?: string;
   GA4_REGEX_SNIPPET_URL?: string;
+  // Live Connectors (Phase 4 - Sprint 1)
+  FEATURE_VIS_PERPLEXITY?: string;
+  FEATURE_VIS_CHATGPT?: string;
+  FEATURE_VIS_CLAUDE?: string;
+  VIS_CONNECT_TIMEOUT_MS?: string;
+  VIS_CONNECT_RETRIES?: string;
+  VIS_RATE_PER_PROJECT?: string;
+  VIS_DAILY_COST_CAP_USD?: string;
+  // Additional API Keys (secrets)
+  PERPLEXITY_API_KEY?: string;
+  CLAUDE_API_KEY?: string;
+  // Optional org IDs
+  PERPLEXITY_ORG_ID?: string;
+  OPENAI_ORG_ID?: string;
 }
 
 // Helper: Validate API key
@@ -110,6 +125,28 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const hour = new Date().getUTCHours();
     
+                // Process visibility queue every 5 minutes (any hour)
+                if (env.FEATURE_ASSISTANT_VISIBILITY === 'true') {
+                  console.log('[VisibilityProcessor] Processing queue...');
+                  try {
+                    // Recovery: Reset stuck runs (30+ minutes) - more aggressive
+                    await env.DB.prepare(
+                      `UPDATE assistant_runs 
+                       SET status = 'error', error = 'timeout - auto-recovery'
+                       WHERE status = 'running' 
+                       AND run_started_at < datetime('now', '-30 minutes')`
+                    ).run();
+                    
+                    // Process only 1 run per tick to prevent CPU timeout
+                    const batch = 1;
+                    for (let i = 0; i < batch; i++) {
+                      ctx.waitUntil(processRun(env, ctx));
+                    }
+                  } catch (error) {
+                    console.error('[VisibilityProcessor] Error processing queue:', error);
+                  }
+                }
+    
     // 03:00 UTC - Nightly backup
     if (hour === 3) {
       console.log('Nightly backup started at', new Date().toISOString());
@@ -162,7 +199,7 @@ export default {
     }
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -2599,10 +2636,93 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       if (path === '/api/visibility/ga4-config' && request.method === 'GET') {
         return visibilityRoutes.generateGA4Config(request);
       }
+
+      if (path === '/api/visibility/metrics/rebuild' && request.method === 'POST') {
+        return visibilityRoutes.rebuildMetrics(request);
+      }
+
+    }
+
+    // CORS preflight for visibility endpoints
+    if (request.method === 'OPTIONS' && path.startsWith('/api/visibility')) {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'content-type, authorization'
+        }
+      });
+    }
+
+    // Processor routes (outside visibility block, before fallbacks)
+    if (path === '/api/visibility/process-next' && request.method === 'POST') {
+      try {
+        const result = await processRun(env, ctx);
+        return new Response(JSON.stringify(result), {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (error) {
+        console.error('[API] Error in process-next:', error);
+        return new Response(JSON.stringify({ 
+          ok: false, 
+          error: 'Internal server error',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+    }
+
+    if (path.match(/^\/api\/visibility\/runs\/[^/]+\/process$/) && request.method === 'POST') {
+      try {
+        const runId = path.split('/')[4];
+        const result = await processRun(env, ctx, runId);
+        return new Response(JSON.stringify(result), {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (error) {
+        console.error('[API] Error in run process:', error);
+        return new Response(JSON.stringify({ 
+          ok: false, 
+          error: 'Internal server error',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+    }
+
+    // Handle /v1/tag.js requests (keep active)
+    if (path === '/v1/tag.js') {
+      return new Response('console.log("Optiview tag loaded");', {
+        status: 200,
+        headers: { 
+          'Content-Type': 'application/javascript',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
     }
 
     // Legacy endpoints - return 410 Gone
-    const legacyPaths = ['/v1/tag.js', '/v1/track', '/v1/collect'];
+    const legacyPaths = ['/v1/track', '/v1/collect'];
     if (legacyPaths.includes(path)) {
       return new Response(
         JSON.stringify({
