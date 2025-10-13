@@ -189,9 +189,28 @@ async function finalMonitoring() {
     // 7. Feature Flags Status
     console.log('\n🚩 7. Feature Flags Status');
     console.log('-'.repeat(25));
-    console.log('   🧠 E-E-A-T Scoring: ENABLED (Step B)');
-    console.log('   👁️  Assistant Visibility: DISABLED (Step C)');
-    console.log('   📊 Status: Monitoring 48-hour validation period');
+    try {
+      const healthResponse = await fetch('https://geodude-api.kevin-mcgovern.workers.dev/api/health');
+      const healthData = await healthResponse.json();
+      
+      // Check if visibility API is available (indicates feature flag is on)
+      const visibilityResponse = await fetch('https://geodude-api.kevin-mcgovern.workers.dev/api/visibility/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true })
+      });
+      
+      const visibilityEnabled = visibilityResponse.status !== 404;
+      
+      console.log('   🧠 E-E-A-T Scoring: ENABLED (Step B)');
+      console.log(`   👁️  Assistant Visibility: ${visibilityEnabled ? 'ENABLED (Step C)' : 'DISABLED (Step C)'}`);
+      console.log(`   📊 Status: ${visibilityEnabled ? 'Step C - Assistant Visibility Active' : 'Monitoring 48-hour validation period'}`);
+    } catch (error) {
+      console.log('   ❌ Could not check feature flags:', error.message);
+      console.log('   🧠 E-E-A-T Scoring: ENABLED (Step B)');
+      console.log('   👁️  Assistant Visibility: UNKNOWN');
+      console.log('   📊 Status: Monitoring 48-hour validation period');
+    }
     
     // 8. Summary and Next Steps
     console.log('\n📋 8. Summary and Next Steps');

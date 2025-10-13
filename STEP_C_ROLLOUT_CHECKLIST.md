@@ -41,9 +41,12 @@
 ## Rollback Commands (if needed)
 
 ```bash
-wrangler secrets put FEATURE_ASSISTANT_VISIBILITY false
-wrangler secrets put FEATURE_EEAT_SCORING false
+# Set FEATURE_ASSISTANT_VISIBILITY=false in wrangler.toml (prod env)
+# Then deploy
 wrangler deploy
+
+# Note: Flags are ENV variables, not secrets
+# FEATURE_EEAT_SCORING can stay true (additive migrations)
 ```
 
 ## Monitoring Commands
