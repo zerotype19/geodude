@@ -9,16 +9,21 @@ export default function VisibilityPage() {
   const [rankings, setRankings] = useState<RankingRow[]>([]);
   const [citations, setCitations] = useState<CitationRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string>("prj_UHoetismrowc"); // TODO: bind to project switcher
   const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+  const [rankingsPage, setRankingsPage] = useState(1);
+  const [citationsPage, setCitationsPage] = useState(1);
+  const [isAdmin, setIsAdmin] = useState(false); // TODO: bind to user role
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
+    setError(null);
     
     Promise.all([
       VisibilityAPI.rankings(assistant, "7d"),
-      VisibilityAPI.recentCitations(projectId, 25),
+      VisibilityAPI.recentCitations(projectId, 50),
     ]).then(([rankingsRes, citationsRes]) => {
       if (!mounted) return;
       
@@ -38,6 +43,7 @@ export default function VisibilityPage() {
     }).catch(error => {
       console.error('Error fetching visibility data:', error);
       if (mounted) {
+        setError('Failed to load visibility data. Please try again.');
         setRankings([]);
         setCitations([]);
       }
@@ -53,6 +59,23 @@ export default function VisibilityPage() {
     const totalMentions = rankings.reduce((s, r) => s + (r.mentions || 0), 0);
     return { uniqueDomains: domains.size, totalMentions };
   }, [rankings]);
+
+  const handleRollup = async () => {
+    try {
+      setLoading(true);
+      const result = await VisibilityAPI.rollupToday();
+      if (result.success) {
+        // Refresh data
+        window.location.reload();
+      } else {
+        setError('Failed to run rollup. Please try again.');
+      }
+    } catch (error) {
+      setError('Failed to run rollup. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -73,8 +96,29 @@ export default function VisibilityPage() {
               {a.replace("_", " ")}
             </button>
           ))}
+          {isAdmin && (
+            <button
+              onClick={handleRollup}
+              disabled={loading}
+              className="px-3 py-1 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? 'Running...' : 'Run Rollup'}
+            </button>
+          )}
         </div>
       </header>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          {error}
+          <button 
+            onClick={() => setError(null)}
+            className="ml-2 text-red-500 hover:text-red-700"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* KPIs */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -87,7 +131,7 @@ export default function VisibilityPage() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="border rounded-2xl p-4 shadow-sm">
           <h2 className="font-medium mb-3">Top Domains — {assistant.replace("_", " ")}</h2>
-          {loading ? <Skeleton rows={8} /> : <RankingsTable rows={rankings} onDomainClick={setSelectedDomain} />}
+          {loading ? <Skeleton rows={8} /> : <RankingsTable rows={rankings} onDomainClick={setSelectedDomain} page={rankingsPage} onPageChange={setRankingsPage} />}
         </div>
 
         <div className="border rounded-2xl p-4 shadow-sm">
@@ -119,68 +163,138 @@ function KPI({ title, value }: { title: string; value: number | string }) {
 
 function RankingsTable({ 
   rows, 
-  onDomainClick 
+  onDomainClick,
+  page = 1,
+  onPageChange
 }: { 
   rows: RankingRow[]; 
   onDomainClick: (domain: string) => void;
+  page?: number;
+  onPageChange?: (page: number) => void;
 }) {
   if (!rows.length) return <EmptyState text="No rankings yet. Try running a rollup or wait for tonight's rollup." />;
   
+  const itemsPerPage = 25;
+  const startIndex = (page - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRows = rows.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(rows.length / itemsPerPage);
+  
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="text-left text-gray-500">
-          <th className="py-2 pr-2">#</th>
-          <th className="py-2 pr-2">Domain</th>
-          <th className="py-2 pr-2">Mentions</th>
-          <th className="py-2 pr-2">% Share</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.slice(0, 25).map(r => (
-          <tr key={`${r.week}-${r.assistant}-${r.domain}`} className="border-t hover:bg-gray-50">
-            <td className="py-2 pr-2">{r.domain_rank}</td>
-            <td className="py-2 pr-2">
-              <button 
-                onClick={() => onDomainClick(r.domain)}
-                className="text-blue-600 hover:underline cursor-pointer"
-              >
-                {r.domain}
-              </button>
-            </td>
-            <td className="py-2 pr-2">{r.mentions || r.mentions_count}</td>
-            <td className="py-2 pr-2">{r.share_pct?.toFixed(2)}%</td>
+    <div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-gray-500">
+            <th className="py-2 pr-2">#</th>
+            <th className="py-2 pr-2">Domain</th>
+            <th className="py-2 pr-2">Mentions</th>
+            <th className="py-2 pr-2">% Share</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {paginatedRows.map(r => (
+            <tr key={`${r.week_start || r.week}-${r.assistant}-${r.domain}`} className="border-t hover:bg-gray-50">
+              <td className="py-2 pr-2">{r.domain_rank}</td>
+              <td className="py-2 pr-2">
+                <button 
+                  onClick={() => onDomainClick(r.domain)}
+                  className="text-blue-600 hover:underline cursor-pointer"
+                >
+                  {r.domain}
+                </button>
+              </td>
+              <td className="py-2 pr-2">{r.mentions || r.mentions_count}</td>
+              <td className="py-2 pr-2">{r.share_pct?.toFixed(2)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      
+      {totalPages > 1 && onPageChange && (
+        <div className="flex justify-between items-center mt-4">
+          <div className="text-sm text-gray-500">
+            Showing {startIndex + 1}-{Math.min(endIndex, rows.length)} of {rows.length}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onPageChange(page - 1)}
+              disabled={page === 1}
+              className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="px-3 py-1 text-sm">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => onPageChange(page + 1)}
+              disabled={page === totalPages}
+              className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 function CitationsList({ rows }: { rows: CitationRow[] }) {
   if (!rows.length) return <EmptyState text="No recent citations yet for this project." />;
   
+  const getAssistantColor = (assistant: string) => {
+    switch (assistant) {
+      case 'perplexity': return 'bg-purple-100 text-purple-800';
+      case 'chatgpt_search': return 'bg-green-100 text-green-800';
+      case 'claude': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getSourceTypeColor = (sourceType?: string) => {
+    switch (sourceType) {
+      case 'native': return 'bg-blue-100 text-blue-800';
+      case 'heuristic': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
   return (
-    <ul className="divide-y">
+    <ul className="divide-y max-h-96 overflow-y-auto">
       {rows.map((c, i) => (
-        <li key={`${c.assistant}-${i}`} className="py-2">
-          <div className="flex items-center justify-between">
-            <div className="truncate">
-              <div className="text-sm font-medium">{c.source_domain}</div>
+        <li key={`${c.assistant}-${i}`} className="py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-900 truncate">
+                {c.title || c.source_domain}
+              </div>
               <a 
                 href={c.url} 
                 target="_blank" 
                 rel="noreferrer" 
-                className="text-xs text-blue-600 underline truncate block"
+                className="text-xs text-blue-600 hover:text-blue-800 truncate block mt-1"
               >
                 {c.url}
               </a>
+              {c.snippet && (
+                <div className="text-xs text-gray-600 mt-1 line-clamp-2">
+                  {c.snippet}
+                </div>
+              )}
             </div>
-            <span className="text-xs px-2 py-1 rounded-full border">
-              {c.assistant}{c.source_type ? ` • ${c.source_type}` : ""}
-            </span>
+            <div className="flex flex-col gap-1 items-end">
+              <span className={`text-xs px-2 py-1 rounded-full ${getAssistantColor(c.assistant)}`}>
+                {c.assistant.replace('_', ' ')}
+              </span>
+              {c.source_type && (
+                <span className={`text-xs px-2 py-1 rounded-full ${getSourceTypeColor(c.source_type)}`}>
+                  {c.source_type}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="text-[11px] text-gray-500 mt-1">
+          <div className="text-[11px] text-gray-500 mt-2">
             {new Date(c.occurred_at).toLocaleString()}
           </div>
         </li>

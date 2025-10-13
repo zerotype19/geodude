@@ -253,6 +253,61 @@ export default {
       });
     }
 
+    // Visibility health check endpoint (public)
+    if (path === '/api/health/visibility') {
+      try {
+        // Get today's scores count
+        const scoresResult = await env.DB.prepare(`
+          SELECT COUNT(*) as count FROM ai_visibility_scores WHERE day = date('now')
+        `).first();
+
+        // Get this week's rankings count
+        const rankingsResult = await env.DB.prepare(`
+          SELECT COUNT(*) as count FROM ai_visibility_rankings 
+          WHERE week_start >= date('now', '-7 days')
+        `).first();
+
+        // Get last rollup time
+        const lastRollupResult = await env.DB.prepare(`
+          SELECT MAX(created_at) as last_rollup FROM ai_visibility_scores
+        `).first();
+
+        // Get enabled assistants
+        const assistantsResult = await env.DB.prepare(`
+          SELECT DISTINCT assistant FROM ai_citations 
+          WHERE occurred_at >= datetime('now', '-7 days') AND assistant IS NOT NULL
+        `).all();
+
+        const health = {
+          status: 'healthy',
+          scores_today: (scoresResult as any)?.count || 0,
+          rankings_week_rows: (rankingsResult as any)?.count || 0,
+          last_rollup_at: (lastRollupResult as any)?.last_rollup || null,
+          assistants_enabled: assistantsResult.results?.map((r: any) => r.assistant) || [],
+          timestamp: new Date().toISOString()
+        };
+
+        return new Response(JSON.stringify(health), {
+          status: 200,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=60' // 1 minute cache
+          }
+        });
+      } catch (error) {
+        console.error('[Health] Error in visibility health check:', error);
+        return new Response(JSON.stringify({ 
+          status: 'unhealthy',
+          error: 'Health check failed',
+          timestamp: new Date().toISOString()
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // robots.txt endpoint (public) - Block all crawlers from API endpoints
     if (path === '/robots.txt') {
       const robotsTxt = `User-agent: *
