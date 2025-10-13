@@ -1304,6 +1304,9 @@ export default {
         console.log(`[page] Looking for page: ${normalized} in audit ${auditId}`);
 
         // 1) Find the exact page row (search by full URL first, then pathname)
+        // Escape special characters for LIKE pattern to avoid "pattern too complex" error
+        const escapedNormalized = normalized.replace(/[%_\\]/g, '\\$&');
+        
         const pageRow = await env.DB.prepare(
           `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
                   word_count, rendered_words, snippet
@@ -1311,7 +1314,7 @@ export default {
            WHERE audit_id = ? AND (url = ? OR url = ? OR url LIKE '%' || ?)
            ORDER BY (url = ?) DESC, (url = ?) DESC
            LIMIT 1`
-        ).bind(auditId, rawU, normalized, normalized, rawU, normalized).first();
+        ).bind(auditId, rawU, normalized, escapedNormalized, rawU, normalized).first();
         
         console.log(`[page] Found page row:`, !!pageRow, `(searched for: "${normalized}")`);
 
