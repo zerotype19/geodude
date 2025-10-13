@@ -49,11 +49,17 @@ export const ClaudeConnector: AssistantConnector = {
         answer = data?.content?.[0]?.text ?? "";
         
         // Extract URLs heuristically from the response
-        // Claude doesn't always return structured citations, so we extract URLs from text
+        // Claude often returns Markdown-style links, so we check for both formats
         const urlRegex = /https?:\/\/[^\s"'<>]+/g;
+        const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s"'<>]+)\)/g;
+        
         const allUrls = [
+          // Standard URLs
           ...(answer.match(urlRegex) || []),
-          ...(JSON.stringify(data).match(urlRegex) || [])
+          ...(JSON.stringify(data).match(urlRegex) || []),
+          // Markdown-style links [text](url)
+          ...(Array.from(answer.matchAll(markdownLinkRegex)).map(match => match[2])),
+          ...(Array.from(JSON.stringify(data).matchAll(markdownLinkRegex)).map(match => match[2]))
         ];
         
         // Deduplicate and limit to top 10

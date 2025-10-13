@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Checks - Optiview AI SEO Platform</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        .header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #3b82f6; }
+        .header h1 { color: #1e40af; margin: 0; }
+        .header p { color: #64748b; margin: 10px 0 0; }
+        .section { margin-bottom: 40px; padding: 25px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #3b82f6; }
+        .section h2 { color: #1e40af; margin-top: 0; }
+        .section h3 { color: #374151; margin-top: 25px; }
+        .check-item { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 15px 0; }
+        .check-item h4 { color: #1e40af; margin-top: 0; }
+        .metric { display: inline-block; background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-right: 8px; }
+        .critical { background: #fef2f2; border-color: #fca5a5; }
+        .warning { background: #fffbeb; border-color: #fcd34d; }
+        .info { background: #eff6ff; border-color: #93c5fd; }
+        .back-link { display: inline-block; margin-top: 30px; color: #3b82f6; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>SEO Audit Checks</h1>
+        <p>Comprehensive AI-powered SEO analysis covering crawlability, structured data, answerability, and trust signals</p>
+    </div>
+
+    <div class="section">
+        <h2>Overview of Optiview's 5-Pillar Scoring System</h2>
+        <p>Optiview uses an advanced 5-pillar scoring methodology that evaluates your website's optimization across traditional SEO and AI visibility factors:</p>
+        
+        <div class="check-item">
+            <h4>🎯 Overall Score</h4>
+            <p>A composite score (0-100) that combines all five pillars with AI-specific optimizations. This represents your total SEO readiness for both traditional search engines and AI assistants.</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Pillar 1: Crawlability & Indexability</h2>
+        <p>Ensures search engines and AI crawlers can access and understand your content.</p>
+        
+        <div class="check-item critical">
+            <h4>🚫 Robots.txt Analysis</h4>
+            <p><strong>Critical Check:</strong> Verifies robots.txt doesn't block important content from AI crawlers. AI assistants need access to crawl your content for citations.</p>
+            <p><strong>Common Issues:</strong> Blocking AI user agents, overly restrictive rules, missing sitemap references</p>
+        </div>
+
+        <div class="check-item warning">
+            <h4>🗺️ XML Sitemap Validation</h4>
+            <p><strong>Important Check:</strong> Ensures sitemaps are properly formatted, accessible, and include all important pages.</p>
+            <p><strong>What We Check:</strong> Sitemap accessibility, URL count, lastmod dates, priority settings</p>
+        </div>
+
+        <div class="check-item info">
+            <h4>⚡ Page Speed & Performance</h4>
+            <p><strong>Performance Check:</strong> Analyzes Core Web Vitals and page load times that impact both user experience and AI crawling efficiency.</p>
+            <p><strong>Metrics:</strong> LCP, INP, CLS, Time to First Byte, Page Load Time</p>
+        </div>
+
+        <div class="check-item">
+            <h4>🔍 URL Structure & Redirects</h4>
+            <p><strong>Technical Check:</strong> Validates clean URLs, proper redirect chains, and canonical URL implementation.</p>
+            <p><strong>What We Check:</strong> 404 errors, redirect loops, duplicate content, URL parameters</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Pillar 2: Structured Data & Entity Fitness</h2>
+        <p>Evaluates how well your content is structured for AI understanding and entity recognition.</p>
+        
+        <div class="check-item critical">
+            <h4>📋 JSON-LD Schema Validation</h4>
+            <p><strong>Critical Check:</strong> Validates structured data markup for proper syntax and required properties. Essential for AI assistants to understand your content.</p>
+            <p><strong>Schema Types:</strong> Organization, WebSite, WebPage, Article, FAQPage, Product, LocalBusiness</p>
+        </div>
+
+        <div class="check-item warning">
+            <h4>🏷️ Meta Tags & Headers</h4>
+            <p><strong>Important Check:</strong> Ensures proper meta descriptions, title tags, and header hierarchy for AI comprehension.</p>
+            <p><strong>What We Check:</strong> Title length, meta description quality, H1/H2/H3 structure, Open Graph tags</p>
+        </div>
+
+        <div class="check-item info">
+            <h4>🔗 Internal Linking Structure</h4>
+            <p><strong>Navigation Check:</strong> Analyzes internal linking patterns that help AI understand content relationships and site architecture.</p>
+            <p><strong>Metrics:</strong> Link depth, anchor text distribution, orphan pages, navigation consistency</p>
+        </div>
+
+        <div class="check-item">
+            <h4>📊 Content Hierarchy</h4>
+            <p><strong>Structure Check:</strong> Evaluates content organization and semantic markup for better AI understanding.</p>
+            <p><strong>What We Check:</strong> Heading structure, content blocks, semantic HTML, readability scores</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Pillar 3: Answer Fitness & Content Optimization</h2>
+        <p>Assesses how well your content answers user questions and is optimized for AI citation.</p>
+        
+        <div class="check-item critical">
+            <h4>❓ FAQ Page Detection</h4>
+            <p><strong>Critical Check:</strong> Identifies FAQ content and validates FAQPage schema markup. AI assistants heavily rely on FAQ content for answers.</p>
+            <p><strong>What We Check:</strong> FAQPage JSON-LD, question-answer structure, content completeness</p>
+        </div>
+
+        <div class="check-item warning">
+            <h4>📝 Content Quality & Depth</h4>
+            <p><strong>Important Check:</strong> Evaluates content comprehensiveness, accuracy, and depth that AI assistants prefer for citations.</p>
+            <p><strong>Metrics:</strong> Word count, readability, content freshness, topic coverage</p>
+        </div>
+
+        <div class="check-item info">
+            <h4>🎯 Question-Answer Optimization</h4>
+            <p><strong>Content Check:</strong> Analyzes how well content addresses specific user questions and search intents.</p>
+            <p><strong>What We Check:</strong> Question-answer pairs, intent matching, content relevance, user query alignment</p>
+        </div>
+
+        <div class="check-item">
+            <h4>📊 Snippet Readiness</h4>
+            <p><strong>AI Optimization Check:</strong> Evaluates content's suitability for AI-generated snippets and summaries.</p>
+            <p><strong>What We Check:</strong> Key phrase density, summary paragraphs, bullet points, structured information</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Pillar 4: Trust, Authority & Provenance</h2>
+        <p>Evaluates credibility signals and E-E-A-T (Experience, Expertise, Authority, Trust) factors.</p>
+        
+        <div class="check-item critical">
+            <h4>🔒 SSL Certificate & Security</h4>
+            <p><strong>Critical Check:</strong> Validates HTTPS implementation and security headers. Essential for user trust and search engine ranking.</p>
+            <p><strong>What We Check:</strong> SSL validity, security headers, mixed content, certificate chain</p>
+        </div>
+
+        <div class="check-item warning">
+            <h4>👤 Author & Publisher Information</h4>
+            <p><strong>Important Check:</strong> Ensures proper author and publisher markup for E-E-A-T signals.</p>
+            <p><strong>What We Check:</strong> Author schema, byline presence, publisher information, author credentials</p>
+        </div>
+
+        <div class="check-item info">
+            <h4>📅 Content Freshness & Updates</h4>
+            <p><strong>Recency Check:</strong> Analyzes content update patterns and freshness indicators.</p>
+            <p><strong>Metrics:</strong> Last modified dates, content age, update frequency, version history</p>
+        </div>
+
+        <div class="check-item">
+            <h4>🔗 External Authority Signals</h4>
+            <p><strong>Authority Check:</strong> Evaluates backlink profile and external validation of your content's authority.</p>
+            <p><strong>What We Check:</strong> Domain authority, backlink quality, citation patterns, social signals</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Pillar 5: AI Visibility & Citation Readiness</h2>
+        <p>Assesses your content's readiness for AI assistant citations and visibility tracking.</p>
+        
+        <div class="check-item critical">
+            <h4>🤖 AI Bot Accessibility</h4>
+            <p><strong>Critical Check:</strong> Ensures AI crawlers can access your content without restrictions. Blocked AI bots can't cite your content.</p>
+            <p><strong>What We Check:</strong> AI user agent access, crawl rate limits, bot-specific restrictions</p>
+        </div>
+
+        <div class="check-item warning">
+            <h4>📊 Citation-Friendly Content</h4>
+            <p><strong>Important Check:</strong> Evaluates content structure and formatting for AI citation optimization.</p>
+            <p><strong>What We Check:</strong> Clear headings, structured data, citation-friendly URLs, content depth</p>
+        </div>
+
+        <div class="check-item info">
+            <h4>🎯 Multi-Assistant Optimization</h4>
+            <p><strong>AI Platform Check:</strong> Analyzes content optimization for different AI assistant preferences.</p>
+            <p><strong>What We Check:</strong> Content diversity, platform-specific optimization, citation patterns</p>
+        </div>
+
+        <div class="check-item">
+            <h4>📈 Visibility Tracking Setup</h4>
+            <p><strong>Monitoring Check:</strong> Ensures proper setup for ongoing AI visibility tracking and analysis.</p>
+            <p><strong>What We Check:</strong> Tracking configuration, citation monitoring, performance metrics</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Advanced AI-Powered Detectors</h2>
+        <p>Optiview includes specialized detectors for comprehensive AI SEO analysis:</p>
+        
+        <div class="check-item">
+            <h4>🔍 Access Tester</h4>
+            <p>Simulates AI bot requests to test actual accessibility and response quality.</p>
+        </div>
+
+        <div class="check-item">
+            <h4>🖥️ Render Parity</h4>
+            <p>Compares server-side HTML with client-side rendered content to ensure AI crawlers see the same content as users.</p>
+        </div>
+
+        <div class="check-item">
+            <h4>📄 Page Type Classifier</h4>
+            <p>Uses AI to automatically classify page types (article, product, FAQ, etc.) for better optimization recommendations.</p>
+        </div>
+
+        <div class="check-item">
+            <h4>⚖️ Schema Fitness Validators</h4>
+            <p>Advanced validation of structured data beyond basic syntax checking, including semantic correctness and completeness.</p>
+        </div>
+
+        <div class="check-item">
+            <h4>🎯 Answer Fitness Analyzer</h4>
+            <p>Evaluates how well content answers specific questions and is optimized for AI-generated responses.</p>
+        </div>
+
+        <div class="check-item">
+            <h4>🏆 E-E-A-T Detectors</h4>
+            <p>Specialized analysis of Experience, Expertise, Authority, and Trust signals that AI assistants prioritize.</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Understanding Your Audit Results</h2>
+        
+        <h3>📊 Score Interpretation</h3>
+        <ul>
+            <li><strong>90-100:</strong> Excellent - Optimized for both traditional SEO and AI visibility</li>
+            <li><strong>70-89:</strong> Good - Minor optimizations needed</li>
+            <li><strong>50-69:</strong> Needs Improvement - Several issues to address</li>
+            <li><strong>Below 50:</strong> Requires Attention - Significant optimization needed</li>
+        </ul>
+
+        <h3>🎯 Priority Actions</h3>
+        <ul>
+            <li><strong>Critical Issues:</strong> Fix immediately - these block AI crawlers or cause major problems</li>
+            <li><strong>Important Issues:</strong> Address within 1-2 weeks - impact SEO performance</li>
+            <li><strong>Optimization Opportunities:</strong> Improve over time - incremental gains</li>
+        </ul>
+
+        <h3>📈 Continuous Monitoring</h3>
+        <p>Optiview provides ongoing monitoring to track:</p>
+        <ul>
+            <li>AI visibility scores and citation frequency</li>
+            <li>Technical SEO health and performance</li>
+            <li>Competitive positioning across AI platforms</li>
+            <li>Content performance and optimization opportunities</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🚀 Getting Started with Audits</h2>
+        <p>Ready to run your first comprehensive SEO audit?</p>
+        <ol>
+            <li>Visit <a href="https://app.optiview.ai">app.optiview.ai</a></li>
+            <li>Enter your website URL</li>
+            <li>Choose audit depth (Basic, Advanced, or Custom)</li>
+            <li>Review your 5-pillar scores and recommendations</li>
+            <li>Implement suggested optimizations</li>
+            <li>Track improvements with regular monitoring</li>
+        </ol>
+    </div>
+
+    <a href="https://app.optiview.ai" class="back-link">← Back to Optiview Dashboard</a>
+</body>
+</html>

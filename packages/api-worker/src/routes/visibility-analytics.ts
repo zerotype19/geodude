@@ -62,6 +62,16 @@ export function createVisibilityAnalyticsRoutes(env: Env) {
           return await handleRollup(request, env, corsHeaders);
         }
         
+        // POST /api/visibility/test-data?assistant=x
+        if (path === '/api/visibility/test-data') {
+          return await handleTestData(request, env, corsHeaders);
+        }
+        
+        // POST /api/visibility/trigger-run
+        if (path === '/api/visibility/trigger-run') {
+          return await handleTriggerRun(request, env, corsHeaders);
+        }
+        
         // GET /api/visibility/citations/recent?projectId=x&limit=y
         if (path === '/api/visibility/citations/recent') {
           return await handleRecentCitations(request, env, corsHeaders);
@@ -411,6 +421,7 @@ async function handleRecentCitations(request: Request, env: Env, corsHeaders: Re
   const url = new URL(request.url);
   const projectId = url.searchParams.get('projectId');
   const limit = parseInt(url.searchParams.get('limit') || '25');
+  const assistant = url.searchParams.get('assistant');
   
   if (!projectId) {
     return new Response(JSON.stringify({ error: 'projectId parameter required' }), {
@@ -420,15 +431,22 @@ async function handleRecentCitations(request: Request, env: Env, corsHeaders: Re
   }
   
   try {
-    const query = `
+    let query = `
       SELECT assistant, source_domain, source_url as url, occurred_at, source_type, title, snippet
       FROM ai_citations
       WHERE project_id = ?
-      ORDER BY occurred_at DESC
-      LIMIT ?
     `;
+    const params: any[] = [projectId];
     
-    const result = await env.DB.prepare(query).bind(projectId, limit).all();
+    if (assistant) {
+      query += ` AND assistant = ?`;
+      params.push(assistant);
+    }
+    
+    query += ` ORDER BY occurred_at DESC LIMIT ?`;
+    params.push(limit);
+    
+    const result = await env.DB.prepare(query).bind(...params).all();
     
     return new Response(JSON.stringify(result.results || []), {
       status: 200,
@@ -638,3 +656,126 @@ async function handleRankingsExport(request: Request, env: Env, corsHeaders: Rec
     });
   }
 }
+
+// Trigger real visibility run for live connectors
+async function handleTriggerRun(request: Request, env: Env, corsHeaders: Record<string, string>) {
+  const url = new URL(request.url);
+  const assistant = url.searchParams.get('assistant');
+  const projectId = url.searchParams.get('projectId') || 'prj_UHoetismrowc';
+  
+  if (!assistant) {
+    return new Response(JSON.stringify({ error: 'assistant parameter required' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+  
+  if (!['perplexity', 'chatgpt_search', 'claude'].includes(assistant)) {
+    return new Response(JSON.stringify({ error: 'Invalid assistant. Must be: perplexity, chatgpt_search, or claude' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+  
+  try {
+    // Import the visibility service
+    const { AssistantVisibilityService } = await import('../assistant-connectors/visibility-service');
+    const visibilityService = new AssistantVisibilityService(env.DB, env.PROMPT_PACKS);
+    
+    // Create a new run
+    const run = await visibilityService.createRun(projectId, assistant);
+    
+    // Add a test prompt
+    const testPrompts = {
+      perplexity: "What are the best SEO tools for 2025?",
+      chatgpt_search: "What are the latest developments in AI and machine learning?",
+      claude: "What are the best programming practices for web development in 2025?"
+    };
+    
+    const prompt = await visibilityService.addPrompt(run.id, testPrompts[assistant as keyof typeof testPrompts], 'visibility_test');
+    
+    // Queue the run for processing (it will be picked up by the cron job)
+    await env.DB.prepare(
+      `UPDATE assistant_runs SET status = 'queued' WHERE id = ?`
+    ).bind(run.id).run();
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: `Triggered ${assistant} run`,
+      runId: run.id,
+      promptId: prompt.id,
+      assistant,
+      projectId
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[VisibilityAnalytics] Error triggering run:', error);
+    return new Response(JSON.stringify({ error: 'Failed to trigger run' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Test data endpoint for demo purposes
+async function handleTestData(request: Request, env: Env, corsHeaders: Record<string, string>) {
+  const url = new URL(request.url);
+  const assistant = url.searchParams.get('assistant');
+  
+  if (!assistant) {
+    return new Response(JSON.stringify({ error: 'assistant parameter required' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+  
+  try {
+    // Insert test citations for the assistant
+    const testDomains = [
+      'openai.com', 'anthropic.com', 'google.com', 'microsoft.com', 'github.com',
+      'stackoverflow.com', 'reddit.com', 'twitter.com', 'linkedin.com', 'youtube.com'
+    ];
+    
+    const testCitations = testDomains.map(domain => ({
+      project_id: 'prj_UHoetismrowc',
+      assistant: assistant,
+      source_domain: domain,
+      source_url: `https://${domain}`,
+      occurred_at: new Date().toISOString(),
+      source_type: 'test'
+    }));
+    
+    for (const citation of testCitations) {
+      await env.DB.prepare(`
+        INSERT OR IGNORE INTO ai_citations 
+        (project_id, assistant, source_domain, source_url, occurred_at, source_type)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        citation.project_id,
+        citation.assistant,
+        citation.source_domain,
+        citation.source_url,
+        citation.occurred_at,
+        citation.source_type
+      ).run();
+    }
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: `Added ${testCitations.length} test citations for ${assistant}`,
+      citations: testCitations.length
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[VisibilityAnalytics] Error adding test data:', error);
+    return new Response(JSON.stringify({ error: 'Failed to add test data' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+

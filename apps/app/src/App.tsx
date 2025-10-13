@@ -26,7 +26,7 @@ export default function App() {
       <header style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         <h1 style={{margin:0, fontSize:22}}>Optiview — Dashboard</h1>
         <nav style={{display:"flex",gap:12}}>
-          <a href="https://app.optiview.ai" target="_blank" rel="noopener noreferrer">Dashboard</a>
+          <Link to="/" className="text-blue-600 hover:underline">Dashboard</Link>
           {import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
             <Link to="/insights/visibility" className="text-blue-600 hover:underline">
               Visibility

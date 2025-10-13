@@ -12,6 +12,9 @@ export default function Footer() {
         <a href="https://optiview.ai/docs/faq.html" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', margin: '0 8px' }}>
           FAQ
         </a>
+        <a href="https://optiview.ai/docs/visibility.html" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', margin: '0 8px' }}>
+          Visibility Intelligence
+        </a>
         <a href="https://optiview.ai/docs/citations.html" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', margin: '0 8px' }}>
           Citations Guide
         </a>
@@ -33,7 +36,7 @@ export default function Footer() {
           optiview.ai
         </a>
         {' • '}
-        <a href="https://app.optiview.ai" target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280', textDecoration: 'none' }}>
+        <a href="/" style={{ color: '#6b7280', textDecoration: 'none' }}>
           app.optiview.ai
         </a>
       </div>

@@ -23,7 +23,7 @@ export default function VisibilityPage() {
     
     Promise.all([
       VisibilityAPI.rankings(assistant, "7d"),
-      VisibilityAPI.recentCitations(projectId, 50),
+      VisibilityAPI.recentCitations(projectId, 50, assistant),
     ]).then(([rankingsRes, citationsRes]) => {
       if (!mounted) return;
       
@@ -56,7 +56,7 @@ export default function VisibilityPage() {
 
   const kpi = useMemo(() => {
     const domains = new Set(rankings.map(r => r.domain));
-    const totalMentions = rankings.reduce((s, r) => s + (r.mentions || 0), 0);
+    const totalMentions = rankings.reduce((s, r) => s + (r.mentions_count || 0), 0);
     return { uniqueDomains: domains.size, totalMentions };
   }, [rankings]);
 
@@ -145,9 +145,11 @@ export default function VisibilityPage() {
           {loading ? <Skeleton rows={8} /> : <RankingsTable rows={rankings} onDomainClick={setSelectedDomain} page={rankingsPage} onPageChange={setRankingsPage} />}
         </div>
 
-        <div className="border rounded-2xl p-4 shadow-sm">
+        <div className="border rounded-2xl p-4 shadow-sm flex flex-col h-full">
           <h2 className="font-medium mb-3">Recent Citations</h2>
-          {loading ? <Skeleton rows={8} /> : <CitationsList rows={citations} />}
+          <div className="flex-1 overflow-hidden">
+            {loading ? <Skeleton rows={8} /> : <CitationsList rows={citations} />}
+          </div>
         </div>
       </section>
 
@@ -214,7 +216,7 @@ function RankingsTable({
                   {r.domain}
                 </button>
               </td>
-              <td className="py-2 pr-2">{r.mentions || r.mentions_count}</td>
+              <td className="py-2 pr-2">{r.mentions_count}</td>
               <td className="py-2 pr-2">{r.share_pct?.toFixed(2)}%</td>
             </tr>
           ))}
@@ -272,7 +274,7 @@ function CitationsList({ rows }: { rows: CitationRow[] }) {
   };
   
   return (
-    <ul className="divide-y max-h-96 overflow-y-auto">
+    <ul className="divide-y h-full overflow-y-auto">
       {rows.map((c, i) => (
         <li key={`${c.assistant}-${i}`} className="py-3">
           <div className="flex items-start justify-between gap-2">

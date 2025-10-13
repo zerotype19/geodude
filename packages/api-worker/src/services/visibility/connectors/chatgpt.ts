@@ -50,11 +50,17 @@ export const ChatGPTSearchConnector: AssistantConnector = {
         answer = data?.choices?.[0]?.message?.content ?? "";
         
         // Extract URLs heuristically from the response
-        // Look for URLs in the content and any tool calls
+        // Look for URLs in the content and any tool calls, including Markdown links
         const urlRegex = /https?:\/\/[^\s"'<>]+/g;
+        const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s"'<>]+)\)/g;
+        
         const allUrls = [
+          // Standard URLs
           ...(answer.match(urlRegex) || []),
-          ...(JSON.stringify(data).match(urlRegex) || [])
+          ...(JSON.stringify(data).match(urlRegex) || []),
+          // Markdown-style links [text](url)
+          ...(Array.from(answer.matchAll(markdownLinkRegex)).map(match => match[2])),
+          ...(Array.from(JSON.stringify(data).matchAll(markdownLinkRegex)).map(match => match[2]))
         ];
         
         // Deduplicate and limit to top 10

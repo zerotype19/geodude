@@ -11,13 +11,13 @@ export type VisibilityScore = {
 };
 
 export type RankingRow = { 
-  week: string; 
+  week_start: string; 
   assistant: string; 
   domain_rank: number; 
   domain: string; 
-  mentions: number; 
+  mentions_count: number; 
   share_pct: number;
-  mentions_count?: number;
+  rank_change?: number;
 };
 
 export type CitationRow = { 
@@ -30,7 +30,7 @@ export type CitationRow = {
   snippet?: string;
 };
 
-const API = import.meta.env.VITE_API_BASE;
+const API = import.meta.env.VITE_API_BASE || 'https://api.optiview.ai';
 
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) throw new Error(`API ${res.status}`);
@@ -51,8 +51,8 @@ export const VisibilityAPI = {
       .then(j<{domain: string; assistant: string; driftData: any[]}>),
 
   // Recent citations endpoint (we'll need to add this to the API)
-  recentCitations: (projectId: string, limit = 25) =>
-    fetch(`${API}/api/visibility/citations/recent?projectId=${projectId}&limit=${limit}`)
+  recentCitations: (projectId: string, limit = 25, assistant?: string) =>
+    fetch(`${API}/api/visibility/citations/recent?projectId=${projectId}&limit=${limit}${assistant ? `&assistant=${assistant}` : ''}`)
       .then(j<CitationRow[]>),
 
   // Manual rollup endpoint (admin only)
