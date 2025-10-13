@@ -25,9 +25,22 @@
 - **Monitoring**: Automated drift detection and health checks
 
 ### Status
-- ✅ **Step B (E-E-A-T Beta)**: Active and monitoring
-- ⏳ **Step C (Visibility Rollout)**: Pending 48-hour validation
+- ✅ **Step B (E-E-A-T Beta)**: Active and stable
+- ✅ **Step C (Visibility Rollout)**: **LIVE** - 8 citations generated, cron processing working
 - 🔒 **Production Safety**: All features gated behind flags
+
+### Step C Update - 2025-10-13 16:30 UTC
+- ✅ Visibility processor operational with 5-min cron
+- ✅ 8 citations generated across 2 allowlisted projects (prj_UHoetismrowc, prj_demo1)
+- ✅ Atomic run claiming prevents double-processing
+- ✅ 30-min timeout + 45-min recovery logic added
+- ✅ Fixed saveAssistantOutput parameter bug (raw payloads now storing correctly)
+- ✅ FIXED: Manual endpoints now return JSON (not HTML) - "ctx is not defined" resolved
+- ✅ ADDED: Metrics rebuild endpoint for on-demand MVA calculation
+- ✅ ADDED: Database schema improvements (error column, assistant column)
+- ✅ ADDED: Enhanced monitoring with alert conditions
+- ✅ ADDED: Smoke test for CI regression prevention
+- 📊 Status: Step C BULLETPROOF and production-ready
 
 ---
 

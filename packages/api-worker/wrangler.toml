@@ -77,7 +77,7 @@ ENABLE_MULTI_PROVIDER = "1"
 FAQ_ALLOWLIST = "/faq,/support/faq,/help/faq,/frequently-asked-questions"
 
 # Phase Next: Assistant Visibility & E-E-A-T
-FEATURE_ASSISTANT_VISIBILITY = "false"
+FEATURE_ASSISTANT_VISIBILITY = "true"
 FEATURE_EEAT_SCORING = "false"
 BROWSER_CLUSTER_MAX = "2"
 FETCH_TIMEOUT_MS = "20000"
@@ -101,5 +101,5 @@ enabled = true
 # - OPENAI_API_KEY (required for content recommendations)
 
 [triggers]
-crons = ["0 6 * * 1", "0 3 * * *"]
+crons = ["0 6 * * 1", "0 3 * * *", "*/5 * * * *"]
 

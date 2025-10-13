@@ -13,6 +13,7 @@ import { warmCitations } from './citations-warm';
 import { handleCitations } from './routes/citations';
 import { handleBotLogsIngest, handleGetCrawlers } from './bots/routes';
 import { createVisibilityRoutes } from './routes/visibility';
+import { processRun } from './routes/visibility-processor';
 
 interface Env {
   DB: D1Database;
@@ -110,6 +111,28 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const hour = new Date().getUTCHours();
     
+                // Process visibility queue every 5 minutes (any hour)
+                if (env.FEATURE_ASSISTANT_VISIBILITY === 'true') {
+                  console.log('[VisibilityProcessor] Processing queue...');
+                  try {
+                    // Recovery: Reset stuck runs (45+ minutes)
+                    await env.DB.prepare(
+                      `UPDATE assistant_runs 
+                       SET status = 'queued' 
+                       WHERE status = 'running' 
+                       AND run_started_at < datetime('now', '-45 minutes')`
+                    ).run();
+                    
+                    // Process up to 2 runs per tick
+                    const batch = 2;
+                    for (let i = 0; i < batch; i++) {
+                      ctx.waitUntil(processRun(env, ctx));
+                    }
+                  } catch (error) {
+                    console.error('[VisibilityProcessor] Error processing queue:', error);
+                  }
+                }
+    
     // 03:00 UTC - Nightly backup
     if (hour === 3) {
       console.log('Nightly backup started at', new Date().toISOString());
@@ -162,7 +185,7 @@ export default {
     }
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
@@ -2598,6 +2621,78 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       
       if (path === '/api/visibility/ga4-config' && request.method === 'GET') {
         return visibilityRoutes.generateGA4Config(request);
+      }
+
+      if (path === '/api/visibility/metrics/rebuild' && request.method === 'POST') {
+        return visibilityRoutes.rebuildMetrics(request);
+      }
+
+    }
+
+    // CORS preflight for visibility endpoints
+    if (request.method === 'OPTIONS' && path.startsWith('/api/visibility')) {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'content-type, authorization'
+        }
+      });
+    }
+
+    // Processor routes (outside visibility block, before fallbacks)
+    if (path === '/api/visibility/process-next' && request.method === 'POST') {
+      try {
+        const result = await processRun(env, ctx);
+        return new Response(JSON.stringify(result), {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (error) {
+        console.error('[API] Error in process-next:', error);
+        return new Response(JSON.stringify({ 
+          ok: false, 
+          error: 'Internal server error',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+    }
+
+    if (path.match(/^\/api\/visibility\/runs\/[^/]+\/process$/) && request.method === 'POST') {
+      try {
+        const runId = path.split('/')[4];
+        const result = await processRun(env, ctx, runId);
+        return new Response(JSON.stringify(result), {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (error) {
+        console.error('[API] Error in run process:', error);
+        return new Response(JSON.stringify({ 
+          ok: false, 
+          error: 'Internal server error',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
       }
     }
 
