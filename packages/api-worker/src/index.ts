@@ -132,6 +132,13 @@ export default {
                 if (env.FEATURE_ASSISTANT_VISIBILITY === 'true') {
                   console.log('[VisibilityProcessor] Processing queue...');
                   try {
+                    // Circuit breaker: Skip processing if browser service is down
+                    const browserHealth = await env.HEURISTICS.get('browser_service_health');
+                    if (browserHealth === 'down') {
+                      console.log('[VisibilityProcessor] Browser service marked as down, skipping queue processing');
+                      return;
+                    }
+                    
                     // Recovery: Reset stuck runs (30+ minutes) - more aggressive
                     await env.DB.prepare(
                       `UPDATE assistant_runs 
@@ -147,7 +154,14 @@ export default {
                     }
                   } catch (error) {
                     console.error('[VisibilityProcessor] Error processing queue:', error);
+                    
+                    // Mark browser service as down if we get consistent CPU exceeded errors
+                    if (error instanceof Error && (error.message.includes('exceededCpu') || error.message.includes('503'))) {
+                      console.warn('[VisibilityProcessor] CPU exceeded or 503 error, marking browser service as down');
+                      await env.HEURISTICS.put('browser_service_health', 'down', { expirationTtl: 3600 }); // 1 hour
+                    }
                   }
+                  return;
                 }
     
     // 03:00 UTC - Nightly backup
@@ -326,6 +340,39 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           'Cache-Control': 'public, max-age=86400' // Cache for 24 hours
         },
       });
+    }
+
+    // Browser service recovery endpoint (admin only)
+    if (path === '/api/admin/browser-recovery' && request.method === 'POST') {
+      try {
+        // Clear the browser service down flag
+        await env.HEURISTICS.delete('browser_service_health');
+        
+        // Test browser service
+        const testBrowser = await env.BROWSER.launch({
+          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+        await testBrowser.close();
+        
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: 'Browser service recovered and tested successfully',
+          timestamp: new Date().toISOString()
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('[BrowserRecovery] Browser service still unavailable:', error);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Browser service still unavailable',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }), {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // Handle common crawler requests for non-existent endpoints
