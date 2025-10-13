@@ -524,7 +524,7 @@ export default function PublicAudit() {
             }}
             className={`tab-button ${activeTab === 'visibility' ? 'active' : ''}`}
           >
-            🚀 Visibility Intelligence
+            Visibility Intelligence
           </button>
         )}
       </div>

@@ -305,7 +305,7 @@ export default function Dashboard() {
                 onClick={() => setActiveTab('visibility')}
                 className={`tab-button ${activeTab === 'visibility' ? 'active' : ''}`}
               >
-                🚀 Visibility Intelligence
+                Visibility Intelligence
               </button>
             )}
           </div>

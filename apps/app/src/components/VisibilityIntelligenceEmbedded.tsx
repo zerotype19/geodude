@@ -34,6 +34,9 @@ export default function VisibilityIntelligenceEmbedded({ auditId, domain }: Visi
   const [citations, setCitations] = useState<CitationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rankingsPage, setRankingsPage] = useState(1);
+  const [citationsPage, setCitationsPage] = useState(1);
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -43,8 +46,8 @@ export default function VisibilityIntelligenceEmbedded({ auditId, domain }: Visi
     const fetchData = async () => {
       try {
         const [rankingsRes, citationsRes] = await Promise.all([
-          fetch(`https://api.optiview.ai/api/visibility/rankings?assistant=${assistant}&period=7d&limit=25`).then(r => r.json()),
-          fetch(`https://api.optiview.ai/api/visibility/citations/recent?projectId=${auditId}&limit=25&assistant=${assistant}`).then(r => r.json())
+          fetch(`https://api.optiview.ai/api/visibility/rankings?assistant=${assistant}&period=7d&limit=100`).then(r => r.json()),
+          fetch(`https://api.optiview.ai/api/visibility/citations/recent?projectId=${auditId}&limit=50&assistant=${assistant}`).then(r => r.json())
         ]);
         
         if (!mounted) return;
@@ -151,190 +154,222 @@ export default function VisibilityIntelligenceEmbedded({ auditId, domain }: Visi
         <div style={{ 
           background: 'white', 
           border: '1px solid #e2e8f0', 
-          borderRadius: '8px', 
+          borderRadius: '12px', 
           padding: '16px', 
           flex: 1,
-          textAlign: 'center'
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
         }}>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: '#1e40af' }}>
+          <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>Unique Domains (7d)</div>
+          <div style={{ fontSize: '32px', fontWeight: '600', color: '#1e293b' }}>
             {kpi.uniqueDomains}
           </div>
-          <div style={{ fontSize: '14px', color: '#64748b' }}>Domains Tracked</div>
         </div>
         <div style={{ 
           background: 'white', 
           border: '1px solid #e2e8f0', 
-          borderRadius: '8px', 
+          borderRadius: '12px', 
           padding: '16px', 
           flex: 1,
-          textAlign: 'center'
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
         }}>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: '#059669' }}>
+          <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>Mentions (7d)</div>
+          <div style={{ fontSize: '32px', fontWeight: '600', color: '#1e293b' }}>
             {kpi.totalMentions}
           </div>
-          <div style={{ fontSize: '14px', color: '#64748b' }}>Total Mentions</div>
         </div>
         <div style={{ 
           background: 'white', 
           border: '1px solid #e2e8f0', 
-          borderRadius: '8px', 
+          borderRadius: '12px', 
           padding: '16px', 
           flex: 1,
-          textAlign: 'center'
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
         }}>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: '#dc2626' }}>
-            {citations.length}
+          <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>Assistants</div>
+          <div style={{ fontSize: '32px', fontWeight: '600', color: '#1e293b' }}>
+            {assistants.length}
           </div>
-          <div style={{ fontSize: '14px', color: '#64748b' }}>Recent Citations</div>
         </div>
       </div>
 
-      {/* Rankings Table */}
-      <div style={{ marginBottom: '24px' }}>
-        <h4 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '600' }}>
-          Top Domains in {assistant.replace('_', ' ')} (Last 7 Days)
-        </h4>
-        {rankings.length > 0 ? (
-          <div style={{ 
-            background: 'white', 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '8px', 
-            overflow: 'hidden'
-          }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ background: '#f8fafc' }}>
-                <tr>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#475569' }}>RANK</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#475569' }}>DOMAIN</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: '#475569' }}>MENTIONS</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: '#475569' }}>SHARE %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rankings.slice(0, 10).map((row, index) => (
-                  <tr key={index} style={{ borderTop: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600' }}>
-                      #{row.domain_rank}
-                    </td>
-                    <td style={{ padding: '12px 16px', fontSize: '14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ 
-                          width: '8px', 
-                          height: '8px', 
-                          borderRadius: '50%', 
-                          background: getAssistantColor(row.assistant) 
-                        }} />
-                        {row.domain}
-                        {row.domain === domain && (
-                          <span style={{ 
-                            background: '#dbeafe', 
-                            color: '#1e40af', 
-                            padding: '2px 6px', 
-                            borderRadius: '4px', 
-                            fontSize: '12px',
-                            fontWeight: '500'
-                          }}>
-                            YOUR DOMAIN
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px' }}>
-                      {row.mentions_count}
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px' }}>
-                      {row.share_pct?.toFixed(1) || '0.0'}%
-                    </td>
+      {/* Rankings + Citations Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+        {/* Rankings Table */}
+        <div style={{ 
+          background: 'white', 
+          border: '1px solid #e2e8f0', 
+          borderRadius: '12px', 
+          padding: '16px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
+              Top Domains — {assistant.replace('_', ' ')}
+            </h4>
+            <button
+              onClick={() => {
+                const url = `https://api.optiview.ai/api/visibility/rankings/export?assistant=${assistant}&period=7d&format=csv&limit=100`;
+                window.open(url, '_blank');
+              }}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                background: '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              📥 CSV
+            </button>
+          </div>
+          {rankings.length > 0 ? (
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                <thead style={{ background: '#f8fafc' }}>
+                  <tr>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#475569' }}>#</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#475569' }}>DOMAIN</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: '#475569' }}>MENTIONS</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: '#475569' }}>% SHARE</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div style={{ 
-            background: '#f8fafc', 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '8px', 
-            padding: '24px',
-            textAlign: 'center',
-            color: '#64748b'
-          }}>
-            No rankings data available for {assistant.replace('_', ' ')} yet.
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {rankings.slice(0, 25).map((row, index) => (
+                    <tr key={index} style={{ borderTop: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: '600' }}>
+                        {row.domain_rank}
+                      </td>
+                      <td style={{ padding: '8px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {row.domain}
+                          {row.domain === domain && (
+                            <span style={{ 
+                              background: '#dbeafe', 
+                              color: '#1e40af', 
+                              padding: '2px 6px', 
+                              borderRadius: '4px', 
+                              fontSize: '10px',
+                              fontWeight: '500'
+                            }}>
+                              YOU
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        {row.mentions_count}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        {row.share_pct?.toFixed(1) || '0.0'}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ 
+              padding: '24px',
+              textAlign: 'center',
+              color: '#64748b',
+              fontSize: '14px'
+            }}>
+              No rankings data available for {assistant.replace('_', ' ')} yet.
+            </div>
+          )}
+        </div>
 
-      {/* Recent Citations */}
-      <div>
-        <h4 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '600' }}>
-          Recent Citations from {assistant.replace('_', ' ')}
-        </h4>
-        {citations.length > 0 ? (
-          <div style={{ 
-            background: 'white', 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '8px', 
-            maxHeight: '400px',
-            overflowY: 'auto'
-          }}>
-            {citations.slice(0, 20).map((citation, index) => (
-              <div key={index} style={{ 
-                padding: '12px 16px', 
-                borderTop: index > 0 ? '1px solid #f1f5f9' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
-                <div style={{ 
-                  width: '8px', 
-                  height: '8px', 
-                  borderRadius: '50%', 
-                  background: getAssistantColor(citation.assistant),
-                  flexShrink: 0
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '2px' }}>
-                    <a 
-                      href={citation.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      style={{ color: '#3b82f6', textDecoration: 'none' }}
-                    >
-                      {citation.title || citation.url}
-                    </a>
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {citation.source_domain} • {formatDate(citation.occurred_at)}
-                    {citation.source_type && (
+        {/* Recent Citations */}
+        <div style={{ 
+          background: 'white', 
+          border: '1px solid #e2e8f0', 
+          borderRadius: '12px', 
+          padding: '16px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <h4 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: '600' }}>
+            Recent Citations
+          </h4>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {citations.length > 0 ? (
+              <div>
+                {citations.slice(0, 20).map((citation, index) => (
+                  <div key={index} style={{ 
+                    padding: '12px 0', 
+                    borderTop: index > 0 ? '1px solid #f1f5f9' : 'none',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px'
+                  }}>
+                    <div style={{ 
+                      width: '8px', 
+                      height: '8px', 
+                      borderRadius: '50%', 
+                      background: getAssistantColor(citation.assistant),
+                      flexShrink: 0,
+                      marginTop: '6px'
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px', lineHeight: '1.4' }}>
+                        <a 
+                          href={citation.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ color: '#3b82f6', textDecoration: 'none' }}
+                        >
+                          {citation.title || citation.url}
+                        </a>
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                        {citation.source_domain} • {formatDate(citation.occurred_at)}
+                      </div>
+                      {citation.snippet && (
+                        <div style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.3' }}>
+                          {citation.snippet.slice(0, 100)}...
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                       <span style={{ 
                         background: '#f3f4f6', 
                         color: '#6b7280', 
                         padding: '2px 6px', 
                         borderRadius: '4px', 
-                        marginLeft: '8px',
-                        fontSize: '11px'
+                        fontSize: '10px'
+                      }}>
+                        {citation.assistant}
+                      </span>
+                      <span style={{ 
+                        background: '#e0e7ff', 
+                        color: '#4338ca', 
+                        padding: '2px 6px', 
+                        borderRadius: '4px', 
+                        fontSize: '10px'
                       }}>
                         {citation.source_type}
                       </span>
-                    )}
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div style={{ 
+                padding: '24px',
+                textAlign: 'center',
+                color: '#64748b',
+                fontSize: '14px'
+              }}>
+                No recent citations from {assistant.replace('_', ' ')} yet.
+              </div>
+            )}
           </div>
-        ) : (
-          <div style={{ 
-            background: '#f8fafc', 
-            border: '1px solid #e2e8f0', 
-            borderRadius: '8px', 
-            padding: '24px',
-            textAlign: 'center',
-            color: '#64748b'
-          }}>
-            No recent citations from {assistant.replace('_', ' ')} yet.
-          </div>
-        )}
+        </div>
       </div>
+
 
       {/* Footer Info */}
       <div style={{ 
