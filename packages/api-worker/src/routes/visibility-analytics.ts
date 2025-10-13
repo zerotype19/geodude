@@ -62,6 +62,11 @@ export function createVisibilityAnalyticsRoutes(env: Env) {
           return await handleRollup(request, env, corsHeaders);
         }
         
+        // GET /api/visibility/citations/recent?projectId=x&limit=y
+        if (path === '/api/visibility/citations/recent') {
+          return await handleRecentCitations(request, env, corsHeaders);
+        }
+        
         return new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -153,11 +158,19 @@ async function handleVisibilityRankings(request: Request, env: Env, corsHeaders:
     let query: string;
     let params: any[];
     
+    // Convert period to SQLite date modifier
+    let dateModifier = '-7 days';
+    if (period === '30d') {
+      dateModifier = '-30 days';
+    } else if (period === '7d') {
+      dateModifier = '-7 days';
+    }
+    
     if (assistant === 'all') {
       query = `
         SELECT week_start, assistant, domain, domain_rank, mentions_count, share_pct, rank_change
         FROM ai_visibility_rankings 
-        WHERE week_start >= date('now', '-${period}')
+        WHERE week_start >= date('now', '${dateModifier}')
         ORDER BY week_start DESC, assistant, domain_rank
         LIMIT ?
       `;
@@ -167,7 +180,7 @@ async function handleVisibilityRankings(request: Request, env: Env, corsHeaders:
         SELECT week_start, assistant, domain, domain_rank, mentions_count, share_pct, rank_change
         FROM ai_visibility_rankings 
         WHERE assistant = ? 
-          AND week_start >= date('now', '-${period}')
+          AND week_start >= date('now', '${dateModifier}')
         ORDER BY week_start DESC, domain_rank
         LIMIT ?
       `;
@@ -365,6 +378,42 @@ async function handleRollup(request: Request, env: Env, corsHeaders: Record<stri
       error: 'Failed to execute rollup',
       details: error instanceof Error ? error.message : 'Unknown error'
     }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleRecentCitations(request: Request, env: Env, corsHeaders: Record<string, string>) {
+  const url = new URL(request.url);
+  const projectId = url.searchParams.get('projectId');
+  const limit = parseInt(url.searchParams.get('limit') || '25');
+  
+  if (!projectId) {
+    return new Response(JSON.stringify({ error: 'projectId parameter required' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+  
+  try {
+    const query = `
+      SELECT assistant, source_domain, source_url as url, occurred_at, source_type, title, snippet
+      FROM ai_citations
+      WHERE project_id = ?
+      ORDER BY occurred_at DESC
+      LIMIT ?
+    `;
+    
+    const result = await env.DB.prepare(query).bind(projectId, limit).all();
+    
+    return new Response(JSON.stringify(result.results || []), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('[VisibilityAnalytics] Error fetching recent citations:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch recent citations' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
