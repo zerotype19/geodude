@@ -12,6 +12,7 @@ import { backupToR2 } from './backup';
 import { warmCitations } from './citations-warm';
 import { handleCitations } from './routes/citations';
 import { handleBotLogsIngest, handleGetCrawlers } from './bots/routes';
+import { createVisibilityRoutes } from './routes/visibility';
 
 interface Env {
   DB: D1Database;
@@ -19,6 +20,9 @@ interface Env {
   RECO_CACHE?: KVNamespace;
   RECO_PRODUCER?: Queue;
   R2_BACKUPS: R2Bucket;
+  PROMPT_PACKS?: KVNamespace;
+  ASSISTANT_SCHEDULES?: KVNamespace;
+  HEURISTICS?: KVNamespace;
   USER_AGENT: string;
   AUDIT_MAX_PAGES: string;
   AUDIT_DAILY_LIMIT: string;
@@ -32,6 +36,14 @@ interface Env {
   ADMIN_BASIC_AUTH?: string;
   RECO_ALLOWED_DOMAINS?: string;
   OPENAI_API_KEY?: string;
+  // Phase Next feature flags
+  FEATURE_ASSISTANT_VISIBILITY?: string;
+  FEATURE_EEAT_SCORING?: string;
+  BROWSER_CLUSTER_MAX?: string;
+  FETCH_TIMEOUT_MS?: string;
+  VISIBILITY_RATE_LIMIT_PER_PROJECT?: string;
+  ALLOWED_ANSWER_ENGINES?: string;
+  GA4_REGEX_SNIPPET_URL?: string;
 }
 
 // Helper: Validate API key
@@ -184,6 +196,56 @@ export default {
     if (path === '/health') {
       return new Response('ok', {
         headers: { ...corsHeaders, 'Content-Type': 'text/plain' },
+      });
+    }
+
+    // robots.txt endpoint (public) - Block all crawlers from API endpoints
+    if (path === '/robots.txt') {
+      const robotsTxt = `User-agent: *
+Disallow: /
+
+# This is an API endpoint, not a website
+# Please do not crawl this API
+# For website content, visit: https://optiview.ai
+
+Sitemap: https://optiview.ai/sitemap.xml`;
+
+      return new Response(robotsTxt, {
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=86400' // Cache for 24 hours
+        },
+      });
+    }
+
+    // Handle common crawler requests for non-existent endpoints
+    const crawlerEndpoints = [
+      '/favicon.ico',
+      '/sitemap.xml',
+      '/sitemap_index.xml',
+      '/wp-admin',
+      '/wp-content',
+      '/wp-includes',
+      '/.well-known',
+      '/apple-touch-icon.png',
+      '/apple-touch-icon-precomposed.png',
+      '/android-chrome-192x192.png',
+      '/android-chrome-512x512.png',
+      '/manifest.json',
+      '/browserconfig.xml',
+      '/humans.txt',
+      '/security.txt'
+    ];
+
+    if (crawlerEndpoints.some(endpoint => path.startsWith(endpoint))) {
+      return new Response('Not Found', {
+        status: 404,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=3600' // Cache for 1 hour
+        },
       });
     }
 
@@ -2506,6 +2568,36 @@ export default {
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+    }
+
+    // Phase Next: Assistant Visibility routes
+    if (path.startsWith('/api/visibility/') && env.FEATURE_ASSISTANT_VISIBILITY === 'true') {
+      const visibilityRoutes = createVisibilityRoutes(env.DB, env.PROMPT_PACKS!);
+      
+      if (path === '/api/visibility/runs' && request.method === 'POST') {
+        return visibilityRoutes.createRun(request);
+      }
+      
+      if (path.match(/^\/api\/visibility\/runs\/[^/]+$/) && request.method === 'GET') {
+        const runId = path.split('/').pop()!;
+        return visibilityRoutes.getRun(request, runId);
+      }
+      
+      if (path === '/api/visibility/citations' && request.method === 'GET') {
+        return visibilityRoutes.getCitations(request);
+      }
+      
+      if (path === '/api/visibility/mva' && request.method === 'GET') {
+        return visibilityRoutes.getMVAMetrics(request);
+      }
+      
+      if (path === '/api/visibility/cloudflare-config' && request.method === 'POST') {
+        return visibilityRoutes.generateCloudflareConfig(request);
+      }
+      
+      if (path === '/api/visibility/ga4-config' && request.method === 'GET') {
+        return visibilityRoutes.generateGA4Config(request);
       }
     }
 

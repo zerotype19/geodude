@@ -1,4 +1,5 @@
-name = "geodude-api"
+# Staging configuration for Phase Next testing
+name = "geodude-api-staging"
 main = "src/index.ts"
 compatibility_date = "2024-11-20"
 compatibility_flags = ["nodejs_compat"]
@@ -19,15 +20,15 @@ id = "6f25c753a8734206bc07c1418423ca1b"
 
 [[kv_namespaces]]
 binding = "PROMPT_PACKS"
-id = "d1fe329042554316af448f986b3a7e0d"
+id = "prompt-packs-namespace"
 
 [[kv_namespaces]]
 binding = "ASSISTANT_SCHEDULES"
-id = "05aa79aa479d44f7a599735e03ad2a78"
+id = "assistant-schedules-namespace"
 
 [[kv_namespaces]]
 binding = "HEURISTICS"
-id = "e037590f3aa9494cbd4d30d5fd6bc333"
+id = "heuristics-namespace"
 
 [[queues.producers]]
 binding = "RECO_PRODUCER"
@@ -50,19 +51,19 @@ RENDER_MODE = "browser"
 RENDER_TIMEOUT_MS = "8000"
 RENDER_MAX_PAGES = "100"
 # Phase F+ Brave AI Configuration
-BRAVE_MAX_QUERIES = "50"            # Soft cap per audit (was 20)
-BRAVE_AI_HARD_CAP = "100"           # Absolute max
-BRAVE_TIMEOUT_MS = "7000"           # Per-query timeout (7s)
-BRAVE_MAX_CONCURRENT = "2"          # Max concurrent requests
-BRAVE_RETRY_5XX = "1"               # Retry once on 5xx errors
-BRAVE_DIAGNOSTICS = "1"             # Enable per-query diagnostics
-BRAVE_AI_ENABLE_COMPARE = "false"   # Enable competitor comparison queries
-BRAVE_QUERY_STRATEGY = "smart"      # smart | basic | aggressive
+BRAVE_MAX_QUERIES = "50"
+BRAVE_AI_HARD_CAP = "100"
+BRAVE_TIMEOUT_MS = "7000"
+BRAVE_MAX_CONCURRENT = "2"
+BRAVE_RETRY_5XX = "1"
+BRAVE_DIAGNOSTICS = "1"
+BRAVE_AI_ENABLE_COMPARE = "false"
+BRAVE_QUERY_STRATEGY = "smart"
 # Phase H: UI Scrape Adapters (Spike)
-LLM_UI_ENABLED = "false"            # Master flag for UI scraping
-LLM_UI_MAX_QUERIES = "10"           # Max UI queries per audit
-LLM_UI_TIMEOUT_MS = "30000"         # Per-query timeout (longer for UI rendering)
-LLM_UI_PROVIDERS = "perplexity"     # Comma-separated: perplexity,you,bing
+LLM_UI_ENABLED = "false"
+LLM_UI_MAX_QUERIES = "10"
+LLM_UI_TIMEOUT_MS = "30000"
+LLM_UI_PROVIDERS = "perplexity"
 ENABLE_PERPLEXITY = "false"
 ENABLE_YOUCOM = "false"
 ENABLE_HEADLESS_PROVIDERS = "false"
@@ -76,12 +77,12 @@ PROVIDER_CACHE_TTL = "86400"
 ENABLE_MULTI_PROVIDER = "1"
 FAQ_ALLOWLIST = "/faq,/support/faq,/help/faq,/frequently-asked-questions"
 
-# Phase Next: Assistant Visibility & E-E-A-T
-FEATURE_ASSISTANT_VISIBILITY = "false"
-FEATURE_EEAT_SCORING = "false"
-BROWSER_CLUSTER_MAX = "2"
+# Phase Next: Assistant Visibility & E-E-A-T - STAGING ENABLED
+FEATURE_ASSISTANT_VISIBILITY = "true"
+FEATURE_EEAT_SCORING = "true"
+BROWSER_CLUSTER_MAX = "1"
 FETCH_TIMEOUT_MS = "20000"
-VISIBILITY_RATE_LIMIT_PER_PROJECT = "30"
+VISIBILITY_RATE_LIMIT_PER_PROJECT = "20"
 ALLOWED_ANSWER_ENGINES = "perplexity,claude-web"
 GA4_REGEX_SNIPPET_URL = ""
 
@@ -94,12 +95,5 @@ enabled = true
 [observability.logs]
 enabled = true
 
-# Secrets (set via wrangler secret put):
-# - BRAVE_SEARCH (already set in Cloudflare)
-# - BRAVE_SEARCH_AI (already set in Cloudflare)
-# - RESEND_KEY (already set in Cloudflare)
-# - OPENAI_API_KEY (required for content recommendations)
-
 [triggers]
 crons = ["0 6 * * 1", "0 3 * * *"]
-
