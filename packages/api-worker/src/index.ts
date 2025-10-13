@@ -1304,17 +1304,31 @@ export default {
         console.log(`[page] Looking for page: ${normalized} in audit ${auditId}`);
 
         // 1) Find the exact page row (search by full URL first, then pathname)
-        // Escape special characters for LIKE pattern to avoid "pattern too complex" error
-        const escapedNormalized = normalized.replace(/[%_\\]/g, '\\$&');
+        // For very long URLs, avoid complex LIKE patterns that cause SQLite errors
+        let pageRow;
         
-        const pageRow = await env.DB.prepare(
-          `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
-                  word_count, rendered_words, snippet
-           FROM audit_pages
-           WHERE audit_id = ? AND (url = ? OR url = ? OR url LIKE '%' || ?)
-           ORDER BY (url = ?) DESC, (url = ?) DESC
-           LIMIT 1`
-        ).bind(auditId, rawU, normalized, escapedNormalized, rawU, normalized).first();
+        if (normalized.length > 200) {
+          // For very long URLs, use exact matches only to avoid pattern complexity
+          pageRow = await env.DB.prepare(
+            `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
+                    word_count, rendered_words, snippet
+             FROM audit_pages
+             WHERE audit_id = ? AND (url = ? OR url = ?)
+             ORDER BY (url = ?) DESC, (url = ?) DESC
+             LIMIT 1`
+          ).bind(auditId, rawU, normalized, rawU, normalized).first();
+        } else {
+          // For shorter URLs, use LIKE pattern with proper escaping
+          const escapedNormalized = normalized.replace(/[%_\\]/g, '\\$&');
+          pageRow = await env.DB.prepare(
+            `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present,
+                    word_count, rendered_words, snippet
+             FROM audit_pages
+             WHERE audit_id = ? AND (url = ? OR url = ? OR url LIKE '%' || ?)
+             ORDER BY (url = ?) DESC, (url = ?) DESC
+             LIMIT 1`
+          ).bind(auditId, rawU, normalized, escapedNormalized, rawU, normalized).first();
+        }
         
         console.log(`[page] Found page row:`, !!pageRow, `(searched for: "${normalized}")`);
 
