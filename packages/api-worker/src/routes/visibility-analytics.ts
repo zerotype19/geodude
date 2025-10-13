@@ -420,11 +420,12 @@ async function handleRollup(request: Request, env: Env, corsHeaders: Record<stri
 async function handleRecentCitations(request: Request, env: Env, corsHeaders: Record<string, string>) {
   const url = new URL(request.url);
   const projectId = url.searchParams.get('projectId');
+  const domain = url.searchParams.get('domain');
   const limit = parseInt(url.searchParams.get('limit') || '25');
   const assistant = url.searchParams.get('assistant');
   
-  if (!projectId) {
-    return new Response(JSON.stringify({ error: 'projectId parameter required' }), {
+  if (!projectId && !domain) {
+    return new Response(JSON.stringify({ error: 'Either projectId or domain parameter required' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -434,9 +435,9 @@ async function handleRecentCitations(request: Request, env: Env, corsHeaders: Re
     let query = `
       SELECT assistant, source_domain, source_url as url, occurred_at, source_type, title, snippet
       FROM ai_citations
-      WHERE project_id = ?
+      WHERE ${projectId ? 'project_id = ?' : 'source_domain = ?'}
     `;
-    const params: any[] = [projectId];
+    const params: any[] = [projectId || domain];
     
     if (assistant) {
       query += ` AND assistant = ?`;

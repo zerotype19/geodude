@@ -47,7 +47,7 @@ export default function VisibilityIntelligenceEmbedded({ auditId, domain }: Visi
       try {
         const [rankingsRes, citationsRes] = await Promise.all([
           fetch(`https://api.optiview.ai/api/visibility/rankings?assistant=${assistant}&period=7d&limit=100`).then(r => r.json()),
-          fetch(`https://api.optiview.ai/api/visibility/citations/recent?projectId=${auditId}&limit=50&assistant=${assistant}`).then(r => r.json())
+          fetch(`https://api.optiview.ai/api/visibility/citations/recent?domain=${encodeURIComponent(domain)}&limit=50&assistant=${assistant}`).then(r => r.json())
         ]);
         
         if (!mounted) return;
