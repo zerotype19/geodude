@@ -54,11 +54,24 @@ export const PerplexityConnector: AssistantConnector = {
                         data?.citations ?? 
                         data?.choices?.[0]?.citations ?? [];
         
-        sources = (citations || []).map((cite: any) => ({
-          title: cite.title || cite.name,
-          url: cite.url,
-          snippet: cite.snippet || cite.text
-        })).filter((cite: any) => cite.url); // Only keep items with URLs
+        // Also check search_results for additional context
+        const searchResults = data?.search_results || [];
+        
+        // Combine citations and search results
+        const allSources = [
+          ...(citations || []).map((cite: any) => ({
+            title: cite.title || cite.name,
+            url: cite.url,
+            snippet: cite.snippet || cite.text
+          })),
+          ...(searchResults || []).map((result: any) => ({
+            title: result.title,
+            url: result.url,
+            snippet: result.snippet
+          }))
+        ];
+        
+        sources = allSources.filter((source: any) => source.url); // Only keep items with URLs
         
       } catch (parseError) {
         console.warn('[PerplexityConnector] Parse error, keeping raw response:', parseError);

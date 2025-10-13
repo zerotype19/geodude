@@ -110,6 +110,7 @@ export async function processRun(env: Env, ctx?: ExecutionContext, runId?: strin
           // Call live connector
           console.log(`[VisibilityProcessor] Calling ${run.assistant} connector...`);
           const { answer, sources, raw } = await connector.ask(prompt.prompt_text, env);
+          console.log(`[VisibilityProcessor] Connector returned: ${sources.length} sources, ${answer.length} chars`);
           
           // Create normalized payload for backward compatibility
           const payload = JSON.stringify({
@@ -123,13 +124,23 @@ export async function processRun(env: Env, ctx?: ExecutionContext, runId?: strin
           console.log(`[VisibilityProcessor] Saved output for prompt ${prompt.id}`);
 
           // Parse citations from sources (already normalized)
-          const citations = sources.map((source, index) => ({
-            source_url: source.url,
-            source_domain: new URL(source.url).hostname,
-            title: source.title || `Citation ${index + 1}`,
-            snippet: source.snippet || "",
-            rank: index + 1
-          }));
+          const citations = sources.map((source, index) => {
+            let domain = "";
+            try {
+              domain = new URL(source.url).hostname;
+            } catch (error) {
+              console.warn(`[VisibilityProcessor] Invalid URL: ${source.url}`);
+              domain = source.url.split('/')[2] || source.url; // Fallback extraction
+            }
+            
+            return {
+              source_url: source.url,
+              source_domain: domain,
+              title: source.title || `Citation ${index + 1}`,
+              snippet: source.snippet || "",
+              rank: index + 1
+            };
+          });
           
           console.log(`[VisibilityProcessor] Parsed ${citations.length} citations from prompt ${prompt.id}`);
 

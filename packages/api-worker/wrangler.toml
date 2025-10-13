@@ -86,7 +86,7 @@ ALLOWED_ANSWER_ENGINES = "perplexity,claude-web"
 GA4_REGEX_SNIPPET_URL = ""
 
 # Live Connectors (Phase 4 - Sprint 1)
-FEATURE_VIS_PERPLEXITY = "false"
+FEATURE_VIS_PERPLEXITY = "true"
 FEATURE_VIS_CHATGPT = "false"
 FEATURE_VIS_CLAUDE = "false"
 VIS_CONNECT_TIMEOUT_MS = "15000"
