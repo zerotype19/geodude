@@ -130,7 +130,18 @@ export default function VisibilityPage() {
       {/* Rankings + Citations */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="border rounded-2xl p-4 shadow-sm">
-          <h2 className="font-medium mb-3">Top Domains — {assistant.replace("_", " ")}</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-medium">Top Domains — {assistant.replace("_", " ")}</h2>
+            <button
+              onClick={() => {
+                const url = `${import.meta.env.VITE_API_BASE}/api/visibility/rankings/export?assistant=${assistant}&period=7d&format=csv&limit=100`;
+                window.open(url, '_blank');
+              }}
+              className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"
+            >
+              📥 CSV
+            </button>
+          </div>
           {loading ? <Skeleton rows={8} /> : <RankingsTable rows={rankings} onDomainClick={setSelectedDomain} page={rankingsPage} onPageChange={setRankingsPage} />}
         </div>
 

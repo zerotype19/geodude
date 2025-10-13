@@ -77,6 +77,11 @@ export function createVisibilityAnalyticsRoutes(env: Env) {
           return await handleCostCheck(request, env, corsHeaders);
         }
         
+        // GET /api/visibility/rankings/export?assistant=x&period=y&format=csv
+        if (path === '/api/visibility/rankings/export') {
+          return await handleRankingsExport(request, env, corsHeaders);
+        }
+        
         return new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -532,6 +537,102 @@ async function handleCostCheck(request: Request, env: Env, corsHeaders: Record<s
       error: 'Failed to fetch cost data',
       timestamp: new Date().toISOString()
     }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function handleRankingsExport(request: Request, env: Env, corsHeaders: Record<string, string>) {
+  const url = new URL(request.url);
+  const assistant = url.searchParams.get('assistant') || 'all';
+  const period = url.searchParams.get('period') || '7d';
+  const format = url.searchParams.get('format') || 'csv';
+  const limit = parseInt(url.searchParams.get('limit') || '100');
+  
+  try {
+    // Convert period to SQLite date modifier
+    let dateModifier = '-7 days';
+    if (period === '30d') {
+      dateModifier = '-30 days';
+    } else if (period === '7d') {
+      dateModifier = '-7 days';
+    }
+    
+    let query: string;
+    let params: any[];
+    
+    if (assistant === 'all') {
+      query = `
+        SELECT week_start, assistant, domain, domain_rank, mentions_count, share_pct, rank_change
+        FROM ai_visibility_rankings 
+        WHERE week_start >= date('now', '${dateModifier}')
+        ORDER BY week_start DESC, assistant, domain_rank
+        LIMIT ?
+      `;
+      params = [limit];
+    } else {
+      query = `
+        SELECT week_start, assistant, domain, domain_rank, mentions_count, share_pct, rank_change
+        FROM ai_visibility_rankings 
+        WHERE assistant = ? 
+          AND week_start >= date('now', '${dateModifier}')
+        ORDER BY week_start DESC, domain_rank
+        LIMIT ?
+      `;
+      params = [assistant, limit];
+    }
+    
+    const result = await env.DB.prepare(query).bind(...params).all();
+    
+    if (format === 'csv') {
+      // Generate CSV
+      const headers = ['Week', 'Assistant', 'Domain', 'Rank', 'Mentions', 'Share %', 'Rank Change'];
+      const csvRows = [headers.join(',')];
+      
+      for (const row of result.results as any[]) {
+        const csvRow = [
+          row.week_start,
+          row.assistant,
+          `"${row.domain}"`, // Quote domains to handle commas
+          row.domain_rank,
+          row.mentions_count,
+          row.share_pct?.toFixed(2) || '0.00',
+          row.rank_change || '0'
+        ];
+        csvRows.push(csvRow.join(','));
+      }
+      
+      const csvContent = csvRows.join('\n');
+      const filename = `visibility-rankings-${assistant}-${period}-${new Date().toISOString().split('T')[0]}.csv`;
+      
+      return new Response(csvContent, {
+        status: 200,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Cache-Control': 'public, max-age=120' // 2 minute cache
+        }
+      });
+    } else {
+      // Return JSON (fallback)
+      return new Response(JSON.stringify({ 
+        assistant, 
+        period, 
+        rankings: result.results || [] 
+      }), {
+        status: 200,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=120' // 2 minute cache
+        }
+      });
+    }
+  } catch (error) {
+    console.error('[VisibilityAnalytics] Error exporting rankings:', error);
+    return new Response(JSON.stringify({ error: 'Failed to export rankings' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
