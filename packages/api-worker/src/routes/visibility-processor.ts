@@ -74,15 +74,15 @@ export async function processRun(env: Env, ctx?: ExecutionContext, runId?: strin
     }
 
     try {
-      // Check for timeout (30 minutes)
-      const runAge = Date.now() - new Date(run.run_started_at).getTime();
-      const timeoutMs = 30 * 60 * 1000; // 30 minutes
-      
-      if (runAge > timeoutMs) {
-        console.warn(`[VisibilityProcessor] Run ${run.id} timed out after ${Math.round(runAge / 1000 / 60)} minutes`);
-        await visibilityService.markRunDone(run.id, "error", `timeout after ${Math.round(runAge / 1000 / 60)} minutes`);
-        return { ok: false, runId: run.id, status: "error", error: "timeout" };
-      }
+                  // Check for timeout (5 minutes) - much more aggressive
+                  const runAge = Date.now() - new Date(run.run_started_at).getTime();
+                  const timeoutMs = 5 * 60 * 1000; // 5 minutes
+                  
+                  if (runAge > timeoutMs) {
+                    console.warn(`[VisibilityProcessor] Run ${run.id} timed out after ${Math.round(runAge / 1000 / 60)} minutes`);
+                    await visibilityService.markRunDone(run.id, "error", `timeout after ${Math.round(runAge / 1000 / 60)} minutes`);
+                    return { ok: false, runId: run.id, status: "error", error: "timeout" };
+                  }
 
       // Get prompts for this run
       const prompts = await visibilityService.getPromptsForRun(run.id);

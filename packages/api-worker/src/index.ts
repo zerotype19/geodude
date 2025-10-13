@@ -115,16 +115,16 @@ export default {
                 if (env.FEATURE_ASSISTANT_VISIBILITY === 'true') {
                   console.log('[VisibilityProcessor] Processing queue...');
                   try {
-                    // Recovery: Reset stuck runs (45+ minutes)
+                    // Recovery: Reset stuck runs (30+ minutes) - more aggressive
                     await env.DB.prepare(
                       `UPDATE assistant_runs 
-                       SET status = 'queued' 
+                       SET status = 'error', error = 'timeout - auto-recovery'
                        WHERE status = 'running' 
-                       AND run_started_at < datetime('now', '-45 minutes')`
+                       AND run_started_at < datetime('now', '-30 minutes')`
                     ).run();
                     
-                    // Process up to 2 runs per tick
-                    const batch = 2;
+                    // Process only 1 run per tick to prevent CPU timeout
+                    const batch = 1;
                     for (let i = 0; i < batch; i++) {
                       ctx.waitUntil(processRun(env, ctx));
                     }
@@ -2696,8 +2696,19 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       }
     }
 
+    // Handle /v1/tag.js requests (keep active)
+    if (path === '/v1/tag.js') {
+      return new Response('console.log("Optiview tag loaded");', {
+        status: 200,
+        headers: { 
+          'Content-Type': 'application/javascript',
+          'Cache-Control': 'public, max-age=3600'
+        }
+      });
+    }
+
     // Legacy endpoints - return 410 Gone
-    const legacyPaths = ['/v1/tag.js', '/v1/track', '/v1/collect'];
+    const legacyPaths = ['/v1/track', '/v1/collect'];
     if (legacyPaths.includes(path)) {
       return new Response(
         JSON.stringify({
