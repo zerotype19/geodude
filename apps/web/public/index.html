@@ -97,8 +97,8 @@
         
         .features-grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
-            gap: 30px; 
+            grid-template-columns: repeat(4, 1fr); 
+            gap: 20px; 
             margin-top: 60px;
         }
         .feature-card { 
@@ -179,6 +179,9 @@
         }
         
         /* Responsive */
+        @media (max-width: 1200px) {
+            .features-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        }
         @media (max-width: 768px) {
             .hero h1 { font-size: 2.5rem; }
             .hero p { font-size: 1.1rem; }
@@ -342,9 +345,8 @@
                 <div class="footer-section">
                     <h4>Company</h4>
                     <ul>
-                        <li><a href="/docs/security.html">Security</a></li>
                         <li><a href="/docs/security.html">Privacy</a></li>
-                        <li><a href="/docs/faq.html">Contact</a></li>
+                        <li><a href="https://app.optiview.ai">Launch App</a></li>
                     </ul>
                 </div>
             </div>

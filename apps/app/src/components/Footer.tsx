@@ -27,7 +27,7 @@ export default function Footer() {
         <a href="https://optiview.ai/docs/security.html" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', margin: '0 8px' }}>
           Security
         </a>
-        <a href="https://optiview.ai/status.html" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', margin: '0 8px' }}>
+        <a href="https://optiview.ai/status" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none', margin: '0 8px' }}>
           Status
         </a>
       </div>
