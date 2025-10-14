@@ -34,14 +34,39 @@ function pLimit(n: number) {
 
 async function logVIEvent(env: Env, runId: string, event: string, detail: string, intentId?: string, source?: string): Promise<void> {
   try {
-    const logId = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const logId = crypto.randomUUID();
     await env.DB.prepare(`
-      INSERT INTO vi_logs (id, run_id, intent_id, source, event, detail, created_at)
+      INSERT INTO vi_logs (id, run_id, intent_id, source, event, detail, occurred_at)
       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).bind(logId, runId, intentId || null, source || null, event, detail).run();
   } catch (error) {
     console.error(`[VI Log] Failed to log event: ${error}`);
-    // Don't throw - logging failures shouldn't break the main flow
+    
+    // Fallback to KV cache as last resort
+    try {
+      if (env.KV_VI_CACHE) {
+        const key = `vi:logs:${runId}`;
+        const logEntry = JSON.stringify({
+          ts: new Date().toISOString(),
+          run_id: runId,
+          intent_id: intentId,
+          source: source,
+          event: event,
+          detail: detail,
+          db_error: String(error)
+        });
+        
+        const existing = await env.KV_VI_CACHE.get(key) || '';
+        await env.KV_VI_CACHE.put(key, existing + logEntry + '\n', { 
+          expirationTtl: 3600,
+          metadata: { type: 'vi_logs' }
+        });
+      }
+    } catch (kvError) {
+      console.error(`[VI Log] KV fallback also failed: ${kvError}`);
+    }
+    
+    // Never throw - logging failures shouldn't break the main flow
   }
 }
 
@@ -152,6 +177,11 @@ export function createVIRoutes(env: Env) {
               ...corsHeaders
             }
           });
+        }
+        
+        // GET /api/vi/connector:test - Test individual connectors
+        if (path === '/api/vi/connector:test' && request.method === 'GET') {
+          return await handleConnectorTest(request, env, corsHeaders);
         }
         
         // GET /api/vi/health - Health check
@@ -742,6 +772,79 @@ async function executeConnectors(
 }
 
 /**
+ * Connector test handler
+ */
+async function handleConnectorTest(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const source = url.searchParams.get('source') || 'perplexity';
+    const query = url.searchParams.get('q') || 'brand visibility';
+    const startTime = Date.now();
+    
+    const controller = new AbortController();
+    const signal = controller.signal;
+    const timer = setTimeout(() => controller.abort('timeout'), 25000);
+    
+    try {
+      let result: any;
+      
+      if (source === 'perplexity') {
+        const connector = getEnabledConnector('perplexity', env);
+        if (!connector) throw new Error('Perplexity connector not enabled');
+        result = await connector.ask(query, env);
+      } else if (source === 'chatgpt' || source === 'chatgpt_search') {
+        const connector = getEnabledConnector('chatgpt_search', env);
+        if (!connector) throw new Error('ChatGPT connector not enabled');
+        result = await connector.ask(query, env);
+      } else if (source === 'claude') {
+        const connector = getEnabledConnector('claude', env);
+        if (!connector) throw new Error('Claude connector not enabled');
+        result = await connector.ask(query, env);
+      } else {
+        return new Response(JSON.stringify({ error: 'unknown source' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+      
+      clearTimeout(timer);
+      
+      return new Response(JSON.stringify({
+        ok: true,
+        source,
+        took_ms: Date.now() - startTime,
+        citations: result?.citations?.slice(0, 5) ?? null,
+        total_citations: result?.citations?.length ?? 0
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+      
+    } catch (error: any) {
+      clearTimeout(timer);
+      return new Response(JSON.stringify({
+        ok: false,
+        source,
+        took_ms: Date.now() - startTime,
+        error: String(error?.message || error)
+      }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+    
+  } catch (error) {
+    return new Response(JSON.stringify({
+      error: 'Internal server error',
+      detail: String(error)
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+}
+
+/**
  * Queue processor for VI runs
  */
 export async function processVIRunFromQueue(runId: string, env: Env): Promise<void> {
@@ -803,9 +906,16 @@ export async function processVIRunFromQueue(runId: string, env: Env): Promise<vo
     const successes = results.filter(r => r.status === 'fulfilled').length;
     const failures = results.filter(r => r.status === 'rejected').length;
     
-    // Determine final status
+    // Check if any results were actually stored in the database
+    const resultCount = await env.DB.prepare(`
+      SELECT COUNT(*) as count FROM visibility_results WHERE run_id = ?
+    `).bind(runId).first();
+    
+    const hasResults = (resultCount as any)?.count > 0;
+    
+    // Determine final status - prioritize showing results over perfect completion
     let finalStatus = 'complete';
-    if (successes === 0) {
+    if (!hasResults) {
       finalStatus = 'failed';
     } else if (failures > 0) {
       finalStatus = 'partial_success';
