@@ -26,6 +26,21 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
   const [selectedSource, setSelectedSource] = useState<string>('chatgpt_search');
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const [provenanceData, setProvenanceData] = useState<any>(null);
+  const [overallCounts, setOverallCounts] = useState<Record<string, AssistantCounts>>({});
+
+  const fetchOverallCounts = async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE || 'https://api.optiview.ai';
+      const response = await fetch(`${apiBase}/api/vi/results:grouped?audit_id=${auditId}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setOverallCounts(data.counts);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch overall counts:', err);
+    }
+  };
 
   const fetchGroupedResults = async (source: string = selectedSource) => {
     try {
@@ -77,6 +92,7 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
   };
 
   useEffect(() => {
+    fetchOverallCounts();
     fetchGroupedResults();
   }, [auditId]);
 
@@ -159,7 +175,7 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
       {/* Assistant Tabs */}
       <AssistantTabs
         sources={results.sources}
-        counts={results.counts}
+        counts={Object.keys(overallCounts).length > 0 ? overallCounts : results.counts}
         selectedSource={selectedSource}
         onSourceChange={handleSourceChange}
       />
