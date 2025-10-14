@@ -68,9 +68,11 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
         console.warn('Failed to fetch provenance data:', provenanceErr);
       }
       
-      // Auto-select first prompt if none selected
-      if (data.prompts.length > 0 && !selectedPromptId) {
-        setSelectedPromptId(data.prompts[0].intent_id);
+      // Auto-select first prompt if none selected or if current selection is not in new data
+      if (data.prompts.length > 0) {
+        if (!selectedPromptId || !data.prompts.find(p => p.intent_id === selectedPromptId)) {
+          setSelectedPromptId(data.prompts[0].intent_id);
+        }
       }
       
     } catch (err) {
@@ -88,6 +90,7 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
   };
 
   const handlePromptSelect = (promptId: string) => {
+    console.log('Prompt selected:', promptId);
     setSelectedPromptId(promptId);
   };
 

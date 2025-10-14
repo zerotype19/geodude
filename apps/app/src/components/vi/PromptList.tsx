@@ -45,7 +45,10 @@ export default function PromptList({ prompts, selectedPromptId, onPromptSelect }
           return (
             <button
               key={prompt.intent_id}
-              onClick={() => onPromptSelect(prompt.intent_id)}
+              onClick={() => {
+                console.log('PromptList: Button clicked for', prompt.intent_id);
+                onPromptSelect(prompt.intent_id);
+              }}
               className={`
                 w-full p-3 text-left transition-all duration-200 border rounded-lg
                 ${isSelected 
