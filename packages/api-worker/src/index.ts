@@ -3098,38 +3098,80 @@ Sitemap: https://optiview.ai/sitemap.xml`;
 };
 
 async function handleFaviconProxy(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const u = url.searchParams.get("u") || "";
+  if (!u) return new Response("missing u", { status: 400 });
+
+  // Accept either a full URL or a bare host
+  let target: URL;
   try {
-    const url = new URL(request.url);
-    const target = url.searchParams.get('u') || '';
-    
-    let host = target;
-    try {
-      host = new URL(target).hostname;
-    } catch {
-      // If target is not a full URL, treat it as a hostname
-    }
-    
-    host = host.replace(/^www\./, '');
-    const upstream = `https://${host}/favicon.ico`;
-    
-    const response = await fetch(upstream, {
-      cf: { cacheEverything: true, cacheTtl: 86400 }
-    });
-    
-    if (!response.ok) {
-      return new Response(null, { status: 204 });
-    }
-    
-    const contentType = response.headers.get('content-type') || 'image/x-icon';
-    return new Response(response.body, {
-      headers: {
-        'content-type': contentType,
-        'cache-control': 'public, max-age=86400',
-        'access-control-allow-origin': '*'
-      }
-    });
-  } catch (error) {
-    return new Response(null, { status: 204 });
+    target = u.startsWith("http") ? new URL(u) : new URL(`https://${u}`);
+  } catch {
+    return new Response("bad url", { status: 400 });
   }
+
+  // SECURITY: only http/https, strip creds, normalize host
+  if (!/^https?:$/.test(target.protocol)) return new Response("bad scheme", { status: 400 });
+  target.username = ""; target.password = "";
+
+  // Strategy:
+  // 1) site /favicon.ico
+  // 2) site /apple-touch-icon.png
+  // 3) google s2 (proxied by us to avoid CSP): https://www.google.com/s2/favicons?sz=64&domain=<host>
+  const candidates = [
+    new URL("/favicon.ico", `${target.protocol}//${target.host}`).toString(),
+    new URL("/apple-touch-icon.png", `${target.protocol}//${target.host}`).toString(),
+    `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(target.host)}`
+  ];
+
+  for (const href of candidates) {
+    try {
+      const resp = await fetch(href, {
+        // small range to avoid large transfers when servers support it
+        headers: { "Range": "bytes=0-0" }
+      });
+      // Some servers ignore Range; accept common OKs
+      if (![200, 206, 304, 403, 405, 406, 429].includes(resp.status)) continue;
+
+      // Re-fetch full file if the first call was partial
+      const full = await fetch(href, { cf: { cacheTtl: 3600, cacheEverything: true } });
+
+      // Must return an image content-type
+      const ct = full.headers.get("content-type") || inferFaviconType(href);
+      if (!/^image\//i.test(ct)) continue;
+
+      const headers = new Headers(full.headers);
+      headers.set("content-type", ct);
+      headers.set("cache-control", "public, max-age=86400, s-maxage=86400");
+      headers.set("access-control-allow-origin", "*");
+
+      return new Response(full.body, { status: 200, headers });
+    } catch (_) {
+      // try next candidate
+    }
+  }
+
+  // Fallback: tiny inline SVG placeholder (always image)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+    <rect width="16" height="16" fill="#e5e7eb"/><text x="8" y="11" text-anchor="middle" font-size="10" fill="#6b7280">?</text>
+  </svg>`;
+  return new Response(svg, {
+    status: 200,
+    headers: {
+      "content-type": "image/svg+xml",
+      "cache-control": "public, max-age=3600",
+      "access-control-allow-origin": "*"
+    }
+  });
+}
+
+// helper
+function inferFaviconType(href: string): string {
+  const lower = href.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".ico")) return "image/x-icon";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  return "image/x-icon";
 }
 
