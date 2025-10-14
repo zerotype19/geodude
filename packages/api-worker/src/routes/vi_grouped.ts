@@ -157,12 +157,13 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
       source = (sourceCounts as any)?.source || 'chatgpt_search';
     }
 
-    // Get intents for this run, limited to 5 per source - MUST be scoped by audit
+    // Get intents for this run and source - MUST be scoped by audit and source
     const intents = await env.DB.prepare(`
-      SELECT vi.id, vi.query, vi.kind, vi.prompt_reason
+      SELECT DISTINCT vi.id, vi.query, vi.kind, vi.prompt_reason
       FROM visibility_intents vi
       JOIN visibility_runs vr ON vi.domain = vr.domain
-      WHERE vr.audit_id = ?
+      JOIN visibility_results vres ON vres.intent_id = vi.id AND vres.run_id = vr.id
+      WHERE vr.audit_id = ? AND vres.source = ?
       ORDER BY 
         CASE vi.kind 
           WHEN 'branded' THEN 1 
@@ -171,7 +172,7 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
         END,
         vi.created_at
       LIMIT 5
-    `).bind(audit_id).all();
+    `).bind(audit_id, source).all();
 
     const prompts: GroupedPrompt[] = [];
     const counts: Record<string, { prompts: number; citations: number }> = {};
