@@ -1222,6 +1222,12 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           
           if (existingProp) {
             propertyId = existingProp.id;
+            // Update existing property with new site_description if provided
+            if (body.site_description) {
+              await env.DB.prepare(
+                'UPDATE properties SET site_description = ? WHERE id = ?'
+              ).bind(body.site_description, propertyId).run();
+            }
           } else {
             propertyId = `prop_${Date.now()}_${domain.replace(/\./g, '_')}`;
             await env.DB.prepare(
@@ -2277,10 +2283,10 @@ Sitemap: https://optiview.ai/sitemap.xml`;
            ORDER BY severity DESC, page_url`
         ).bind(auditId).all();
 
-        // Get property domain for entity recommendations
+        // Get property domain and site description for entity recommendations
         const property = await env.DB.prepare(
-          'SELECT domain FROM properties WHERE id = ?'
-        ).bind(audit.property_id).first<{ domain: string }>();
+          'SELECT domain, site_description FROM properties WHERE id = ?'
+        ).bind(audit.property_id).first<{ domain: string; site_description: string | null }>();
 
         // Check for entity recommendations (Organization sameAs)
         let entity_recommendations = null;
@@ -2719,6 +2725,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
             domain: property.domain,
             name: property.name || property.domain,
           } : null,
+          site_description: property?.site_description || null,
           scores: scores,
           site: site,
           pages_crawled: audit.pages_crawled,

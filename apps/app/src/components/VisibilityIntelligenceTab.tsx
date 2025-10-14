@@ -73,6 +73,7 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [showDebug, setShowDebug] = useState(false);
   const [siteDescription, setSiteDescription] = useState<string>('');
+  const [storedSiteDescription, setStoredSiteDescription] = useState<string>('');
 
   // Poll for results when run is processing
   useEffect(() => {
@@ -125,6 +126,22 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
     }
   };
 
+  const fetchStoredSiteDescription = async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE || 'https://api.optiview.ai';
+      const response = await fetch(`${apiBase}/v1/audits/${auditId}`);
+      if (response.ok) {
+        const audit = await response.json();
+        if (audit.site_description) {
+          setStoredSiteDescription(audit.site_description);
+          setSiteDescription(audit.site_description);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching stored site description:', error);
+    }
+  };
+
   const fetchDebugLogs = async () => {
     if (!run?.id) return;
     
@@ -145,6 +162,13 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
     try {
       setRunning(true);
       setError(null);
+      
+      // Validate that site description is provided
+      if (!siteDescription.trim()) {
+        setError('Site description is required for better AI assistant citation results');
+        setRunning(false);
+        return;
+      }
       
       const apiBase = import.meta.env.VITE_API_BASE || 'https://api.optiview.ai';
       const response = await fetch(`${apiBase}/api/vi/run`, {
@@ -187,6 +211,7 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
 
   useEffect(() => {
     fetchResults().finally(() => setLoading(false));
+    fetchStoredSiteDescription();
   }, [auditId]);
 
   const getAssistantColor = (assistant: string) => {
@@ -291,7 +316,7 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
       {(!run || run.status === 'failed' || run.status === 'complete') && (
         <div className="mb-6">
           <label htmlFor="site-description" className="block text-sm font-medium text-gray-700 mb-2">
-            Site Description (Optional)
+            Site Description <span className="text-red-500">*</span>
           </label>
           <textarea
             id="site-description"
@@ -300,9 +325,10 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
             placeholder="Describe your site, business, or what you do (e.g., 'AI-powered SEO tool for tracking visibility across search engines', 'E-commerce platform for handmade jewelry', etc.)"
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             rows={3}
+            required
           />
           <p className="text-xs text-gray-500 mt-1">
-            This helps generate more targeted prompts for better citation results across all AI assistants.
+            <span className="text-red-500">*</span> Required. This helps generate more targeted prompts for better citation results across all AI assistants.
           </p>
         </div>
       )}
