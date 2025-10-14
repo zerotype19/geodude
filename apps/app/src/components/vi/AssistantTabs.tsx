@@ -46,24 +46,24 @@ export default function AssistantTabs({ sources, counts, selectedSource, onSourc
             className={`
               px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2
               ${isSelected 
-                ? 'bg-blue-100 text-blue-700 border-2 border-blue-200' 
+                ? 'bg-white text-gray-900 border-2 border-gray-300 shadow-sm' 
                 : hasResults 
-                  ? 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200' 
-                  : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  ? 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-white hover:border-gray-300 hover:shadow-sm' 
+                  : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
               }
             `}
             disabled={false}
             title={hasResults ? `${count.prompts} prompts, ${count.citations} citations` : 'No results available'}
           >
             <div 
-              className="w-2 h-2 rounded-full"
+              className="w-2 h-2 rounded-full opacity-70"
               style={{ backgroundColor: getAssistantColor(source) }}
             ></div>
             <span>{getAssistantDisplayName(source)}</span>
             {hasResults && (
               <span className={`
                 px-2 py-0.5 rounded-full text-xs
-                ${isSelected ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'}
+                ${isSelected ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-600'}
               `}>
                 {count.citations}
               </span>

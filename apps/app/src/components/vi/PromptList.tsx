@@ -47,10 +47,10 @@ export default function PromptList({ prompts, selectedPromptId, onPromptSelect }
               key={prompt.intent_id}
               onClick={() => onPromptSelect(prompt.intent_id)}
               className={`
-                w-full p-3 text-left transition-all duration-200 border rounded-lg bg-white
+                w-full p-3 text-left transition-all duration-200 border rounded-lg
                 ${isSelected 
                   ? 'border-blue-500 ring-1 ring-blue-200 bg-blue-50' 
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                 }
               `}
             >
