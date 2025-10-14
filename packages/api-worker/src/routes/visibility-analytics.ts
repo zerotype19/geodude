@@ -755,6 +755,7 @@ async function handleTestData(request: Request, env: Env, corsHeaders: Record<st
       }
       
       return {
+        id: `cite_test_${assistant}_${domain}_${index}_${Date.now()}`,
         project_id: 'prj_UHoetismrowc',
         assistant: assistant,
         source_domain: domain,
@@ -769,9 +770,10 @@ async function handleTestData(request: Request, env: Env, corsHeaders: Record<st
     for (const citation of testCitations) {
       await env.DB.prepare(`
         INSERT OR IGNORE INTO ai_citations 
-        (project_id, assistant, source_domain, source_url, title, snippet, occurred_at, source_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (id, project_id, assistant, source_domain, source_url, title, snippet, occurred_at, source_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
+        citation.id,
         citation.project_id,
         citation.assistant,
         citation.source_domain,
