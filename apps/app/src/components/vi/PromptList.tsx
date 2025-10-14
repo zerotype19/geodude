@@ -41,6 +41,8 @@ export default function PromptList({ prompts, selectedPromptId, onPromptSelect }
         {prompts.map((prompt, index) => {
           const isSelected = selectedPromptId === prompt.intent_id;
           const citationCount = prompt.citations.length;
+          const auditedCount = prompt.citations.filter(c => c.was_audited).length;
+          const competitorCount = citationCount - auditedCount;
           
           return (
             <button
@@ -71,9 +73,21 @@ export default function PromptList({ prompts, selectedPromptId, onPromptSelect }
                     `}>
                       {prompt.kind === 'branded' ? 'Branded' : 'Non-branded'}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      {citationCount} citation{citationCount !== 1 ? 's' : ''}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {auditedCount > 0 && (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          Your Site {auditedCount}
+                        </span>
+                      )}
+                      {competitorCount > 0 && (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                          Competitors {competitorCount}
+                        </span>
+                      )}
+                      {citationCount === 0 && (
+                        <span className="text-xs text-gray-500">No citations</span>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="text-sm font-medium text-gray-900 mb-1">
