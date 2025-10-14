@@ -97,7 +97,7 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
 
     // Get the latest run for this audit (or specific run_id) - MUST be scoped by audit_id
     let runQuery = `
-      SELECT r.id, r.domain, r.audited_url, r.hostname, r.project_id, r.status, r.created_at
+      SELECT r.id, r.domain, r.audited_url, r.hostname, r.project_id, r.status, r.started_at
       FROM visibility_runs r
       WHERE r.audit_id = ?
     `;

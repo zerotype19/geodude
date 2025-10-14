@@ -83,7 +83,7 @@ async function handleProvenanceDebug(request: Request, env: Env, corsHeaders: Re
 
     // Get latest run for this audit
     const runQuery = `
-      SELECT r.id, r.status, r.sources, r.created_at, r.domain, r.project_id
+      SELECT r.id, r.status, r.sources, r.started_at, r.domain, r.project_id
       FROM visibility_runs r
       WHERE r.audit_id = ?
       ORDER BY r.started_at DESC
@@ -162,7 +162,7 @@ async function handleProvenanceDebug(request: Request, env: Env, corsHeaders: Re
         id: runData.id,
         status: runData.status,
         sources: JSON.parse(runData.sources || '[]'),
-        created_at: runData.created_at,
+        created_at: runData.started_at,
         domain: runData.domain,
         alias_match: aliases
       },
