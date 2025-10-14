@@ -3,6 +3,7 @@
  */
 
 import { parseSourcesBlock, normalizeUrl, validateUrls, Citation } from "../citations";
+import { normalizeHost, deriveAliases, isAuditedUrl } from "../domain-match";
 
 type Env = {
   OPENAI_API_KEY: string;
@@ -72,32 +73,67 @@ If you cannot find any sources, return an empty citations array.`
   const text = await res.text();
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${text.slice(0,300)}`);
 
-  let citations: Citation[] = [];
+  // 1) Collect raw candidates from ALL places
+  let responseText = "";
+  let structured: Citation[] = [];
+  let parsed: Citation[] = [];
+  
   try {
     const json = JSON.parse(text);
     const content = json?.choices?.[0]?.message?.content ?? "";
-    // If the model honored JSON schema, content is JSON string
+    responseText = content;
+    
+    // Get structured citations from JSON response
     let payload: any = content;
     if (typeof content === "string") {
       try { payload = JSON.parse(content); } catch { /* will fallback */ }
     }
-    if (payload?.citations?.length) {
-      citations = payload.citations
-        .map((c: any) => ({ title: c.title, ref_url: normalizeUrl(c.url) || "" }))
-        .filter((c: Citation) => !!c.ref_url);
-    } else {
-      // Fallback to text parsing (in case schema not honored)
-      const raw = json?.choices?.[0]?.message?.content ?? "";
-      citations = parseSourcesBlock(String(raw));
-    }
+    
+    const structuredSources = (payload?.sources || payload?.citations || [])
+      .map((s: any) => ({ 
+        title: s.title || s.name, 
+        ref_url: normalizeUrl(s.url) || "" 
+      }))
+      .filter((c: Citation) => !!c.ref_url);
+    
+    structured = structuredSources;
+    
+    // Get parsed citations from text
+    parsed = parseSourcesBlock(String(responseText));
+    
   } catch {
     // As a last resort, try parsing the raw response for links
-    citations = parseSourcesBlock(text);
+    responseText = responseText || "";
+    parsed = parseSourcesBlock(responseText);
   }
 
-  // Validate URLs (cheap HEAD)
-  const ok = await validateUrls(citations.map(c => c.ref_url), timeoutMs);
-  const final = citations.filter(c => ok.includes(c.ref_url));
+  // 2) Merge + de-dup, keep first title seen
+  const seen = new Set<string>();
+  const merged = [...structured, ...parsed].filter(c => {
+    if (!c?.ref_url) return false;
+    const key = c.ref_url.trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  // 3) Validate with brand-host bypass
+  const auditedHost = "cologuard.com"; // TODO: get from env or context
+  const aliases = deriveAliases(auditedHost);
+  const brandHosts = [auditedHost, ...aliases].filter(Boolean);
+
+  const validUrls = await validateUrls(merged.map(m => m.ref_url), 15000, brandHosts);
+
+  // 4) Build final citations (preserve titles)
+  const final = merged
+    .filter(m => validUrls.includes(m.ref_url))
+    .map((m, idx) => ({
+      rank: idx + 1,
+      ref_url: m.ref_url,
+      title: m.title?.trim() || undefined,
+      ref_domain: new URL(m.ref_url).hostname.replace(/^www\./,'').toLowerCase(),
+      was_audited: isAuditedUrl(m.ref_url, auditedHost, aliases)
+    }));
 
   return { citations: final };
 }

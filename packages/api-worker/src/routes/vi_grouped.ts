@@ -1,6 +1,6 @@
 import { Env } from '../index';
 import { normalizeFromUrl } from '../lib/domain';
-import { isAuditedUrl } from '../services/vi/domain-match';
+import { isAuditedUrl, deriveAliases } from '../services/vi/domain-match';
 
 export interface GroupedCitation {
   rank: number;
@@ -172,14 +172,6 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
       `).bind(intentData.id, source).all();
 
       // Generate aliases for better domain matching
-      const aliases: string[] = [];
-      
-      // Cologuard-specific aliases
-      if (domain.includes('cologuard') || domain === 'cologuard.com') {
-        aliases.push('cologuard.com', 'exactsciences.com');
-      }
-      
-      // Generic brand alias detection (if site description contains brand name)
       const auditDetails = await env.DB.prepare(`
         SELECT p.site_description, p.domain 
         FROM properties p
@@ -187,13 +179,8 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
         WHERE a.id = ?
       `).bind(audit_id).first();
       
-      if (auditDetails) {
-        const siteDesc = (auditDetails as any).site_description?.toLowerCase() || '';
-        const brand = (auditDetails as any).domain?.toLowerCase().replace('.com', '') || '';
-        if (siteDesc.includes(brand)) {
-          aliases.push(`${brand}.com`);
-        }
-      }
+      const siteDescription = (auditDetails as any)?.site_description;
+      const aliases = deriveAliases(domain, siteDescription);
 
       const citations: GroupedCitation[] = (citationsResult.results || []).map((c: any) => ({
         rank: c.rank,

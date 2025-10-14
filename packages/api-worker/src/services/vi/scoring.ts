@@ -3,7 +3,7 @@
  * Computes 0-100 visibility scores for domains across AI assistants
  */
 
-import { isAuditedUrl } from './domain-match';
+import { isAuditedUrl, deriveAliases } from './domain-match';
 
 export interface VisibilityScore {
   score: number;           // 0-100 overall score
@@ -108,19 +108,24 @@ export class VisibilityScorer {
     const hostname = (run as any).hostname;
     const projectId = (run as any).project_id;
 
-    // Process each citation
-    for (let i = 0; i < citations.length; i++) {
-      const citation = citations[i];
-      const resultId = crypto.randomUUID();
-      
-      // Generate aliases for better domain matching
-      const aliases: string[] = [];
-      if (domain.includes('cologuard') || domain === 'cologuard.com') {
-        aliases.push('cologuard.com', 'exactsciences.com');
-      }
-      
-      // Determine if this citation is from the audited domain using proper domain matching
-      const isAuditedDomain = isAuditedUrl(citation.ref_url, domain, aliases);
+            // Process each citation
+            for (let i = 0; i < citations.length; i++) {
+              const citation = citations[i];
+              const resultId = crypto.randomUUID();
+              
+              // Extract domain from citation URL
+              let refDomain: string;
+              try {
+                refDomain = new URL(citation.ref_url).hostname.replace(/^www\./, '');
+              } catch {
+                refDomain = citation.ref_url;
+              }
+              
+              // Generate aliases for better domain matching
+              const aliases = deriveAliases(domain);
+              
+              // Determine if this citation is from the audited domain using proper domain matching
+              const isAuditedDomain = isAuditedUrl(citation.ref_url, domain, aliases);
 
               // Generate better title if missing or poor quality
               let title = citation.title;

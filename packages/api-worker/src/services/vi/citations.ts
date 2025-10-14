@@ -13,19 +13,37 @@ export function normalizeUrl(u: string): string | null {
   } catch { return null; }
 }
 
-export async function validateUrls(urls: string[], timeoutMs: number): Promise<string[]> {
+export async function validateUrls(urls: string[], timeoutMs: number, brandHosts: string[] = []): Promise<string[]> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort('timeout'), timeoutMs);
   try {
-    const head = async (u: string) => {
+    const validateUrl = async (u: string) => {
       try {
-        const r = await fetch(u, { method: "HEAD", signal: controller.signal });
-        // Accept most non-5xx as reachable; some sites 403/405 HEAD
-        return (r.status >= 200 && r.status < 400) || r.status === 403 || r.status === 405;
-      } catch { return false; }
+        // Skip validation for branded hosts
+        const host = new URL(u).hostname.replace(/^www\./, '').toLowerCase();
+        if (brandHosts.includes(host)) {
+          return true;
+        }
+
+        // Use GET with Range header for better compatibility
+        const r = await fetch(u, { 
+          method: "GET",
+          headers: { "Range": "bytes=0-0", "Accept": "text/html,application/xhtml+xml" },
+          signal: controller.signal,
+          redirect: "follow"
+        });
+        
+        // Accept most non-5xx as reachable; some sites 403/405/406/429 on HEAD
+        return (r.status >= 200 && r.status < 400) || 
+               r.status === 403 || r.status === 405 || r.status === 406 || r.status === 429;
+      } catch { 
+        // Treat network hiccups as soft-accept for now
+        return true;
+      }
     };
+    
     const ok: string[] = [];
-    for (const u of urls) if (await head(u)) ok.push(u);
+    for (const u of urls) if (await validateUrl(u)) ok.push(u);
     return ok;
   } finally { clearTimeout(t); }
 }
@@ -33,43 +51,43 @@ export async function validateUrls(urls: string[], timeoutMs: number): Promise<s
 // Enhanced parser (SOURCES bullets & markdown links)
 export function parseSourcesBlock(s: string): Citation[] {
   const out: Citation[] = [];
+  const lines = s.split(/\r?\n/);
 
-  // Enhanced Perplexity format: "- Title — https://..." or "- Title — https://... [1]"
-  for (const line of s.split("\n")) {
-    const m = line.trim().match(/^-+\s*(.+?)\s+—\s+(https?:\/\/[^\s\]]+)(?:\s*\[[^\]]*\])?/i);
-    if (m) {
-      const u = normalizeUrl(m[2]);
+  // Handle bullet format with unicode dashes: "- Title — https://..." or "- Title – https://..." or "- Title - https://..."
+  const bulletLine = /^\s*[-*•]\s*(?<title>.+?)\s*[—–-]\s*(?<url>https?:\/\/[^\s)]+)\/?\s*$/i;
+  
+  for (const line of lines) {
+    const m = line.match(bulletLine);
+    if (m?.groups?.url) {
+      const u = normalizeUrl(m.groups.url.trim());
       if (u) {
-        const title = m[1].trim();
+        const title = m.groups.title?.trim();
         out.push({ title: title || undefined, ref_url: u });
       }
-    }
-  }
-
-  // Standard bullet format: "- Title — https://..."
-  for (const line of s.split("\n")) {
-    const m = line.trim().match(/^[-•]\s*(.+?)\s+—\s+(https?:\/\/[^\s\]]+)/i);
-    if (m) {
-      const u = normalizeUrl(m[2]);
-      if (u) {
-        const title = m[1].trim();
-        out.push({ title: title || undefined, ref_url: u });
-      }
+      continue; // Skip other parsing for this line
     }
   }
 
   // Markdown links: [Title](https://...)
-  const md = [...s.matchAll(/\[([^\]]{1,200})\]\((https?:\/\/[^)\s]+)\)/g)];
-  for (const m of md) {
-    const u = normalizeUrl(m[2]);
-    if (u) out.push({ title: m[1].trim(), ref_url: u });
+  const markdownLink = /\[(?<title>[^\]]+)]\((?<url>https?:\/\/[^)]+)\)/g;
+  for (const line of lines) {
+    let md;
+    while ((md = markdownLink.exec(line)) !== null) {
+      const u = normalizeUrl(md.groups?.url?.trim());
+      if (u) {
+        out.push({ title: md.groups?.title?.trim(), ref_url: u });
+      }
+    }
   }
 
   // Bare URLs (last resort)
-  const bare = [...s.matchAll(/(?<!\()(?<!")\bhttps?:\/\/[^\s)]+/g)];
-  for (const m of bare) {
-    const u = normalizeUrl(m[0]);
-    if (u) out.push({ ref_url: u });
+  const bareUrl = /(https?:\/\/[^\s)]+)(?![^<]*>)/g;
+  for (const line of lines) {
+    let bu;
+    while ((bu = bareUrl.exec(line)) !== null) {
+      const u = normalizeUrl(bu[1].trim());
+      if (u) out.push({ ref_url: u });
+    }
   }
 
   // Dedup by URL and improve titles

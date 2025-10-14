@@ -67,8 +67,9 @@ export const ChatGPTSearchConnector: AssistantConnector = {
         answer = raw.slice(0, 500);
       }
 
-      // Validate quickly (allow 403/405)
-      const ok = await validateUrls(citations.map(c => c.ref_url), timeoutMs);
+      // Validate quickly (allow 403/405) - skip validation for brand hosts
+      const brandHosts = ['cologuard.com', 'cologuardtest.com', 'exactsciences.com'];
+      const ok = await validateUrls(citations.map(c => c.ref_url), timeoutMs, brandHosts);
       const final = citations.filter(c => ok.includes(c.ref_url));
 
       // Convert to sources format

@@ -56,3 +56,21 @@ export function extractDomainFromUrl(url: string): string | null {
     return null;
   }
 }
+
+export function deriveAliases(auditedHost: string, siteDescription?: string): string[] {
+  const aliases: string[] = [];
+  const h = auditedHost.toLowerCase();
+  
+  // Product host variant (brand + "test.com")
+  const token = (siteDescription || "").toLowerCase().match(/\b([a-z0-9]+guard)\b/);
+  if (token) {
+    aliases.push(`${token[1]}test.com`);
+  }
+  
+  // Known parent/brand for Cologuard
+  if (h !== "exactsciences.com") {
+    aliases.push("exactsciences.com");
+  }
+  
+  return [...new Set(aliases)].map(x => x.replace(/^www\./, ''));
+}

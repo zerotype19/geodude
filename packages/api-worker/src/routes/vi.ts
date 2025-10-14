@@ -7,6 +7,8 @@ import { normalizeFromUrl, getCacheKey } from '../lib/domain';
 import { IntentGenerator } from '../services/vi/intents';
 import { VisibilityScorer } from '../services/vi/scoring';
 import { getEnabledConnector } from '../services/visibility/connectors';
+import { getAvailableSources, Source } from '../services/vi/source-availability';
+import { parseSourcesBlock } from '../services/vi/citations';
 
 // Utility functions for reliable execution
 async function withTimeout<T>(ms: number, task: (signal: AbortSignal) => Promise<T>): Promise<T> {
@@ -249,7 +251,10 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     // Check both URL parameters and request body for audit_id
     const url = new URL(request.url);
     const audit_id = url.searchParams.get('audit_id') || body.audit_id;
-    const { mode = 'on_demand', sources, max_intents, regenerate_intents = false, site_description } = body;
+    const { mode = 'on_demand', sources, max_intents, site_description } = body;
+    
+    // Parse regenerate_intents from query params or body
+    const regenerate_intents = url.searchParams.get('regenerate_intents') === 'true' || body.regenerate_intents === true;
 
     if (!audit_id) {
       return new Response(JSON.stringify({ error: 'audit_id is required' }), {
@@ -302,28 +307,36 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     }
 
     const maxIntents = parseInt(max_intents || env.VI_MAX_INTENTS || '100');
-    console.log('[VIRoutes] VI_SOURCES env var:', env.VI_SOURCES);
-    let enabledSources;
-    try {
-      enabledSources = sources || JSON.parse(env.VI_SOURCES || '["perplexity","chatgpt_search","claude"]');
-    } catch (error) {
-      console.error('[VIRoutes] Failed to parse VI_SOURCES:', error);
-      enabledSources = ['perplexity', 'chatgpt_search', 'claude']; // fallback
+    
+    // Use single source of truth for source availability
+    const requested = sources as Source[] | undefined;
+    let availableSources = getAvailableSources(env);
+    
+    // Check for Perplexity circuit breaker
+    const breaker = await env.KV_VI_CACHE?.get("vi:breaker:perplexity");
+    if (breaker) {
+      availableSources = availableSources.filter(s => s !== "perplexity");
     }
-    console.log('[VIRoutes] Parsed enabledSources:', enabledSources);
+    
+    const finalSources: Source[] = (requested?.length ? requested : availableSources);
+    console.log('[VIRoutes] Available sources:', availableSources);
+    console.log('[VIRoutes] Final sources:', finalSources);
 
-    // Check if there's a recent run
-    const recentRun = await getRecentRun(env, projectId, domainInfo.etld1);
-    if (recentRun && !regenerate_intents) {
-      return new Response(JSON.stringify({
-        run_id: recentRun.id,
-        status: recentRun.status,
-        domain: domainInfo.etld1,
-        intents: recentRun.intents_count
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    // Check if there's a recent run (skip if regenerating intents)
+    let recentRun = null;
+    if (!regenerate_intents) {
+      recentRun = await getRecentRun(env, projectId, domainInfo.etld1);
+      if (recentRun) {
+        return new Response(JSON.stringify({
+          run_id: recentRun.id,
+          status: recentRun.status,
+          domain: domainInfo.etld1,
+          intents: recentRun.intents_count
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // Generate or get intents
@@ -362,24 +375,16 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
       domainInfo.hostname,
       mode,
       intents.length,
-      JSON.stringify(enabledSources),
+      JSON.stringify(finalSources),
       'processing'
     ).run();
 
-    // Check if any connectors can run
-    const availableSources = enabledSources.filter(source => hasRequiredApiKey(source, env));
-    
-    // Preflight check - fail fast if no API keys available
-    if (availableSources.length === 0) {
-      const missing = [];
-      if (enabledSources.includes('perplexity') && !env.PERPLEXITY_API_KEY) missing.push('PERPLEXITY_API_KEY');
-      if (enabledSources.includes('chatgpt_search') && !env.OPENAI_API_KEY) missing.push('OPENAI_API_KEY');
-      if (enabledSources.includes('claude') && !env.CLAUDE_API_KEY) missing.push('CLAUDE_API_KEY');
-      
+    // Preflight check - fail fast if no sources available
+    if (finalSources.length === 0) {
       return new Response(JSON.stringify({
-        error: "Missing required API keys",
-        missing,
-        enabled_sources: enabledSources
+        error: "No assistant sources available",
+        available_sources: availableSources,
+        requested_sources: requested
       }), {
         status: 400,
         headers: {
@@ -392,10 +397,10 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     // Enqueue the run for background processing
     if (env.VI_RUN_Q) {
       await env.VI_RUN_Q.send({ run_id: runId });
-      await logVIEvent(env, runId, 'run_queued', `Queued for processing with ${availableSources.length} sources`);
+      await logVIEvent(env, runId, 'run_queued', `Queued for processing with sources: ${finalSources.join(',')}`);
     } else {
       // Fallback to direct execution if queue not available
-      executeConnectors(env, runId, intents, availableSources, domainInfo).catch(error => {
+      executeConnectors(env, runId, intents, finalSources, domainInfo).catch(error => {
         console.error(`[VIRoutes] Error executing connectors for run ${runId}:`, error);
       });
     }
@@ -951,7 +956,7 @@ async function handleConnectorTest(request: Request, env: Env, corsHeaders: Reco
       // Parse citations from result if not already parsed
       let citations = result?.citations;
       if (!citations && (result?.text || result?.answer)) {
-        citations = parseCitationsFromText(result.text || result.answer);
+        citations = parseSourcesBlock(result.text || result.answer);
       }
       
       return new Response(JSON.stringify({
@@ -1090,7 +1095,7 @@ async function handleParserTest(request: Request, env: Env, corsHeaders: Record<
     const { text } = await request.json();
     
     // Parse citations from text using the same logic as connectors
-    const citations = parseCitationsFromText(text);
+    const citations = parseSourcesBlock(text);
     
     return new Response(JSON.stringify({
       count: citations.length,
@@ -1322,7 +1327,18 @@ export async function processVIRunFromQueue(runId: string, env: Env): Promise<vo
       SELECT * FROM visibility_intents WHERE domain = ? ORDER BY created_at
     `).bind((run as any).domain).all();
 
-    const sources = JSON.parse((run as any).sources || '[]');
+    // Use current source availability instead of stored sources
+    const storedSources = JSON.parse((run as any).sources || '[]') as Source[];
+    const availableSources = getAvailableSources(env);
+    
+    // Use available sources that were requested, or all available if none specified
+    const sources = storedSources.length > 0 ? 
+      storedSources.filter(s => availableSources.includes(s)) : 
+      availableSources;
+    
+    console.log('[QueueProcessor] Stored sources:', storedSources);
+    console.log('[QueueProcessor] Available sources:', availableSources);
+    console.log('[QueueProcessor] Final sources:', sources);
     const domainInfo = {
       etld1: (run as any).domain,
       hostname: (run as any).hostname
@@ -1436,7 +1452,7 @@ async function processIntentWithTimeout(
         // Parse and store results
         let citations = result?.citations;
         if (!citations && (result?.text || result?.answer)) {
-          citations = parseCitationsFromText(result.text || result.answer);
+          citations = parseSourcesBlock(result.text || result.answer);
         }
         
         if (result && citations && citations.length > 0) {
