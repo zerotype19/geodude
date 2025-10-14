@@ -769,7 +769,7 @@ async function handleTestData(request: Request, env: Env, corsHeaders: Record<st
     
     for (const citation of testCitations) {
       await env.DB.prepare(`
-        INSERT OR IGNORE INTO ai_citations 
+        INSERT OR REPLACE INTO ai_citations 
         (id, project_id, assistant, source_domain, source_url, title, snippet, occurred_at, source_type)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
