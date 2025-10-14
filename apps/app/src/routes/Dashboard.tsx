@@ -13,6 +13,7 @@ import AdvancedRunDrawer from "../components/AdvancedRunDrawer";
 export default function Dashboard() {
   const { apiKey, save, clear } = useApiKey();
   const [url, setUrl] = useState(""); // Demo mode: just enter a URL
+  const [siteDescription, setSiteDescription] = useState(""); // Site description for better VI prompts
   const [loading, setLoading] = useState(false);
   const [audit, setAudit] = useState<Audit | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +83,7 @@ export default function Dashboard() {
           include: advancedOpts.include,
           exclude: advancedOpts.exclude,
         },
+        site_description: siteDescription.trim() || undefined,
       });
       const full = await getAudit(id);
       setAudit(full);
@@ -128,7 +130,7 @@ export default function Dashboard() {
         <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: '#475569' }}>
           Enter a website URL to audit
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input 
             placeholder="yoursite.com" 
             value={url} 
@@ -173,6 +175,31 @@ export default function Dashboard() {
           >
             Advanced...
           </button>
+        </div>
+        
+        {/* Site Description Field */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6, color: '#475569' }}>
+            Site Description (Optional)
+          </label>
+          <textarea
+            placeholder="Describe your site, business, or what you do (e.g., 'AI-powered SEO tool for tracking visibility across search engines', 'E-commerce platform for handmade jewelry', etc.)"
+            value={siteDescription}
+            onChange={e => setSiteDescription(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              fontSize: 14,
+              border: '2px solid #e2e8f0',
+              borderRadius: 8,
+              resize: 'vertical',
+              minHeight: '60px',
+              fontFamily: 'inherit'
+            }}
+          />
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+            This helps generate more targeted prompts for better citation results in Visibility Intelligence.
+          </div>
         </div>
         {audit?.id && (
           <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6 }}>

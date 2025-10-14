@@ -226,12 +226,13 @@ export async function startAudit(opts: {
   url?: string; // Demo mode: pass URL directly
   apiKey?: string;
   maxPages?: number;
+  site_description?: string; // Site description for better VI prompts
   filters?: {
     include?: string[];
     exclude?: string[];
   };
 }): Promise<{ id: string }> {
-  const { property_id, url, apiKey, maxPages, filters } = opts;
+  const { property_id, url, apiKey, maxPages, site_description, filters } = opts;
   
   // Demo mode: use URL directly
   const body: any = { maxPages, filters };
@@ -239,6 +240,9 @@ export async function startAudit(opts: {
     body.url = url;
   } else if (property_id) {
     body.property_id = property_id;
+  }
+  if (site_description) {
+    body.site_description = site_description;
   }
   
   const headers: any = { "content-type": "application/json" };

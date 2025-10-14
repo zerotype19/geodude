@@ -258,9 +258,9 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
       });
     }
 
-    // Get audit details with project_id and domain from properties table
+    // Get audit details with project_id, domain, and site_description from properties table
     const audit = await env.DB.prepare(`
-      SELECT a.id, p.project_id, p.domain
+      SELECT a.id, p.project_id, p.domain, p.site_description
       FROM audits a
       JOIN properties p ON a.property_id = p.id
       WHERE a.id = ?
@@ -277,6 +277,7 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     const auditedUrl = `https://${domain}`;
     const domainInfo = normalizeFromUrl(auditedUrl);
     const projectId = (audit as any).project_id;
+    const storedSiteDescription = (audit as any).site_description;
 
     // Rate limiting: 3 runs per hour per project
     const recentRuns = await env.DB.prepare(`
@@ -326,13 +327,15 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     }
 
     // Generate or get intents
+    // Use stored site description from properties table, fallback to request body
+    const effectiveSiteDescription = storedSiteDescription || site_description;
     let intents;
-    if (regenerate_intents || site_description) {
-      intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents, site_description);
+    if (regenerate_intents || effectiveSiteDescription) {
+      intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents, effectiveSiteDescription);
     } else {
       intents = await intentGenerator.getIntents(projectId, domainInfo.etld1);
       if (intents.length === 0) {
-        intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents, site_description);
+        intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents, effectiveSiteDescription);
       }
     }
 

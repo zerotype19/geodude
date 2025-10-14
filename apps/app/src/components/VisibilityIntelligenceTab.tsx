@@ -288,7 +288,7 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
       </div>
 
       {/* Site Description Field */}
-      {(!run || run.status === 'failed') && (
+      {(!run || run.status === 'failed' || run.status === 'complete') && (
         <div className="mb-6">
           <label htmlFor="site-description" className="block text-sm font-medium text-gray-700 mb-2">
             Site Description (Optional)

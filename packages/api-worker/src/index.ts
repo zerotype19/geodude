@@ -1177,6 +1177,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           property_id?: string;
           url?: string; // Demo mode: URL directly
           maxPages?: number;
+          site_description?: string; // Site description for better VI prompts
           filters?: {
             include?: string[];
             exclude?: string[];
@@ -1224,8 +1225,8 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           } else {
             propertyId = `prop_${Date.now()}_${domain.replace(/\./g, '_')}`;
             await env.DB.prepare(
-              'INSERT INTO properties (id, project_id, domain) VALUES (?, ?, ?)'
-            ).bind(propertyId, 'demo', domain).run();
+              'INSERT INTO properties (id, project_id, domain, site_description) VALUES (?, ?, ?, ?)'
+            ).bind(propertyId, 'demo', domain, body.site_description || null).run();
           }
           
           authResult = { valid: true, projectId: 'demo' };
