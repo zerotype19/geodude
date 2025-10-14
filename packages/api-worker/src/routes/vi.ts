@@ -33,11 +33,16 @@ function pLimit(n: number) {
 }
 
 async function logVIEvent(env: Env, runId: string, event: string, detail: string, intentId?: string, source?: string): Promise<void> {
-  const logId = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  await env.DB.prepare(`
-    INSERT INTO vi_logs (id, run_id, intent_id, source, event, detail, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-  `).bind(logId, runId, intentId || null, source || null, event, detail).run();
+  try {
+    const logId = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    await env.DB.prepare(`
+      INSERT INTO vi_logs (id, run_id, intent_id, source, event, detail, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(logId, runId, intentId || null, source || null, event, detail).run();
+  } catch (error) {
+    console.error(`[VI Log] Failed to log event: ${error}`);
+    // Don't throw - logging failures shouldn't break the main flow
+  }
 }
 
 export interface Env {
@@ -52,7 +57,8 @@ export interface Env {
   VI_MAX_INTENTS?: string;
   VI_RECENCY_HOURS?: string;
   VI_CACHE_TTL_SEC?: string;
-  // API Keys
+  VI_CONNECTOR_TIMEOUT_MS?: string;
+  // API Keys (secrets from Cloudflare)
   PERPLEXITY_API_KEY?: string;
   OPENAI_API_KEY?: string;
   CLAUDE_API_KEY?: string;
@@ -129,6 +135,23 @@ export function createVIRoutes(env: Env) {
         // POST /api/vi/intents:generate - Force regenerate intents
         if (path === '/api/vi/intents:generate' && request.method === 'POST') {
           return await handleGenerateIntents(request, env, corsHeaders);
+        }
+        
+        // GET /api/vi/diag/secrets - Diagnostics for API keys
+        if (path === '/api/vi/diag/secrets' && request.method === 'GET') {
+          return new Response(JSON.stringify({
+            openai: !!env.OPENAI_API_KEY && env.OPENAI_API_KEY.length > 10,
+            perplexity: !!env.PERPLEXITY_API_KEY && env.PERPLEXITY_API_KEY.length > 10,
+            claude: !!env.CLAUDE_API_KEY && env.CLAUDE_API_KEY.length > 10,
+            worker: "geodude-api",
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          });
         }
         
         // GET /api/vi/health - Health check
@@ -239,25 +262,35 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     // Check if any connectors can run
     const availableSources = enabledSources.filter(source => hasRequiredApiKey(source, env));
     
+    // Preflight check - fail fast if no API keys available
     if (availableSources.length === 0) {
-      // No API keys available, complete run immediately with empty results
-      await env.DB.prepare(`
-        UPDATE visibility_runs 
-        SET finished_at = ?, status = 'complete'
-        WHERE id = ?
-      `).bind(new Date().toISOString(), runId).run();
-      await logVIEvent(env, runId, 'run_complete', 'No API keys available, completed immediately');
+      const missing = [];
+      if (enabledSources.includes('perplexity') && !env.PERPLEXITY_API_KEY) missing.push('PERPLEXITY_API_KEY');
+      if (enabledSources.includes('chatgpt_search') && !env.OPENAI_API_KEY) missing.push('OPENAI_API_KEY');
+      if (enabledSources.includes('claude') && !env.CLAUDE_API_KEY) missing.push('CLAUDE_API_KEY');
+      
+      return new Response(JSON.stringify({
+        error: "Missing required API keys",
+        missing,
+        enabled_sources: enabledSources
+      }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      });
+    }
+    
+    // Enqueue the run for background processing
+    if (env.VI_RUN_Q) {
+      await env.VI_RUN_Q.send({ run_id: runId });
+      await logVIEvent(env, runId, 'run_queued', `Queued for processing with ${availableSources.length} sources`);
     } else {
-      // Enqueue the run for background processing
-      if (env.VI_RUN_Q) {
-        await env.VI_RUN_Q.send({ run_id: runId });
-        await logVIEvent(env, runId, 'run_queued', `Queued for processing with ${availableSources.length} sources`);
-      } else {
-        // Fallback to direct execution if queue not available
-        executeConnectors(env, runId, intents, availableSources, domainInfo).catch(error => {
-          console.error(`[VIRoutes] Error executing connectors for run ${runId}:`, error);
-        });
-      }
+      // Fallback to direct execution if queue not available
+      executeConnectors(env, runId, intents, availableSources, domainInfo).catch(error => {
+        console.error(`[VIRoutes] Error executing connectors for run ${runId}:`, error);
+      });
     }
 
     return new Response(JSON.stringify({
@@ -713,6 +746,16 @@ async function executeConnectors(
  */
 export async function processVIRunFromQueue(runId: string, env: Env): Promise<void> {
   try {
+    // Log secret availability for debugging
+    console.log(JSON.stringify({
+      where: "queue",
+      have: {
+        openai: !!env.OPENAI_API_KEY,
+        perplexity: !!env.PERPLEXITY_API_KEY,
+        claude: !!env.CLAUDE_API_KEY
+      }
+    }));
+    
     await logVIEvent(env, runId, 'processing_started', 'Queue consumer started processing');
     
     // Get run details
