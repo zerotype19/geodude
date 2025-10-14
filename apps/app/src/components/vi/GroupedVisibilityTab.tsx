@@ -90,7 +90,6 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
   };
 
   const handlePromptSelect = (promptId: string) => {
-    console.log('Prompt selected:', promptId);
     setSelectedPromptId(promptId);
   };
 
