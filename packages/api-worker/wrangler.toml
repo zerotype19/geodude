@@ -29,17 +29,17 @@ id = "05aa79aa479d44f7a599735e03ad2a78"
 binding = "HEURISTICS"
 id = "e037590f3aa9494cbd4d30d5fd6bc333"
 
-[[kv_namespaces]]
-binding = "KV_VI_CACHE"
-id = "f148590f3aa9494cbd4d30d5fd6bc334"
+# [[kv_namespaces]]
+# binding = "KV_VI_CACHE"
+# id = "f148590f3aa9494cbd4d30d5fd6bc334"
 
-[[kv_namespaces]]
-binding = "KV_VI_RULES"
-id = "f248590f3aa9494cbd4d30d5fd6bc335"
+# [[kv_namespaces]]
+# binding = "KV_VI_RULES"
+# id = "f248590f3aa9494cbd4d30d5fd6bc335"
 
-[[kv_namespaces]]
-binding = "KV_VI_SEEDS"
-id = "f348590f3aa9494cbd4d30d5fd6bc336"
+# [[kv_namespaces]]
+# binding = "KV_VI_SEEDS"
+# id = "f348590f3aa9494cbd4d30d5fd6bc336"
 
 [[queues.producers]]
 binding = "RECO_PRODUCER"
