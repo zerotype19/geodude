@@ -35,7 +35,8 @@ export class IntentGenerator {
   async generateIntents(
     projectId: string, 
     domainInfo: DomainInfo, 
-    maxIntents: number = 100
+    maxIntents: number = 100,
+    siteDescription?: string
   ): Promise<Intent[]> {
     console.log(`[IntentGenerator] Generating intents for ${domainInfo.etld1}`);
     
@@ -46,7 +47,7 @@ export class IntentGenerator {
     const verticalSeeds = await this.getVerticalSeeds();
     
     // 3. Generate intents using templates
-    const intents = this.renderTemplates(domainInfo, siteSeeds, verticalSeeds);
+    const intents = this.renderTemplates(domainInfo, siteSeeds, verticalSeeds, siteDescription);
     
     // 4. Dedupe and limit
     const uniqueIntents = this.deduplicateIntents(intents).slice(0, maxIntents);
@@ -105,7 +106,8 @@ export class IntentGenerator {
   private renderTemplates(
     domainInfo: DomainInfo, 
     siteSeeds: SiteSeeds, 
-    verticalSeeds: any
+    verticalSeeds: any,
+    siteDescription?: string
   ): Intent[] {
     const intents: Intent[] = [];
     const brand = siteSeeds.brand || domainInfo.etld1.split('.')[0];
@@ -208,6 +210,48 @@ export class IntentGenerator {
       { id: this.generateId(), intent_type: 'evidence', query: `${brand} reviews`, weight: 1.0 },
       { id: this.generateId(), intent_type: 'evidence', query: `${brand} testimonials`, weight: 1.0 }
     );
+
+    // G) Discovery queries (weight 1.5) - These work better across all connectors
+    intents.push(
+      { id: this.generateId(), intent_type: 'discovery', query: `Best tools to track AI assistant citations`, weight: 1.5 },
+      { id: this.generateId(), intent_type: 'discovery', query: `How to verify if ChatGPT cites a website`, weight: 1.5 },
+      { id: this.generateId(), intent_type: 'discovery', query: `LLM index visibility platforms`, weight: 1.5 },
+      { id: this.generateId(), intent_type: 'discovery', query: `Perplexity citations tracking tools`, weight: 1.5 },
+      { id: this.generateId(), intent_type: 'discovery', query: `AI visibility monitoring software`, weight: 1.5 },
+      { id: this.generateId(), intent_type: 'discovery', query: `Answer Engine Optimization tools`, weight: 1.5 },
+      { id: this.generateId(), intent_type: 'discovery', query: `Generative Engine Optimization platforms`, weight: 1.5 },
+      { id: this.generateId(), intent_type: 'discovery', query: `SEO tools for AI search engines`, weight: 1.5 }
+    );
+
+    // H) Site description-driven queries (weight 1.4) - Use user-provided description for better targeting
+    if (siteDescription && siteDescription.trim().length > 10) {
+      const description = siteDescription.trim();
+      
+      // Extract key terms from description
+      const keyTerms = description
+        .toLowerCase()
+        .split(/[\s,.-]+/)
+        .filter(term => term.length > 3 && !['for', 'the', 'and', 'with', 'that', 'this', 'from', 'they', 'have'].includes(term))
+        .slice(0, 5);
+      
+      // Generate contextual queries based on description
+      intents.push(
+        { id: this.generateId(), intent_type: 'description', query: `Best ${keyTerms[0] || 'tools'} platforms`, weight: 1.4 },
+        { id: this.generateId(), intent_type: 'description', query: `Top ${keyTerms[0] || 'tools'} solutions`, weight: 1.4 },
+        { id: this.generateId(), intent_type: 'description', query: `${keyTerms[0] || 'Tools'} vs competitors`, weight: 1.4 },
+        { id: this.generateId(), intent_type: 'description', query: `How does ${brand} work?`, weight: 1.4 },
+        { id: this.generateId(), intent_type: 'description', query: `${brand} alternatives`, weight: 1.4 },
+        { id: this.generateId(), intent_type: 'description', query: `Is ${brand} worth it?`, weight: 1.4 }
+      );
+
+      // If description mentions specific features/categories, create targeted queries
+      if (keyTerms.length > 1) {
+        intents.push(
+          { id: this.generateId(), intent_type: 'description', query: `${keyTerms[0]} and ${keyTerms[1]} tools`, weight: 1.3 },
+          { id: this.generateId(), intent_type: 'description', query: `${keyTerms[0]} ${keyTerms[1]} platforms`, weight: 1.3 }
+        );
+      }
+    }
 
     return intents;
   }

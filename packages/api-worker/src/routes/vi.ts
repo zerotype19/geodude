@@ -249,7 +249,7 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     // Check both URL parameters and request body for audit_id
     const url = new URL(request.url);
     const audit_id = url.searchParams.get('audit_id') || body.audit_id;
-    const { mode = 'on_demand', sources, max_intents, regenerate_intents = false } = body;
+    const { mode = 'on_demand', sources, max_intents, regenerate_intents = false, site_description } = body;
 
     if (!audit_id) {
       return new Response(JSON.stringify({ error: 'audit_id is required' }), {
@@ -327,12 +327,12 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
 
     // Generate or get intents
     let intents;
-    if (regenerate_intents) {
-      intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents);
+    if (regenerate_intents || site_description) {
+      intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents, site_description);
     } else {
       intents = await intentGenerator.getIntents(projectId, domainInfo.etld1);
       if (intents.length === 0) {
-        intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents);
+        intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents, site_description);
       }
     }
 

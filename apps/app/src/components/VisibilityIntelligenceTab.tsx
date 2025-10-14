@@ -72,6 +72,7 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
   const [polling, setPolling] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [showDebug, setShowDebug] = useState(false);
+  const [siteDescription, setSiteDescription] = useState<string>('');
 
   // Poll for results when run is processing
   useEffect(() => {
@@ -154,7 +155,8 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
           mode: 'on_demand',
           sources: assistants,
           max_intents: 100,
-          regenerate_intents: false
+          regenerate_intents: false,
+          site_description: siteDescription.trim()
         })
       });
 
@@ -284,6 +286,26 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
           )}
         </div>
       </div>
+
+      {/* Site Description Field */}
+      {(!run || run.status === 'failed') && (
+        <div className="mb-6">
+          <label htmlFor="site-description" className="block text-sm font-medium text-gray-700 mb-2">
+            Site Description (Optional)
+          </label>
+          <textarea
+            id="site-description"
+            value={siteDescription}
+            onChange={(e) => setSiteDescription(e.target.value)}
+            placeholder="Describe your site, business, or what you do (e.g., 'AI-powered SEO tool for tracking visibility across search engines', 'E-commerce platform for handmade jewelry', etc.)"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            rows={3}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            This helps generate more targeted prompts for better citation results across all AI assistants.
+          </p>
+        </div>
+      )}
 
       {/* Error State */}
       {error && (
