@@ -98,7 +98,8 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
 
   const fetchResults = async () => {
     try {
-      const response = await fetch(`https://api.optiview.ai/api/vi/results?audit_id=${auditId}`);
+      const apiBase = import.meta.env.VITE_API_BASE || 'https://api.optiview.ai';
+      const response = await fetch(`${apiBase}/api/vi/results?audit_id=${auditId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch results');
       }
@@ -123,7 +124,8 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
       setRunning(true);
       setError(null);
       
-      const response = await fetch('https://api.optiview.ai/api/vi/run', {
+      const apiBase = import.meta.env.VITE_API_BASE || 'https://api.optiview.ai';
+      const response = await fetch(`${apiBase}/api/vi/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -156,7 +158,8 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
 
   const exportCSV = () => {
     if (!run) return;
-    window.open(`https://api.optiview.ai/api/vi/export.csv?run_id=${run.id}`, '_blank');
+    const apiBase = import.meta.env.VITE_API_BASE || 'https://api.optiview.ai';
+    window.open(`${apiBase}/api/vi/export.csv?run_id=${run.id}`, '_blank');
   };
 
   useEffect(() => {
