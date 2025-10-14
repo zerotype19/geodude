@@ -123,31 +123,6 @@ export default function Dashboard() {
     <>
       <h1>Optiview — AI SEO Audit & Visibility Intelligence</h1>
       
-      {import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
-        <div className="card" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1e40af 100%)', color: 'white', marginBottom: '24px' }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-            🚀 New: Visibility Intelligence v1.0
-          </div>
-          <div style={{ fontSize: 14, marginBottom: 16, opacity: 0.9 }}>
-            Track how AI assistants (Perplexity, ChatGPT Search, Claude) reference your content with real-time citations, 0-100 visibility scores, and competitive rankings.
-          </div>
-          <Link 
-            to="/insights/visibility" 
-            style={{ 
-              display: 'inline-block', 
-              background: 'white', 
-              color: '#3b82f6', 
-              padding: '8px 16px', 
-              borderRadius: '6px', 
-              textDecoration: 'none', 
-              fontWeight: '600',
-              fontSize: '14px'
-            }}
-          >
-            Explore Visibility Intelligence →
-          </Link>
-        </div>
-      )}
 
       <div className="card">
         <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8, color: '#475569' }}>
