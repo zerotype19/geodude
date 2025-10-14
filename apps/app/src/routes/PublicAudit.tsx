@@ -8,7 +8,7 @@ import EntityRecommendations from "../components/EntityRecommendations";
 import Citations from "../components/Citations";
 import BraveQueriesModal from "../components/BraveQueriesModal";
 import AIDebugModal from "../components/AIDebugModal";
-import VisibilityIntelligenceEmbedded from "../components/VisibilityIntelligenceEmbedded";
+import VisibilityIntelligenceTab from "../components/VisibilityIntelligenceTab";
 import { getBotMeta } from "../lib/botMeta";
 
 // Helper function for score color coding
@@ -723,7 +723,7 @@ export default function PublicAudit() {
           <Citations auditId={id!} citations={audit.citations}/>
         )}
         {activeTab === 'visibility' && import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
-          <VisibilityIntelligenceEmbedded auditId={id!} domain={audit.domain || audit.url} />
+          <VisibilityIntelligenceTab auditId={id!} domain={audit.domain || audit.url} projectId={audit.project_id} />
         )}
       </div>
       

@@ -15,6 +15,8 @@ import { handleBotLogsIngest, handleGetCrawlers } from './bots/routes';
 import { createVisibilityRoutes } from './routes/visibility';
 import { processRun } from './routes/visibility-processor';
 import { createVisibilityAnalyticsRoutes } from './routes/visibility-analytics';
+import { createVIRoutes } from './routes/vi';
+import { normalizeFromUrl } from './lib/domain';
 
 interface Env {
   DB: D1Database;
@@ -56,6 +58,19 @@ interface Env {
   VIS_DAILY_COST_CAP_USD?: string;
   // Phase 5 Analytics
   FEATURE_PHASE5_ANALYTICS?: string;
+  // Visibility Intelligence (VI) Configuration
+  USE_LIVE_VISIBILITY?: string;
+  VI_SOURCES?: string;
+  VI_REFRESH_CRON?: string;
+  VI_MAX_INTENTS?: string;
+  VI_INTENT_TIMEOUT_MS?: string;
+  VI_CONNECTOR_TIMEOUT_MS?: string;
+  VI_CACHE_TTL_SEC?: string;
+  VI_RECENCY_HOURS?: string;
+  // KV Namespaces
+  KV_VI_CACHE?: KVNamespace;
+  KV_VI_RULES?: KVNamespace;
+  KV_VI_SEEDS?: KVNamespace;
   // Additional API Keys (secrets)
   PERPLEXITY_API_KEY?: string;
   CLAUDE_API_KEY?: string;
@@ -124,6 +139,84 @@ async function checkCitationsBudget(env: Env): Promise<boolean> {
   return true;
 }
 
+/**
+ * Run scheduled Visibility Intelligence runs for all active audits
+ */
+async function runScheduledVIRuns(env: Env): Promise<void> {
+  try {
+    // Get recent audits (last 14 days) grouped by domain
+    const audits = await env.DB.prepare(`
+      SELECT project_id, audited_url, MAX(id) as latest_audit_id
+      FROM audits
+      WHERE created_at >= datetime('now', '-14 days')
+      GROUP BY project_id, audited_url
+      LIMIT 50
+    `).all();
+
+    if (!audits.results || audits.results.length === 0) {
+      console.log('[VI Scheduler] No recent audits found');
+      return;
+    }
+
+    console.log(`[VI Scheduler] Found ${audits.results.length} unique audit domains`);
+
+    for (const audit of audits.results as any[]) {
+      try {
+        const domainInfo = normalizeFromUrl(audit.audited_url);
+        
+        // Check if there's already a recent run for this domain
+        const recentRun = await env.DB.prepare(`
+          SELECT id FROM visibility_runs 
+          WHERE project_id = ? AND domain = ? AND status = 'complete'
+            AND started_at >= datetime('now', '-6 hours')
+          LIMIT 1
+        `).bind(audit.project_id, domainInfo.etld1).first();
+
+        if (recentRun) {
+          console.log(`[VI Scheduler] Skipping ${domainInfo.etld1} - recent run exists`);
+          continue;
+        }
+
+        // Start a new VI run
+        console.log(`[VI Scheduler] Starting VI run for ${domainInfo.etld1}`);
+        
+        const viRoutes = createVIRoutes(env);
+        const request = new Request('http://localhost/api/vi/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audit_id: audit.latest_audit_id,
+            mode: 'scheduled',
+            sources: JSON.parse(env.VI_SOURCES || '["perplexity","chatgpt","claude"]'),
+            max_intents: parseInt(env.VI_MAX_INTENTS || '100'),
+            regenerate_intents: false
+          })
+        });
+
+        const response = await viRoutes.fetch(request);
+        const result = await response.json();
+        
+        if (response.ok) {
+          console.log(`[VI Scheduler] Started VI run ${result.run_id} for ${domainInfo.etld1}`);
+        } else {
+          console.error(`[VI Scheduler] Failed to start VI run for ${domainInfo.etld1}:`, result);
+        }
+
+        // Small delay between runs
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+      } catch (error) {
+        console.error(`[VI Scheduler] Error processing audit ${audit.latest_audit_id}:`, error);
+      }
+    }
+
+    console.log('[VI Scheduler] Scheduled runs completed');
+  } catch (error) {
+    console.error('[VI Scheduler] Error in scheduled VI runs:', error);
+    throw error;
+  }
+}
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const hour = new Date().getUTCHours();
@@ -186,6 +279,18 @@ export default {
         console.log('Phase 5 nightly rollup completed');
       } catch (error) {
         console.error('Phase 5 nightly rollup failed:', error);
+      }
+      return;
+    }
+    
+    // Every 6 hours - Visibility Intelligence scheduled runs
+    if ((hour === 0 || hour === 6 || hour === 12 || hour === 18) && env.USE_LIVE_VISIBILITY === 'true') {
+      console.log('VI scheduled runs started at', new Date().toISOString());
+      try {
+        await runScheduledVIRuns(env);
+        console.log('VI scheduled runs completed');
+      } catch (error) {
+        console.error('VI scheduled runs failed:', error);
       }
       return;
     }
@@ -2768,8 +2873,14 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       return analyticsRoutes.fetch(request);
     }
 
+    // Visibility Intelligence (VI) routes
+    if (path.startsWith('/api/vi/') && env.USE_LIVE_VISIBILITY === 'true') {
+      const viRoutes = createVIRoutes(env);
+      return viRoutes.fetch(request);
+    }
+
     // CORS preflight for visibility endpoints
-    if (request.method === 'OPTIONS' && path.startsWith('/api/visibility')) {
+    if (request.method === 'OPTIONS' && (path.startsWith('/api/visibility') || path.startsWith('/api/vi'))) {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',

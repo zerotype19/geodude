@@ -29,6 +29,18 @@ id = "05aa79aa479d44f7a599735e03ad2a78"
 binding = "HEURISTICS"
 id = "e037590f3aa9494cbd4d30d5fd6bc333"
 
+[[kv_namespaces]]
+binding = "KV_VI_CACHE"
+id = "f148590f3aa9494cbd4d30d5fd6bc334"
+
+[[kv_namespaces]]
+binding = "KV_VI_RULES"
+id = "f248590f3aa9494cbd4d30d5fd6bc335"
+
+[[kv_namespaces]]
+binding = "KV_VI_SEEDS"
+id = "f348590f3aa9494cbd4d30d5fd6bc336"
+
 [[queues.producers]]
 binding = "RECO_PRODUCER"
 queue = "reco-queue"
@@ -96,6 +108,16 @@ VIS_DAILY_COST_CAP_USD = "10"
 # Phase 5 Analytics
 FEATURE_PHASE5_ANALYTICS = "true"
 
+# Visibility Intelligence (VI) Configuration
+USE_LIVE_VISIBILITY = "true"
+VI_SOURCES = '["chatgpt","perplexity","claude"]'
+VI_REFRESH_CRON = "0 */6 * * *"
+VI_MAX_INTENTS = "120"
+VI_INTENT_TIMEOUT_MS = "25000"
+VI_CONNECTOR_TIMEOUT_MS = "35000"
+VI_CACHE_TTL_SEC = "172800"
+VI_RECENCY_HOURS = "6"
+
 [browser]
 binding = "BROWSER"
 
@@ -112,5 +134,5 @@ enabled = true
 # - OPENAI_API_KEY (required for content recommendations)
 
 [triggers]
-crons = ["0 6 * * 1", "0 3 * * *", "*/5 * * * *"]
+crons = ["0 6 * * 1", "0 3 * * *", "*/5 * * * *", "0 */6 * * *"]
 
