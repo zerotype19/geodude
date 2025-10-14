@@ -2961,6 +2961,11 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       return analyticsRoutes.fetch(request);
     }
 
+    // Handle favicon proxy (before VI routes to avoid path conflicts)
+    if (path === '/api/favicon' && request.method === 'GET') {
+      return await handleFaviconProxy(request, env);
+    }
+
     // Visibility Intelligence (VI) routes
     if (path.startsWith('/api/vi/') && env.USE_LIVE_VISIBILITY === 'true') {
       // Handle grouped results endpoint
@@ -2973,11 +2978,6 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       if (path === '/api/vi/debug/provenance') {
         const debugRoutes = createDebugVIRoutes(env);
         return debugRoutes.fetch(request);
-      }
-      
-      // Handle favicon proxy
-      if (path === '/api/favicon' && request.method === 'GET') {
-        return await handleFaviconProxy(request, env);
       }
       
       const viRoutes = createVIRoutes(env);
