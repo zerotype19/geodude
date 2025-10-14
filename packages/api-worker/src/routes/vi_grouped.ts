@@ -182,6 +182,29 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
       counts[source] = { prompts: 0, citations: 0 };
     });
 
+    // Calculate counts for all sources first
+    const allCountsResult = await env.DB.prepare(`
+      SELECT 
+        vr.source,
+        COUNT(DISTINCT vr.intent_id) as prompt_count,
+        COUNT(vc.id) as citation_count
+      FROM visibility_results vr
+      LEFT JOIN visibility_citations vc ON vc.result_id = vr.id
+      WHERE vr.run_id = ?
+      GROUP BY vr.source
+    `).bind(runData.id).all();
+
+    // Update counts with actual data from all sources
+    for (const countData of (allCountsResult.results || [])) {
+      const sourceName = countData.source;
+      if (allSources.includes(sourceName)) {
+        counts[sourceName] = {
+          prompts: countData.prompt_count || 0,
+          citations: countData.citation_count || 0
+        };
+      }
+    }
+
     // Process each intent
     for (const intent of (intents.results || [])) {
       const intentData = intent as any;
@@ -224,9 +247,6 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
           prompt_reason: intentData.prompt_reason || 'Generated from site description',
           citations
         });
-
-        counts[source].prompts++;
-        counts[source].citations += citations.length;
       }
     }
 
