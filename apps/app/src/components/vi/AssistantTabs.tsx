@@ -52,6 +52,11 @@ export default function AssistantTabs({ sources, counts, selectedSource, onSourc
                   : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
               }
             `}
+            style={{
+              backgroundColor: isSelected ? 'white' : (hasResults ? '#f9fafb' : '#f9fafb'),
+              color: isSelected ? '#111827' : (hasResults ? '#374151' : '#6b7280'),
+              border: isSelected ? '2px solid #d1d5db' : '1px solid #e5e7eb'
+            }}
             disabled={false}
             title={hasResults ? `${count.prompts} prompts, ${count.citations} citations` : 'No results available'}
           >

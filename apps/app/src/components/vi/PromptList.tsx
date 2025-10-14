@@ -53,6 +53,11 @@ export default function PromptList({ prompts, selectedPromptId, onPromptSelect }
                   : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                 }
               `}
+              style={{
+                backgroundColor: isSelected ? '#eff6ff' : 'white',
+                color: '#1e293b',
+                border: isSelected ? '1px solid #3b82f6' : '1px solid #e2e8f0'
+              }}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
