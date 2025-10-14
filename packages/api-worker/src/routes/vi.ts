@@ -8,8 +8,41 @@ import { IntentGenerator } from '../services/vi/intents';
 import { VisibilityScorer } from '../services/vi/scoring';
 import { getEnabledConnector } from '../services/visibility/connectors';
 
+// Utility functions for reliable execution
+async function withTimeout<T>(ms: number, task: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort('timeout'), ms);
+  try { 
+    return await task(ctrl.signal); 
+  } finally { 
+    clearTimeout(t); 
+  }
+}
+
+function pLimit(n: number) {
+  const queue: (() => void)[] = []; 
+  let active = 0;
+  const next = () => { active--; queue.shift()?.(); };
+  return <T>(fn: () => Promise<T>) => new Promise<T>((resolve, reject) => {
+    const run = () => { 
+      active++; 
+      fn().then(r => { resolve(r); next(); }).catch(e => { reject(e); next(); }); 
+    };
+    active < n ? run() : queue.push(run);
+  });
+}
+
+async function logVIEvent(env: Env, runId: string, event: string, detail: string, intentId?: string, source?: string): Promise<void> {
+  const logId = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  await env.DB.prepare(`
+    INSERT INTO vi_logs (id, run_id, intent_id, source, event, detail, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `).bind(logId, runId, intentId || null, source || null, event, detail).run();
+}
+
 export interface Env {
   DB: D1Database;
+  VI_RUN_Q?: Queue;
   KV_VI_CACHE?: KVNamespace;
   KV_VI_RULES?: KVNamespace;
   KV_VI_SEEDS?: KVNamespace;
@@ -19,14 +52,14 @@ export interface Env {
   VI_MAX_INTENTS?: string;
   VI_RECENCY_HOURS?: string;
   VI_CACHE_TTL_SEC?: string;
-  // Connector flags
-  FEATURE_VIS_PERPLEXITY?: string;
-  FEATURE_VIS_CHATGPT?: string;
-  FEATURE_VIS_CLAUDE?: string;
   // API Keys
   PERPLEXITY_API_KEY?: string;
   OPENAI_API_KEY?: string;
   CLAUDE_API_KEY?: string;
+  // Connector flags
+  FEATURE_VIS_PERPLEXITY?: string;
+  FEATURE_VIS_CHATGPT?: string;
+  FEATURE_VIS_CLAUDE?: string;
   // Optional org IDs
   PERPLEXITY_ORG_ID?: string;
   OPENAI_ORG_ID?: string;
@@ -213,11 +246,18 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
         SET finished_at = ?, status = 'complete'
         WHERE id = ?
       `).bind(new Date().toISOString(), runId).run();
+      await logVIEvent(env, runId, 'run_complete', 'No API keys available, completed immediately');
     } else {
-      // Execute connectors asynchronously
-      executeConnectors(env, runId, intents, availableSources, domainInfo).catch(error => {
-        console.error(`[VIRoutes] Error executing connectors for run ${runId}:`, error);
-      });
+      // Enqueue the run for background processing
+      if (env.VI_RUN_Q) {
+        await env.VI_RUN_Q.send({ run_id: runId });
+        await logVIEvent(env, runId, 'run_queued', `Queued for processing with ${availableSources.length} sources`);
+      } else {
+        // Fallback to direct execution if queue not available
+        executeConnectors(env, runId, intents, availableSources, domainInfo).catch(error => {
+          console.error(`[VIRoutes] Error executing connectors for run ${runId}:`, error);
+        });
+      }
     }
 
     return new Response(JSON.stringify({
@@ -666,6 +706,147 @@ async function executeConnectors(
       WHERE id = ?
     `).bind(new Date().toISOString(), runId).run();
   }
+}
+
+/**
+ * Queue processor for VI runs
+ */
+export async function processVIRunFromQueue(runId: string, env: Env): Promise<void> {
+  try {
+    await logVIEvent(env, runId, 'processing_started', 'Queue consumer started processing');
+    
+    // Get run details
+    const run = await env.DB.prepare(`
+      SELECT * FROM visibility_runs WHERE id = ?
+    `).bind(runId).first();
+    
+    if (!run) {
+      await logVIEvent(env, runId, 'processing_error', 'Run not found');
+      return;
+    }
+
+    // Get intents for this run
+    const intents = await env.DB.prepare(`
+      SELECT * FROM visibility_intents WHERE run_id = ? ORDER BY created_at
+    `).bind(runId).all();
+
+    const sources = JSON.parse((run as any).sources || '[]');
+    const domainInfo = {
+      etld1: (run as any).domain,
+      hostname: (run as any).hostname
+    };
+
+    // Update status to processing and set initial heartbeat
+    await env.DB.prepare(`
+      UPDATE visibility_runs 
+      SET status = 'processing', heartbeat_at = CURRENT_TIMESTAMP, progress = 0
+      WHERE id = ?
+    `).bind(runId).run();
+
+    // Process with concurrency limit and timeouts
+    const limit = pLimit(3); // Process 3 intents at a time
+    const connectorTimeout = parseInt(env.VI_CONNECTOR_TIMEOUT_MS || '15000');
+    
+    let processed = 0;
+    const total = intents.results?.length || 0;
+    
+    const results = await Promise.allSettled(
+      (intents.results || []).map(intent => 
+        limit(() => processIntentWithTimeout(runId, intent, sources, domainInfo, connectorTimeout, env))
+      )
+    );
+
+    // Count successes and failures
+    const successes = results.filter(r => r.status === 'fulfilled').length;
+    const failures = results.filter(r => r.status === 'rejected').length;
+    
+    // Determine final status
+    let finalStatus = 'complete';
+    if (successes === 0) {
+      finalStatus = 'failed';
+    } else if (failures > 0) {
+      finalStatus = 'partial_success';
+    }
+
+    // Update run status
+    await env.DB.prepare(`
+      UPDATE visibility_runs 
+      SET status = ?, finished_at = CURRENT_TIMESTAMP, progress = ?, heartbeat_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(finalStatus, total, runId).run();
+
+    await logVIEvent(env, runId, 'processing_complete', `Processed ${successes}/${total} intents successfully`);
+    
+  } catch (error) {
+    console.error(`[VI Queue] Error processing run ${runId}:`, error);
+    await env.DB.prepare(`
+      UPDATE visibility_runs 
+      SET status = 'failed', error = ?, finished_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(String(error), runId).run();
+    await logVIEvent(env, runId, 'processing_error', `Error: ${error}`);
+  }
+}
+
+async function processIntentWithTimeout(
+  runId: string, 
+  intent: any, 
+  sources: string[], 
+  domainInfo: any, 
+  timeoutMs: number, 
+  env: Env
+): Promise<void> {
+  return withTimeout(timeoutMs, async (signal) => {
+    await logVIEvent(env, runId, 'intent_started', `Processing intent: ${intent.query}`, intent.id);
+    
+    for (const source of sources) {
+      try {
+        const connector = getEnabledConnector(source, env);
+        if (!connector) {
+          await logVIEvent(env, runId, 'connector_skipped', `Connector ${source} not enabled`, intent.id, source);
+          continue;
+        }
+
+        if (!hasRequiredApiKey(source, env)) {
+          await logVIEvent(env, runId, 'connector_skipped', `Missing API key for ${source}`, intent.id, source);
+          continue;
+        }
+
+        // Check cache first
+        const cacheKey = getCacheKey(source, domainInfo.etld1, intent.query);
+        let cached = null;
+        if (env.KV_VI_CACHE) {
+          cached = await env.KV_VI_CACHE.get(cacheKey, 'json');
+        }
+
+        let result;
+        if (cached) {
+          await logVIEvent(env, runId, 'cache_hit', `Using cached result for ${source}`, intent.id, source);
+          result = cached;
+        } else {
+          await logVIEvent(env, runId, 'connector_call', `Calling ${source} connector`, intent.id, source);
+          result = await connector.ask(intent.query, env);
+          
+          // Cache the result
+          if (env.KV_VI_CACHE && result) {
+            const cacheTTL = parseInt(env.VI_CACHE_TTL_SEC || '172800');
+            await env.KV_VI_CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: cacheTTL });
+          }
+        }
+
+        // Store results
+        if (result && result.citations) {
+          const scorer = new VisibilityScorer(env);
+          await scorer.processConnectorResult(runId, intent.id, source, result);
+          await logVIEvent(env, runId, 'result_stored', `Stored ${result.citations.length} citations`, intent.id, source);
+        }
+
+      } catch (error) {
+        await logVIEvent(env, runId, 'connector_error', `Error with ${source}: ${error}`, intent.id, source);
+        // Continue with other sources
+      }
+    }
+  });
 }
 
 /**

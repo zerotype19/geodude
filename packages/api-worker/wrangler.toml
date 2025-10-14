@@ -45,6 +45,13 @@ id = "e037590f3aa9494cbd4d30d5fd6bc333"
 binding = "RECO_PRODUCER"
 queue = "reco-queue"
 
+[[queues.producers]]
+binding = "VI_RUN_Q"
+queue = "vi-run-q"
+
+[[queues.consumers]]
+queue = "vi-run-q"
+
 [[r2_buckets]]
 binding = "R2_BACKUPS"
 bucket_name = "geodude-backups"

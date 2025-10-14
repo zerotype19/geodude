@@ -23,6 +23,7 @@ interface Env {
   RATE_LIMIT_KV: KVNamespace;
   RECO_CACHE?: KVNamespace;
   RECO_PRODUCER?: Queue;
+  VI_RUN_Q?: Queue;
   R2_BACKUPS: R2Bucket;
   PROMPT_PACKS?: KVNamespace;
   ASSISTANT_SCHEDULES?: KVNamespace;
@@ -217,7 +218,33 @@ async function runScheduledVIRuns(env: Env): Promise<void> {
   }
 }
 
+async function handleVIRunQueue(batch: MessageBatch<any>, env: Env, ctx: ExecutionContext): Promise<void> {
+  for (const message of batch.messages) {
+    try {
+      const { run_id } = message.body;
+      console.log(`[VI Queue] Processing run ${run_id}`);
+      
+      // Import the queue processor from vi.ts
+      const { processVIRunFromQueue } = await import('./routes/vi');
+      await processVIRunFromQueue(run_id, env);
+      
+      message.ack();
+    } catch (error) {
+      console.error(`[VI Queue] Error processing message:`, error);
+      message.retry();
+    }
+  }
+}
+
 export default {
+  async queue(batch: MessageBatch<any>, env: Env, ctx: ExecutionContext): Promise<void> {
+    // Handle VI run queue
+    if (batch.queue === 'vi-run-q') {
+      await handleVIRunQueue(batch, env, ctx);
+      return;
+    }
+  },
+
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const hour = new Date().getUTCHours();
     
