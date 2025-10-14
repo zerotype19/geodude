@@ -735,29 +735,49 @@ async function handleTestData(request: Request, env: Env, corsHeaders: Record<st
   try {
     // Insert test citations for the assistant
     const testDomains = [
-      'openai.com', 'anthropic.com', 'google.com', 'microsoft.com', 'github.com',
+      'optiview.ai', 'openai.com', 'anthropic.com', 'google.com', 'microsoft.com', 'github.com',
       'stackoverflow.com', 'reddit.com', 'twitter.com', 'linkedin.com', 'youtube.com'
     ];
     
-    const testCitations = testDomains.map(domain => ({
-      project_id: 'prj_UHoetismrowc',
-      assistant: assistant,
-      source_domain: domain,
-      source_url: `https://${domain}`,
-      occurred_at: new Date().toISOString(),
-      source_type: 'test'
-    }));
+    const testCitations = testDomains.map((domain, index) => {
+      const now = new Date();
+      const occurredAt = new Date(now.getTime() - (index * 60 * 60 * 1000)); // Spread over hours
+      
+      let title, snippet, url;
+      if (domain === 'optiview.ai') {
+        title = 'Optiview - AI SEO Platform with Visibility Intelligence';
+        snippet = 'Track how AI assistants like Perplexity, ChatGPT Search, and Claude reference your content. Get comprehensive SEO audits plus AI citation tracking.';
+        url = 'https://optiview.ai';
+      } else {
+        title = `${domain} - ${domain.split('.')[0]} Platform`;
+        snippet = `Learn more about ${domain} and how it works with AI assistants and search engines.`;
+        url = `https://${domain}`;
+      }
+      
+      return {
+        project_id: 'prj_UHoetismrowc',
+        assistant: assistant,
+        source_domain: domain,
+        source_url: url,
+        title: title,
+        snippet: snippet,
+        occurred_at: occurredAt.toISOString(),
+        source_type: 'test'
+      };
+    });
     
     for (const citation of testCitations) {
       await env.DB.prepare(`
         INSERT OR IGNORE INTO ai_citations 
-        (project_id, assistant, source_domain, source_url, occurred_at, source_type)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (project_id, assistant, source_domain, source_url, title, snippet, occurred_at, source_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         citation.project_id,
         citation.assistant,
         citation.source_domain,
         citation.source_url,
+        citation.title,
+        citation.snippet,
         citation.occurred_at,
         citation.source_type
       ).run();
