@@ -1,6 +1,6 @@
 import { Env } from '../index';
 import { normalizeFromUrl } from '../lib/domain';
-import { isAuditedUrl, deriveAliases } from '../services/vi/domain-match';
+import { isAuditedUrl, deriveAliases, etld1 } from '../services/vi/domain-match';
 
 export interface GroupedCitation {
   rank: number;
@@ -76,35 +76,65 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
       });
     }
 
-    // Get the latest run for this audit (or specific run_id)
-    let runQuery = `
-      SELECT id, domain, audited_url, hostname, project_id, status
-      FROM visibility_runs 
-      WHERE audit_id = ?
+    // PROVENANCE GUARDRAIL: Get audit details first to enforce audit→run binding
+    const auditQuery = `
+      SELECT a.id, a.project_id, p.domain, p.site_description
+      FROM audits a
+      JOIN properties p ON a.property_id = p.id
+      WHERE a.id = ?
     `;
-    let runParams = [audit_id];
+    
+    const audit = await env.DB.prepare(auditQuery).bind(audit_id).first();
+    if (!audit) {
+      return new Response(JSON.stringify({ error: 'Audit not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const auditData = audit as any;
+    const auditDomain = auditData.domain;
+    const projectId = auditData.project_id;
+
+    // Get the latest run for this audit (or specific run_id) - MUST be scoped by audit_id AND project_id
+    let runQuery = `
+      SELECT r.id, r.domain, r.audited_url, r.hostname, r.project_id, r.status, r.created_at
+      FROM visibility_runs r
+      WHERE r.audit_id = ? AND r.project_id = ?
+    `;
+    let runParams = [audit_id, projectId];
 
     if (run_id) {
-      runQuery += ' AND id = ?';
+      runQuery += ' AND r.id = ?';
       runParams.push(run_id);
     }
 
-    runQuery += ' ORDER BY started_at DESC LIMIT 1';
+    runQuery += ' ORDER BY r.started_at DESC LIMIT 1';
 
     const run = await env.DB.prepare(runQuery).bind(...runParams).first();
 
     if (!run) {
-      return new Response(JSON.stringify({ error: 'No visibility run found' }), {
+      return new Response(JSON.stringify({ error: 'No visibility run found for this audit' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
       });
     }
 
     const runData = run as any;
-    const domain = runData.domain;
-    const auditedUrl = runData.audited_url;
-    const hostname = runData.hostname;
-    const projectId = runData.project_id;
+    const runDomain = runData.domain;
+    
+    // DOMAIN INTEGRITY ASSERTION: Ensure run domain matches audit domain or is a valid alias
+    const aliases = deriveAliases(auditDomain, auditData.site_description);
+    if (etld1(runDomain) !== etld1(auditDomain) && !aliases.includes(etld1(runDomain))) {
+      console.error(`[PROVENANCE] Domain mismatch: run=${runDomain} audit=${auditDomain} aliases=${aliases.join(',')}`);
+      return new Response(JSON.stringify({ 
+        error: 'Domain mismatch: run domain does not match audit domain or valid aliases',
+        details: `run: ${runDomain}, audit: ${auditDomain}, aliases: ${aliases.join(', ')}`
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
 
     // Get available sources for this run
     const sourcesResult = await env.DB.prepare(`
@@ -128,20 +158,21 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
       source = (sourceCounts as any)?.source || 'chatgpt_search';
     }
 
-    // Get intents for this run, limited to 5 per source
+    // Get intents for this run, limited to 5 per source - MUST be scoped by project
     const intents = await env.DB.prepare(`
-      SELECT id, query, kind, prompt_reason
-      FROM visibility_intents 
-      WHERE domain = ? 
+      SELECT vi.id, vi.query, vi.kind, vi.prompt_reason
+      FROM visibility_intents vi
+      JOIN visibility_runs vr ON vi.domain = vr.domain
+      WHERE vr.audit_id = ? AND vr.project_id = ?
       ORDER BY 
-        CASE kind 
+        CASE vi.kind 
           WHEN 'branded' THEN 1 
           WHEN 'non_branded' THEN 2 
           ELSE 3 
         END,
-        created_at
+        vi.created_at
       LIMIT 5
-    `).bind(domain).all();
+    `).bind(audit_id, projectId).all();
 
     const prompts: GroupedPrompt[] = [];
     const counts: Record<string, { prompts: number; citations: number }> = {};
@@ -171,16 +202,8 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
         ORDER BY vc.rank ASC
       `).bind(intentData.id, source).all();
 
-      // Generate aliases for better domain matching
-      const auditDetails = await env.DB.prepare(`
-        SELECT p.site_description, p.domain 
-        FROM properties p
-        JOIN audits a ON p.id = a.property_id
-        WHERE a.id = ?
-      `).bind(audit_id).first();
-      
-      const siteDescription = (auditDetails as any)?.site_description;
-      const aliases = deriveAliases(domain, siteDescription);
+      // Use already-fetched aliases for domain matching
+      const aliases = deriveAliases(auditDomain, auditData.site_description);
 
       const citations: GroupedCitation[] = (citationsResult.results || []).map((c: any) => ({
         rank: c.rank,
@@ -188,7 +211,7 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
         ref_url: c.ref_url,
         link_text: c.title || 'Untitled',
         ref_domain: c.ref_domain,
-        was_audited: isAuditedUrl(c.ref_url, domain, aliases),
+        was_audited: isAuditedUrl(c.ref_url, auditDomain, aliases),
         captured_at: c.occurred_at
       }));
 
@@ -211,7 +234,7 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
     const result: GroupedResults = {
       audit_id,
       run_id: runData.id,
-      domain,
+      domain: auditDomain, // Use audit domain, not run domain
       selected_source: source,
       sources: allSources,
       prompts,

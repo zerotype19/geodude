@@ -25,6 +25,7 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
   const [results, setResults] = useState<GroupedResults | null>(null);
   const [selectedSource, setSelectedSource] = useState<string>('chatgpt_search');
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const [provenanceData, setProvenanceData] = useState<any>(null);
 
   const fetchGroupedResults = async (source: string = selectedSource) => {
     try {
@@ -40,6 +41,17 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
       
       const data = await response.json();
       setResults(data);
+      
+      // Fetch provenance data for this audit
+      try {
+        const provenanceResponse = await fetch(`${apiBase}/api/vi/debug/provenance?audit_id=${auditId}`);
+        if (provenanceResponse.ok) {
+          const provenance = await provenanceResponse.json();
+          setProvenanceData(provenance);
+        }
+      } catch (provenanceErr) {
+        console.warn('Failed to fetch provenance data:', provenanceErr);
+      }
       
       // Auto-select first prompt if none selected
       if (data.prompts.length > 0 && !selectedPromptId) {
@@ -122,12 +134,19 @@ export default function GroupedVisibilityTab({ auditId, domain, projectId }: Gro
         <div>
           <h3 className="text-xl font-semibold">Visibility Intelligence</h3>
           <p className="text-sm text-gray-600">AI assistant visibility for {domain}</p>
+          {provenanceData && (
+            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+              <span>Run: {results.run_id.split('_').pop()}</span>
+              <span>Sources: {provenanceData.run?.sources?.join(', ') || 'N/A'}</span>
+              <span>Status: {provenanceData.run?.status || 'N/A'}</span>
+              {provenanceData.run?.created_at && (
+                <span>Created: {new Date(provenanceData.run.created_at).toLocaleString()}</span>
+              )}
+            </div>
+          )}
         </div>
         
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">
-            Run ID: {results.run_id.split('_').pop()}
-          </span>
           <button
             onClick={() => fetchGroupedResults()}
             className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border"

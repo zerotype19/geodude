@@ -105,6 +105,11 @@ export interface Env {
 }
 
 export function createVIRoutes(env: Env) {
+  // DEMO SEED DISABLE: Prevent any demo/seed data on production
+  const DEMO = env.VI_DEMO_SEED === "true";
+  if (DEMO) {
+    throw new Error("Demo seed is disabled on production");
+  }
 
   return {
     async fetch(request: Request): Promise<Response> {

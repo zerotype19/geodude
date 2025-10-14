@@ -17,6 +17,7 @@ import { processRun } from './routes/visibility-processor';
 import { createVisibilityAnalyticsRoutes } from './routes/visibility-analytics';
 import { createVIRoutes } from './routes/vi';
 import { createGroupedVIRoutes } from './routes/vi_grouped';
+import { createDebugVIRoutes } from './routes/vi_debug';
 import { normalizeFromUrl } from './lib/domain';
 
 interface Env {
@@ -2966,6 +2967,12 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       if (path === '/api/vi/results:grouped') {
         const groupedRoutes = createGroupedVIRoutes(env);
         return groupedRoutes.fetch(request);
+      }
+      
+      // Handle debug provenance endpoint
+      if (path === '/api/vi/debug/provenance') {
+        const debugRoutes = createDebugVIRoutes(env);
+        return debugRoutes.fetch(request);
       }
       
       // Handle favicon proxy
