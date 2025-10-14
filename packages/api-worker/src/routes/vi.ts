@@ -118,6 +118,7 @@ export function createVIRoutes(env: Env) {
       const path = url.pathname;
       
       // CORS headers - match main application CORS logic
+      // CORS headers for all responses
       const allowedOrigins = [
         'https://app.optiview.ai',
         'https://optiview.ai',
