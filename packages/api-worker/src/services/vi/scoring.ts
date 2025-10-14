@@ -73,6 +73,91 @@ export class VisibilityScorer {
   }
 
   /**
+   * Process a connector result and store it in the database
+   */
+  async processConnectorResult(
+    runId: string,
+    intentId: string,
+    source: string,
+    result: { answer?: string; text?: string; citations?: Array<{title?: string; ref_url: string; snippet?: string}> }
+  ): Promise<void> {
+    const citations = result.citations || [];
+    if (citations.length === 0) return;
+
+    // Get run details
+    const run = await this.env.DB.prepare(`
+      SELECT domain, audited_url, hostname, project_id
+      FROM visibility_runs WHERE id = ?
+    `).bind(runId).first();
+
+    if (!run) {
+      throw new Error(`Run ${runId} not found`);
+    }
+
+    const domain = (run as any).domain;
+    const auditedUrl = (run as any).audited_url;
+    const hostname = (run as any).hostname;
+    const projectId = (run as any).project_id;
+
+    // Process each citation
+    for (let i = 0; i < citations.length; i++) {
+      const citation = citations[i];
+      const resultId = crypto.randomUUID();
+      
+      // Determine if this citation is from the audited domain
+      const refDomain = new URL(citation.ref_url).hostname;
+      const isAuditedDomain = refDomain === hostname || refDomain === domain;
+
+      // Store the citation
+      await this.env.DB.prepare(`
+        INSERT INTO visibility_citations (
+          id, result_id, ref_url, ref_domain, title, snippet, rank, is_audited_domain
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        crypto.randomUUID(),
+        resultId,
+        citation.ref_url,
+        refDomain,
+        citation.title || null,
+        citation.snippet || null,
+        i + 1, // rank
+        isAuditedDomain ? 1 : 0
+      ).run();
+
+      // Calculate visibility score for this intent/source combination
+      const intentScore = this.calculateIntentScore([{
+        ref_url: citation.ref_url,
+        ref_domain: refDomain,
+        title: citation.title,
+        snippet: citation.snippet,
+        rank: i + 1,
+        is_audited_domain: isAuditedDomain
+      }], domain);
+
+      // Store the result
+      await this.env.DB.prepare(`
+        INSERT INTO visibility_results (
+          id, run_id, project_id, domain, audited_url, hostname,
+          source, intent_id, query, visibility_score, rank, raw_payload
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        resultId,
+        runId,
+        projectId,
+        domain,
+        auditedUrl,
+        hostname,
+        source,
+        intentId,
+        result.answer || result.text || '',
+        intentScore,
+        i + 1,
+        JSON.stringify(result)
+      ).run();
+    }
+  }
+
+  /**
    * Calculate overall visibility score for a run
    */
   async calculateOverallScore(

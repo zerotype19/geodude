@@ -283,6 +283,24 @@ export default {
                   }
                   return;
                 }
+
+    // VI Watchdog: Mark stale runs as timed_out every 5 minutes
+    if (env.USE_LIVE_VISIBILITY === 'true') {
+      try {
+        const staleRuns = await env.DB.prepare(`
+          UPDATE visibility_runs 
+          SET status = 'timed_out', finished_at = CURRENT_TIMESTAMP, error = 'Heartbeat timeout - no activity for 10+ minutes'
+          WHERE status = 'processing' 
+            AND (heartbeat_at IS NULL OR heartbeat_at < datetime('now', '-10 minutes'))
+        `).run();
+        
+        if (staleRuns.changes > 0) {
+          console.log(`[VI Watchdog] Marked ${staleRuns.changes} stale runs as timed_out`);
+        }
+      } catch (error) {
+        console.error('[VI Watchdog] Error marking stale runs:', error);
+      }
+    }
     
     // 03:00 UTC - Nightly backup
     if (hour === 3) {

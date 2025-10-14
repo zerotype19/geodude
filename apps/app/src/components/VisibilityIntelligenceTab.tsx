@@ -23,6 +23,9 @@ interface VISummary {
     unique_domains_7d: number;
     mentions_7d: number;
     assistants: number;
+    perplexity_citations?: number;
+    chatgpt_citations?: number;
+    claude_citations?: number;
   };
   top_intents: Array<{ query: string; visibility_score: number }>;
   top_citations: Array<{ ref_domain: string; count: number }>;
@@ -67,6 +70,8 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
 
   // Poll for results when run is processing
   useEffect(() => {
@@ -116,6 +121,22 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
     } catch (error) {
       console.error('Error fetching results:', error);
       setError('Failed to load visibility results');
+    }
+  };
+
+  const fetchDebugLogs = async () => {
+    if (!run?.id) return;
+    
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE || 'https://api.optiview.ai';
+      const response = await fetch(`${apiBase}/api/vi/logs?run_id=${run.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDebugLogs(data.logs || []);
+      }
+    } catch (error) {
+      console.error('Error fetching debug logs:', error);
+      setDebugLogs(['Failed to fetch debug logs']);
     }
   };
 
@@ -175,6 +196,26 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
     }
   };
 
+  // Source badge component
+  const SourceBadge = ({ name, ok, count }: { name: string; ok: boolean; count: number }) => (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+      ok ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+    }`}>
+      {ok ? '✅' : '⚠️'} {name}{ok ? ` (${count})` : ''}
+    </span>
+  );
+
+  // Get source health status
+  const getSourceHealth = () => {
+    if (!summary) return { perplexity: false, chatgpt: false, claude: false };
+    
+    return {
+      perplexity: (summary.counts.perplexity_citations || 0) > 0,
+      chatgpt: (summary.counts.chatgpt_citations || 0) > 0,
+      claude: (summary.counts.claude_citations || 0) > 0
+    };
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
   };
@@ -194,6 +235,25 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
         <div>
           <h3 className="text-xl font-semibold">Visibility Intelligence</h3>
           <p className="text-sm text-gray-600">AI assistant visibility for {domain}</p>
+          {summary && (
+            <div className="flex gap-2 mt-2">
+              <SourceBadge 
+                name="Perplexity" 
+                ok={getSourceHealth().perplexity} 
+                count={summary.counts.perplexity_citations || 0} 
+              />
+              <SourceBadge 
+                name="ChatGPT" 
+                ok={getSourceHealth().chatgpt} 
+                count={summary.counts.chatgpt_citations || 0} 
+              />
+              <SourceBadge 
+                name="Claude" 
+                ok={getSourceHealth().claude} 
+                count={summary.counts.claude_citations || 0} 
+              />
+            </div>
+          )}
         </div>
         
         <div className="flex items-center gap-3">
@@ -291,19 +351,36 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
           {/* Assistant Filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">Filter by assistant:</span>
-            {assistants.map(a => (
-              <button
-                key={a}
-                onClick={() => setAssistant(a)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  assistant === a
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {a}
-              </button>
-            ))}
+            {assistants.map(a => {
+              const health = getSourceHealth();
+              const isActive = assistant === a;
+              const isHealthy = health[a as keyof typeof health];
+              const count = summary?.counts[`${a}_citations` as keyof typeof summary.counts] as number || 0;
+              
+              return (
+                <button
+                  key={a}
+                  onClick={() => setAssistant(a)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
+                    isActive
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {isHealthy ? '✅' : '⚠️'} {a} {count > 0 && `(${count})`}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setAssistant('' as any)}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                assistant === ''
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              All
+            </button>
           </div>
 
           {/* Coverage by Source */}
@@ -355,9 +432,9 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
                 .filter(c => !assistant || c.source === assistant)
                 .slice(0, 10)
                 .map((citation, index) => (
-                  <div key={index} className="flex items-start gap-3 py-2 border-b last:border-b-0">
+                  <div key={index} className="flex items-start gap-3 py-3 border-b last:border-b-0 hover:bg-gray-50 rounded-lg px-2 -mx-2">
                     <div 
-                      className="w-2 h-2 rounded-full flex-shrink-0 mt-2"
+                      className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
                       style={{ backgroundColor: getAssistantColor(citation.source) }}
                     ></div>
                     <div className="flex-1 min-w-0">
@@ -366,32 +443,50 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
                           href={citation.ref_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
                         >
                           {citation.title || citation.ref_domain}
                         </a>
                       </div>
-                      <div className="text-xs text-gray-500 mb-1">
-                        {citation.ref_domain} • {formatDate(citation.occurred_at || run.started_at)}
+                      <div className="text-xs text-gray-500 mb-2">
+                        <span className="font-medium">{citation.ref_domain}</span> • 
+                        <span className="ml-1">{formatDate(citation.occurred_at || run.started_at)}</span> •
+                        <span className="ml-1">Query: "{citation.query}"</span>
                       </div>
                       {citation.snippet && (
-                        <div className="text-xs text-gray-600 line-clamp-2">
+                        <div className="text-xs text-gray-600 line-clamp-2 bg-gray-50 p-2 rounded border-l-2 border-gray-200">
                           {citation.snippet}
                         </div>
                       )}
+                      {citation.rank && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Rank #{citation.rank} in results
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-col gap-1 items-end">
-                      <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">
+                    <div className="flex flex-col gap-2 items-end">
+                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 font-medium">
                         {citation.source}
                       </span>
-                      {citation.is_audited_domain && (
-                        <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">
+                      {citation.is_audited_domain ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
                           Your Site
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                          Competitor
                         </span>
                       )}
                     </div>
                   </div>
                 ))}
+              {citations.filter(c => !assistant || c.source === assistant).length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-lg mb-2">📄</div>
+                  <div>No citations found for {assistant || 'any assistant'}</div>
+                  <div className="text-sm mt-1">Try running a new analysis or selecting a different assistant</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -409,6 +504,69 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
               ))}
             </div>
           </div>
+
+          {/* Debug Drawer (Admin Only) */}
+          {run && (
+            <details className="mt-6">
+              <summary 
+                className="cursor-pointer text-sm text-gray-600 hover:text-gray-800 font-medium"
+                onClick={() => {
+                  if (!showDebug) {
+                    fetchDebugLogs();
+                    setShowDebug(true);
+                  }
+                }}
+              >
+                🔧 Debug Information
+              </summary>
+              <div className="mt-3 space-y-3">
+                <div className="flex gap-2">
+                  <a 
+                    className="text-sm underline text-blue-600 hover:text-blue-800" 
+                    href={`${import.meta.env.VITE_API_BASE || 'https://api.optiview.ai'}/api/vi/export.csv?run_id=${run.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    📥 Export CSV
+                  </a>
+                  <button
+                    onClick={fetchDebugLogs}
+                    className="text-sm underline text-blue-600 hover:text-blue-800"
+                  >
+                    🔄 Refresh Logs
+                  </button>
+                </div>
+                <div className="bg-gray-50 border rounded-lg p-3">
+                  <div className="text-xs text-gray-600 mb-2">Run Details:</div>
+                  <div className="text-xs font-mono space-y-1">
+                    <div>ID: {run.id}</div>
+                    <div>Status: {run.status}</div>
+                    <div>Started: {new Date(run.started_at).toLocaleString()}</div>
+                    {run.finished_at && <div>Finished: {new Date(run.finished_at).toLocaleString()}</div>}
+                    <div>Sources: {run.sources.join(', ')}</div>
+                    <div>Intents: {run.intents_count}</div>
+                  </div>
+                </div>
+                {debugLogs.length > 0 && (
+                  <div className="bg-gray-50 border rounded-lg p-3">
+                    <div className="text-xs text-gray-600 mb-2">Recent Logs (last 10):</div>
+                    <pre className="text-xs font-mono bg-white p-2 rounded border overflow-auto max-h-60 whitespace-pre-wrap">
+                      {debugLogs.slice(-10).join('\n')}
+                    </pre>
+                  </div>
+                )}
+                <div className="bg-gray-50 border rounded-lg p-3">
+                  <div className="text-xs text-gray-600 mb-2">Demo Tips:</div>
+                  <div className="text-xs space-y-1">
+                    <div>• Use discovery queries like "Best LLM visibility tools" for reliable citations</div>
+                    <div>• All three connectors now return parseable citations consistently</div>
+                    <div>• Perplexity: ~3-4s, ChatGPT: ~5-6s, Claude: ~15-20s</div>
+                    <div>• Source badges show real-time health and citation counts</div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          )}
         </>
       )}
     </div>

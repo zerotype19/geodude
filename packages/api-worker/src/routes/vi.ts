@@ -35,12 +35,18 @@ function pLimit(n: number) {
 async function logVIEvent(env: Env, runId: string, event: string, detail: string, intentId?: string, source?: string): Promise<void> {
   try {
     const logId = crypto.randomUUID();
-    await env.DB.prepare(`
+    const statement = `
       INSERT INTO vi_logs (id, run_id, intent_id, source, event, detail, occurred_at)
       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `).bind(logId, runId, intentId || null, source || null, event, detail).run();
+    `;
+    console.log(`[VI Log] Attempting to insert: ${statement}`);
+    console.log(`[VI Log] Bind values: [${logId}, ${runId}, ${intentId || null}, ${source || null}, ${event}, ${detail}]`);
+    
+    await env.DB.prepare(statement).bind(logId, runId, intentId || null, source || null, event, detail).run();
+    console.log(`[VI Log] Successfully logged event: ${event}`);
   } catch (error) {
     console.error(`[VI Log] Failed to log event: ${error}`);
+    console.error(`[VI Log] Error details:`, error);
     
     // Fallback to KV cache as last resort
     try {
@@ -184,9 +190,24 @@ export function createVIRoutes(env: Env) {
           return await handleConnectorTest(request, env, corsHeaders);
         }
         
+        // POST /api/vi/parser:test - Test citation parser
+        if (path === '/api/vi/parser:test' && request.method === 'POST') {
+          return await handleParserTest(request, env, corsHeaders);
+        }
+        
         // GET /api/vi/health - Health check
         if (path === '/api/vi/health' && request.method === 'GET') {
           return await handleHealth(request, env, corsHeaders);
+        }
+
+        // GET /api/vi/net:test - Network connectivity test
+        if (path === '/api/vi/net:test' && request.method === 'GET') {
+          return await handleNetworkTest(request, env, corsHeaders);
+        }
+
+        // GET /api/vi/logs - Get debug logs for a run
+        if (path === '/api/vi/logs' && request.method === 'GET') {
+          return await handleLogs(request, env, corsHeaders);
         }
 
         return new Response(JSON.stringify({ error: 'Not found' }), {
@@ -213,13 +234,27 @@ export function createVIRoutes(env: Env) {
 async function handleRun(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
   try {
     const intentGenerator = new IntentGenerator(env);
-    const body = await request.json();
-    const { audit_id, mode = 'on_demand', sources, max_intents, regenerate_intents = false } = body;
+    
+    // Handle empty request body gracefully
+    let body = {};
+    try {
+      const text = await request.text();
+      if (text.trim()) {
+        body = JSON.parse(text);
+      }
+    } catch (error) {
+      console.warn('[VIRoutes] Failed to parse request body:', error);
+    }
+    
+    // Check both URL parameters and request body for audit_id
+    const url = new URL(request.url);
+    const audit_id = url.searchParams.get('audit_id') || body.audit_id;
+    const { mode = 'on_demand', sources, max_intents, regenerate_intents = false } = body;
 
     if (!audit_id) {
       return new Response(JSON.stringify({ error: 'audit_id is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
       });
     }
 
@@ -242,8 +277,39 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     const auditedUrl = `https://${domain}`;
     const domainInfo = normalizeFromUrl(auditedUrl);
     const projectId = (audit as any).project_id;
+
+    // Rate limiting: 3 runs per hour per project
+    const recentRuns = await env.DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM visibility_runs 
+      WHERE project_id = ? AND started_at >= datetime('now', '-1 hour')
+    `).bind(projectId).first();
+
+    if ((recentRuns as any)?.count >= 3) {
+      return new Response(JSON.stringify({ 
+        error: 'Rate limit exceeded', 
+        detail: 'Maximum 3 VI runs per hour per project',
+        retry_after: 3600
+      }), {
+        status: 429,
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Retry-After': '3600',
+          ...corsHeaders 
+        }
+      });
+    }
+
     const maxIntents = parseInt(max_intents || env.VI_MAX_INTENTS || '100');
-    const enabledSources = sources || JSON.parse(env.VI_SOURCES || '["perplexity","chatgpt_search","claude"]');
+    console.log('[VIRoutes] VI_SOURCES env var:', env.VI_SOURCES);
+    let enabledSources;
+    try {
+      enabledSources = sources || JSON.parse(env.VI_SOURCES || '["perplexity","chatgpt_search","claude"]');
+    } catch (error) {
+      console.error('[VIRoutes] Failed to parse VI_SOURCES:', error);
+      enabledSources = ['perplexity', 'chatgpt_search', 'claude']; // fallback
+    }
+    console.log('[VIRoutes] Parsed enabledSources:', enabledSources);
 
     // Check if there's a recent run
     const recentRun = await getRecentRun(env, projectId, domainInfo.etld1);
@@ -408,6 +474,25 @@ async function handleResults(request: Request, env: Env, corsHeaders: Record<str
 
     // Calculate summary
     const summary = await calculateSummary(env, (run as any).id, (run as any).domain, scorer);
+    
+    // Add per-source citation counts
+    const sourceCounts = await env.DB.prepare(`
+      SELECT source, COUNT(*) as count
+      FROM visibility_citations vc
+      JOIN visibility_results vr ON vc.result_id = vr.id
+      WHERE vr.run_id = ?
+      GROUP BY source
+    `).bind((run as any).id).all();
+
+    const sourceCountMap: Record<string, number> = {};
+    (sourceCounts as any)?.results?.forEach((row: any) => {
+      sourceCountMap[`${row.source}_citations`] = row.count;
+    });
+
+    summary.counts = {
+      ...summary.counts,
+      ...sourceCountMap
+    };
 
     return new Response(JSON.stringify({
       run,
@@ -605,18 +690,58 @@ async function handleHealth(request: Request, env: Env, corsHeaders: Record<stri
     const successCount = await env.DB.prepare(`
       SELECT COUNT(*) as count 
       FROM visibility_runs 
-      WHERE started_at >= datetime('now', '-1 day') AND status = 'complete'
+      WHERE started_at >= datetime('now', '-1 day') AND status IN ('complete', 'partial_success')
+    `).first();
+
+    // Get per-source success rates and metrics
+    const sourceMetrics = await env.DB.prepare(`
+      SELECT 
+        source,
+        COUNT(*) as total_calls,
+        COUNT(CASE WHEN vr.run_id IN (
+          SELECT id FROM visibility_runs WHERE status IN ('complete', 'partial_success')
+        ) THEN 1 END) as successful_calls,
+        AVG(CASE WHEN vr.run_id IN (
+          SELECT id FROM visibility_runs WHERE status IN ('complete', 'partial_success')
+        ) THEN 1.0 ELSE 0.0 END) as success_rate
+      FROM visibility_results vr
+      JOIN visibility_runs runs ON vr.run_id = runs.id
+      WHERE runs.started_at >= datetime('now', '-1 day')
+      GROUP BY source
+    `).all();
+
+    // Get timeout counts
+    const timeoutCount = await env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM vi_logs 
+      WHERE occurred_at >= datetime('now', '-1 day') 
+        AND event = 'connector_error' 
+        AND detail LIKE '%timeout%'
+    `).first();
+
+    // Get total citations in last 24h
+    const citationCount = await env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM visibility_citations vc
+      JOIN visibility_results vr ON vc.result_id = vr.id
+      JOIN visibility_runs runs ON vr.run_id = runs.id
+      WHERE runs.started_at >= datetime('now', '-1 day')
     `).first();
 
     return new Response(JSON.stringify({
       status: 'healthy',
       runs_24h: (runCount as any)?.count || 0,
-      success_rate: (runCount as any)?.count > 0 ? 
-        ((successCount as any)?.count || 0) / ((runCount as any)?.count || 1) : 0,
+      successful_runs_24h: (successCount as any)?.count || 0,
+      timeouts_24h: (timeoutCount as any)?.count || 0,
+      citations_24h: (citationCount as any)?.count || 0,
+      source_metrics: (sourceMetrics as any)?.results || [],
       timestamp: new Date().toISOString()
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        ...corsHeaders
+      }
     });
   } catch (error) {
     console.error('[VIRoutes] Error in handleHealth:', error);
@@ -625,7 +750,10 @@ async function handleHealth(request: Request, env: Env, corsHeaders: Record<stri
       details: error instanceof Error ? error.message : String(error)
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        ...corsHeaders
+      }
     });
   }
 }
@@ -778,7 +906,7 @@ async function handleConnectorTest(request: Request, env: Env, corsHeaders: Reco
   try {
     const url = new URL(request.url);
     const source = url.searchParams.get('source') || 'perplexity';
-    const query = url.searchParams.get('q') || 'brand visibility';
+    const query = url.searchParams.get('q') || 'Best LLM visibility tools';
     const startTime = Date.now();
     
     const controller = new AbortController();
@@ -809,12 +937,19 @@ async function handleConnectorTest(request: Request, env: Env, corsHeaders: Reco
       
       clearTimeout(timer);
       
+      // Parse citations from result if not already parsed
+      let citations = result?.citations;
+      if (!citations && (result?.text || result?.answer)) {
+        citations = parseCitationsFromText(result.text || result.answer);
+      }
+      
       return new Response(JSON.stringify({
         ok: true,
         source,
         took_ms: Date.now() - startTime,
-        citations: result?.citations?.slice(0, 5) ?? null,
-        total_citations: result?.citations?.length ?? 0
+        citations: citations?.slice(0, 5) ?? null,
+        total_citations: citations?.length ?? 0,
+        raw_result: result ? JSON.stringify(result).substring(0, 200) + '...' : null
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -845,10 +980,310 @@ async function handleConnectorTest(request: Request, env: Env, corsHeaders: Reco
 }
 
 /**
+ * Network connectivity test handler
+ */
+async function handleNetworkTest(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
+  const url = new URL(request.url);
+  const host = url.searchParams.get('host') || 'api.perplexity.ai';
+  const startTime = Date.now();
+  
+  try {
+    const res = await fetch(`https://${host}`, { 
+      method: 'HEAD',
+      signal: AbortSignal.timeout(10000) // 10s timeout
+    });
+    const took = Date.now() - startTime;
+    
+    return new Response(JSON.stringify({
+      host,
+      ok: res.ok,
+      status: res.status,
+      took_ms: took
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+    
+  } catch (error) {
+    const took = Date.now() - startTime;
+    return new Response(JSON.stringify({
+      host,
+      ok: false,
+      error: String(error),
+      took_ms: took
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+}
+
+/**
+ * Get debug logs for a run
+ */
+async function handleLogs(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const runId = url.searchParams.get('run_id');
+    
+    if (!runId) {
+      return new Response(JSON.stringify({ error: 'run_id is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    // Get logs from D1
+    const logs = await env.DB.prepare(`
+      SELECT event, detail, source, intent_id, occurred_at
+      FROM vi_logs 
+      WHERE run_id = ? 
+      ORDER BY occurred_at DESC 
+      LIMIT 50
+    `).bind(runId).all();
+
+    // Format logs for display
+    const formattedLogs = (logs as any)?.results?.map((log: any) => {
+      const timestamp = new Date(log.occurred_at).toLocaleTimeString();
+      const source = log.source ? `[${log.source}]` : '';
+      const intent = log.intent_id ? `(${log.intent_id.slice(-8)})` : '';
+      return `${timestamp} ${source} ${log.event}${intent}: ${log.detail}`;
+    }) || [];
+
+    return new Response(JSON.stringify({
+      run_id: runId,
+      logs: formattedLogs,
+      count: formattedLogs.length
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+
+  } catch (error) {
+    console.error('[VIRoutes] Error in handleLogs:', error);
+    return new Response(JSON.stringify({ 
+      error: 'Failed to fetch logs',
+      details: error instanceof Error ? error.message : String(error)
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+}
+
+/**
+ * Citation parser test handler
+ */
+async function handleParserTest(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
+  try {
+    const { text } = await request.json();
+    
+    // Parse citations from text using the same logic as connectors
+    const citations = parseCitationsFromText(text);
+    
+    return new Response(JSON.stringify({
+      count: citations.length,
+      citations: citations.slice(0, 10), // Limit to first 10 for readability
+      original_text: text.substring(0, 500) + (text.length > 500 ? '...' : '')
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+    
+  } catch (error) {
+    return new Response(JSON.stringify({
+      error: 'Failed to parse text',
+      detail: String(error)
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders }
+    });
+  }
+}
+
+/**
+ * Parse citations from connector response text
+ */
+function parseCitationsFromText(text: string): Array<{ title: string; ref_url: string }> {
+  const citations: Array<{ title: string; ref_url: string }> = [];
+  
+  console.log(`[CitationParser] Parsing text (${text.length} chars):`, text.substring(0, 200) + '...');
+  
+  // Pattern 1: Sources block with bullet points (most common format)
+  const sourcesMatch = text.match(/(?:sources?|references?|links?):\s*\n?([\s\S]*?)(?:\n\n|\n[A-Z]|$)/i);
+  if (sourcesMatch) {
+    console.log(`[CitationParser] Found sources section:`, sourcesMatch[1]);
+    const sourcesText = sourcesMatch[1];
+    const bulletPattern = /[-•]\s*(.+?)\s*[—–-]\s*(https?:\/\/[^\s\)\]]+)/g;
+    let bulletMatch;
+    while ((bulletMatch = bulletPattern.exec(sourcesText)) !== null) {
+      const [, title, url] = bulletMatch;
+      try {
+        const urlObj = new URL(url);
+        
+        // Filter out junk links
+        if (isJunkLink(url, urlObj)) {
+          console.log(`[CitationParser] Filtered junk citation: ${url}`);
+          continue;
+        }
+        
+        // Normalize URL
+        const normalizedUrl = normalizeUrl(url, urlObj);
+        
+        citations.push({
+          title: title.trim(),
+          ref_url: normalizedUrl
+        });
+        console.log(`[CitationParser] Extracted citation: ${title} -> ${normalizedUrl}`);
+      } catch {
+        console.log(`[CitationParser] Invalid URL: ${url}`);
+      }
+    }
+  }
+  
+  // Pattern 2: Markdown-style links [text](url)
+  const markdownPattern = /\[([^\]]+)\]\((https?:\/\/[^\s\)\]]+)\)/g;
+  let match;
+  while ((match = markdownPattern.exec(text)) !== null) {
+    const [, title, url] = match;
+    try {
+      const urlObj = new URL(url);
+      
+      // Filter out junk links
+      if (isJunkLink(url, urlObj)) {
+        console.log(`[CitationParser] Filtered junk markdown URL: ${url}`);
+        continue;
+      }
+      
+      // Normalize URL
+      const normalizedUrl = normalizeUrl(url, urlObj);
+      
+      citations.push({
+        title: title.trim(),
+        ref_url: normalizedUrl
+      });
+      console.log(`[CitationParser] Extracted markdown citation: ${title} -> ${normalizedUrl}`);
+    } catch {
+      console.log(`[CitationParser] Invalid markdown URL: ${url}`);
+    }
+  }
+  
+  // Pattern 3: Direct URL references (fallback)
+  const urlPattern = /https?:\/\/[^\s\)\]\}]+/g;
+  const urls = text.match(urlPattern) || [];
+  
+  for (const url of urls) {
+    // Skip if we already found this URL in a structured format
+    if (citations.some(c => c.ref_url === url)) continue;
+    
+    try {
+      const urlObj = new URL(url);
+      
+      // Filter out junk links
+      if (isJunkLink(url, urlObj)) {
+        console.log(`[CitationParser] Filtered junk URL: ${url}`);
+        continue;
+      }
+      
+      // Normalize domain
+      const normalizedUrl = normalizeUrl(url, urlObj);
+      
+      citations.push({
+        ref_url: normalizedUrl,
+        title: 'Untitled'
+      });
+      console.log(`[CitationParser] Extracted direct URL: ${normalizedUrl}`);
+    } catch {
+      console.log(`[CitationParser] Invalid direct URL: ${url}`);
+    }
+  }
+  
+  console.log(`[CitationParser] Total citations extracted: ${citations.length}`);
+  return citations;
+}
+
+/**
+ * Check if a URL is junk/spam
+ */
+function isJunkLink(url: string, urlObj: URL): boolean {
+  // Filter out data URLs, file URLs, and same-page anchors
+  if (url.startsWith('data:') || url.startsWith('file:') || url.startsWith('#')) {
+    return true;
+  }
+  
+  // Filter out very long URLs (likely spam)
+  if (url.length > 500) {
+    return true;
+  }
+  
+  // Filter out common junk domains
+  const junkDomains = [
+    'localhost', '127.0.0.1', '0.0.0.0',
+    'example.com', 'test.com', 'demo.com',
+    'bit.ly', 'tinyurl.com', 't.co', 'goo.gl'
+  ];
+  
+  const hostname = urlObj.hostname.toLowerCase();
+  if (junkDomains.some(junk => hostname.includes(junk))) {
+    return true;
+  }
+  
+  // Filter out URLs with suspicious patterns
+  if (url.includes('?utm_') || url.includes('&utm_')) {
+    // Allow UTM params but flag very long ones
+    if (url.length > 200) return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Normalize URL by removing www. prefix and converting to lowercase
+ */
+function normalizeUrl(url: string, urlObj: URL): string {
+  // Remove www. prefix from hostname
+  let hostname = urlObj.hostname.toLowerCase();
+  if (hostname.startsWith('www.')) {
+    hostname = hostname.substring(4);
+  }
+  
+  // Rebuild URL with normalized hostname
+  const normalized = new URL(url);
+  normalized.hostname = hostname;
+  
+  return normalized.toString();
+}
+
+/**
  * Queue processor for VI runs
  */
 export async function processVIRunFromQueue(runId: string, env: Env): Promise<void> {
   try {
+    // CRITICAL: Ensure vi_logs table exists FIRST (before any logging)
+    await env.DB.batch([
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS vi_logs (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        intent_id TEXT,
+        source TEXT,
+        event TEXT,
+        detail TEXT,
+        occurred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`),
+      env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_vi_logs_run ON vi_logs(run_id)`)
+    ]);
+    
+    // Debug DB context and schema
+    const who = (env: Env) => env.DB?.database || 'unknown';
+    console.log({ where: 'queue', db: who(env) });
+    
+    // Verify live schema from queue context
+    const tables = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all();
+    console.log({ where: 'queue', tables: tables.results?.map(t => t.name) });
+    
+    const columns = await env.DB.prepare("PRAGMA table_info('vi_logs')").all();
+    console.log({ where: 'queue', vi_logs_columns: columns.results });
+    
     // Log secret availability for debugging
     console.log(JSON.stringify({
       where: "queue",
@@ -871,10 +1306,10 @@ export async function processVIRunFromQueue(runId: string, env: Env): Promise<vo
       return;
     }
 
-    // Get intents for this run
+    // Get intents for this run's domain
     const intents = await env.DB.prepare(`
-      SELECT * FROM visibility_intents WHERE run_id = ? ORDER BY created_at
-    `).bind(runId).all();
+      SELECT * FROM visibility_intents WHERE domain = ? ORDER BY created_at
+    `).bind((run as any).domain).all();
 
     const sources = JSON.parse((run as any).sources || '[]');
     const domainInfo = {
@@ -987,11 +1422,18 @@ async function processIntentWithTimeout(
           }
         }
 
-        // Store results
-        if (result && result.citations) {
+        // Parse and store results
+        let citations = result?.citations;
+        if (!citations && (result?.text || result?.answer)) {
+          citations = parseCitationsFromText(result.text || result.answer);
+        }
+        
+        if (result && citations && citations.length > 0) {
           const scorer = new VisibilityScorer(env);
-          await scorer.processConnectorResult(runId, intent.id, source, result);
-          await logVIEvent(env, runId, 'result_stored', `Stored ${result.citations.length} citations`, intent.id, source);
+          await scorer.processConnectorResult(runId, intent.id, source, { ...result, citations });
+          await logVIEvent(env, runId, 'result_stored', `Stored ${citations.length} citations`, intent.id, source);
+        } else {
+          await logVIEvent(env, runId, 'no_citations', `No citations found in response`, intent.id, source);
         }
 
       } catch (error) {

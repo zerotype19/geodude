@@ -27,7 +27,16 @@ export const PerplexityConnector: AssistantConnector = {
         },
         body: JSON.stringify({
           model: "sonar", // Safe default; can be made configurable
-          messages: [{ role: "user", content: prompt }],
+          messages: [
+            { 
+              role: "system", 
+              content: "Answer concisely and include explicit sources. Always end with a SOURCES section using bullet points like: - <title> — <url>" 
+            },
+            { 
+              role: "user", 
+              content: `${prompt}\n\nThen output a SOURCES list with bullet points:\n- <title> — <url>` 
+            }
+          ],
           return_images: false,
           temperature: 0.2
         }),
