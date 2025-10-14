@@ -437,33 +437,36 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
                       className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
                       style={{ backgroundColor: getAssistantColor(citation.source) }}
                     ></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-900 mb-1">
-                        <a 
-                          href={citation.ref_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 hover:underline"
-                        >
-                          {citation.title || citation.ref_domain}
-                        </a>
-                      </div>
-                      <div className="text-xs text-gray-500 mb-2">
-                        <span className="font-medium">{citation.ref_domain}</span> • 
-                        <span className="ml-1">{formatDate(citation.occurred_at || run.started_at)}</span> •
-                        <span className="ml-1">Query: "{citation.query}"</span>
-                      </div>
-                      {citation.snippet && (
-                        <div className="text-xs text-gray-600 line-clamp-2 bg-gray-50 p-2 rounded border-l-2 border-gray-200">
-                          {citation.snippet}
-                        </div>
-                      )}
-                      {citation.rank && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          Rank #{citation.rank} in results
-                        </div>
-                      )}
-                    </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-900 mb-1">
+                  <a 
+                    href={citation.ref_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {citation.title && citation.title !== 'Untitled' ? citation.title : 
+                     citation.ref_url.includes(citation.ref_domain) ? `${citation.ref_domain} - ${citation.ref_url.split('/').pop() || 'Home'}` :
+                     citation.ref_domain}
+                  </a>
+                </div>
+                <div className="text-xs text-gray-500 mb-2">
+                  <span className="font-medium">{citation.ref_domain}</span> • 
+                  <span className="ml-1">{formatDate(citation.occurred_at || run.started_at)}</span> •
+                  {citation.query && (
+                    <span className="ml-1">Query: "{citation.query.slice(0, 50)}{citation.query.length > 50 ? '...' : ''}"</span>
+                  )}
+                </div>
+                {citation.snippet && (
+                  <div className="text-xs text-gray-600 line-clamp-2 bg-gray-50 p-2 rounded border-l-2 border-gray-200">
+                    {citation.snippet}
+                  </div>
+                )}
+                <div className="text-xs text-gray-500 mt-1 flex gap-2">
+                  {citation.rank && <span>Rank #{citation.rank}</span>}
+                  <span>Source: {citation.source}</span>
+                </div>
+              </div>
                     <div className="flex flex-col gap-2 items-end">
                       <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 font-medium">
                         {citation.source}

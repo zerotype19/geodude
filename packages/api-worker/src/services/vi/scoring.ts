@@ -108,21 +108,40 @@ export class VisibilityScorer {
       const refDomain = new URL(citation.ref_url).hostname;
       const isAuditedDomain = refDomain === hostname || refDomain === domain;
 
-      // Store the citation
-      await this.env.DB.prepare(`
-        INSERT INTO visibility_citations (
-          id, result_id, ref_url, ref_domain, title, snippet, rank, is_audited_domain
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        crypto.randomUUID(),
-        resultId,
-        citation.ref_url,
-        refDomain,
-        citation.title || null,
-        citation.snippet || null,
-        i + 1, // rank
-        isAuditedDomain ? 1 : 0
-      ).run();
+              // Generate better title if missing
+              let title = citation.title;
+              if (!title || title === 'Untitled') {
+                try {
+                  const url = new URL(citation.ref_url);
+                  const pathParts = url.pathname.split('/').filter(p => p && p.length > 2);
+                  if (pathParts.length > 0) {
+                    title = pathParts[pathParts.length - 1]
+                      .replace(/[-_]/g, ' ')
+                      .replace(/\.[^.]*$/, '')
+                      .replace(/^\w/, c => c.toUpperCase());
+                  } else {
+                    title = url.hostname.replace('www.', '');
+                  }
+                } catch {
+                  title = citation.ref_url;
+                }
+              }
+
+              // Store the citation
+              await this.env.DB.prepare(`
+                INSERT INTO visibility_citations (
+                  id, result_id, ref_url, ref_domain, title, snippet, rank, is_audited_domain
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              `).bind(
+                crypto.randomUUID(),
+                resultId,
+                citation.ref_url,
+                refDomain,
+                title,
+                citation.snippet || null,
+                i + 1, // rank
+                isAuditedDomain ? 1 : 0
+              ).run();
 
       // Calculate visibility score for this intent/source combination
       const intentScore = this.calculateIntentScore([{
