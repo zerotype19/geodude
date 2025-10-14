@@ -47,11 +47,25 @@ export function createVIRoutes(env: Env) {
       const url = new URL(request.url);
       const path = url.pathname;
       
-      // CORS headers
+      // CORS headers - match main application CORS logic
+      const allowedOrigins = [
+        'https://app.optiview.ai',
+        'https://optiview.ai',
+        'https://geodude-app.pages.dev',
+        'https://geodude.pages.dev',
+        'http://localhost:5173',
+        'http://localhost:5174',
+      ];
+      
+      const origin = request.headers.get('Origin');
+      const allowOrigin = allowedOrigins.some(allowed => 
+        origin?.includes(allowed.replace('https://', '').replace('http://', ''))
+      ) ? origin : allowedOrigins[0];
+      
       const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowOrigin || '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
       };
       
       if (request.method === 'OPTIONS') {
@@ -201,7 +215,10 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
       intents: intents.length
     }), {
       status: 201,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        ...corsHeaders
+      }
     });
   } catch (error) {
     console.error('[VIRoutes] Error in handleRun:', error);
@@ -210,7 +227,10 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
       details: error instanceof Error ? error.message : String(error)
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        ...corsHeaders
+      }
     });
   }
 }
@@ -281,7 +301,10 @@ async function handleResults(request: Request, env: Env, corsHeaders: Record<str
       citations: citations.results
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        ...corsHeaders
+      }
     });
   } catch (error) {
     console.error('[VIRoutes] Error in handleResults:', error);
@@ -290,7 +313,10 @@ async function handleResults(request: Request, env: Env, corsHeaders: Record<str
       details: error instanceof Error ? error.message : String(error)
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        ...corsHeaders
+      }
     });
   }
 }
