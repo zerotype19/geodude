@@ -78,7 +78,7 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
 
     // PROVENANCE GUARDRAIL: Get audit details first to enforce audit→run binding
     const auditQuery = `
-      SELECT a.id, a.project_id, p.domain, p.site_description
+      SELECT a.id, p.domain, p.site_description
       FROM audits a
       JOIN properties p ON a.property_id = p.id
       WHERE a.id = ?
@@ -94,15 +94,14 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
 
     const auditData = audit as any;
     const auditDomain = auditData.domain;
-    const projectId = auditData.project_id;
 
-    // Get the latest run for this audit (or specific run_id) - MUST be scoped by audit_id AND project_id
+    // Get the latest run for this audit (or specific run_id) - MUST be scoped by audit_id
     let runQuery = `
       SELECT r.id, r.domain, r.audited_url, r.hostname, r.project_id, r.status, r.created_at
       FROM visibility_runs r
-      WHERE r.audit_id = ? AND r.project_id = ?
+      WHERE r.audit_id = ?
     `;
-    let runParams = [audit_id, projectId];
+    let runParams = [audit_id];
 
     if (run_id) {
       runQuery += ' AND r.id = ?';
@@ -158,12 +157,12 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
       source = (sourceCounts as any)?.source || 'chatgpt_search';
     }
 
-    // Get intents for this run, limited to 5 per source - MUST be scoped by project
+    // Get intents for this run, limited to 5 per source - MUST be scoped by audit
     const intents = await env.DB.prepare(`
       SELECT vi.id, vi.query, vi.kind, vi.prompt_reason
       FROM visibility_intents vi
       JOIN visibility_runs vr ON vi.domain = vr.domain
-      WHERE vr.audit_id = ? AND vr.project_id = ?
+      WHERE vr.audit_id = ?
       ORDER BY 
         CASE vi.kind 
           WHEN 'branded' THEN 1 
@@ -172,7 +171,7 @@ async function handleGroupedResults(request: Request, env: Env, corsHeaders: Rec
         END,
         vi.created_at
       LIMIT 5
-    `).bind(audit_id, projectId).all();
+    `).bind(audit_id).all();
 
     const prompts: GroupedPrompt[] = [];
     const counts: Record<string, { prompts: number; citations: number }> = {};

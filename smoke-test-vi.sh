@@ -39,26 +39,25 @@ check_response() {
 # 1. Check secrets and availability
 echo "1️⃣  Checking secrets and source availability..."
 SECRETS_RESPONSE=$(curl -s "$BASE_URL/api/vi/diag/secrets")
-SOURCES_RESPONSE=$(curl -s "$BASE_URL/api/vi/diag/sources")
 
 echo "Secrets status:"
 echo "$SECRETS_RESPONSE" | jq -r 'to_entries[] | "  \(.key): \(.value)"'
 
-echo "Available sources:"
-echo "$SOURCES_RESPONSE" | jq -r '.sources // "[]"'
+# Check if all three API keys are available
+OPENAI_AVAILABLE=$(echo "$SECRETS_RESPONSE" | jq -r '.openai // false')
+PERPLEXITY_AVAILABLE=$(echo "$SECRETS_RESPONSE" | jq -r '.perplexity // false')
+CLAUDE_AVAILABLE=$(echo "$SECRETS_RESPONSE" | jq -r '.claude // false')
 
-# Check if all three sources are available
-AVAILABLE_SOURCES=$(echo "$SOURCES_RESPONSE" | jq -r '.sources // [] | length')
-if [ "$AVAILABLE_SOURCES" -eq 3 ]; then
-    echo -e "${GREEN}✅ All 3 sources available${NC}"
+if [ "$OPENAI_AVAILABLE" = "true" ] && [ "$PERPLEXITY_AVAILABLE" = "true" ] && [ "$CLAUDE_AVAILABLE" = "true" ]; then
+    echo -e "${GREEN}✅ All 3 API keys available${NC}"
 else
-    echo -e "${RED}❌ Only $AVAILABLE_SOURCES sources available (expected 3)${NC}"
+    echo -e "${RED}❌ Some API keys missing: OpenAI=$OPENAI_AVAILABLE, Perplexity=$PERPLEXITY_AVAILABLE, Claude=$CLAUDE_AVAILABLE${NC}"
 fi
 echo ""
 
 # 2. Test parser sanity
 echo "2️⃣  Testing citation parser..."
-PARSER_RESPONSE=$(curl -s -X POST "$BASE_URL/api/vi/test/parser" \
+PARSER_RESPONSE=$(curl -s -X POST "$BASE_URL/api/vi/parser:test" \
   -H 'content-type: application/json' \
   --data '{
     "text": "- Cologuard® — https://www.cologuardtest.com\n- Insurance Coverage — https://www.cologuardtest.com/insurance-coverage\n- Medicare Coverage — https://www.medicare.gov/coverage/cologuard-test\n- FAQs — https://www.cologuardtest.com/faq"

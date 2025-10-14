@@ -65,7 +65,7 @@ async function handleProvenanceDebug(request: Request, env: Env, corsHeaders: Re
 
     // Get audit details
     const auditQuery = `
-      SELECT a.id, a.project_id, p.domain, p.site_description
+      SELECT a.id, p.domain, p.site_description
       FROM audits a
       JOIN properties p ON a.property_id = p.id
       WHERE a.id = ?
@@ -85,12 +85,12 @@ async function handleProvenanceDebug(request: Request, env: Env, corsHeaders: Re
     const runQuery = `
       SELECT r.id, r.status, r.sources, r.created_at, r.domain, r.project_id
       FROM visibility_runs r
-      WHERE r.audit_id = ? AND r.project_id = ?
+      WHERE r.audit_id = ?
       ORDER BY r.started_at DESC
       LIMIT 1
     `;
     
-    const run = await env.DB.prepare(runQuery).bind(audit_id, auditData.project_id).first();
+    const run = await env.DB.prepare(runQuery).bind(audit_id).first();
     if (!run) {
       return new Response(JSON.stringify({ error: 'No visibility run found' }), {
         status: 404,
@@ -156,7 +156,7 @@ async function handleProvenanceDebug(request: Request, env: Env, corsHeaders: Re
       audit: {
         id: auditData.id,
         domain: auditData.domain,
-        project_id: auditData.project_id
+        project_id: runData.project_id // Get project_id from run, not audit
       },
       run: {
         id: runData.id,
