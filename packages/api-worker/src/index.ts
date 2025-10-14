@@ -1346,6 +1346,39 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           },
         });
 
+        // Auto-start VI run if VI is enabled and site_description is provided
+        if (env.USE_LIVE_VISIBILITY === 'true' && body.site_description) {
+          try {
+            console.log(`[Audit Start] Auto-starting VI run for audit ${auditId}`);
+            
+            const viRoutes = createVIRoutes(env);
+            const viRequest = new Request('http://localhost/api/vi/run', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                audit_id: auditId,
+                mode: 'auto',
+                sources: JSON.parse(env.VI_SOURCES || '["chatgpt_search","perplexity","claude"]'),
+                max_intents: parseInt(env.VI_MAX_INTENTS || '100'),
+                regenerate_intents: true, // Always regenerate for auto-runs
+                site_description: body.site_description
+              })
+            });
+
+            const viResponse = await viRoutes.fetch(viRequest);
+            const viResult = await viResponse.json();
+            
+            if (viResult.run_id) {
+              console.log(`[Audit Start] VI run started: ${viResult.run_id}`);
+            } else {
+              console.warn(`[Audit Start] VI run failed:`, viResult);
+            }
+          } catch (viError) {
+            console.error(`[Audit Start] Failed to start VI run:`, viError);
+            // Don't fail the audit creation if VI fails
+          }
+        }
+
         // Fetch the completed audit
         const audit = await env.DB.prepare(
           `SELECT id, property_id, status, score_overall, score_crawlability, 

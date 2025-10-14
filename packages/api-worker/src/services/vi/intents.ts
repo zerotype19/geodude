@@ -61,33 +61,47 @@ export class IntentGenerator {
 
   private async getSiteSeeds(projectId: string, domainInfo: DomainInfo): Promise<SiteSeeds> {
     try {
-      // Get content assets for this domain
-      const assets = await this.env.DB.prepare(`
-        SELECT url, json_extract(metadata, '$.title') as title,
-               json_extract(metadata, '$.h1') as h1,
-               json_extract(metadata, '$.h2') as h2,
-               json_extract(metadata, '$.faq') as faq
-        FROM content_assets
-        WHERE project_id = ? AND url LIKE ?
-        LIMIT 500
-      `).bind(projectId, `%${domainInfo.etld1}%`).all();
+      // Try to get content from audit pages if available
+      let assets: any[] = [];
+      try {
+        const auditPages = await this.env.DB.prepare(`
+          SELECT url, title, h1, h2, faq_present
+          FROM audit_pages
+          WHERE audit_id IN (
+            SELECT id FROM audits WHERE property_id IN (
+              SELECT id FROM properties WHERE project_id = ? AND domain = ?
+            )
+          )
+          LIMIT 100
+        `).bind(projectId, domainInfo.etld1).all();
+        
+        assets = auditPages.results as any[];
+      } catch (error) {
+        console.warn('[IntentGenerator] Could not get audit pages, using fallback');
+      }
 
       // Extract brand name from domain or content
-      const brand = this.extractBrandName(domainInfo, assets.results as any[]);
+      const brand = this.extractBrandName(domainInfo, assets);
       
       // Extract products/categories from content
-      const products = this.extractProducts(assets.results as any[]);
-      const categories = this.extractCategories(assets.results as any[]);
+      const products = this.extractProducts(assets);
+      const categories = this.extractCategories(assets);
 
       return {
-        urls: assets.results as any[],
+        urls: assets,
         brand,
         products,
         categories
       };
     } catch (error) {
       console.error('[IntentGenerator] Error getting site seeds:', error);
-      return { urls: [], brand: domainInfo.etld1.split('.')[0] };
+      // Fallback to domain-based brand name
+      return { 
+        urls: [], 
+        brand: domainInfo.etld1.split('.')[0],
+        products: [],
+        categories: []
+      };
     }
   }
 

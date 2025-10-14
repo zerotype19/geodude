@@ -106,19 +106,10 @@ export function createVIRoutes(env: Env) {
 
   return {
     async fetch(request: Request): Promise<Response> {
-      // Check if VI is enabled
-      if (env.USE_LIVE_VISIBILITY !== 'true') {
-        return new Response(JSON.stringify({ error: 'Visibility Intelligence not enabled' }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-
       const url = new URL(request.url);
       const path = url.pathname;
       
       // CORS headers - match main application CORS logic
-      // CORS headers for all responses
       const allowedOrigins = [
         'https://app.optiview.ai',
         'https://optiview.ai',
@@ -138,6 +129,14 @@ export function createVIRoutes(env: Env) {
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
       };
+      
+      // Check if VI is enabled
+      if (env.USE_LIVE_VISIBILITY !== 'true') {
+        return new Response(JSON.stringify({ error: 'Visibility Intelligence not enabled' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
       
       if (request.method === 'OPTIONS') {
         return new Response(null, { status: 200, headers: corsHeaders });
@@ -213,7 +212,7 @@ export function createVIRoutes(env: Env) {
 
         return new Response(JSON.stringify({ error: 'Not found' }), {
           status: 404,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
       } catch (error) {
         console.error('[VIRoutes] Error:', error);
@@ -222,7 +221,7 @@ export function createVIRoutes(env: Env) {
           details: error instanceof Error ? error.message : String(error)
         }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
       }
     }
@@ -434,7 +433,7 @@ async function handleResults(request: Request, env: Env, corsHeaders: Record<str
     if (!audit_id && !run_id) {
       return new Response(JSON.stringify({ error: 'audit_id or run_id is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
       });
     }
 
@@ -454,7 +453,7 @@ async function handleResults(request: Request, env: Env, corsHeaders: Record<str
     if (!run) {
       return new Response(JSON.stringify({ error: 'Run not found' }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
       });
     }
 

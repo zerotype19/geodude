@@ -75,6 +75,12 @@ export default function Dashboard() {
       return;
     }
     
+    if (!siteDescription.trim()) {
+      setError("Please enter a site description");
+      setLoading(false);
+      return;
+    }
+    
     try {
       const { id } = await startAudit({
         url: normalizedUrl, // Demo mode: pass URL directly, no property_id needed
@@ -180,12 +186,13 @@ export default function Dashboard() {
         {/* Site Description Field */}
         <div style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', fontSize: 14, fontWeight: 500, marginBottom: 6, color: '#475569' }}>
-            Site Description (Optional)
+            Site Description <span style={{ color: '#dc2626' }}>*</span>
           </label>
           <textarea
             placeholder="Describe your site, business, or what you do (e.g., 'AI-powered SEO tool for tracking visibility across search engines', 'E-commerce platform for handmade jewelry', etc.)"
             value={siteDescription}
             onChange={e => setSiteDescription(e.target.value)}
+            required
             style={{
               width: '100%',
               padding: '12px 16px',
@@ -198,7 +205,7 @@ export default function Dashboard() {
             }}
           />
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-            This helps generate more targeted prompts for better citation results in Visibility Intelligence.
+            <span style={{ color: '#dc2626' }}>*</span> Required. This helps generate more targeted prompts for better citation results in Visibility Intelligence.
           </div>
         </div>
         {audit?.id && (
