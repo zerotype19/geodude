@@ -33,8 +33,6 @@ export interface Env {
 }
 
 export function createVIRoutes(env: Env) {
-  const intentGenerator = new IntentGenerator(env);
-  const scorer = new VisibilityScorer(env);
 
   return {
     async fetch(request: Request): Promise<Response> {
@@ -114,6 +112,7 @@ export function createVIRoutes(env: Env) {
  */
 async function handleRun(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
   try {
+    const intentGenerator = new IntentGenerator(env);
     const body = await request.json();
     const { audit_id, mode = 'on_demand', sources, max_intents, regenerate_intents = false } = body;
 
@@ -124,11 +123,12 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
       });
     }
 
-    // Get audit details
+    // Get audit details with project_id and domain from properties table
     const audit = await env.DB.prepare(`
-      SELECT id, project_id, audited_url
-      FROM audits 
-      WHERE id = ?
+      SELECT a.id, p.project_id, p.domain
+      FROM audits a
+      JOIN properties p ON a.property_id = p.id
+      WHERE a.id = ?
     `).bind(audit_id).first();
 
     if (!audit) {
@@ -138,7 +138,9 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
       });
     }
 
-    const domainInfo = normalizeFromUrl((audit as any).audited_url);
+    const domain = (audit as any).domain;
+    const auditedUrl = `https://${domain}`;
+    const domainInfo = normalizeFromUrl(auditedUrl);
     const projectId = (audit as any).project_id;
     const maxIntents = parseInt(max_intents || env.VI_MAX_INTENTS || '100');
     const enabledSources = sources || JSON.parse(env.VI_SOURCES || '["perplexity","chatgpt","claude"]');
@@ -218,6 +220,7 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
  */
 async function handleResults(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
   try {
+    const scorer = new VisibilityScorer(env);
     const url = new URL(request.url);
     const audit_id = url.searchParams.get('audit_id');
     const run_id = url.searchParams.get('run_id');
@@ -269,7 +272,7 @@ async function handleResults(request: Request, env: Env, corsHeaders: Record<str
     `).bind((run as any).id, limit).all();
 
     // Calculate summary
-    const summary = await calculateSummary(env, (run as any).id, (run as any).domain);
+    const summary = await calculateSummary(env, (run as any).id, (run as any).domain, scorer);
 
     return new Response(JSON.stringify({
       run,
@@ -412,6 +415,7 @@ async function handleExport(request: Request, env: Env): Promise<Response> {
  */
 async function handleGenerateIntents(request: Request, env: Env, corsHeaders: Record<string, string>): Promise<Response> {
   try {
+    const intentGenerator = new IntentGenerator(env);
     const body = await request.json();
     const { project_id, domain, max_intents = 100 } = body;
 
@@ -496,6 +500,7 @@ async function executeConnectors(
   domainInfo: any
 ): Promise<void> {
   try {
+    const scorer = new VisibilityScorer(env);
     console.log(`[VIRoutes] Executing connectors for run ${runId}`);
     
     for (const intent of intents) {
@@ -624,7 +629,7 @@ async function getRecentRun(env: Env, projectId: string, domain: string): Promis
   `).bind(projectId, domain).first();
 }
 
-async function calculateSummary(env: Env, runId: string, domain: string): Promise<any> {
+async function calculateSummary(env: Env, runId: string, domain: string, scorer: VisibilityScorer): Promise<any> {
   const results = await env.DB.prepare(`
     SELECT source, AVG(visibility_score) as avg_score, COUNT(*) as count
     FROM visibility_results 
