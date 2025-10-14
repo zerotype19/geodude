@@ -546,7 +546,7 @@ export default function VisibilityIntelligenceTab({ auditId, domain, projectId }
                     <div>Status: {run.status}</div>
                     <div>Started: {new Date(run.started_at).toLocaleString()}</div>
                     {run.finished_at && <div>Finished: {new Date(run.finished_at).toLocaleString()}</div>}
-                    <div>Sources: {run.sources.join(', ')}</div>
+                    <div>Sources: {Array.isArray(run.sources) ? run.sources.join(', ') : String(run.sources || 'N/A')}</div>
                     <div>Intents: {run.intents_count}</div>
                   </div>
                 </div>
