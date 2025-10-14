@@ -3,6 +3,8 @@
  * Computes 0-100 visibility scores for domains across AI assistants
  */
 
+import { isAuditedUrl } from './domain-match';
+
 export interface VisibilityScore {
   score: number;           // 0-100 overall score
   coverage: number;        // percentage of intents with audited domain citations
@@ -84,7 +86,7 @@ export class VisibilityScorer {
     const citations = result.citations || [];
     if (citations.length === 0) return;
 
-    // Get run details
+    // Get run details and original intent query
     const run = await this.env.DB.prepare(`
       SELECT domain, audited_url, hostname, project_id
       FROM visibility_runs WHERE id = ?
@@ -93,6 +95,13 @@ export class VisibilityScorer {
     if (!run) {
       throw new Error(`Run ${runId} not found`);
     }
+
+    // Get the original intent query
+    const intent = await this.env.DB.prepare(`
+      SELECT query FROM visibility_intents WHERE id = ?
+    `).bind(intentId).first();
+
+    const originalQuery = (intent as any)?.query || 'Unknown query';
 
     const domain = (run as any).domain;
     const auditedUrl = (run as any).audited_url;
@@ -104,24 +113,49 @@ export class VisibilityScorer {
       const citation = citations[i];
       const resultId = crypto.randomUUID();
       
-      // Determine if this citation is from the audited domain
-      const refDomain = new URL(citation.ref_url).hostname;
-      const isAuditedDomain = refDomain === hostname || refDomain === domain;
+      // Generate aliases for better domain matching
+      const aliases: string[] = [];
+      if (domain.includes('cologuard') || domain === 'cologuard.com') {
+        aliases.push('cologuard.com', 'exactsciences.com');
+      }
+      
+      // Determine if this citation is from the audited domain using proper domain matching
+      const isAuditedDomain = isAuditedUrl(citation.ref_url, domain, aliases);
 
-              // Generate better title if missing
+              // Generate better title if missing or poor quality
               let title = citation.title;
-              if (!title || title === 'Untitled') {
+              if (!title || title === 'Untitled' || 
+                  title.length < 3 || 
+                  title.match(/^[a-z0-9\s]+$/) || // All lowercase/numbers only
+                  title.match(/^pac\s+\d+$/i) || // "Pac 20384651" pattern
+                  title.match(/^[a-z\s]+$/) && title.length < 20) { // All lowercase, short
                 try {
                   const url = new URL(citation.ref_url);
                   const pathParts = url.pathname.split('/').filter(p => p && p.length > 2);
+                  
                   if (pathParts.length > 0) {
-                    title = pathParts[pathParts.length - 1]
-                      .replace(/[-_]/g, ' ')
-                      .replace(/\.[^.]*$/, '')
-                      .replace(/^\w/, c => c.toUpperCase());
+                    const lastPart = pathParts[pathParts.length - 1];
+                    // Skip obvious IDs and try the previous part
+                    if (lastPart.match(/^(pac|id|ref|test)\s*\d+$/i) && pathParts.length > 1) {
+                      const prevPart = pathParts[pathParts.length - 2];
+                      title = prevPart
+                        .replace(/[-_]/g, ' ')
+                        .replace(/\.[^.]*$/, '')
+                        .replace(/^\w/, c => c.toUpperCase());
+                    } else {
+                      title = lastPart
+                        .replace(/[-_]/g, ' ')
+                        .replace(/\.[^.]*$/, '')
+                        .replace(/^\w/, c => c.toUpperCase());
+                    }
                   } else {
-                    title = url.hostname.replace('www.', '');
+                    // Fallback to hostname with better formatting
+                    title = url.hostname.replace('www.', '').replace(/\./g, ' ').replace(/^\w/, c => c.toUpperCase());
                   }
+                  
+                  // Ensure title is capitalized properly
+                  title = title.replace(/\b\w/g, c => c.toUpperCase());
+                  
                 } catch {
                   title = citation.ref_url;
                 }
@@ -157,8 +191,8 @@ export class VisibilityScorer {
       await this.env.DB.prepare(`
         INSERT INTO visibility_results (
           id, run_id, project_id, domain, audited_url, hostname,
-          source, intent_id, query, visibility_score, rank, raw_payload
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          source, intent_id, query, visibility_score, rank, raw_payload, ai_response
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         resultId,
         runId,
@@ -168,10 +202,11 @@ export class VisibilityScorer {
         hostname,
         source,
         intentId,
-        result.answer || result.text || '',
+        originalQuery,
         intentScore,
         i + 1,
-        JSON.stringify(result)
+        JSON.stringify(result),
+        result.answer || result.text || ''
       ).run();
     }
   }

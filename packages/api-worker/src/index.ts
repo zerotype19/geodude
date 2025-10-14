@@ -16,6 +16,7 @@ import { createVisibilityRoutes } from './routes/visibility';
 import { processRun } from './routes/visibility-processor';
 import { createVisibilityAnalyticsRoutes } from './routes/visibility-analytics';
 import { createVIRoutes } from './routes/vi';
+import { createGroupedVIRoutes } from './routes/vi_grouped';
 import { normalizeFromUrl } from './lib/domain';
 
 interface Env {
@@ -2961,6 +2962,17 @@ Sitemap: https://optiview.ai/sitemap.xml`;
 
     // Visibility Intelligence (VI) routes
     if (path.startsWith('/api/vi/') && env.USE_LIVE_VISIBILITY === 'true') {
+      // Handle grouped results endpoint
+      if (path === '/api/vi/results:grouped') {
+        const groupedRoutes = createGroupedVIRoutes(env);
+        return groupedRoutes.fetch(request);
+      }
+      
+      // Handle favicon proxy
+      if (path === '/api/favicon' && request.method === 'GET') {
+        return await handleFaviconProxy(request, env);
+      }
+      
       const viRoutes = createVIRoutes(env);
       return viRoutes.fetch(request);
     }
@@ -3077,4 +3089,40 @@ Sitemap: https://optiview.ai/sitemap.xml`;
     );
   },
 };
+
+async function handleFaviconProxy(request: Request, env: Env): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const target = url.searchParams.get('u') || '';
+    
+    let host = target;
+    try {
+      host = new URL(target).hostname;
+    } catch {
+      // If target is not a full URL, treat it as a hostname
+    }
+    
+    host = host.replace(/^www\./, '');
+    const upstream = `https://${host}/favicon.ico`;
+    
+    const response = await fetch(upstream, {
+      cf: { cacheEverything: true, cacheTtl: 86400 }
+    });
+    
+    if (!response.ok) {
+      return new Response(null, { status: 204 });
+    }
+    
+    const contentType = response.headers.get('content-type') || 'image/x-icon';
+    return new Response(response.body, {
+      headers: {
+        'content-type': contentType,
+        'cache-control': 'public, max-age=86400',
+        'access-control-allow-origin': '*'
+      }
+    });
+  } catch (error) {
+    return new Response(null, { status: 204 });
+  }
+}
 

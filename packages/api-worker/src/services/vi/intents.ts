@@ -11,6 +11,8 @@ export interface Intent {
   query: string;
   weight: number;
   source_hint?: string;
+  kind?: 'branded' | 'non_branded';
+  prompt_reason?: string;
 }
 
 export interface SiteSeeds {
@@ -127,146 +129,102 @@ export class IntentGenerator {
     const brand = siteSeeds.brand || domainInfo.etld1.split('.')[0];
     const domain = domainInfo.etld1;
 
-    // A) Brand Core (weight 1.3)
+    // Generate exactly 5 prompts: 3 branded, 2 non-branded
+    // A) Branded prompts (3)
     intents.push(
-      { id: this.generateId(), intent_type: 'brand', query: `What is ${brand}?`, weight: 1.3 },
-      { id: this.generateId(), intent_type: 'brand', query: `Is ${brand} legit?`, weight: 1.3 },
-      { id: this.generateId(), intent_type: 'brand', query: `Is ${brand} trustworthy?`, weight: 1.3 },
-      { id: this.generateId(), intent_type: 'brand', query: `${brand} customer support`, weight: 1.3 },
-      { id: this.generateId(), intent_type: 'brand', query: `${brand} pricing`, weight: 1.3 },
-      { id: this.generateId(), intent_type: 'brand', query: `${brand} plans`, weight: 1.3 },
-      { id: this.generateId(), intent_type: 'brand', query: `${brand} coupon`, weight: 1.3 },
-      { id: this.generateId(), intent_type: 'brand', query: `${brand} discount`, weight: 1.3 }
-    );
-
-    // B) Product/Service (weight 1.2)
-    if (siteSeeds.products && siteSeeds.products.length > 0) {
-      siteSeeds.products.slice(0, 5).forEach(product => {
-        intents.push(
-          { id: this.generateId(), intent_type: 'product', query: `Best ${product}`, weight: 1.2 },
-          { id: this.generateId(), intent_type: 'product', query: `How does ${brand} ${product} work?`, weight: 1.2 },
-          { id: this.generateId(), intent_type: 'product', query: `${brand} ${product} alternatives`, weight: 1.2 }
-        );
-      });
-    }
-
-    if (siteSeeds.categories && siteSeeds.categories.length > 0) {
-      siteSeeds.categories.slice(0, 3).forEach(category => {
-        intents.push(
-          { id: this.generateId(), intent_type: 'product', query: `Best ${category} tools`, weight: 1.2 },
-          { id: this.generateId(), intent_type: 'product', query: `Top ${category} platforms`, weight: 1.2 }
-        );
-      });
-    }
-
-    // C) How-To / Problem Jobs (weight 1.0)
-    if (siteSeeds.urls.length > 0) {
-      // Extract FAQ questions
-      const faqQuestions = siteSeeds.urls
-        .filter(url => url.faq)
-        .map(url => url.faq)
-        .slice(0, 10);
-      
-      faqQuestions.forEach(faq => {
-        if (faq && faq.length > 10 && faq.length < 200) {
-          intents.push({
-            id: this.generateId(),
-            intent_type: 'howto',
-            query: faq,
-            weight: 1.0
-          });
-        }
-      });
-
-      // Extract H1/H2 headings for how-to queries
-      const headings = siteSeeds.urls
-        .flatMap(url => [url.h1, url.h2])
-        .filter(heading => heading && heading.length > 10)
-        .slice(0, 15);
-
-      headings.forEach(heading => {
-        intents.push({
-          id: this.generateId(),
-          intent_type: 'howto',
-          query: `How to ${heading.toLowerCase()}`, 
-          weight: 1.0
-        });
-      });
-    }
-
-    // D) Comparatives (weight 1.4) - Add competitor queries if we have competitors
-    const competitors = ['competitor', 'alternative', 'vs', 'compare'];
-    competitors.forEach(comp => {
-      intents.push({
-        id: this.generateId(),
-        intent_type: 'compare',
-        query: `${brand} vs ${comp}`,
-        weight: 1.4
-      });
-    });
-
-    // E) Local/Entity (weight 1.1) - if applicable
-    if (siteSeeds.locations && siteSeeds.locations.length > 0) {
-      siteSeeds.locations.slice(0, 3).forEach(location => {
-        intents.push({
-          id: this.generateId(),
-          intent_type: 'local',
-          query: `${brand} ${location}`,
-          weight: 1.1
-        });
-      });
-    }
-
-    // F) Evidence/Citations (weight 1.0)
-    intents.push(
-      { id: this.generateId(), intent_type: 'evidence', query: `Who cites ${brand}?`, weight: 1.0 },
-      { id: this.generateId(), intent_type: 'evidence', query: `Sources referencing ${domain}`, weight: 1.0 },
-      { id: this.generateId(), intent_type: 'evidence', query: `${brand} reviews`, weight: 1.0 },
-      { id: this.generateId(), intent_type: 'evidence', query: `${brand} testimonials`, weight: 1.0 }
-    );
-
-    // G) Discovery queries (weight 1.5) - These work better across all connectors
-    intents.push(
-      { id: this.generateId(), intent_type: 'discovery', query: `Best tools to track AI assistant citations`, weight: 1.5 },
-      { id: this.generateId(), intent_type: 'discovery', query: `How to verify if ChatGPT cites a website`, weight: 1.5 },
-      { id: this.generateId(), intent_type: 'discovery', query: `LLM index visibility platforms`, weight: 1.5 },
-      { id: this.generateId(), intent_type: 'discovery', query: `Perplexity citations tracking tools`, weight: 1.5 },
-      { id: this.generateId(), intent_type: 'discovery', query: `AI visibility monitoring software`, weight: 1.5 },
-      { id: this.generateId(), intent_type: 'discovery', query: `Answer Engine Optimization tools`, weight: 1.5 },
-      { id: this.generateId(), intent_type: 'discovery', query: `Generative Engine Optimization platforms`, weight: 1.5 },
-      { id: this.generateId(), intent_type: 'discovery', query: `SEO tools for AI search engines`, weight: 1.5 }
-    );
-
-    // H) Site description-driven queries (weight 1.4) - Use user-provided description for better targeting
-    if (siteDescription && siteDescription.trim().length > 10) {
-      const description = siteDescription.trim();
-      
-      // Extract key terms from description
-      const keyTerms = description
-        .toLowerCase()
-        .split(/[\s,.-]+/)
-        .filter(term => term.length > 3 && !['for', 'the', 'and', 'with', 'that', 'this', 'from', 'they', 'have'].includes(term))
-        .slice(0, 5);
-      
-      // Generate contextual queries based on description
-      intents.push(
-        { id: this.generateId(), intent_type: 'description', query: `Best ${keyTerms[0] || 'tools'} platforms`, weight: 1.4 },
-        { id: this.generateId(), intent_type: 'description', query: `Top ${keyTerms[0] || 'tools'} solutions`, weight: 1.4 },
-        { id: this.generateId(), intent_type: 'description', query: `${keyTerms[0] || 'Tools'} vs competitors`, weight: 1.4 },
-        { id: this.generateId(), intent_type: 'description', query: `How does ${brand} work?`, weight: 1.4 },
-        { id: this.generateId(), intent_type: 'description', query: `${brand} alternatives`, weight: 1.4 },
-        { id: this.generateId(), intent_type: 'description', query: `Is ${brand} worth it?`, weight: 1.4 }
-      );
-
-      // If description mentions specific features/categories, create targeted queries
-      if (keyTerms.length > 1) {
-        intents.push(
-          { id: this.generateId(), intent_type: 'description', query: `${keyTerms[0]} and ${keyTerms[1]} tools`, weight: 1.3 },
-          { id: this.generateId(), intent_type: 'description', query: `${keyTerms[0]} ${keyTerms[1]} platforms`, weight: 1.3 }
-        );
+      { 
+        id: this.generateId(), 
+        intent_type: 'brand', 
+        query: `What is ${brand}?`, 
+        weight: 1.3,
+        kind: 'branded',
+        prompt_reason: 'Core brand identity question'
+      },
+      { 
+        id: this.generateId(), 
+        intent_type: 'brand', 
+        query: `Is ${brand} legit?`, 
+        weight: 1.3,
+        kind: 'branded',
+        prompt_reason: 'Trust and legitimacy verification'
+      },
+      { 
+        id: this.generateId(), 
+        intent_type: 'brand', 
+        query: `${brand} pricing`, 
+        weight: 1.3,
+        kind: 'branded',
+        prompt_reason: 'Cost and pricing information'
       }
+    );
+
+    // B) Non-branded prompts (2) - Based on site description
+    if (siteDescription && siteDescription.trim().length > 10) {
+      const description = siteDescription.trim().toLowerCase();
+      
+      // Extract category/industry from description
+      let category = 'tools';
+      if (description.includes('cancer') || description.includes('screening')) {
+        category = 'cancer screening tools';
+      } else if (description.includes('seo') || description.includes('search')) {
+        category = 'SEO tools';
+      } else if (description.includes('ecommerce') || description.includes('shop')) {
+        category = 'e-commerce platforms';
+      } else if (description.includes('analytics') || description.includes('data')) {
+        category = 'analytics tools';
+      }
+      
+      // Extract primary job-to-be-done
+      let jobToBeDone = 'get better results';
+      if (description.includes('track') || description.includes('monitor')) {
+        jobToBeDone = 'track and monitor performance';
+      } else if (description.includes('optimize') || description.includes('improve')) {
+        jobToBeDone = 'optimize and improve results';
+      } else if (description.includes('analyze') || description.includes('measure')) {
+        jobToBeDone = 'analyze and measure performance';
+      }
+      
+      intents.push(
+        { 
+          id: this.generateId(), 
+          intent_type: 'category', 
+          query: `Best ${category} (include sources)`, 
+          weight: 1.2,
+          kind: 'non_branded',
+          prompt_reason: `Category-based discovery for ${category}`
+        },
+        { 
+          id: this.generateId(), 
+          intent_type: 'howto', 
+          query: `How to ${jobToBeDone} (include sources)`, 
+          weight: 1.2,
+          kind: 'non_branded',
+          prompt_reason: `Job-to-be-done query: ${jobToBeDone}`
+        }
+      );
+    } else {
+      // Fallback non-branded prompts
+      intents.push(
+        { 
+          id: this.generateId(), 
+          intent_type: 'category', 
+          query: `Best tools for ${brand} (include sources)`, 
+          weight: 1.2,
+          kind: 'non_branded',
+          prompt_reason: 'Generic category discovery'
+        },
+        { 
+          id: this.generateId(), 
+          intent_type: 'howto', 
+          query: `How to use ${brand} effectively (include sources)`, 
+          weight: 1.2,
+          kind: 'non_branded',
+          prompt_reason: 'Generic how-to query'
+        }
+      );
     }
 
+    // Return exactly 5 prompts (3 branded + 2 non-branded)
     return intents;
   }
 
@@ -285,8 +243,8 @@ export class IntentGenerator {
       for (const intent of intents) {
         await this.env.DB.prepare(`
           INSERT OR REPLACE INTO visibility_intents 
-          (id, project_id, domain, intent_type, query, source_hint, weight, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          (id, project_id, domain, intent_type, query, source_hint, weight, kind, prompt_reason, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           intent.id,
           projectId,
@@ -295,6 +253,8 @@ export class IntentGenerator {
           intent.query,
           intent.source_hint || 'generic',
           intent.weight,
+          intent.kind || 'branded',
+          intent.prompt_reason || 'Generated from site description',
           new Date().toISOString()
         ).run();
       }

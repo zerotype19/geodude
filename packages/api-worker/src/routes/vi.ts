@@ -330,6 +330,14 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     // Use stored site description from properties table, fallback to request body
     const effectiveSiteDescription = storedSiteDescription || site_description;
     let intents;
+    
+    // Clear old intents if regenerating
+    if (regenerate_intents) {
+      await env.DB.prepare(`
+        DELETE FROM visibility_intents WHERE domain = ?
+      `).bind(domainInfo.etld1).run();
+    }
+    
     if (regenerate_intents || effectiveSiteDescription) {
       intents = await intentGenerator.generateIntents(projectId, domainInfo, maxIntents, effectiveSiteDescription);
     } else {
