@@ -110,7 +110,7 @@ FEATURE_PHASE5_ANALYTICS = "true"
 
 # Visibility Intelligence (VI) Configuration
 USE_LIVE_VISIBILITY = "true"
-VI_SOURCES = '["chatgpt","perplexity","claude"]'
+VI_SOURCES = '["chatgpt_search","perplexity","claude"]'
 VI_REFRESH_CRON = "0 */6 * * *"
 VI_MAX_INTENTS = "120"
 VI_INTENT_TIMEOUT_MS = "25000"
@@ -131,7 +131,10 @@ enabled = true
 # - BRAVE_SEARCH (already set in Cloudflare)
 # - BRAVE_SEARCH_AI (already set in Cloudflare)
 # - RESEND_KEY (already set in Cloudflare)
-# - OPENAI_API_KEY (required for content recommendations)
+# API Keys for AI Assistant Connectors
+# OPENAI_API_KEY = "your-openai-api-key-here"
+# PERPLEXITY_API_KEY = "your-perplexity-api-key-here" 
+# CLAUDE_API_KEY = "your-claude-api-key-here"
 
 [triggers]
 crons = ["0 6 * * 1", "0 3 * * *", "*/5 * * * *", "0 */6 * * *"]

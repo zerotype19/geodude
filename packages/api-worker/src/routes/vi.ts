@@ -157,7 +157,7 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
     const domainInfo = normalizeFromUrl(auditedUrl);
     const projectId = (audit as any).project_id;
     const maxIntents = parseInt(max_intents || env.VI_MAX_INTENTS || '100');
-    const enabledSources = sources || JSON.parse(env.VI_SOURCES || '["perplexity","chatgpt","claude"]');
+    const enabledSources = sources || JSON.parse(env.VI_SOURCES || '["perplexity","chatgpt_search","claude"]');
 
     // Check if there's a recent run
     const recentRun = await getRecentRun(env, projectId, domainInfo.etld1);
@@ -203,10 +203,22 @@ async function handleRun(request: Request, env: Env, corsHeaders: Record<string,
       'processing'
     ).run();
 
-    // Execute connectors asynchronously
-    executeConnectors(env, runId, intents, enabledSources, domainInfo).catch(error => {
-      console.error(`[VIRoutes] Error executing connectors for run ${runId}:`, error);
-    });
+    // Check if any connectors can run
+    const availableSources = enabledSources.filter(source => hasRequiredApiKey(source, env));
+    
+    if (availableSources.length === 0) {
+      // No API keys available, complete run immediately with empty results
+      await env.DB.prepare(`
+        UPDATE visibility_runs 
+        SET finished_at = ?, status = 'complete'
+        WHERE id = ?
+      `).bind(new Date().toISOString(), runId).run();
+    } else {
+      // Execute connectors asynchronously
+      executeConnectors(env, runId, intents, availableSources, domainInfo).catch(error => {
+        console.error(`[VIRoutes] Error executing connectors for run ${runId}:`, error);
+      });
+    }
 
     return new Response(JSON.stringify({
       run_id: runId,
@@ -538,6 +550,12 @@ async function executeConnectors(
         }
 
         try {
+          // Check if API key is available for this connector
+          if (!hasRequiredApiKey(source, env)) {
+            console.warn(`[VIRoutes] Missing API key for ${source}, skipping`);
+            continue;
+          }
+
           // Check cache first
           const cacheKey = getCacheKey(source, domainInfo.etld1, intent.query);
           let cached = null;
@@ -644,6 +662,19 @@ async function executeConnectors(
 /**
  * Helper functions
  */
+function hasRequiredApiKey(source: string, env: Env): boolean {
+  switch (source) {
+    case "perplexity":
+      return !!env.PERPLEXITY_API_KEY;
+    case "chatgpt_search":
+      return !!env.OPENAI_API_KEY;
+    case "claude":
+      return !!env.CLAUDE_API_KEY;
+    default:
+      return false;
+  }
+}
+
 async function getRecentRun(env: Env, projectId: string, domain: string): Promise<any> {
   const hours = parseInt(env.VI_RECENCY_HOURS || '6');
   return await env.DB.prepare(`
