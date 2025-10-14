@@ -537,11 +537,20 @@ async function executeConnectors(
   sources: string[],
   domainInfo: any
 ): Promise<void> {
+  const startTime = Date.now();
+  const maxExecutionTime = 120000; // 2 minutes max
+  
   try {
     const scorer = new VisibilityScorer(env);
     console.log(`[VIRoutes] Executing connectors for run ${runId}`);
     
     for (const intent of intents) {
+      // Check timeout
+      if (Date.now() - startTime > maxExecutionTime) {
+        console.warn(`[VIRoutes] Timeout reached for run ${runId}, stopping execution`);
+        break;
+      }
+      
       for (const source of sources) {
         const connector = getEnabledConnector(source, env);
         if (!connector) {
