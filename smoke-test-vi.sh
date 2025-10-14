@@ -80,20 +80,14 @@ else
 fi
 echo ""
 
-# 3. Force a fresh run
-echo "3️⃣  Forcing fresh VI run..."
-RUN_RESPONSE=$(curl -s -X POST "$BASE_URL/api/vi/run?audit_id=$AUDIT_ID&regenerate_intents=true" \
-  -H 'content-type: application/json' \
-  --data '{
-    "sources": ["perplexity", "chatgpt_search", "claude"],
-    "max_intents": 5
-  }')
-
-RUN_ID=$(echo "$RUN_RESPONSE" | jq -r '.run_id // "null"')
+# 3. Check existing run (skip creating new one due to rate limits)
+echo "3️⃣  Checking existing VI run..."
+RUN_RESPONSE=$(curl -s "$BASE_URL/api/vi/debug/provenance?audit_id=$AUDIT_ID")
+RUN_ID=$(echo "$RUN_RESPONSE" | jq -r '.run.id // "null"')
 if [ "$RUN_ID" != "null" ] && [ "$RUN_ID" != "" ]; then
-    echo -e "${GREEN}✅ Fresh run created: $RUN_ID${NC}"
+    echo -e "${GREEN}✅ Found existing run: $RUN_ID${NC}"
 else
-    echo -e "${RED}❌ Failed to create fresh run${NC}"
+    echo -e "${RED}❌ No existing run found${NC}"
     echo "$RUN_RESPONSE"
     exit 1
 fi
