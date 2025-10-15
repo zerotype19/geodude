@@ -35,14 +35,14 @@ export async function enqueueBatch(
 ): Promise<number> {
   if (!items.length) return 0;
   
-  // Chunk items to keep SQL params under 999 limit
-  const chunks = chunk(items, 120);
+  // Chunk items to keep SQL params under 999 limit (4 params per item, so max ~200 items, but be conservative)
+  const chunks = chunk(items, 150);
   let total = 0;
   
   for (const c of chunks) {
     const values = c.map(() => '(?,?,?,?, "pending", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').join(',');
     const sql = `
-      INSERT INTO audit_frontier (audit_id, url, depth, priority, state, created_at, updated_at)
+      INSERT INTO audit_frontier (audit_id, url, depth, priority, status, created_at, updated_at)
       VALUES ${values}
       ON CONFLICT(audit_id, url) DO NOTHING;
     `;
