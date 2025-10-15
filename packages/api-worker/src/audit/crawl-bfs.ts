@@ -189,29 +189,38 @@ export async function crawlBatchBfs(
           
           console.log(`[CrawlBFS] Link filtering: ${links.length} total, ${filteredCount} filtered, ${internalCount} internal, ${normalizedCount} invalid, ${validCount} valid, ${existingCount} existing, ${newLinks.length} new`);
           
-          // Enqueue new links with smarter prioritization
-          for (const link of newLinks) {
-            // Calculate priority based on path similarity
-            const currentPath = new URL(url).pathname;
-            const linkPath = new URL(link).pathname;
-            
-            let priority = 1.0; // Default for other internal links
-            
-            if (link === origin) {
-              priority = 0.0; // Home page (highest priority)
-            } else if (link.includes('/header/') || link.includes('/footer/') || link.includes('/nav/')) {
-              priority = 0.1; // Navigation elements
-            } else if (linkPath.startsWith(currentPath) || linkPath === currentPath) {
-              priority = 0.5; // Same path or subpath
-            } else if (link.includes('/sitemap') || link.includes('/map')) {
-              priority = 0.8; // Sitemap-related pages
-            }
-            
-            await enqueueUrl(env, auditId, link, depth + 1, priority, url);
-          }
-          
+          // Batch enqueue new links with smarter prioritization
           if (newLinks.length > 0) {
-            console.log(`[CrawlBFS] Discovered ${newLinks.length} new links from ${url} (frontier: ${frontierCount})`);
+            const linkItems = newLinks.map(link => {
+              // Calculate priority based on path similarity
+              const currentPath = new URL(url).pathname;
+              const linkPath = new URL(link).pathname;
+              
+              let priority = 1.0; // Default for other internal links
+              
+              if (link === origin) {
+                priority = 0.0; // Home page (highest priority)
+              } else if (link.includes('/header/') || link.includes('/footer/') || link.includes('/nav/')) {
+                priority = 0.1; // Navigation elements
+              } else if (linkPath.startsWith(currentPath) || linkPath === currentPath) {
+                priority = 0.5; // Same path or subpath
+              } else if (link.includes('/sitemap') || link.includes('/map')) {
+                priority = 0.8; // Sitemap-related pages
+              }
+              
+              return { url: link, depth: depth + 1, priority, source: url };
+            });
+            
+            // Batch insert all links at once
+            const { frontierBatchEnqueue } = await import('./frontier-batch');
+            const enqueued = await frontierBatchEnqueue(env, auditId, linkItems.map(item => item.url), {
+              depth: depth + 1,
+              priorityBase: 0.5,
+              source: url,
+              origin: origin
+            });
+            
+            console.log(`[CrawlBFS] Batch enqueued ${enqueued} new links from ${url} (frontier: ${frontierCount})`);
           }
         } catch (error) {
           console.error(`[CrawlBFS] Error extracting links from ${url}:`, error);
