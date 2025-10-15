@@ -54,15 +54,19 @@ export async function discoverSitemaps(env: any, canonicalHost: string): Promise
 
   console.log(`[SitemapDiscovery] Testing ${urlsToTry.length} sitemap candidates`);
 
+  // Process URLs in batches to avoid HTTP deadlock
+  const batchSize = 3;
   const hits: string[] = [];
-  const promises = urlsToTry.map(async (url) => {
-    try {
-      // Try HEAD first with browsery User-Agent
+  
+  for (let i = 0; i < urlsToTry.length; i += batchSize) {
+    const batch = urlsToTry.slice(i, i + batchSize);
+    const batchPromises = batch.map(async (url) => {
+      try {
+      // Use GET directly since we need the content for looksLikeSitemap
       const UA = 'OptiviewAuditor/1.0 (+https://app.optiview.ai) Mozilla/5.0';
       
-      let r = await safeFetch(url, { 
-        method: 'HEAD',
-        timeoutMs: 8000, 
+      const r = await safeFetch(url, { 
+        timeoutMs: 12000,
         followRedirects: true,
         headers: {
           'User-Agent': UA,
@@ -70,32 +74,21 @@ export async function discoverSitemaps(env: any, canonicalHost: string): Promise
         }
       });
       
-      // If HEAD failed, try GET with decompression
-      if (!r.ok) {
-        r = await safeFetch(url, { 
-          timeoutMs: 12000,
-          followRedirects: true,
-          headers: {
-            'User-Agent': UA,
-            'Accept': 'application/xml,text/xml,application/octet-stream,*/*'
-          }
-        });
+        if (r.ok && looksLikeSitemap(r)) {
+          const finalUrl = r.finalUrl ?? url;
+          const bytes = r.text?.length ?? 0;
+          const contentType = r.headers?.['content-type'] || '';
+          console.log(`SITEMAP_ROOT_FETCH { url: "${finalUrl}", status: ${r.status || 200}, ct: "${contentType}", bytes: ${bytes} }`);
+          hits.push(finalUrl);
+        }
+      } catch (error) {
+        // Silent fail for individual candidates
       }
-      
-      if (r.ok && looksLikeSitemap(r)) {
-        const finalUrl = r.finalUrl ?? url;
-        const bytes = r.text?.length ?? 0;
-        const contentType = r.headers?.['content-type'] || '';
-        console.log(`SITEMAP_ROOT_FETCH { url: "${finalUrl}", status: ${r.status || 200}, ct: "${contentType}", bytes: ${bytes} }`);
-        hits.push(finalUrl);
-      }
-    } catch (error) {
-      // Silent fail for individual candidates
-    }
-  });
-
-  // Wait for all candidates with a reasonable timeout
-  await Promise.allSettled(promises);
+    });
+    
+    // Wait for this batch to complete before starting the next
+    await Promise.allSettled(batchPromises);
+  }
 
   // Dedup by normalized host
   const uniqueHits = Array.from(new Set(hits));
@@ -137,11 +130,20 @@ async function collectSitemapsFromRobots(env: any, bases: string[]): Promise<str
 
 function looksLikeSitemap(resp: SafeFetchResult): boolean {
   const ct = (resp.headers?.['content-type'] || '').toLowerCase();
-  if (ct.includes('xml') || ct.includes('octet-stream') || ct === '') return true;
   
-  // Some servers lie; fallback by sniffing body
-  if (resp.text) {
-    return /<\s*(urlset|sitemapindex)\b/i.test(resp.text);
+  // Always sniff the body first - most reliable
+  if (resp.text && resp.text.length > 0) {
+    const hasXmlStructure = /<\s*(urlset|sitemapindex)\b/i.test(resp.text);
+    if (hasXmlStructure) {
+      console.log(`[SitemapDiscovery] Detected sitemap by content: ${resp.text.length} bytes`);
+      return true;
+    }
+  }
+  
+  // Fallback to content-type check
+  if (ct.includes('xml') || ct.includes('octet-stream') || ct === '') {
+    console.log(`[SitemapDiscovery] Detected sitemap by content-type: "${ct}"`);
+    return true;
   }
   
   return false;
