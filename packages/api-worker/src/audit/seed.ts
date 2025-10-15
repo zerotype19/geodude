@@ -34,17 +34,36 @@ export async function seedFrontier(
     console.log(`[Seed] Added homepage: ${origin}`);
     
     // 2. Sitemap seeds @ depth 1, priority 0.5 (capped)
-    const sm = (opts.sitemapUrls ?? [])
-      .slice(0, opts.maxSitemap ?? 500)
-      .map(href => normalizeUrl(href, origin))
-      .filter((url): url is string => Boolean(url) && isValidPageUrl(url)) as string[];
+    const sitemapResult = await loadSitemapUrls(env, origin, { cap: opts.maxSitemap ?? 500 });
+    const sm = sitemapResult.urls;
+    const sitemapIndexCount = sitemapResult.sitemapIndexCount;
+    const urlsetCount = sitemapResult.urlsetCount;
     
     const uniqueSitemap = [...new Set(sm)];
-    for (const u of uniqueSitemap) {
-      await enqueueUrl(env, auditId, u, 1, 0.5, 'sitemap');
-      totalEnqueued++;
+    
+    // Batch enqueue with priority sorting
+    const priorityPaths = ['pricing', 'product', 'help', 'support', 'docs', 'about', 'blog', 'contact', 'features', 'legal', 'terms'];
+    const sortedSitemap = uniqueSitemap.sort((a, b) => {
+      const aPath = new URL(a).pathname.toLowerCase();
+      const bPath = new URL(b).pathname.toLowerCase();
+      
+      const aPriority = priorityPaths.some(path => aPath.includes(path)) ? 0 : 1;
+      const bPriority = priorityPaths.some(path => bPath.includes(path)) ? 0 : 1;
+      
+      return aPriority - bPriority;
+    });
+    
+    let enqueuedCount = 0;
+    for (const u of sortedSitemap) {
+      try {
+        await enqueueUrl(env, auditId, u, 1, 0.5, 'sitemap');
+        enqueuedCount++;
+        totalEnqueued++;
+      } catch (error) {
+        console.log(`[Seed] Failed to enqueue ${u}:`, error);
+      }
     }
-    console.log(`[Seed] Added ${uniqueSitemap.length} sitemap URLs`);
+    console.log(`[Seed] Added ${enqueuedCount}/${uniqueSitemap.length} sitemap URLs`);
     
     // 3. Check if we have enough seeds
     if (totalEnqueued < minRequired) {
@@ -101,7 +120,7 @@ export async function seedFrontier(
       WHERE id = ?1
     `).bind(auditId).run();
     
-    console.log(`SEED_SITEMAP { discovered: ${uniqueSitemap.length}, enqueued: ${totalEnqueued}, seeded: 1, reason: 'success' }`);
+    console.log(`SEED_SITEMAP { audit: ${auditId}, discovered: ${uniqueSitemap.length}, enqueued: ${totalEnqueued}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'simple' }`);
     
     return {
       homepage: 1,
@@ -227,7 +246,7 @@ export async function loadSitemapUrls(
   env: any, 
   origin: string, 
   opts: { cap: number }
-): Promise<string[]> {
+): Promise<{ urls: string[]; sitemapIndexCount: number; urlsetCount: number }> {
   try {
     console.log(`[Seed] Loading sitemap URLs for ${origin}`);
     
@@ -239,32 +258,69 @@ export async function loadSitemapUrls(
     ];
     
     const allUrls: string[] = [];
+    let sitemapIndexCount = 0;
+    let urlsetCount = 0;
     
     for (const sitemapUrl of sitemapUrls) {
       try {
         const response = await safeFetch(sitemapUrl, {
-          timeoutMs: 15000,
+          timeoutMs: 30000, // Increased timeout for big sitemaps
           retries: 1,
           headers: {
-            'User-Agent': env.USER_AGENT || 'Mozilla/5.0 (compatible; OptiviewAudit/1.0)'
+            'User-Agent': env.USER_AGENT || 'Mozilla/5.0 (compatible; OptiviewAudit/1.0)',
+            'Accept': 'application/xml,text/xml,application/octet-stream,*/*'
           }
         });
         
         if (response.ok && response.data) {
           const xml = response.data as string;
           
-          // Extract URLs from XML using regex (simple approach)
-          const urlRegex = /<loc>(.*?)<\/loc>/gi;
-          let match;
-          
-          while ((match = urlRegex.exec(xml)) !== null) {
-            const url = match[1].trim();
-            if (url && isInternal(url, origin) && isValidPageUrl(url)) {
-              allUrls.push(url);
+          // Support both sitemap index and URL set
+          if (xml.includes('<sitemapindex') || xml.includes('<sitemap>')) {
+            // Sitemap Index: follow child sitemaps (cap at 20)
+            const sitemapRegex = /<sitemap>\s*<loc>(.*?)<\/loc>/gi;
+            let match;
+            const childSitemaps: string[] = [];
+            
+            while ((match = sitemapRegex.exec(xml)) !== null && childSitemaps.length < 20) {
+              const childUrl = match[1].trim();
+              if (childUrl && isInternal(childUrl, origin)) {
+                childSitemaps.push(childUrl);
+              }
             }
+            
+            console.log(`[Seed] Found sitemap index with ${childSitemaps.length} child sitemaps`);
+            sitemapIndexCount = childSitemaps.length;
+            
+            // Fetch URLs from child sitemaps
+            for (const childUrl of childSitemaps) {
+              try {
+                const childResponse = await safeFetch(childUrl, {
+                  timeoutMs: 15000,
+                  retries: 1,
+                  headers: {
+                    'User-Agent': env.USER_AGENT || 'Mozilla/5.0 (compatible; OptiviewAudit/1.0)',
+                    'Accept': 'application/xml,text/xml,application/octet-stream,*/*'
+                  }
+                });
+                
+                if (childResponse.ok && childResponse.data) {
+                  const childXml = childResponse.data as string;
+                  const urls = extractUrlsFromXml(childXml, origin);
+                  allUrls.push(...urls);
+                }
+              } catch (error) {
+                console.log(`[Seed] Failed to fetch child sitemap ${childUrl}:`, error);
+              }
+            }
+          } else {
+            // URL Set: direct URLs
+            const urls = extractUrlsFromXml(xml, origin);
+            allUrls.push(...urls);
+            urlsetCount = urls.length;
           }
           
-          console.log(`[Seed] Found ${allUrls.length} URLs in ${sitemapUrl}`);
+          console.log(`[Seed] Found ${allUrls.length} URLs in ${sitemapUrl} (index: ${sitemapIndexCount}, urlsets: ${urlsetCount})`);
           break; // Found a sitemap, stop trying others
         }
       } catch (error) {
@@ -278,10 +334,43 @@ export async function loadSitemapUrls(
     const capped = unique.slice(0, opts.cap);
     
     console.log(`[Seed] Returning ${capped.length} sitemap URLs (capped from ${unique.length})`);
-    return capped;
+    return { urls: capped, sitemapIndexCount, urlsetCount };
     
   } catch (error) {
     console.error(`[Seed] Error loading sitemap URLs:`, error);
-    return [];
+    return { urls: [], sitemapIndexCount: 0, urlsetCount: 0 };
   }
+}
+
+function extractUrlsFromXml(xml: string, origin: string): string[] {
+  const urls: string[] = [];
+  
+  // Try XML DOM parsing first (more robust)
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    
+    // Handle both <urlset> and namespaced variants
+    const locElements = doc.querySelectorAll('loc, *\\:loc');
+    for (const loc of locElements) {
+      const url = loc.textContent?.trim();
+      if (url && isInternal(url, origin) && isValidPageUrl(url)) {
+        urls.push(url);
+      }
+    }
+  } catch (error) {
+    // Fallback to regex if DOM parsing fails
+    console.log(`[Seed] XML DOM parsing failed, using regex fallback`);
+    const urlRegex = /<loc>(.*?)<\/loc>/gi;
+    let match;
+    
+    while ((match = urlRegex.exec(xml)) !== null) {
+      const url = match[1].trim();
+      if (url && isInternal(url, origin) && isValidPageUrl(url)) {
+        urls.push(url);
+      }
+    }
+  }
+  
+  return urls;
 }

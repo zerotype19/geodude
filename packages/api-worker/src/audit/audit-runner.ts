@@ -14,7 +14,13 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
 
   switch (phase) {
     case 'crawl': {
-      await runCrawlTick(env, auditId);      // does selfContinue() and RETURN
+      const result = await runCrawlTick(env, auditId, ctx);      // returns continuation info
+      
+      // If work remains, schedule immediate next tick via ctx.waitUntil
+      if (result.shouldContinue) {
+        console.log(`[AuditRunner] Scheduling immediate continuation via ctx.waitUntil`);
+        ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
+      }
       return;                                // 🔴 never run another phase in same tick
     }
     case 'citations': {
@@ -46,8 +52,16 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
   }
 }
 
-async function runCrawlTick(env: any, auditId: string) {
+async function runCrawlTick(env: any, auditId: string, ctx: any) {
   console.log(`[AuditRunner] Running crawl tick for ${auditId}`);
+  
+  // Frontier safety: demote stale visiting URLs to pending
+  await env.DB.prepare(`
+    UPDATE audit_frontier 
+    SET status='pending', updated_at=datetime('now')
+    WHERE audit_id=?1 AND status='visiting' 
+    AND DATETIME(updated_at) <= DATETIME('now', '-120 seconds')
+  `).bind(auditId).run();
   
   // Import crawl functions
   const { seedFrontier, getHomeNavLinks, loadSitemapUrls } = await import('./seed');
@@ -94,7 +108,8 @@ async function runCrawlTick(env: any, auditId: string) {
     }
     
     // Get sitemap URLs if available
-    const sitemapUrls = await loadSitemapUrls(env, baseUrl, { cap: parseInt(env.SITEMAP_URL_CAP || '500') });
+    const sitemapResult = await loadSitemapUrls(env, baseUrl, { cap: parseInt(env.SITEMAP_URL_CAP || '500') });
+    const sitemapUrls = sitemapResult.urls;
     
     // Seed the frontier
     const seedResult = await seedFrontier(env, auditId, baseUrl, {
@@ -181,7 +196,8 @@ async function runCrawlTick(env: any, auditId: string) {
   const timeMs = Date.now() - Date.now(); // TODO: track actual tick start time
   console.log(`CRAWL_TICK {processed: ${batch.processed}, pages: ${stateRow.pages}, analyzed_total: ${analyzedTotal}, pending: ${stateRow.pending}, visiting: ${stateRow.visiting}, ms: ${timeMs}}`);
   
-  return; // 🔴 always stop here
+  // Return continuation info
+  return { shouldContinue: !advanced && stateRow.pending > 0 }; // 🔴 always stop here
 }
 
 async function runCitationsTick(env: any, auditId: string) {
