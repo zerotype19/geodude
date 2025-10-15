@@ -53,7 +53,6 @@ async function runCrawlTick(env: any, auditId: string) {
   const { seedFrontier, getHomeNavLinks, loadSitemapUrls } = await import('./seed');
   const { crawlBatchBfs } = await import('./crawl-bfs');
   const { tryAdvanceFromCrawl } = await import('./crawl-exit');
-  const { selfContinue } = await import('./continue');
   
   // Get audit details
   const auditRow = await env.DB.prepare(
@@ -172,8 +171,8 @@ async function runCrawlTick(env: any, auditId: string) {
   // Try to advance atomically
   const advanced = await tryAdvanceFromCrawl(env, auditId, maxPages);
   if (!advanced) {
-    console.log(`[AuditRunner] More work to do, self-dispatching continuation`);
-    await selfContinue(env, auditId);
+    console.log(`[AuditRunner] More work to do, relying on watchdog to continue`);
+    // Don't make HTTP requests to ourselves - let watchdog handle continuation
   } else {
     console.log(`[AuditRunner] Successfully advanced from crawl to citations phase`);
   }
@@ -195,8 +194,7 @@ async function runCitationsTick(env: any, auditId: string) {
     WHERE id=?1 AND status='running'
   `).bind(auditId).run();
   
-  const { selfContinue } = await import('./continue');
-  await selfContinue(env, auditId);
+  console.log(`[AuditRunner] Citations phase completed, relying on watchdog to continue`);
 }
 
 async function runSynthTick(env: any, auditId: string) {
@@ -209,8 +207,7 @@ async function runSynthTick(env: any, auditId: string) {
     WHERE id=?1 AND status='running'
   `).bind(auditId).run();
   
-  const { selfContinue } = await import('./continue');
-  await selfContinue(env, auditId);
+  console.log(`[AuditRunner] Citations phase completed, relying on watchdog to continue`);
 }
 
 async function finalizeAudit(env: any, auditId: string) {
@@ -308,8 +305,7 @@ async function runPhaseOnce(env: any, auditId: string, phase: string) {
       `).bind(auditId).run();
   }
   
-  const { selfContinue } = await import('./continue');
-  await selfContinue(env, auditId);
+  console.log(`[AuditRunner] Citations phase completed, relying on watchdog to continue`);
 }
 
 function getNextPhase(currentPhase: string): string {

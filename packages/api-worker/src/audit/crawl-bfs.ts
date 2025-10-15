@@ -286,22 +286,14 @@ export async function crawlBatchBfs(
   // Tick-level observability
   console.log(`CRAWL_TICK {processed: ${processed}, pages: ${currentTotal}, analyzed_total: ${analyzedTotal}, pending: ${frontierStatus?.pending || 0}, visiting: ${frontierStatus?.visiting || 0}, ms: ${timeMs}}`);
   
-  // CRITICAL: If we should continue, schedule continuation and return immediately
+  // CRITICAL: If we should continue, log and let watchdog handle it
   if (shouldContinue) {
     console.log(`SELF_CONTINUE { pending: ${remaining}, batch: ${opts.batchSize} }`);
+    console.log(`[CrawlBFS] Work remaining, relying on watchdog to continue (runs every 5min)`);
     
-    // Import and call selfContinue
-    const { selfContinue } = await import('./continue');
-    const continueResult = await selfContinue(env, auditId);
-    
-    if (continueResult) {
-      console.log(`[CrawlBFS] Scheduled continuation successfully`);
-    } else {
-      console.log(`[CrawlBFS] Failed to schedule continuation, will rely on watchdog`);
-    }
-    
-    // CRITICAL: Return immediately after scheduling continuation
-    return { processed, timeMs, shouldContinue: false, continuationScheduled: true };
+    // Don't make HTTP requests to ourselves - let watchdog handle continuation
+    // This prevents 522 timeout errors and circular dependencies
+    return { processed, timeMs, shouldContinue: true, continuationScheduled: false };
   }
   
   return { processed, timeMs, shouldContinue };
