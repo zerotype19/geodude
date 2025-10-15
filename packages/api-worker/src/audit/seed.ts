@@ -70,6 +70,9 @@ export async function seedFrontier(
     
     console.log(`[Seed] Collected ${allUrls.length} total URLs from sitemaps`);
     
+    // SIMPLE APPROACH: Just take the first 50 URLs from sitemap and crawl them
+    const maxPages = parseInt(env.CRAWL_MAX_PAGES || '50');
+    
     // 4. Normalize and deduplicate
     const normalized = allUrls
       .map(url => normalizeUrl(url, `https://${canonicalHost}`))
@@ -78,41 +81,38 @@ export async function seedFrontier(
     const unique = [...new Set(normalized)];
     console.log(`[Seed] After normalization: ${unique.length} unique URLs`);
     
-    // 5. Batch enqueue with priority sorting
-    const priorityPaths = ['pricing', 'product', 'help', 'support', 'docs', 'about', 'blog', 'contact', 'features', 'legal', 'terms'];
-    const sorted = unique.sort((a, b) => {
-      const aPath = new URL(a).pathname.toLowerCase();
-      const bPath = new URL(b).pathname.toLowerCase();
-      
-      const aPriority = priorityPaths.some(path => aPath.includes(path)) ? 0.3 : 0.8;
-      const bPriority = priorityPaths.some(path => bPath.includes(path)) ? 0.3 : 0.8;
-      
-      return aPriority - bPriority;
-    });
-    
-    // 6. Always include homepage
+    // 5. Take first 50 URLs + homepage
     const homepageUrl = `https://${canonicalHost}/`;
-    const finalUrls = [homepageUrl, ...sorted.filter(url => url !== homepageUrl)];
+    const urlsToCrawl = [homepageUrl];
     
-    // 7. Batch insert all URLs
-    const inserted = await frontierBatchEnqueue(env, auditId, finalUrls, { 
+    // Add sitemap URLs up to the limit
+    for (const url of unique) {
+      if (url !== homepageUrl && urlsToCrawl.length < maxPages) {
+        urlsToCrawl.push(url);
+      }
+    }
+    
+    console.log(`[Seed] Selected ${urlsToCrawl.length} URLs to crawl directly`);
+    
+    // 6. Batch insert URLs for direct crawling
+    const inserted = await frontierBatchEnqueue(env, auditId, urlsToCrawl, { 
       depth: 0, 
       priorityBase: 0.5, 
-      source: 'sitemap' 
+      source: 'sitemap_direct' 
     });
     
-    console.log(`[Seed] Successfully enqueued ${inserted} URLs`);
+    console.log(`[Seed] Successfully enqueued ${inserted} URLs for direct crawling`);
     
-    // 8. Check if we have enough seeds
-    if (inserted >= minRequired) {
+    // 7. Always mark as seeded if we have any URLs
+    if (inserted > 0) {
       await markSeeded(env, auditId);
       
-      console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${finalUrls.length}, enqueued: ${inserted}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'smart' }`);
+      console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${urlsToCrawl.length}, enqueued: ${inserted}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'direct' }`);
       
       return {
         homepage: 1,
         navLinks: 0,
-        sitemapUrls: unique.length,
+        sitemapUrls: urlsToCrawl.length,
         total: inserted,
         seeded: true
       };
@@ -137,12 +137,12 @@ export async function seedFrontier(
       if (totalInserted >= minRequired) {
         await markSeeded(env, auditId);
         
-        console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${finalUrls.length + fallbackUrls.length}, enqueued: ${totalInserted}, seeded: 1, fallback: ${fallbackInserted}, mode: 'smart+fallback' }`);
+        console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${urlsToCrawl.length + fallbackUrls.length}, enqueued: ${totalInserted}, seeded: 1, fallback: ${fallbackInserted}, mode: 'direct+fallback' }`);
         
         return {
           homepage: 1,
           navLinks: 0,
-          sitemapUrls: unique.length,
+          sitemapUrls: urlsToCrawl.length,
           total: totalInserted,
           seeded: true
         };
@@ -165,7 +165,7 @@ export async function seedFrontier(
     return {
       homepage: 1,
       navLinks: 0,
-      sitemapUrls: unique.length,
+      sitemapUrls: urlsToCrawl.length,
       total: inserted,
       seeded: false,
       reason: 'SEED_INSUFFICIENT_URLS'
