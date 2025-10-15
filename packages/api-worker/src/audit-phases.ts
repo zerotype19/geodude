@@ -13,6 +13,173 @@ import { runSmartBraveQueries } from './brave/ai';
 import { calculateScores } from './score';
 import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractOrganization } from './html';
 
+/**
+ * Crawl a batch of pages with immediate persistence and time limits
+ */
+async function crawlBatch(env: any, auditId: string, urls: string[], opts: {
+  deadlineMs: number;
+  batchSize: number;
+}): Promise<{ processed: number; timeMs: number }> {
+  const started = Date.now();
+  let processed = 0;
+
+  for (const url of urls) {
+    if (processed >= opts.batchSize) break;
+    if (Date.now() - started > opts.deadlineMs) break;
+
+    try {
+      // Add delay between requests
+      if (processed > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      const pageStart = Date.now();
+      
+      // Use render semaphore to limit concurrent renders
+      const rendered = await withRenderSemaphore(async () => {
+        return await withCircuitBreaker('browser', env, async () => {
+          return await renderPage(env, url, { userAgent: env.USER_AGENT });
+        });
+      });
+      
+      const pageTime = Date.now() - pageStart;
+      
+      if (rendered.statusCode === 200 || rendered.statusCode === 0) {
+        const html = rendered.html;
+        const title = extractTitle(html);
+        const h1 = extractH1(html);
+        const wordCount = rendered.words;
+        const snippet = rendered.snippet;
+        const hasH1 = rendered.hasH1;
+        const jsonLdCount = rendered.jsonLdCount;
+        const faqOnPage = rendered.faqOnPage;
+
+        // IMMEDIATE UPSERT - do not wait until the end of the phase
+        await env.DB.prepare(`
+          INSERT INTO audit_pages(audit_id, url, status_code, title, h1, has_h1, jsonld_count, faq_present, word_count, rendered_words, snippet, load_time_ms, error)
+          VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+          ON CONFLICT(audit_id, url) DO UPDATE SET
+            status_code=excluded.status_code,
+            title=excluded.title,
+            h1=excluded.h1,
+            has_h1=excluded.has_h1,
+            jsonld_count=excluded.jsonld_count,
+            faq_present=excluded.faq_present,
+            word_count=excluded.word_count,
+            rendered_words=excluded.rendered_words,
+            snippet=excluded.snippet,
+            load_time_ms=excluded.load_time_ms,
+            error=excluded.error
+        `).bind(
+          auditId,
+          url,
+          rendered.statusCode || 200,
+          title,
+          h1,
+          hasH1 ? 1 : 0,
+          jsonLdCount,
+          faqOnPage ? 1 : 0,
+          wordCount,
+          wordCount,
+          snippet,
+          pageTime,
+          null
+        ).run();
+        
+        console.log(`[AuditPhases] Saved page to database: ${url} (${wordCount} words)`);
+      } else {
+        // Save failed page with error
+        await env.DB.prepare(`
+          INSERT INTO audit_pages(audit_id, url, status_code, title, h1, has_h1, jsonld_count, faq_present, word_count, rendered_words, snippet, load_time_ms, error)
+          VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+          ON CONFLICT(audit_id, url) DO UPDATE SET
+            status_code=excluded.status_code,
+            error=excluded.error
+        `).bind(
+          auditId,
+          url,
+          rendered.statusCode || 0,
+          null,
+          null,
+          0,
+          0,
+          0,
+          0,
+          null,
+          null,
+          pageTime,
+          `HTTP ${rendered.statusCode}`
+        ).run();
+      }
+
+      processed++;
+    } catch (error) {
+      console.error(`[AuditPhases] Failed to crawl page ${url}:`, error);
+      
+      // Save failed page with error
+      await env.DB.prepare(`
+        INSERT INTO audit_pages(audit_id, url, status_code, title, h1, has_h1, jsonld_count, faq_present, word_count, rendered_words, snippet, load_time_ms, error)
+        VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+        ON CONFLICT(audit_id, url) DO UPDATE SET
+          error=excluded.error
+      `).bind(
+        auditId,
+        url,
+        0,
+        null,
+        null,
+        0,
+        0,
+        0,
+        0,
+        null,
+        null,
+        0,
+        error instanceof Error ? error.message : String(error)
+      ).run();
+      
+      processed++; // Count failed pages too
+    }
+  }
+
+  return { processed, timeMs: Date.now() - started };
+}
+
+/**
+ * Extract internal links from HTML content
+ */
+function extractInternalLinks(html: string, baseUrl: string): string[] {
+  const links: string[] = [];
+  const baseHost = new URL(baseUrl).hostname;
+  
+  // Simple regex to find href attributes
+  const hrefMatches = html.match(/href=["']([^"']+)["']/gi);
+  
+  if (hrefMatches) {
+    for (const match of hrefMatches) {
+      const href = match.replace(/href=["']([^"']+)["']/i, '$1');
+      
+      // Skip external links, fragments, and non-http links
+      if (href.startsWith('http')) {
+        try {
+          const url = new URL(href);
+          if (url.hostname === baseHost) {
+            links.push(href);
+          }
+        } catch {
+          // Invalid URL, skip
+        }
+      } else if (href.startsWith('/') && !href.startsWith('//')) {
+        // Internal absolute path
+        links.push(`${baseUrl}${href}`);
+      }
+    }
+  }
+  
+  // Remove duplicates and limit to reasonable number for faster execution
+  return [...new Set(links)].slice(0, 5);
+}
+
 interface Env {
   DB: D1Database;
   USER_AGENT: string;
@@ -65,7 +232,7 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
 
   const domain = property.domain;
   const baseUrl = `https://${domain}`;
-  const maxPages = parseInt(env.AUDIT_MAX_PAGES || '100');
+  const maxPages = parseInt(env.AUDIT_MAX_PAGES || '5'); // Reduced from 100 to 5 for faster execution
 
   let crawlabilityData: any;
   let aiAccess: any;
@@ -129,19 +296,57 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
   const crawlResult = await runPhase(auditId, 'crawl', env, async (ctx) => {
     console.log(`[AuditPhases] Crawling pages for ${domain}`);
     
-    // Get URLs to crawl from sitemap if available, otherwise just homepage
+    // Get URLs to crawl from sitemap if available, otherwise try to discover common pages
     let urlsToCrawl = [baseUrl];
     
     if (sitemapResult.success && sitemapResult.data?.urls && sitemapResult.data.urls.length > 0) {
       console.log(`[AuditPhases] Found ${sitemapResult.data.urls.length} URLs in sitemap`);
       urlsToCrawl = sitemapResult.data.urls.slice(0, maxPages);
     } else {
-      console.log(`[AuditPhases] No sitemap URLs found, crawling homepage only`);
+      console.log(`[AuditPhases] No sitemap URLs found, trying to discover common pages`);
+      
+      // For sites without sitemaps, try to discover common pages by crawling the homepage
+      // and looking for internal links
+      try {
+        const homepageResponse = await safeFetch(baseUrl, {
+          timeoutMs: 10000,
+          retries: 1,
+          headers: { 'User-Agent': env.USER_AGENT }
+        });
+        
+        if (homepageResponse.ok && homepageResponse.data) {
+          const html = homepageResponse.data as string;
+          
+          // Extract internal links from the homepage
+          const internalLinks = extractInternalLinks(html, baseUrl);
+          
+          if (internalLinks.length > 0) {
+            console.log(`[AuditPhases] Discovered ${internalLinks.length} internal links from homepage`);
+            urlsToCrawl = [baseUrl, ...internalLinks.slice(0, maxPages - 1)];
+          }
+        }
+      } catch (error) {
+        console.log(`[AuditPhases] Failed to discover internal links: ${error}`);
+      }
     }
     const crawledPages: PageData[] = [];
     const crawlIssues: AuditIssue[] = [];
 
-    for (let i = 0; i < Math.min(urlsToCrawl.length, maxPages); i++) {
+    // Use batching with immediate persistence instead of sequential processing
+    const batchSize = parseInt(env.PAGE_BATCH_SIZE || '2');
+    const deadlineMs = parseInt(env.CRAWL_TIMEBOX_MS || '20000'); // 20 seconds
+    
+    console.log(`[AuditPhases] Starting crawl batch: ${urlsToCrawl.length} URLs, batch size ${batchSize}, deadline ${deadlineMs}ms`);
+    
+    const batch = await crawlBatch(env, auditId, urlsToCrawl, { 
+      deadlineMs, 
+      batchSize 
+    });
+    
+    console.log(`[AuditPhases] Crawl batch completed: processed ${batch.processed}/${urlsToCrawl.length} pages in ${batch.timeMs}ms`);
+
+    // Skip the old sequential loop - we're using batching now
+    if (false) for (let i = 0; i < Math.min(urlsToCrawl.length, maxPages); i++) {
       const pageUrl = urlsToCrawl[i];
       
       // Add delay between requests
@@ -171,7 +376,7 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
           const jsonLdCount = rendered.jsonLdCount;
           const faqOnPage = rendered.faqOnPage;
 
-          crawledPages.push({
+          const pageData = {
             url: pageUrl,
             status_code: rendered.statusCode || 200,
             title,
@@ -184,7 +389,36 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
             snippet,
             load_time_ms: pageTime,
             error: null,
-          });
+          };
+
+          crawledPages.push(pageData);
+
+          // Save page to database immediately to prevent data loss on timeout
+          try {
+            await env.DB.prepare(
+              `INSERT INTO audit_pages 
+               (audit_id, url, status_code, title, h1, has_h1, jsonld_count, faq_present, word_count, rendered_words, snippet, load_time_ms, error)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ).bind(
+              auditId,
+              pageData.url,
+              pageData.status_code,
+              pageData.title,
+              pageData.h1,
+              pageData.has_h1,
+              pageData.jsonld_count,
+              pageData.faq_present,
+              pageData.word_count,
+              pageData.rendered_words,
+              pageData.snippet,
+              pageData.load_time_ms,
+              pageData.error
+            ).run();
+            
+            console.log(`[AuditPhases] Saved page to database: ${pageUrl}`);
+          } catch (dbError) {
+            console.error(`[AuditPhases] Failed to save page to database: ${pageUrl}`, dbError);
+          }
 
           // Check for issues
           if (!title) {
@@ -272,10 +506,16 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
       }
     }
 
+    // Get the pages we just saved to return them
+    const savedPages = await env.DB.prepare(
+      `SELECT * FROM audit_pages WHERE audit_id = ? ORDER BY fetched_at DESC LIMIT ?`
+    ).bind(auditId, batch.processed).all();
+
     return {
-      pages: crawledPages,
-      issues: crawlIssues,
-      urlsTotal: urlsToCrawl.length
+      pages: savedPages.results as PageData[],
+      issues: [], // Issues will be generated during analysis phase
+      urlsTotal: urlsToCrawl.length,
+      urlsProcessed: batch.processed
     };
   });
 
@@ -393,28 +633,8 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
       auditId
     ).run();
 
-    // Save pages
-    for (const page of pages) {
-      await env.DB.prepare(
-        `INSERT INTO audit_pages 
-         (audit_id, url, status_code, title, h1, has_h1, jsonld_count, faq_present, word_count, rendered_words, snippet, load_time_ms, error)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        auditId,
-        page.url ?? '',
-        page.status_code ?? 0,
-        page.title ?? null,
-        page.h1 ?? null,
-        page.has_h1 ? 1 : 0,
-        page.jsonld_count ?? 0,
-        page.faq_present ? 1 : 0,
-        page.word_count ?? 0,
-        page.rendered_words ?? null,
-        page.snippet ?? null,
-        page.load_time_ms ?? 0,
-        page.error ?? null
-      ).run();
-    }
+    // Pages are now saved immediately during crawling to prevent data loss
+    // No need to save them again here
 
     // Save issues
     for (const issue of issues) {

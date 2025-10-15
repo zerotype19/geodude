@@ -918,6 +918,38 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       return handleBotLogsIngest(request, env);
     }
 
+    // POST /internal/audits/continue - Internal endpoint to continue audit processing (self-dispatch)
+    if (path === '/internal/audits/continue' && request.method === 'POST') {
+      try {
+        const body = await request.json() as { auditId: string; resume?: boolean };
+        const { auditId, resume = true } = body;
+        
+        // Validate internal token (basic security)
+        const authHeader = request.headers.get('Authorization');
+        if (!authHeader || !authHeader.includes('Bearer')) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        console.log(`[Internal] Continuing audit ${auditId} with resume=${resume}`);
+        
+        // Continue the audit phases
+        await runAuditPhases(env, ctx, { auditId, resume });
+        
+        return new Response(JSON.stringify({ ok: true, message: 'Audit continuation started' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('[Internal] Error continuing audit:', error);
+        return new Response(JSON.stringify({ error: 'Failed to continue audit' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // POST /v1/audits/retry - Retry audit from checkpoint
     if (path === '/v1/audits/retry' && request.method === 'POST') {
       try {
@@ -1197,14 +1229,19 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       const auditId = path.split('/')[3];
       
       try {
-        // Update audit status to failed
+        // Parse request body for failure details
+        const body = await request.json().catch(() => ({}));
+        const reason = body.reason || 'Manual intervention - audit was stuck';
+        
+        // Update audit status to failed with proper failure tracking
         await env.DB.prepare(
           `UPDATE audits 
            SET status = 'failed', 
-               error = 'Manual intervention - audit was stuck',
+               failure_code = 'MANUAL_FAIL',
+               failure_detail = ?,
                completed_at = datetime('now')
            WHERE id = ?`
-        ).bind(auditId).run();
+        ).bind(reason, auditId).run();
         
         return new Response(
           JSON.stringify({ 
@@ -1250,18 +1287,21 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           );
         }
 
-        // Domain allowlist (safety)
-        const allowed = (env.RECO_ALLOWED_DOMAINS || '').split(',').map(d => d.trim().toLowerCase());
-        const host = new URL(body.url).host.toLowerCase();
-        
-        if (allowed.length > 0 && !allowed.includes(host)) {
-          return new Response(
-            JSON.stringify({ error: 'Forbidden', message: `Domain ${host} not allowed for content recommendations` }),
-            {
-              status: 403,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            }
-          );
+        // Domain allowlist (safety) - only restrict if explicitly configured
+        const allowedDomains = (env.RECO_ALLOWED_DOMAINS || '').trim();
+        if (allowedDomains) {
+          const allowed = allowedDomains.split(',').map(d => d.trim().toLowerCase());
+          const host = new URL(body.url).host.toLowerCase();
+          
+          if (!allowed.includes(host)) {
+            return new Response(
+              JSON.stringify({ error: 'Forbidden', message: `Domain ${host} not allowed for content recommendations` }),
+              {
+                status: 403,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              }
+            );
+          }
         }
 
         const id = crypto.randomUUID();
@@ -2031,24 +2071,38 @@ Sitemap: https://optiview.ai/sitemap.xml`;
 
         const total = countResult?.total || 0;
 
-        return new Response(JSON.stringify({
+        // Ensure we always return a valid response structure
+        const response = {
           results: result.results || [],
           pagination: {
-            page,
-            pageSize,
-            total,
-            totalPages: Math.ceil(total / pageSize),
+            page: page || 1,
+            pageSize: pageSize || 20,
+            total: total || 0,
+            totalPages: Math.ceil((total || 0) / (pageSize || 20)),
           },
-        }), {
+        };
+
+        return new Response(JSON.stringify(response), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
 
       } catch (error) {
         console.error('[Pages Endpoint] Error:', error);
-        return new Response(JSON.stringify({ 
+        
+        // Return a safe fallback response that won't crash the frontend
+        const fallbackResponse = {
+          results: [],
+          pagination: {
+            page: 1,
+            pageSize: 20,
+            total: 0,
+            totalPages: 0,
+          },
           error: 'Failed to fetch pages',
           details: error instanceof Error ? error.message : String(error)
-        }), {
+        };
+        
+        return new Response(JSON.stringify(fallbackResponse), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -3090,14 +3144,15 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         };
 
         // Transform scores from flat columns to nested object
-        const scores = audit.score_overall !== null ? {
-          total: audit.score_overall,
-          crawlability: audit.score_crawlability,
-          structured: audit.score_structured,
-          answerability: audit.score_answerability,
-          trust: audit.score_trust,
+        // For failed audits, provide default scores to prevent frontend crashes
+        const scores = {
+          total: audit.score_overall || 0,
+          crawlability: audit.score_crawlability || 0,
+          structured: audit.score_structured || 0,
+          answerability: audit.score_answerability || 0,
+          trust: audit.score_trust || 0,
           breakdown,
-        } : null;
+        };
 
         // Transform issues to match frontend expectations
         const transformedIssues = (issues.results as any[]).map((issue: any) => ({
@@ -3270,7 +3325,14 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           phase_heartbeat_at: audit.phase_heartbeat_at,
           phase_attempts: audit.phase_attempts || 0,
           failure_code: audit.failure_code,
-          failure_detail: audit.failure_detail ? JSON.parse(audit.failure_detail) : null,
+          failure_detail: audit.failure_detail ? (() => {
+            try {
+              return JSON.parse(audit.failure_detail);
+            } catch {
+              // If it's not valid JSON, return as plain string
+              return audit.failure_detail;
+            }
+          })() : null,
           // Audit environment status
           circuit_breakers: circuitStatus,
           pages: pagesOut,

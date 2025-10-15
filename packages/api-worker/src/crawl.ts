@@ -281,19 +281,20 @@ export async function probeAiAccess(url: string): Promise<AiAccessProbeResult> {
         }
       });
 
-      const status = response.status;
+      const status = response.status || 0;
       const ok = status >= 200 && status < 400;
       const diff = status !== baselineStatus;
       const blocked = status === 403 || status === 401 || status === 429 || (diff && !ok);
 
+      // safeFetch doesn't return headers, so we'll use null for now
       results.push({
         bot: bot.name,
         status,
         ok,
         diff,
-        server: response.headers.get('server'),
-        cfRay: response.headers.get('cf-ray'),
-        akamai: response.headers.get('x-akamai-request-id'),
+        server: null, // safeFetch doesn't expose headers
+        cfRay: null,
+        akamai: null,
         blocked,
       });
 

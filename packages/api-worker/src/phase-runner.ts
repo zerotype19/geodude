@@ -60,7 +60,7 @@ export const PHASE_CONFIGS: Record<string, PhaseConfig> = {
   },
   crawl: {
     name: 'crawl',
-    timeoutMs: 90000, // 90s for first pass crawling
+    timeoutMs: 25000, // 25s - safe for Cloudflare Workers
     maxAttempts: 1,
     description: 'Page crawling and content extraction'
   },
