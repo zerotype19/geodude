@@ -915,7 +915,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
     }
 
     // Analysis routes - Schema/H1/E-E-A-T analysis
-    if (path.includes('/analysis/')) {
+    if (path.includes('/analysis/') || path.includes('/summary')) {
       return handleAnalysisRoutes(request, env);
     }
 
@@ -2705,7 +2705,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
                  a.issues_count, a.started_at, a.completed_at, a.error,
                  a.phase, a.phase_started_at, a.phase_heartbeat_at, a.phase_attempts, 
                  a.failure_code, a.failure_detail,
-                 p.domain, p.name as property_name
+                 p.domain, p.domain as property_name
           FROM audits a
           JOIN properties p ON a.property_id = p.id
         `;
