@@ -4,7 +4,7 @@ export async function frontierBatchEnqueue(
   env: any, 
   auditId: string, 
   urls: string[], 
-  opts: { depth: number; priorityBase: number; source: string }
+  opts: { depth: number; priorityBase: number; source: string; origin?: string }
 ): Promise<number> {
   console.log(`[FrontierBatch] Enqueueing ${urls.length} URLs for audit ${auditId}`);
   
@@ -12,7 +12,7 @@ export async function frontierBatchEnqueue(
   
   // Normalize URLs and filter duplicates
   const normalized = urls
-    .map(url => normalizeUrl(url, ''))
+    .map(url => normalizeUrl(url, opts.origin || ''))
     .filter((url): url is string => Boolean(url));
   
   const unique = [...new Set(normalized)];

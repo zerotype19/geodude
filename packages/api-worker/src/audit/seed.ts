@@ -117,7 +117,8 @@ export async function seedFrontier(
     const inserted = await frontierBatchEnqueue(env, auditId, urlsToCrawl, { 
       depth: 0, 
       priorityBase: 0.5, 
-      source: 'sitemap_direct' 
+      source: 'sitemap_direct',
+      origin: `https://${canonicalHost}`
     });
     
     console.log(`[Seed] Successfully enqueued ${inserted} URLs for direct crawling`);
@@ -147,7 +148,8 @@ export async function seedFrontier(
       const fallbackInserted = await frontierBatchEnqueue(env, auditId, fallbackUrls, { 
         depth: 1, 
         priorityBase: 0.8, 
-        source: 'fallback' 
+        source: 'fallback',
+        origin: `https://${canonicalHost}`
       });
       
       const totalInserted = inserted + fallbackInserted;
