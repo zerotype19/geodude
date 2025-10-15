@@ -292,229 +292,80 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
     aiAccess = probesResult.data;
   }
 
-  // Phase 5: Page Crawling
+  // Phase 5: Page Crawling with BFS Frontier
   const crawlResult = await runPhase(auditId, 'crawl', env, async (ctx) => {
-    console.log(`[AuditPhases] Crawling pages for ${domain}`);
+    console.log(`[AuditPhases] Starting BFS crawl for ${domain}`);
     
-    // Get URLs to crawl from sitemap if available, otherwise try to discover common pages
-    let urlsToCrawl = [baseUrl];
+    // Import BFS functions
+    const { seedFrontier, getHomeNavLinks, loadSitemapUrls } = await import('./audit/seed');
+    const { crawlBatchBfs } = await import('./audit/crawl-bfs');
     
-    if (sitemapResult.success && sitemapResult.data?.urls && sitemapResult.data.urls.length > 0) {
-      console.log(`[AuditPhases] Found ${sitemapResult.data.urls.length} URLs in sitemap`);
-      urlsToCrawl = sitemapResult.data.urls.slice(0, maxPages);
-    } else {
-      console.log(`[AuditPhases] No sitemap URLs found, trying to discover common pages`);
+    // Check if frontier is already seeded
+    const phaseState = await getPhaseState(env, auditId, 'crawl');
+    
+    if (!phaseState?.seeded) {
+      console.log(`[AuditPhases] Seeding crawl frontier for ${domain}`);
       
-      // For sites without sitemaps, try to discover common pages by crawling the homepage
-      // and looking for internal links
-      try {
-        const homepageResponse = await safeFetch(baseUrl, {
-          timeoutMs: 10000,
-          retries: 1,
-          headers: { 'User-Agent': env.USER_AGENT }
-        });
-        
-        if (homepageResponse.ok && homepageResponse.data) {
-          const html = homepageResponse.data as string;
-          
-          // Extract internal links from the homepage
-          const internalLinks = extractInternalLinks(html, baseUrl);
-          
-          if (internalLinks.length > 0) {
-            console.log(`[AuditPhases] Discovered ${internalLinks.length} internal links from homepage`);
-            urlsToCrawl = [baseUrl, ...internalLinks.slice(0, maxPages - 1)];
-          }
-        }
-      } catch (error) {
-        console.log(`[AuditPhases] Failed to discover internal links: ${error}`);
-      }
+      // Get navigation links from homepage
+      const { navLinks } = await getHomeNavLinks(env, baseUrl);
+      
+      // Get sitemap URLs if available
+      const sitemapUrls = sitemapResult.success && sitemapResult.data?.urls 
+        ? sitemapResult.data.urls 
+        : await loadSitemapUrls(env, baseUrl, { cap: parseInt(env.SITEMAP_URL_CAP || '500') });
+      
+      // Seed the frontier
+      const seedResult = await seedFrontier(env, auditId, baseUrl, {
+        navLinks,
+        sitemapUrls,
+        maxSitemap: parseInt(env.SITEMAP_URL_CAP || '500')
+      });
+      
+      console.log(`[AuditPhases] Frontier seeded: ${seedResult.total} URLs (home: ${seedResult.homepage}, nav: ${seedResult.navLinks}, sitemap: ${seedResult.sitemapUrls})`);
+      
+      // Mark as seeded
+      await setPhaseState(env, auditId, 'crawl', { seeded: true });
     }
-    const crawledPages: PageData[] = [];
-    const crawlIssues: AuditIssue[] = [];
-
-    // Use batching with immediate persistence instead of sequential processing
+    
+    // Run BFS crawl batch
     const batchSize = parseInt(env.PAGE_BATCH_SIZE || '2');
-    const deadlineMs = parseInt(env.CRAWL_TIMEBOX_MS || '20000'); // 20 seconds
+    const deadlineMs = parseInt(env.CRAWL_TIMEBOX_MS || '20000');
+    const maxDepth = parseInt(env.CRAWL_MAX_DEPTH || '3');
+    const maxPages = parseInt(env.CRAWL_MAX_PAGES || '50');
     
-    console.log(`[AuditPhases] Starting crawl batch: ${urlsToCrawl.length} URLs, batch size ${batchSize}, deadline ${deadlineMs}ms`);
+    console.log(`[AuditPhases] Running BFS batch: batch size ${batchSize}, deadline ${deadlineMs}ms, max depth ${maxDepth}, max pages ${maxPages}`);
     
-    const batch = await crawlBatch(env, auditId, urlsToCrawl, { 
-      deadlineMs, 
-      batchSize 
+    const batch = await crawlBatchBfs(env, auditId, baseUrl, {
+      deadlineMs,
+      batchSize,
+      maxDepth,
+      maxPages
     });
     
-    console.log(`[AuditPhases] Crawl batch completed: processed ${batch.processed}/${urlsToCrawl.length} pages in ${batch.timeMs}ms`);
+    console.log(`[AuditPhases] BFS batch completed: processed ${batch.processed} pages in ${batch.timeMs}ms, should continue: ${batch.shouldContinue}`);
+    
+    // PR-Fix-7: Atomic gate for leaving crawl - prevents race conditions
+    const { tryAdvanceFromCrawl } = await import('./audit/crawl-exit');
+    const advanced = await tryAdvanceFromCrawl(env, auditId, maxPages);
 
-    // Skip the old sequential loop - we're using batching now
-    if (false) for (let i = 0; i < Math.min(urlsToCrawl.length, maxPages); i++) {
-      const pageUrl = urlsToCrawl[i];
-      
-      // Add delay between requests
-      if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      try {
-        const pageStart = Date.now();
-        
-        // Use render semaphore to limit concurrent renders
-        const rendered = await withRenderSemaphore(async () => {
-          return await withCircuitBreaker('browser', env, async () => {
-            return await renderPage(env, pageUrl, { userAgent: env.USER_AGENT });
-          });
-        });
-        
-        const pageTime = Date.now() - pageStart;
-        
-        if (rendered.statusCode === 200 || rendered.statusCode === 0) {
-          const html = rendered.html;
-          const title = extractTitle(html);
-          const h1 = extractH1(html);
-          const wordCount = rendered.words;
-          const snippet = rendered.snippet;
-          const hasH1 = rendered.hasH1;
-          const jsonLdCount = rendered.jsonLdCount;
-          const faqOnPage = rendered.faqOnPage;
-
-          const pageData = {
-            url: pageUrl,
-            status_code: rendered.statusCode || 200,
-            title,
-            h1,
-            has_h1: hasH1,
-            jsonld_count: jsonLdCount,
-            faq_present: faqOnPage,
-            word_count: wordCount,
-            rendered_words: wordCount,
-            snippet,
-            load_time_ms: pageTime,
-            error: null,
-          };
-
-          crawledPages.push(pageData);
-
-          // Save page to database immediately to prevent data loss on timeout
-          try {
-            await env.DB.prepare(
-              `INSERT INTO audit_pages 
-               (audit_id, url, status_code, title, h1, has_h1, jsonld_count, faq_present, word_count, rendered_words, snippet, load_time_ms, error)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-            ).bind(
-              auditId,
-              pageData.url,
-              pageData.status_code,
-              pageData.title,
-              pageData.h1,
-              pageData.has_h1,
-              pageData.jsonld_count,
-              pageData.faq_present,
-              pageData.word_count,
-              pageData.rendered_words,
-              pageData.snippet,
-              pageData.load_time_ms,
-              pageData.error
-            ).run();
-            
-            console.log(`[AuditPhases] Saved page to database: ${pageUrl}`);
-          } catch (dbError) {
-            console.error(`[AuditPhases] Failed to save page to database: ${pageUrl}`, dbError);
-          }
-
-          // Check for issues
-          if (!title) {
-            crawlIssues.push({
-              page_url: pageUrl,
-              issue_type: 'missing_title',
-              severity: 'critical',
-              message: 'Page missing title tag',
-            });
-          }
-
-          if (!hasH1) {
-            crawlIssues.push({
-              page_url: pageUrl,
-              issue_type: 'missing_h1',
-              severity: 'warning',
-              message: 'Page missing H1 heading',
-            });
-          }
-
-          if (jsonLdCount === 0) {
-            crawlIssues.push({
-              page_url: pageUrl,
-              issue_type: 'missing_structured_data',
-              severity: 'info',
-              message: 'Page missing JSON-LD structured data',
-            });
-          }
-
-          if (wordCount < 120) {
-            crawlIssues.push({
-              page_url: pageUrl,
-              issue_type: 'thin_content',
-              severity: 'warning',
-              message: `Thin content: only ${wordCount} words`,
-              details: JSON.stringify({ words: wordCount, snippet }),
-            });
-          }
-        } else {
-          crawledPages.push({
-            url: pageUrl,
-            status_code: rendered.status || 0,
-            title: null,
-            h1: null,
-            has_h1: false,
-            jsonld_count: 0,
-            faq_present: false,
-            word_count: 0,
-            rendered_words: 0,
-            snippet: null,
-            load_time_ms: pageTime,
-            error: `HTTP ${rendered.status}`,
-          });
-
-          crawlIssues.push({
-            page_url: pageUrl,
-            issue_type: 'page_error',
-            severity: 'critical',
-            message: `Page returned HTTP ${rendered.status}`,
-          });
-        }
-      } catch (error) {
-        crawledPages.push({
-          url: pageUrl,
-          status_code: 0,
-          title: null,
-          h1: null,
-          has_h1: false,
-          jsonld_count: 0,
-          faq_present: false,
-          word_count: 0,
-          rendered_words: 0,
-          snippet: null,
-          load_time_ms: 0,
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        crawlIssues.push({
-          page_url: pageUrl,
-          issue_type: 'page_unreachable',
-          severity: 'critical',
-          message: 'Failed to fetch page',
-          details: error instanceof Error ? error.message : String(error),
-        });
-      }
+    if (!advanced) {
+      // We still have pending work or haven't hit the goal → continue crawling
+      console.log(`[AuditPhases] More work to do, self-dispatching continuation`);
+      await selfContinue(env, auditId); // Always return after this
+      return { pages: [], issues: [], urlsTotal: 0, urlsProcessed: batch.processed };
     }
-
-    // Get the pages we just saved to return them
+    
+    console.log(`[AuditPhases] Successfully advanced from crawl to citations phase`);
+    
+    // Get the pages we just crawled
     const savedPages = await env.DB.prepare(
       `SELECT * FROM audit_pages WHERE audit_id = ? ORDER BY fetched_at DESC LIMIT ?`
-    ).bind(auditId, batch.processed).all();
+    ).bind(auditId, maxPages).all();
 
     return {
       pages: savedPages.results as PageData[],
       issues: [], // Issues will be generated during analysis phase
-      urlsTotal: urlsToCrawl.length,
+      urlsTotal: maxPages,
       urlsProcessed: batch.processed
     };
   });
@@ -528,6 +379,12 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
 
   // Phase 6: Brave AI Citations
   const citationsResult = await runPhase(auditId, 'citations', env, async (ctx) => {
+    // Bounce-back guard to ensure crawl is complete
+    const { ensureCrawlCompleteOrRewind } = await import('./audit/bounce-back');
+    if (!(await ensureCrawlCompleteOrRewind(env, auditId, parseInt(env.CRAWL_MAX_PAGES || '50')))) {
+      return { logs: [] }; // Don't run citations yet
+    }
+
     console.log(`[AuditPhases] Running Brave AI queries for ${domain}`);
     
     if (!env.BRAVE_SEARCH_AI) {
@@ -575,6 +432,12 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
 
   // Phase 7: Synthesis (Calculate scores)
   const synthResult = await runPhase(auditId, 'synth', env, async (ctx) => {
+    // Bounce-back guard to ensure crawl is complete
+    const { ensureCrawlCompleteOrRewind } = await import('./audit/bounce-back');
+    if (!(await ensureCrawlCompleteOrRewind(env, auditId, parseInt(env.CRAWL_MAX_PAGES || '50')))) {
+      return { scores: {} }; // Don't run synth yet
+    }
+
     console.log(`[AuditPhases] Calculating scores for ${domain}`);
     
     const structuredData = {
@@ -597,6 +460,12 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
 
   // Phase 8: Finalize (Save to database)
   const finalizeResult = await runPhase(auditId, 'finalize', env, async (ctx) => {
+    // Bounce-back guard to ensure crawl is complete
+    const { ensureCrawlCompleteOrRewind } = await import('./audit/bounce-back');
+    if (!(await ensureCrawlCompleteOrRewind(env, auditId, parseInt(env.CRAWL_MAX_PAGES || '50')))) {
+      return { success: true }; // Don't run finalize yet
+    }
+
     console.log(`[AuditPhases] Finalizing audit ${auditId}`);
     
     const scores = synthResult.data.scores;
@@ -661,4 +530,43 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
 
   console.log(`[AuditPhases] Audit ${auditId} completed successfully`);
   return auditId;
+}
+
+/**
+ * Get phase state from database
+ */
+async function getPhaseState(env: any, auditId: string, phase: string): Promise<any> {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT phase_state FROM audits WHERE id = ?`
+    ).bind(auditId).first<{ phase_state: string }>();
+    
+    if (!row?.phase_state) return null;
+    
+    return JSON.parse(row.phase_state);
+  } catch (error) {
+    console.error(`[AuditPhases] Error getting phase state:`, error);
+    return null;
+  }
+}
+
+/**
+ * Set phase state in database
+ */
+async function setPhaseState(env: any, auditId: string, phase: string, state: any): Promise<void> {
+  try {
+    await env.DB.prepare(
+      `UPDATE audits SET phase_state = ? WHERE id = ?`
+    ).bind(JSON.stringify(state), auditId).run();
+  } catch (error) {
+    console.error(`[AuditPhases] Error setting phase state:`, error);
+  }
+}
+
+/**
+ * Self-dispatch audit continuation using reliable helper
+ */
+async function selfContinue(env: any, auditId: string): Promise<boolean> {
+  const { selfContinue: reliableSelfContinue } = await import('./audit/continue');
+  return await reliableSelfContinue(env, auditId);
 }

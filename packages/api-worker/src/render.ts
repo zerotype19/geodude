@@ -5,6 +5,13 @@ import puppeteer from '@cloudflare/puppeteer';
 import { parseHTML } from 'linkedom';
 import { Readability } from '@mozilla/readability';
 
+/**
+ * Sleep utility for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 type Mode = 'browser' | 'html';
 
 export interface RenderResult {
@@ -101,93 +108,148 @@ export async function renderPage(
 ): Promise<RenderResult> {
   const force = opts?.force;
 
+  // PR-3: 3-tier strategy for browser rendering stability
+  // 1) Browser attempt with navigation timeout
+  const browserResult = await tryBrowserRender(env, url, { 
+    navTimeoutMs: parseInt(env.RENDER_NAV_TIMEOUT_MS || '10000'),
+    userAgent: opts?.userAgent,
+    force: force === 'html' ? false : true
+  });
+  
+  if (browserResult.ok) {
+    return browserResult.value;
+  }
+
+  // 2) Retry once with fresh session (short backoff)
+  await sleep(300);
+  console.log(`[render] Browser failed, retrying with fresh session for ${url}`);
+  
+  const retryResult = await tryBrowserRender(env, url, { 
+    navTimeoutMs: parseInt(env.RENDER_NAV_TIMEOUT_MS || '10000') + 2000, // Slightly longer timeout
+    userAgent: opts?.userAgent,
+    force: force === 'html' ? false : true,
+    freshSession: true
+  });
+  
+  if (retryResult.ok) {
+    return retryResult.value;
+  }
+
+  // 3) Fallback to basic HTTP fetch
+  console.log(`[render] Browser failed, falling back to basic fetch for ${url}`);
+  return await tryBasicFetch(env, url, { 
+    timeoutMs: parseInt(env.BASIC_FETCH_TIMEOUT_MS || '8000'),
+    userAgent: opts?.userAgent
+  });
+}
+
+/**
+ * Try browser rendering with retries and resource blocking
+ */
+async function tryBrowserRender(
+  env: any,
+  url: string,
+  opts: { navTimeoutMs: number; userAgent?: string; force?: boolean; freshSession?: boolean }
+): Promise<{ ok: boolean; value?: RenderResult; error?: string }> {
   // Check browser service availability before attempting
-  const browserAvailable = force !== 'html' && env.BROWSER && await isBrowserServiceAvailable(env);
+  const browserAvailable = !opts.force && env.BROWSER && await isBrowserServiceAvailable(env);
+  
+  if (!browserAvailable) {
+    return { ok: false, error: 'Browser service unavailable' };
+  }
 
-  // Try Browser first unless forced to html or browser unavailable
-  if (browserAvailable) {
-    const startTime = Date.now();
-    try {
-      console.log(`[render] attempting browser mode for ${url}`);
-      
-      // Official Cloudflare Browser Rendering API
-      const browser = await puppeteer.launch(env.BROWSER);
-      const page = await browser.newPage();
-      page.setDefaultNavigationTimeout(30_000);
+  const startTime = Date.now();
+  try {
+    console.log(`[render] attempting browser mode for ${url} (timeout: ${opts.navTimeoutMs}ms)`);
+    
+    // Official Cloudflare Browser Rendering API
+    const browser = await puppeteer.launch(env.BROWSER);
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(opts.navTimeoutMs);
 
-      // Set user agent if provided
-      if (opts?.userAgent) {
-        await page.setUserAgent(opts.userAgent);
+    // Set user agent if provided
+    if (opts?.userAgent) {
+      await page.setUserAgent(opts.userAgent);
+    }
+
+    // Block heavy assets to speed up rendering (images, media, fonts)
+    // We only need text content, not visuals
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      if (['image', 'media', 'font', 'stylesheet'].includes(resourceType)) {
+        request.abort();
+      } else {
+        request.continue();
       }
+    });
 
-      // Block heavy assets to speed up rendering (images, media, fonts)
-      // We only need text content, not visuals
-      await page.setRequestInterception(true);
-      page.on('request', (request) => {
-        const resourceType = request.resourceType();
-        if (['image', 'media', 'font', 'stylesheet'].includes(resourceType)) {
-          request.abort();
-        } else {
-          request.continue();
-        }
-      });
+    // Navigate and wait for content with configurable timeout
+    const response = await page.goto(url, {
+      waitUntil: ['load', 'domcontentloaded', 'networkidle0'] as any,
+      timeout: opts.navTimeoutMs,
+    });
+    
+    // Get status code from response (0 = unknown/network error)
+    const statusCode = response?.status() ?? 0;
 
-      // Navigate and wait for content
-      const response = await page.goto(url, {
-        waitUntil: ['load', 'domcontentloaded', 'networkidle0'] as any,
-        timeout: 30_000,
-      });
-      
-      // Get status code from response (0 = unknown/network error)
-      const statusCode = response?.status() ?? 0;
+    // Get full HTML after JS runs
+    const html: string = await page.content();
 
-      // Get full HTML after JS runs
-      const html: string = await page.content();
+    // Extract metadata from browser DOM (more reliable than linkedom)
+    const browserData = await page.evaluate(() => {
+      const h1 = document.querySelector('h1');
+      const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+      return {
+        hasH1: !!h1,
+        h1Text: h1?.textContent?.trim() || null,
+        jsonLdCount: jsonLdScripts.length
+      };
+    });
 
-      // Extract metadata from browser DOM (more reliable than linkedom)
-      const browserData = await page.evaluate(() => {
-        const h1 = document.querySelector('h1');
-        const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
-        return {
-          hasH1: !!h1,
-          h1Text: h1?.textContent?.trim() || null,
-          jsonLdCount: jsonLdScripts.length
-        };
-      });
+    // Clean up
+    await browser.close();
 
-      // Clean up
-      await browser.close();
-
-      const extracted = await extractFromHTML(html);
-      const renderTime = Date.now() - startTime;
-      console.log(`[render] browser: ${url} -> ${extracted.words} words, status ${statusCode}, H1: ${browserData.hasH1}, in ${renderTime}ms`);
-      
-      // Override H1 detection with browser's result (more reliable than linkedom)
-      return { 
+    const extracted = await extractFromHTML(html);
+    const renderTime = Date.now() - startTime;
+    console.log(`[render] browser: ${url} -> ${extracted.words} words, status ${statusCode}, H1: ${browserData.hasH1}, in ${renderTime}ms`);
+    
+    // Override H1 detection with browser's result (more reliable than linkedom)
+    return { 
+      ok: true,
+      value: {
         mode: 'browser', 
         statusCode, 
         ...extracted,
         hasH1: browserData.hasH1,
         jsonLdCount: browserData.jsonLdCount 
-      };
-    } catch (err: any) {
-      const errorMsg = err?.message || String(err);
-      console.error(`[render] browser failed for ${url}, falling back:`, errorMsg);
-      
-      // Surface error in debug mode
-      if (opts?.debug) {
-        (globalThis as any).__render_error_hint = errorMsg;
       }
-      
-      // Fall through to HTML mode
-    }
+    };
+  } catch (err: any) {
+    const errorMsg = err?.message || String(err);
+    console.error(`[render] browser failed for ${url}:`, errorMsg);
+    
+    return { ok: false, error: errorMsg };
   }
+}
 
-  // HTML fallback (fetch + Readability)
-  console.log(`[render] html mode for ${url}`);
+/**
+ * Basic HTTP fetch fallback with structured response
+ */
+async function tryBasicFetch(
+  env: any,
+  url: string,
+  opts: { timeoutMs: number; userAgent?: string }
+): Promise<RenderResult> {
+  console.log(`[render] basic fetch for ${url} (timeout: ${opts.timeoutMs}ms)`);
+  
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs);
+    
     const resp = await fetch(url, {
       redirect: 'follow',
+      signal: controller.signal,
       headers: {
         'user-agent': opts?.userAgent || 
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -196,16 +258,18 @@ export async function renderPage(
       cf: { cacheTtl: 300, cacheEverything: true } as any,
     });
     
+    clearTimeout(timeoutId);
+    
     const statusCode = resp.status;
     const html = await resp.text();
     const extracted = await extractFromHTML(html);
     
-    console.log(`[render] html: ${url} -> ${extracted.words} words, status ${statusCode}`);
+    console.log(`[render] basic fetch: ${url} -> ${extracted.words} words, status ${statusCode}`);
     return { mode: 'html', statusCode, ...extracted };
   } catch (err: any) {
-    console.error(`[render] html fetch failed for ${url}:`, err?.message);
+    console.error(`[render] basic fetch failed for ${url}:`, err?.message);
     
-    // Return empty result
+    // Return empty result with error status
     return {
       mode: 'html',
       statusCode: 0,
@@ -215,7 +279,7 @@ export async function renderPage(
       snippet: '',
       hasH1: false,
       jsonLdCount: 0,
-      faqOnPage: false,
+      faqOnPage: false
     };
   }
 }

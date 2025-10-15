@@ -125,6 +125,16 @@ VI_CONNECTOR_TIMEOUT_MS = "15000"
 VI_CACHE_TTL_SEC = "172800"
 VI_RECENCY_HOURS = "6"
 
+# BFS Crawl Throughput Knobs (PR-Fix-5)
+PAGE_BATCH_SIZE = "5"           # Process 5 pages per tick (was 2)
+CRAWL_TIMEBOX_MS = "25000"      # 25s per tick (was 20s)
+CRAWL_MAX_PAGES = "50"          # Target 50 pages per audit
+CRAWL_MAX_DEPTH = "3"           # Max crawl depth
+NAV_SEED_LIMIT = "75"           # Max nav links to seed (was 50)
+SITEMAP_URL_CAP = "500"         # Max sitemap URLs to seed
+CRAWL_MAX_URLS_IN_FRONTIER = "2000"  # Hard cap on frontier size
+CRAWL_MAX_ENQUEUE_PER_PAGE = "100"   # Max links to extract per page
+
 [browser]
 binding = "BROWSER"
 

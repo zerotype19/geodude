@@ -33,6 +33,23 @@ export async function runWatchdog(env: any, config: WatchdogConfig = DEFAULT_CON
   try {
     console.log('[Watchdog] Starting stuck audit check...');
 
+    // Recover stuck "visiting" URLs (timeout recovery)
+    try {
+      const recoveredResult = await env.DB.prepare(`
+        UPDATE audit_frontier
+        SET status='pending', updated_at=datetime('now')
+        WHERE status='visiting'
+          AND julianday('now') - julianday(updated_at) > (2.0/1440)
+      `).run();
+      
+      if (recoveredResult.changes > 0) {
+        console.log(`[Watchdog] visiting_recovered: ${recoveredResult.changes} stuck 'visiting' URLs back to 'pending'`);
+      }
+    } catch (error) {
+      console.error(`[Watchdog] Error recovering stuck visiting URLs:`, error);
+      errors.push(`Visiting recovery error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
     // Find stuck audits
     const stuckAudits = await findStuckAudits(env, config);
     checked = stuckAudits.length;
@@ -71,6 +88,22 @@ export async function runWatchdog(env: any, config: WatchdogConfig = DEFAULT_CON
 
     // Check for slow phases
     await checkSlowPhases(env);
+
+    // PR-Fix-4: Check for audits with pending frontier but wrong phase
+    const frontierStuckAudits = await findFrontierStuckAudits(env);
+    if (frontierStuckAudits.length > 0) {
+      console.log(`[Watchdog] Found ${frontierStuckAudits.length} audits with pending frontier but wrong phase`);
+      
+      for (const audit of frontierStuckAudits) {
+        try {
+          await handleFrontierStuckAudit(audit, env);
+          reEnqueued++;
+        } catch (error) {
+          console.error(`[Watchdog] Error handling frontier stuck audit ${audit.id}:`, error);
+          errors.push(`Frontier stuck audit error: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    }
 
     console.log(`[Watchdog] Completed: ${checked} checked, ${reEnqueued} re-enqueued, ${failed} failed, ${errors.length} errors`);
 
@@ -333,5 +366,80 @@ export async function getAuditStats(env: any): Promise<{
       stuck: 0,
       avgDuration: 0,
     };
+  }
+}
+
+/**
+ * PR-Fix-4: Find audits with pending frontier but wrong phase
+ */
+async function findFrontierStuckAudits(env: any): Promise<Array<{
+  id: string;
+  phase: string;
+  pendingCount: number;
+  pageCount: number;
+}>> {
+  try {
+    const query = `
+      SELECT a.id, a.phase, 
+             COALESCE(f.pend, 0) as pendingCount,
+             COALESCE(p.pages, 0) as pageCount
+      FROM audits a
+      JOIN (
+        SELECT audit_id, COUNT(*) AS pend 
+        FROM audit_frontier 
+        WHERE status='pending' 
+        GROUP BY audit_id
+      ) f ON f.audit_id = a.id
+      LEFT JOIN (
+        SELECT audit_id, COUNT(*) AS pages 
+        FROM audit_pages 
+        GROUP BY audit_id
+      ) p ON p.audit_id = a.id
+      WHERE a.status='running'
+        AND a.phase <> 'crawl'
+        AND f.pend > 0
+        AND IFNULL(p.pages, 0) < 50
+    `;
+    
+    const result = await env.DB.prepare(query).all();
+    return result.results as Array<{
+      id: string;
+      phase: string;
+      pendingCount: number;
+      pageCount: number;
+    }>;
+  } catch (error) {
+    console.error('[Watchdog] Error finding frontier stuck audits:', error);
+    return [];
+  }
+}
+
+/**
+ * Handle frontier stuck audit by rewinding to crawl phase
+ */
+async function handleFrontierStuckAudit(
+  audit: { id: string; phase: string; pendingCount: number; pageCount: number },
+  env: any
+): Promise<void> {
+  console.log(`[Watchdog] WATCHDOG_REWIND_TO_CRAWL: Audit ${audit.id} has ${audit.pendingCount} pending URLs but is in phase '${audit.phase}'`);
+  
+  // Set phase back to crawl and bump attempts
+  await env.DB.prepare(`
+    UPDATE audits 
+    SET phase='crawl', 
+        phase_attempts=phase_attempts+1, 
+        phase_heartbeat_at=datetime('now'),
+        phase_started_at=datetime('now')
+    WHERE id=?1
+  `).bind(audit.id).run();
+  
+  // Self-continue to resume crawling
+  const { selfContinue } = await import('./audit/continue');
+  const success = await selfContinue(env, audit.id);
+  
+  if (success) {
+    console.log(`[Watchdog] Successfully rewound audit ${audit.id} to crawl phase and dispatched continuation`);
+  } else {
+    console.error(`[Watchdog] Failed to dispatch continuation for rewound audit ${audit.id}`);
   }
 }

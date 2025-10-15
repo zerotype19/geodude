@@ -18,9 +18,10 @@ import { createVisibilityAnalyticsRoutes } from './routes/visibility-analytics';
 import { createVIRoutes } from './routes/vi';
 import { createGroupedVIRoutes } from './routes/vi_grouped';
 import { createDebugVIRoutes } from './routes/vi_debug';
+import { handleAnalysisRoutes } from './routes/analysis';
 import { runWatchdog } from './watchdog';
 import { runPhase, PHASE_CONFIGS } from './phase-runner';
-import { runAuditPhases } from './audit-phases';
+import { runAuditPhases } from './audit/audit-runner';
 import { getCircuitStatus } from './circuit-breaker';
 import { normalizeFromUrl } from './lib/domain';
 
@@ -913,6 +914,11 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       return handleCitations(request, env);
     }
 
+    // Analysis routes - Schema/H1/E-E-A-T analysis
+    if (path.includes('/analysis/')) {
+      return handleAnalysisRoutes(request, env);
+    }
+
     // POST /v1/botlogs/ingest - Admin-only AI bot log ingestion (Phase G)
     if (path === '/v1/botlogs/ingest' && request.method === 'POST') {
       return handleBotLogsIngest(request, env);
@@ -935,12 +941,24 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         
         console.log(`[Internal] Continuing audit ${auditId} with resume=${resume}`);
         
-        // Continue the audit phases
-        await runAuditPhases(env, ctx, { auditId, resume });
+        // Acquire lock or exit silently (idempotent)
+        const { tryAcquireLock, releaseLock } = await import('./audit/lock');
+        if (!await tryAcquireLock(env, auditId)) {
+          console.log('CONTINUE_LOCK_BUSY', { auditId });
+          return new Response(JSON.stringify({ ok: true, skipped: 'locked' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
         
-        return new Response(JSON.stringify({ ok: true, message: 'Audit continuation started' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        try {
+          // Continue the audit phases
+          await runAuditPhases(env, ctx, { auditId, resume });
+          return new Response(JSON.stringify({ ok: true, message: 'Audit continuation started' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } finally {
+          await releaseLock(env, auditId);
+        }
       } catch (error) {
         console.error('[Internal] Error continuing audit:', error);
         return new Response(JSON.stringify({ error: 'Failed to continue audit' }), {
@@ -997,7 +1015,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         ).bind(now, now, auditId).run();
 
         // Start audit processing in background
-        const auditPromise = runAuditPhases(auditId, env).then(async (completedAuditId) => {
+        const auditPromise = runAuditPhases(env, ctx, { auditId }).then(async (completedAuditId) => {
           console.log(`[Audit Retry] Audit ${completedAuditId} completed successfully`);
         }).catch(async (error) => {
           console.error(`[Audit Retry] Audit ${auditId} failed:`, error);
@@ -1701,7 +1719,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         ).bind(auditId, propertyId).run();
 
         // Start audit processing in background using ctx.waitUntil
-        const auditPromise = runAuditPhases(auditId, env).then(async (completedAuditId) => {
+        const auditPromise = runAuditPhases(env, ctx, { auditId }).then(async (completedAuditId) => {
           // Auto-start VI run if VI is enabled and site_description is provided
           if (env.USE_LIVE_VISIBILITY === 'true' && body.site_description) {
             try {
