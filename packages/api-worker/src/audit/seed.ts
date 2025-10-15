@@ -54,22 +54,37 @@ export async function seedFrontier(
     const urlCap = parseInt(env.SITEMAP_URL_CAP || '500');
     const childCap = 20; // Max child sitemaps to follow
     
+    // CRITICAL: Limit sitemap discovery to prevent worker timeouts
+    const maxSitemapsToProcess = 3; // Only process first 3 sitemaps
+    const maxUrlsPerSitemap = 100;  // Only take first 100 URLs per sitemap
+    
+    // Process sitemaps with limits to prevent timeouts
+    let sitemapsProcessed = 0;
     for (const sitemapUrl of sitemapUrls) {
+      if (sitemapsProcessed >= maxSitemapsToProcess) {
+        console.log(`[Seed] Limiting to ${maxSitemapsToProcess} sitemaps to prevent timeout`);
+        break;
+      }
+      
       console.log(`[Seed] Parsing sitemap: ${sitemapUrl}`);
-      const result = await parseSitemap(env, sitemapUrl, { childCap, urlCap });
+      const result = await parseSitemap(env, sitemapUrl, { childCap, urlCap: maxUrlsPerSitemap });
       console.log(`[Seed] Sitemap result: ${result.urls.length} URLs, ${result.sitemapIndexCount} children, ${result.urlsetCount} urlset`);
       allUrls.push(...result.urls);
       sitemapIndexCount += result.sitemapIndexCount;
       urlsetCount += result.urlsetCount;
       
-      // Follow child sitemaps (sitemap index)
-      for (const childUrl of result.indexChildren) {
+      // Follow child sitemaps (sitemap index) - limit to prevent timeout
+      const maxChildren = Math.min(result.indexChildren.length, 5); // Only first 5 children
+      for (let i = 0; i < maxChildren; i++) {
+        const childUrl = result.indexChildren[i];
         console.log(`[Seed] Parsing child sitemap: ${childUrl}`);
-        const childResult = await parseSitemap(env, childUrl, { childCap: 0, urlCap });
+        const childResult = await parseSitemap(env, childUrl, { childCap: 0, urlCap: maxUrlsPerSitemap });
         console.log(`[Seed] Child result: ${childResult.urls.length} URLs`);
         allUrls.push(...childResult.urls);
         urlsetCount += childResult.urlsetCount;
       }
+      
+      sitemapsProcessed++;
     }
     
     console.log(`[Seed] Collected ${allUrls.length} total URLs from sitemaps`);
