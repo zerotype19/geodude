@@ -127,8 +127,10 @@ VI_CACHE_TTL_SEC = "172800"
 VI_RECENCY_HOURS = "6"
 
 # BFS Crawl Throughput Knobs (PR-Fix-5)
-PAGE_BATCH_SIZE = "5"           # Process 5 pages per tick (was 2)
+PAGE_BATCH_SIZE = "2"           # Process 2 pages per tick (reduced for stability)
 CRAWL_TIMEBOX_MS = "25000"      # 25s per tick (was 20s)
+CRAWL_TICK_BUDGET_MS = "18000"  # 18s CPU budget per tick (leaves margin for waitUntil)
+MAX_LINKS_ENQUEUE_PER_TICK = "80" # Cap enqueues per tick to prevent timeouts
 CRAWL_MAX_PAGES = "50"          # Target 50 pages per audit
 CRAWL_MAX_DEPTH = "3"           # Max crawl depth
 NAV_SEED_LIMIT = "75"           # Max nav links to seed (was 50)

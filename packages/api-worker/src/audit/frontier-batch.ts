@@ -18,42 +18,55 @@ export async function frontierBatchEnqueue(
   const unique = [...new Set(normalized)];
   console.log(`[FrontierBatch] After normalization: ${unique.length} unique URLs`);
   
-  // Batch insert with duplicate handling
-  const params = unique.flatMap(url => [auditId, url, opts.depth, opts.priorityBase, 'pending', opts.source]);
+  // Convert to items format for new enqueueBatch
+  const items = unique.map(url => ({
+    url,
+    depth: opts.depth,
+    priority: opts.priorityBase
+  }));
   
-  try {
-    // D1 doesn't support ON CONFLICT, so we need to insert one by one with error handling
-    let inserted = 0;
+  return await enqueueBatch(env.DB, auditId, items);
+}
+
+export async function enqueueBatch(
+  db: any, 
+  auditId: string,
+  items: Array<{url: string; depth: number; priority: number}>
+): Promise<number> {
+  if (!items.length) return 0;
+  
+  // Chunk items to keep SQL params under 999 limit
+  const chunks = chunk(items, 120);
+  let total = 0;
+  
+  for (const c of chunks) {
+    const values = c.map(() => '(?,?,?,?, "pending", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)').join(',');
+    const sql = `
+      INSERT INTO audit_frontier (audit_id, url, depth, priority, state, created_at, updated_at)
+      VALUES ${values}
+      ON CONFLICT(audit_id, url) DO NOTHING;
+    `;
+    const params = c.flatMap(i => [auditId, i.url, i.depth, i.priority]);
     
-    for (let i = 0; i < unique.length; i++) {
-      try {
-        const url = unique[i];
-        const offset = i * 6; // Each URL has 6 parameters
-        const urlParams = params.slice(offset, offset + 6);
-        
-        const result = await env.DB.prepare(`
-          INSERT INTO audit_frontier (audit_id, url, depth, priority, status, discovered_from, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-        `).bind(...urlParams).run();
-        
-        if (result.changes > 0) {
-          inserted++;
-        }
-      } catch (error) {
-        // Ignore duplicate key errors (SQLite error 19)
-        if (!error.message?.includes('UNIQUE constraint failed')) {
-          console.warn(`[FrontierBatch] Failed to insert URL ${unique[i]}:`, error);
-        }
-      }
+    try {
+      const res = await db.prepare(sql).bind(...params).run();
+      total += res.meta.changes ?? 0;
+    } catch (error) {
+      console.error(`[FrontierBatch] Error inserting chunk:`, error);
+      // Continue with next chunk
     }
-    
-    console.log(`SEED_ENQUEUE { audit: ${auditId}, attempted: ${unique.length}, inserted: ${inserted}, duplicates: ${unique.length - inserted} }`);
-    
-    return inserted;
-  } catch (error) {
-    console.error(`[FrontierBatch] Error batch inserting URLs:`, error);
-    return 0;
   }
+  
+  console.log(`ENQUEUE_BATCH { audit: ${auditId}, attempted: ${items.length}, inserted: ${total}, duplicates: ${items.length - total} }`);
+  return total;
+}
+
+function chunk<T>(array: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunks.push(array.slice(i, i + size));
+  }
+  return chunks;
 }
 
 export async function markSeeded(env: any, auditId: string): Promise<void> {
