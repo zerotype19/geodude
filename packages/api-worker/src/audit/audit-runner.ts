@@ -29,6 +29,10 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
       const ok = await ensureCrawlCompleteOrRewind(env, auditId, parseInt(env.CRAWL_MAX_PAGES ?? '50'));
       if (!ok) return;                       // rewound; continuation scheduled
       await runCitationsTick(env, auditId);  // a single batch
+      
+      // Schedule next phase
+      console.log(`[AuditRunner] Scheduling next phase (synth) via ctx.waitUntil`);
+      ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
       return;
     }
     case 'synth': {
@@ -36,6 +40,10 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
       const ok = await ensureCrawlCompleteOrRewind(env, auditId, parseInt(env.CRAWL_MAX_PAGES ?? '50'));
       if (!ok) return;
       await runSynthTick(env, auditId);      // a single batch if needed
+      
+      // Schedule next phase
+      console.log(`[AuditRunner] Scheduling next phase (finalize) via ctx.waitUntil`);
+      ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
       return;
     }
     case 'finalize': {
@@ -48,6 +56,10 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
     default:
       // discovery/robots/sitemap/probes should ALSO return after each chunk
       await runPhaseOnce(env, auditId, phase);
+      
+      // Schedule next phase via ctx.waitUntil
+      console.log(`[AuditRunner] Scheduling next phase via ctx.waitUntil`);
+      ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
       return;
   }
 }
@@ -252,6 +264,24 @@ async function runPhaseOnce(env: any, auditId: string, phase: string) {
   const baseUrl = `https://${domain}`;
   
   switch (phase) {
+    case 'init': {
+      console.log(`[AuditRunner] Init phase for ${domain}`);
+      // Update heartbeat
+      await env.DB.prepare(`
+        UPDATE audits 
+        SET phase_heartbeat_at = datetime('now')
+        WHERE id=?1
+      `).bind(auditId).run();
+      
+      // Advance to discovery
+      await env.DB.prepare(`
+        UPDATE audits
+        SET phase='discovery', phase_started_at=datetime('now'), phase_heartbeat_at=datetime('now')
+        WHERE id=?1 AND status='running'
+      `).bind(auditId).run();
+      break;
+    }
+    
     case 'discovery': {
       console.log(`[AuditRunner] Discovery phase for ${domain}`);
       // Update heartbeat
