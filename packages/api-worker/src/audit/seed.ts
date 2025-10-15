@@ -123,20 +123,27 @@ export async function seedFrontier(
     
     console.log(`[Seed] Successfully enqueued ${inserted} URLs for direct crawling`);
     
-    // 7. Always mark as seeded if we have any URLs
-    if (inserted > 0) {
+    // 7. Check if we have enough URLs (either newly inserted or already in frontier)
+    const existingCount = await env.DB.prepare(`
+      SELECT COUNT(*) as count FROM audit_frontier WHERE audit_id = ?1
+    `).bind(auditId).first<{ count: number }>();
+    
+    const totalUrls = existingCount?.count ?? 0;
+    console.log(`[Seed] Total URLs in frontier: ${totalUrls} (newly inserted: ${inserted})`);
+    
+    if (totalUrls >= minRequired) {
       await markSeeded(env, auditId);
       
-      console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${urlsToCrawl.length}, enqueued: ${inserted}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'direct' }`);
+      console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${urlsToCrawl.length}, enqueued: ${inserted}, total_in_frontier: ${totalUrls}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'direct' }`);
       
       return {
         homepage: 1,
         navLinks: 0,
         sitemapUrls: urlsToCrawl.length,
-        total: inserted,
+        total: totalUrls,
         seeded: true
       };
-    } else if (fallbackHome && inserted < minRequired) {
+    } else if (fallbackHome && totalUrls < minRequired) {
       // 9. Fallback: add common paths if still below threshold
       const commonPaths = [
         '/about', '/contact', '/support', '/help', '/faq', '/privacy', '/terms',
@@ -155,23 +162,31 @@ export async function seedFrontier(
       const totalInserted = inserted + fallbackInserted;
       console.log(`[Seed] Added ${fallbackInserted} fallback URLs, total: ${totalInserted}`);
       
-      if (totalInserted >= minRequired) {
+      // Check total URLs in frontier after fallback
+      const finalCount = await env.DB.prepare(`
+        SELECT COUNT(*) as count FROM audit_frontier WHERE audit_id = ?1
+      `).bind(auditId).first<{ count: number }>();
+      
+      const finalTotal = finalCount?.count ?? 0;
+      console.log(`[Seed] Final total URLs in frontier: ${finalTotal}`);
+      
+      if (finalTotal >= minRequired) {
         await markSeeded(env, auditId);
         
-        console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${urlsToCrawl.length + fallbackUrls.length}, enqueued: ${totalInserted}, seeded: 1, fallback: ${fallbackInserted}, mode: 'direct+fallback' }`);
+        console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${urlsToCrawl.length + fallbackUrls.length}, enqueued: ${totalInserted}, total_in_frontier: ${finalTotal}, seeded: 1, fallback: ${fallbackInserted}, mode: 'direct+fallback' }`);
         
         return {
           homepage: 1,
           navLinks: 0,
           sitemapUrls: urlsToCrawl.length,
-          total: totalInserted,
+          total: finalTotal,
           seeded: true
         };
       }
     }
     
     // 10. If still not enough, fail the seeding
-    console.error(`[Seed] SEED_INSUFFICIENT_URLS: Only ${inserted} URLs enqueued, need ${minRequired}`);
+    console.error(`[Seed] SEED_INSUFFICIENT_URLS: Only ${totalUrls} URLs in frontier, need ${minRequired}`);
     await env.DB.prepare(`
       UPDATE audits 
       SET phase_state = json_set(
