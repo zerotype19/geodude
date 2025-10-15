@@ -11,12 +11,16 @@ export interface SafeFetchOptions {
   method?: string;
   body?: string;
   signal?: AbortSignal;
+  followRedirects?: boolean;
 }
 
 export interface SafeFetchResult<T = any> {
   ok: boolean;
   status?: number;
   data?: T;
+  text?: string;
+  headers?: Record<string, string>;
+  finalUrl?: string;
   error?: {
     code: string;
     message: string;
@@ -39,7 +43,8 @@ export async function safeFetch<T = any>(
     headers = {},
     method = 'GET',
     body,
-    signal
+    signal,
+    followRedirects = true
   } = options;
 
   let lastError: Error | null = null;
@@ -60,24 +65,37 @@ export async function safeFetch<T = any>(
         headers,
         body,
         signal: combinedSignal,
+        redirect: followRedirects ? 'follow' : 'manual'
       });
 
       clearTimeout(timeoutId);
 
       if (response.ok) {
         let data: T;
+        let text: string;
         const contentType = response.headers.get('content-type');
         
         if (contentType?.includes('application/json')) {
           data = await response.json();
+          text = JSON.stringify(data);
         } else {
-          data = await response.text() as T;
+          text = await response.text();
+          data = text as T;
         }
+
+        // Convert headers to object
+        const headersObj: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+          headersObj[key] = value;
+        });
 
         return {
           ok: true,
           status: response.status,
           data,
+          text,
+          headers: headersObj,
+          finalUrl: response.url,
         };
       }
 
