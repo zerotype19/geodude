@@ -107,9 +107,9 @@ export async function crawlBatchBfs(
       if (isHtml) {
         console.log('ANALYZE_RUN', { url, html_len: res.html.length });
         try {
-          const { analyzeHtml } = await import('../../analysis/html-analyzer');
-          const { mapToDb } = await import('../../analysis/map');
-          const { saveAnalysisRow } = await import('../../analysis/save-analysis');
+          const { analyzeHtml } = await import('../analysis/html-analyzer');
+          const { mapToDb } = await import('../analysis/map');
+          const { saveAnalysisRow } = await import('../analysis/save-analysis');
           
           const parsed = analyzeHtml(res.html, url);       // must not throw; catch inside if needed
           const row = mapToDb(auditId, url, parsed);
