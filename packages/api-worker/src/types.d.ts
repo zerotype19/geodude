@@ -14,10 +14,11 @@ declare global {
     // Browser Rendering (Cloudflare)
     BROWSER?: any;
     
-    // Environment Variables
-    USER_AGENT: string;
-    AUDIT_MAX_PAGES: string;
-    AUDIT_DAILY_LIMIT: string;
+  // Environment Variables
+  USER_AGENT: string;
+  AUDIT_MAX_PAGES: string;
+  AUDIT_DAILY_LIMIT: string;
+  RATE_LIMIT_DAILY_ENABLED?: string;
     HASH_SALT: string;
     BRAVE_SEARCH_ENDPOINT: string;
     CITATIONS_MAX_PER_QUERY: string;

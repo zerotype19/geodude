@@ -38,6 +38,7 @@ interface Env {
   USER_AGENT: string;
   AUDIT_MAX_PAGES: string;
   AUDIT_DAILY_LIMIT: string;
+  RATE_LIMIT_DAILY_ENABLED?: string;
   HASH_SALT: string;
   BRAVE_SEARCH?: string;
   BRAVE_SEARCH_ENDPOINT?: string;
@@ -104,25 +105,11 @@ async function validateApiKey(apiKey: string | null, env: Env): Promise<{ valid:
   return { valid: true, projectId: project.id };
 }
 
-// Helper: Check rate limit
+// Helper: Check rate limit (now with feature flag support)
 async function checkRateLimit(projectId: string, env: Env): Promise<{ allowed: boolean; count: number; limit: number }> {
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  const key = `rl:${projectId}:${today}`;
-  
-  const currentCount = await env.RATE_LIMIT_KV.get(key);
-  const count = currentCount ? parseInt(currentCount) : 0;
-  const limit = parseInt(env.AUDIT_DAILY_LIMIT || '10');
-
-  if (count >= limit) {
-    return { allowed: false, count, limit };
-  }
-
-  // Increment counter
-  await env.RATE_LIMIT_KV.put(key, (count + 1).toString(), {
-    expirationTtl: 86400 * 2, // 2 days
-  });
-
-  return { allowed: true, count: count + 1, limit };
+  // Import the new rate limiting utilities
+  const { enforceDailyAuditLimit } = await import('./lib/rate-limit');
+  return await enforceDailyAuditLimit(env, projectId);
 }
 
 // Helper: Check citations budget (prevent excessive API calls)
@@ -1650,7 +1637,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         }
         
         // Check rate limit (demo gets higher limit)
-        const rateLimit = await checkRateLimit(authResult.projectId!, env, authResult.projectId === 'demo' ? 100 : undefined);
+        const rateLimit = await checkRateLimit(authResult.projectId!, env);
         
         if (!rateLimit.allowed) {
           return new Response(
