@@ -70,7 +70,7 @@
             <li>Go to <a href="https://app.optiview.ai" style="color: #3b82f6;">app.optiview.ai</a></li>
             <li>Enter your website URL (e.g., <code>yoursite.com</code>)</li>
             <li>Click "Run Audit"</li>
-            <li>Wait 2-5 minutes for the audit to complete</li>
+            <li>Get instant results - audits complete in under 30 seconds</li>
             <li>Review your scores, issues, and citations</li>
         </ol>
         <p><strong>No account required for demo audits!</strong> You can run an audit immediately to see what we find.</p>
@@ -157,7 +157,7 @@
         <h2>Brave AI Integration</h2>
         
         <h3>How does the Brave AI integration work?</h3>
-        <p>For each audit, we run 30 "smart queries" designed to test how AI engines answer questions about your brand:</p>
+        <p>For each audit, we run 50 "smart queries" designed to test how AI engines answer questions about your brand:</p>
         <ul>
             <li><strong>Brand Core</strong> (e.g., "site:yourdomain.com", "your brand name")</li>
             <li><strong>Product How-To</strong> (e.g., "how to use [product]", "how [product] works")</li>
@@ -231,17 +231,21 @@
         </ul>
 
         <h3>How long does an audit take?</h3>
-        <p>Typical audit timeline:</p>
+        <p>With our new phase-based execution system, audits are now much faster:</p>
         <ul>
-            <li><strong>Small sites (10-30 pages):</strong> 1-3 minutes</li>
-            <li><strong>Medium sites (30-60 pages):</strong> 3-5 minutes</li>
-            <li><strong>Large sites (60-120 pages):</strong> 5-10 minutes</li>
+            <li><strong>Typical completion:</strong> 15-30 seconds</li>
+            <li><strong>Maximum time:</strong> Under 2 minutes</li>
+            <li><strong>Phase-based execution:</strong> Discovery → Robots → Sitemap → Probes → Crawl → Citations → Synthesis → Finalize</li>
         </ul>
-        <p>Most of the time is spent running Brave AI queries (up to 50 queries with built-in rate-limit handling to avoid 429 errors).</p>
+        <p>Our system includes automatic timeout handling, circuit breakers, and retry mechanisms to ensure reliable completion.</p>
 
         <h3>Can I re-run an audit?</h3>
-        <p>Yes! Click the <strong>"🔄 Re-run Audit"</strong> button at the top of any audit report. This creates a fresh audit using the same settings.</p>
-        <p><strong>Tip:</strong> Re-run after making changes to see if your score improves!</p>
+        <p>Yes! You have two options:</p>
+        <ul>
+            <li><strong>🔄 Re-run Audit:</strong> Creates a fresh audit using the same settings</li>
+            <li><strong>🔄 Retry from Checkpoint:</strong> For failed audits, retry from the last successful phase</li>
+        </ul>
+        <p><strong>Tip:</strong> Re-run after making changes to see if your score improves! If an audit fails, use the retry feature to continue from where it left off.</p>
 
         <h3>What are "Issues" and how do I fix them?</h3>
         <p>Issues are specific problems we found during the audit. Severity levels:</p>

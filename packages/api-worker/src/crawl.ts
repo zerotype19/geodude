@@ -3,6 +3,8 @@
  * Checks robots.txt, sitemap, and AI bot access
  */
 
+import { safeFetch } from './safe-fetch';
+
 interface RobotsData {
   found: boolean;
   content?: string;
@@ -13,6 +15,7 @@ interface RobotsData {
 interface SitemapData {
   found: boolean;
   urlCount?: number;
+  urls?: string[];
 }
 
 const AI_BOTS = [
@@ -58,14 +61,15 @@ export async function checkRobotsTxt(baseUrl: string): Promise<RobotsData> {
   const robotsUrl = `${baseUrl}/robots.txt`;
   
   try {
-    const response = await fetch(robotsUrl, {
-      redirect: 'follow',
+    const response = await safeFetch(robotsUrl, {
+      timeoutMs: 10000, // 10s timeout
+      retries: 2,
       headers: {
         'User-Agent': 'OptiviewAuditBot/1.0'
-      },
+      }
     });
 
-    if (!response.ok) {
+    if (!response.ok || !response.data) {
       return {
         found: false,
         aiBotsAllowed: Object.fromEntries(AI_BOTS.map(bot => [bot, true])), // Assume allowed if no robots.txt
@@ -73,7 +77,7 @@ export async function checkRobotsTxt(baseUrl: string): Promise<RobotsData> {
       };
     }
 
-    const content = await response.text();
+    const content = response.data as string;
     const aiBotsAllowed = parseRobotsForBots(content);
     const sitemapUrls = parseSitemapUrls(content);
 
@@ -169,7 +173,7 @@ function parseSitemapUrls(content: string): string[] {
 }
 
 /**
- * Check if sitemap is accessible
+ * Check if sitemap is accessible and extract URLs
  */
 export async function checkSitemap(sitemapUrls: string[]): Promise<SitemapData> {
   if (sitemapUrls.length === 0) {
@@ -180,31 +184,66 @@ export async function checkSitemap(sitemapUrls: string[]): Promise<SitemapData> 
   const sitemapUrl = sitemapUrls[0];
 
   try {
-    const response = await fetch(sitemapUrl, {
-      redirect: 'follow',
+    const response = await safeFetch(sitemapUrl, {
+      timeoutMs: 10000, // 10s timeout
+      retries: 2,
       headers: {
         'User-Agent': 'OptiviewAuditBot/1.0'
-      },
+      }
     });
 
-    if (!response.ok) {
+    if (!response.ok || !response.data) {
       return { found: false };
     }
 
-    const content = await response.text();
+    const content = response.data as string;
     
-    // Count URLs in sitemap (rough estimate)
-    const urlMatches = content.match(/<loc>/g);
-    const urlCount = urlMatches ? urlMatches.length : 0;
-
+    // Extract URLs from sitemap
+    const urls = extractUrlsFromSitemap(content);
+    
     return {
       found: true,
-      urlCount,
+      urlCount: urls.length,
+      urls: urls.slice(0, 100), // Limit to first 100 URLs
     };
   } catch (error) {
     console.error('Failed to fetch sitemap:', error);
     return { found: false };
   }
+}
+
+/**
+ * Extract URLs from sitemap XML content
+ */
+function extractUrlsFromSitemap(content: string): string[] {
+  const urls: string[] = [];
+  
+  // Handle both regular sitemaps and sitemap index files
+  if (content.includes('<sitemapindex')) {
+    // Sitemap index - extract sitemap URLs
+    const sitemapMatches = content.match(/<loc>(.*?)<\/loc>/g);
+    if (sitemapMatches) {
+      sitemapMatches.forEach(match => {
+        const url = match.replace(/<\/?loc>/g, '');
+        if (url && url.startsWith('http')) {
+          urls.push(url);
+        }
+      });
+    }
+  } else {
+    // Regular sitemap - extract page URLs
+    const urlMatches = content.match(/<loc>(.*?)<\/loc>/g);
+    if (urlMatches) {
+      urlMatches.forEach(match => {
+        const url = match.replace(/<\/?loc>/g, '');
+        if (url && url.startsWith('http')) {
+          urls.push(url);
+        }
+      });
+    }
+  }
+  
+  return urls;
 }
 
 /**
@@ -215,14 +254,15 @@ export async function probeAiAccess(url: string): Promise<AiAccessProbeResult> {
   // First, get baseline with normal user agent
   let baselineStatus = 0;
   try {
-    const baseline = await fetch(url, { 
+    const baseline = await safeFetch(url, { 
+      timeoutMs: 15000, // 15s timeout for AI probes
+      retries: 1,
       method: 'HEAD',
-      redirect: 'manual', // Don't follow redirects
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     });
-    baselineStatus = baseline.status;
+    baselineStatus = baseline.status || 0;
   } catch (error) {
     console.error('Baseline probe failed:', error);
   }
@@ -232,9 +272,10 @@ export async function probeAiAccess(url: string): Promise<AiAccessProbeResult> {
   // Test each AI bot user agent
   for (const bot of AI_BOT_USER_AGENTS) {
     try {
-      const response = await fetch(url, {
+      const response = await safeFetch(url, {
+        timeoutMs: 15000, // 15s timeout for AI probes
+        retries: 1,
         method: 'HEAD',
-        redirect: 'manual',
         headers: {
           'User-Agent': bot.ua
         }

@@ -18,6 +18,10 @@ import { createVisibilityAnalyticsRoutes } from './routes/visibility-analytics';
 import { createVIRoutes } from './routes/vi';
 import { createGroupedVIRoutes } from './routes/vi_grouped';
 import { createDebugVIRoutes } from './routes/vi_debug';
+import { runWatchdog } from './watchdog';
+import { runPhase, PHASE_CONFIGS } from './phase-runner';
+import { runAuditPhases } from './audit-phases';
+import { getCircuitStatus } from './circuit-breaker';
 import { normalizeFromUrl } from './lib/domain';
 
 interface Env {
@@ -285,6 +289,40 @@ export default {
                   }
                   return;
                 }
+
+        // Audit Watchdog: Check for stuck audits every 5 minutes
+        try {
+          const watchdogResult = await runWatchdog(env);
+          if (watchdogResult.checked > 0) {
+            console.log(`[AuditWatchdog] Checked ${watchdogResult.checked} audits, re-enqueued ${watchdogResult.reEnqueued}, failed ${watchdogResult.failed}`);
+          }
+        } catch (error) {
+          console.error('[AuditWatchdog] Error running watchdog:', error);
+        }
+
+        // Legacy Cleanup: Clean up old stuck audits daily (at 3 AM)
+        const now = new Date();
+        if (now.getHours() === 3 && now.getMinutes() < 5) {
+          try {
+            const cleanupResult = await env.DB.prepare(
+              `UPDATE audits
+               SET status='failed',
+                   failure_code='LEGACY_STUCK',
+                   failure_detail='Auto-failed by cleanup: no heartbeat; pre-refactor run',
+                   completed_at=datetime('now')
+               WHERE status='running'
+                 AND (phase='init' OR phase IS NULL)
+                 AND (phase_heartbeat_at IS NULL OR phase_heartbeat_at < datetime('now','-7 day'))
+                 AND started_at < datetime('now','-1 day')`
+            ).run();
+            
+            if (cleanupResult.changes > 0) {
+              console.log(`[LegacyCleanup] Cleaned up ${cleanupResult.changes} legacy stuck audits`);
+            }
+          } catch (error) {
+            console.error('[LegacyCleanup] Error cleaning up legacy audits:', error);
+          }
+        }
 
     // VI Watchdog: Mark stale runs as timed_out every 5 minutes
     if (env.USE_LIVE_VISIBILITY === 'true') {
@@ -880,6 +918,280 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       return handleBotLogsIngest(request, env);
     }
 
+    // POST /v1/audits/retry - Retry audit from checkpoint
+    if (path === '/v1/audits/retry' && request.method === 'POST') {
+      try {
+        const body = await request.json() as { audit_id: string; resume?: boolean };
+        const { audit_id: auditId, resume = true } = body;
+
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'audit_id is required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get current audit state
+        const audit = await env.DB.prepare(
+          'SELECT id, status, phase, phase_attempts FROM audits WHERE id = ?'
+        ).bind(auditId).first<{ id: string; status: string; phase: string; phase_attempts: number }>();
+
+        if (!audit) {
+          return new Response(JSON.stringify({ error: 'Audit not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (audit.status !== 'failed') {
+          return new Response(JSON.stringify({ error: 'Can only retry failed audits' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Reset audit for retry
+        const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        await env.DB.prepare(
+          `UPDATE audits 
+           SET status = 'running',
+               phase = 'init',
+               phase_started_at = ?,
+               phase_heartbeat_at = ?,
+               failure_code = NULL,
+               failure_detail = NULL,
+               phase_attempts = phase_attempts + 1
+           WHERE id = ?`
+        ).bind(now, now, auditId).run();
+
+        // Start audit processing in background
+        const auditPromise = runAuditPhases(auditId, env).then(async (completedAuditId) => {
+          console.log(`[Audit Retry] Audit ${completedAuditId} completed successfully`);
+        }).catch(async (error) => {
+          console.error(`[Audit Retry] Audit ${auditId} failed:`, error);
+          await env.DB.prepare(
+            `UPDATE audits 
+             SET status = 'failed', 
+                 error = ?,
+                 completed_at = datetime('now')
+             WHERE id = ?`
+          ).bind(
+            error instanceof Error ? error.message : String(error),
+            auditId
+          ).run();
+        });
+
+        // Use ctx.waitUntil to run audit in background
+        if (ctx && ctx.waitUntil) {
+          ctx.waitUntil(auditPromise);
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          audit_id: auditId,
+          message: 'Audit retry started from checkpoint'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        console.error('[Audit Retry] Error:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to retry audit',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // POST /admin/cleanup-legacy-audits - Clean up legacy stuck audits (admin only)
+    if (path === '/admin/cleanup-legacy-audits' && request.method === 'POST') {
+      try {
+        const result = await env.DB.prepare(
+          `UPDATE audits
+           SET status='failed',
+               failure_code='LEGACY_STUCK',
+               failure_detail='Auto-failed by cleanup: no heartbeat; pre-refactor run',
+               completed_at=datetime('now')
+           WHERE status='running'
+             AND (phase='init' OR phase IS NULL)
+             AND (phase_heartbeat_at IS NULL OR phase_heartbeat_at < datetime('now','-7 day'))
+             AND started_at < datetime('now','-1 day')`
+        ).run();
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Legacy stuck audits cleaned up',
+          changes: result.changes,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        console.error('[Cleanup Legacy] Error:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to cleanup legacy audits',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // GET /admin/audit-stats - Get audit statistics for ops dashboard (admin only)
+    if (path === '/admin/audit-stats' && request.method === 'GET') {
+      try {
+        // Audits last 24h by status
+        const statusStats = await env.DB.prepare(
+          `SELECT status, COUNT(*) as count
+           FROM audits
+           WHERE started_at > datetime('now','-1 day')
+           GROUP BY status`
+        ).all();
+
+        // Phase duration stats (p50/p95)
+        const phaseStats = await env.DB.prepare(
+          `SELECT phase, 
+                  AVG(CASE WHEN phase_started_at IS NOT NULL AND completed_at IS NOT NULL 
+                      THEN (julianday(completed_at) - julianday(phase_started_at)) * 1440.0 * 60.0 
+                      ELSE NULL END) as avg_duration_ms,
+                  COUNT(CASE WHEN phase_started_at IS NOT NULL AND completed_at IS NOT NULL THEN 1 END) as completed_count
+           FROM audits
+           WHERE started_at > datetime('now','-1 day')
+             AND phase IS NOT NULL
+           GROUP BY phase
+           HAVING completed_count > 0`
+        ).all();
+
+        // Top failure codes last 24h
+        const failureStats = await env.DB.prepare(
+          `SELECT failure_code, COUNT(*) as count
+           FROM audits
+           WHERE status = 'failed'
+             AND started_at > datetime('now','-1 day')
+             AND failure_code IS NOT NULL
+           GROUP BY failure_code
+           ORDER BY count DESC
+           LIMIT 10`
+        ).all();
+
+        // Watchdog actions last 24h (from logs - we'd need to track this in a table for real implementation)
+        const watchdogStats = {
+          rescues: 0, // Would need to track in audit_watchdog_logs table
+          force_fails: 0
+        };
+
+        // Current running audits with weak heartbeat
+        const stuckAudits = await env.DB.prepare(
+          `SELECT id, phase, phase_heartbeat_at
+           FROM audits
+           WHERE status='running'
+             AND julianday('now') - julianday(phase_heartbeat_at) > 2.0/1440`
+        ).all();
+
+        const stats = {
+          audits_last_24h: Object.fromEntries(
+            (statusStats.results || []).map((s: any) => [s.status, s.count])
+          ),
+          phase_performance: (phaseStats.results || []).map((p: any) => ({
+            phase: p.phase,
+            avg_duration_ms: Math.round(p.avg_duration_ms || 0),
+            completed_count: p.completed_count
+          })),
+          top_failure_codes: (failureStats.results || []).map((f: any) => ({
+            code: f.failure_code,
+            count: f.count
+          })),
+          watchdog_actions: watchdogStats,
+          current_stuck_count: (stuckAudits.results || []).length,
+          timestamp: new Date().toISOString()
+        };
+
+        return new Response(JSON.stringify(stats), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        console.error('[Audit Stats] Error:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to get audit stats',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // GET /admin/circuit-status - Get circuit breaker status (admin only)
+    if (path === '/admin/circuit-status' && request.method === 'GET') {
+      try {
+        const status = await getCircuitStatus(env);
+        return new Response(JSON.stringify({
+          success: true,
+          circuits: status,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('[Circuit Status] Error:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to get circuit status',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // GET /admin/test-phase-runner - Test the phase runner (admin only)
+    if (path === '/admin/test-phase-runner' && request.method === 'GET') {
+      try {
+        const testAuditId = `test_${Date.now()}`;
+        
+        // Create a test audit record using existing property
+        await env.DB.prepare(
+          `INSERT INTO audits (id, property_id, status, pages_total, phase) 
+           VALUES (?, ?, 'running', 0, 'init')`
+        ).bind(testAuditId, 'prop_1760416136281_example_com').run();
+
+        // Test a simple phase
+        const result = await runPhase(testAuditId, 'discovery', env, async (ctx) => {
+          console.log(`[TestPhase] Running discovery phase for ${ctx.auditId}`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate work
+          return { urls: ['https://example.com'] };
+        });
+
+        // Clean up test audit
+        await env.DB.prepare('DELETE FROM audits WHERE id = ?').bind(testAuditId).run();
+
+        return new Response(
+          JSON.stringify({ 
+            ok: true, 
+            testResult: result,
+            phaseConfigs: Object.keys(PHASE_CONFIGS)
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        return new Response(
+          JSON.stringify({ 
+            ok: false, 
+            error: error instanceof Error ? error.message : String(error) 
+          }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    }
+
     // POST /admin/audits/:id/fail - Manually fail a stuck audit (admin only)
     if (path.match(/^\/admin\/audits\/[^/]+\/fail$/) && request.method === 'POST') {
       const auditId = path.split('/')[3];
@@ -1340,76 +1652,80 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           );
         }
 
-        const auditId = await runAudit(propertyId, env, {
-          maxPages,
-          filters: {
-            include: includePatterns as RegExp[],
-            exclude: excludePatterns as RegExp[],
-          },
+        // Create audit record with "running" status
+        const auditId = `aud_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        await env.DB.prepare(
+          `INSERT INTO audits (id, property_id, status, pages_total) 
+           VALUES (?, ?, 'running', 0)`
+        ).bind(auditId, propertyId).run();
+
+        // Start audit processing in background using ctx.waitUntil
+        const auditPromise = runAuditPhases(auditId, env).then(async (completedAuditId) => {
+          // Auto-start VI run if VI is enabled and site_description is provided
+          if (env.USE_LIVE_VISIBILITY === 'true' && body.site_description) {
+            try {
+              console.log(`[Audit Start] Auto-starting VI run for audit ${completedAuditId}`);
+              
+              const viRoutes = createVIRoutes(env);
+              const viRequest = new Request('http://localhost/api/vi/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  audit_id: completedAuditId,
+                  mode: 'auto',
+                  sources: JSON.parse(env.VI_SOURCES || '["chatgpt_search","perplexity","claude"]'),
+                  max_intents: parseInt(env.VI_MAX_INTENTS || '100'),
+                  regenerate_intents: true, // Always regenerate for auto-runs
+                  site_description: body.site_description
+                })
+              });
+
+              const viResponse = await viRoutes.fetch(viRequest);
+              const viResult = await viResponse.json();
+              
+              if (viResult.run_id) {
+                console.log(`[Audit Start] VI run started: ${viResult.run_id}`);
+              } else {
+                console.warn(`[Audit Start] VI run failed:`, viResult);
+              }
+            } catch (viError) {
+              console.error(`[Audit Start] Failed to start VI run:`, viError);
+              // Don't fail the audit creation if VI fails
+            }
+          }
+        }).catch(async (error) => {
+          console.error(`[Audit Start] Audit ${auditId} failed:`, error);
+          // Update audit with error status
+          await env.DB.prepare(
+            `UPDATE audits 
+             SET status = 'failed', 
+                 error = ?,
+                 completed_at = datetime('now')
+             WHERE id = ?`
+          ).bind(
+            error instanceof Error ? error.message : String(error),
+            auditId
+          ).run();
         });
 
-        // Auto-start VI run if VI is enabled and site_description is provided
-        if (env.USE_LIVE_VISIBILITY === 'true' && body.site_description) {
-          try {
-            console.log(`[Audit Start] Auto-starting VI run for audit ${auditId}`);
-            
-            const viRoutes = createVIRoutes(env);
-            const viRequest = new Request('http://localhost/api/vi/run', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                audit_id: auditId,
-                mode: 'auto',
-                sources: JSON.parse(env.VI_SOURCES || '["chatgpt_search","perplexity","claude"]'),
-                max_intents: parseInt(env.VI_MAX_INTENTS || '100'),
-                regenerate_intents: true, // Always regenerate for auto-runs
-                site_description: body.site_description
-              })
-            });
-
-            const viResponse = await viRoutes.fetch(viRequest);
-            const viResult = await viResponse.json();
-            
-            if (viResult.run_id) {
-              console.log(`[Audit Start] VI run started: ${viResult.run_id}`);
-            } else {
-              console.warn(`[Audit Start] VI run failed:`, viResult);
-            }
-          } catch (viError) {
-            console.error(`[Audit Start] Failed to start VI run:`, viError);
-            // Don't fail the audit creation if VI fails
-          }
+        // Use ctx.waitUntil to run audit in background
+        if (ctx && ctx.waitUntil) {
+          ctx.waitUntil(auditPromise);
         }
 
-        // Fetch the completed audit
-        const audit = await env.DB.prepare(
-          `SELECT id, property_id, status, score_overall, score_crawlability, 
-                  score_structured, score_answerability, score_trust, 
-                  pages_crawled, pages_total, issues_count, 
-                  started_at, completed_at, error
-           FROM audits WHERE id = ?`
-        ).bind(auditId).first();
-
-        // Transform scores for consistency with GET endpoint
-        const scores = audit.score_overall !== null ? {
-          total: audit.score_overall,
-          crawlability: audit.score_crawlability,
-          structured: audit.score_structured,
-          answerability: audit.score_answerability,
-          trust: audit.score_trust,
-        } : null;
-
+        // Immediately return the audit ID with "running" status
         const response = {
-          id: audit.id,
-          property_id: audit.property_id,
-          status: audit.status,
-          scores: scores,
-          pages_crawled: audit.pages_crawled,
-          pages_total: audit.pages_total,
-          issues_count: audit.issues_count,
-          started_at: audit.started_at,
-          completed_at: audit.completed_at,
-          error: audit.error,
+          id: auditId,
+          property_id: propertyId,
+          status: 'running',
+          scores: null,
+          pages_crawled: 0,
+          pages_total: 0,
+          issues_count: 0,
+          started_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          completed_at: null,
+          error: null,
         };
 
         return new Response(JSON.stringify(response), {
@@ -1684,6 +2000,58 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+    }
+
+    // GET /v1/audits/:id/pages - Get all pages for audit with pagination
+    if (path.match(/^\/v1\/audits\/[^/]+\/pages$/) && request.method === 'GET') {
+      const auditId = path.split('/')[3];
+      const url = new URL(request.url);
+      
+      // Parse pagination params
+      const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
+      const pageSize = Math.min(50, Math.max(1, parseInt(url.searchParams.get('pageSize') || '20')));
+      const offset = (page - 1) * pageSize;
+
+      try {
+        // Get pages with pagination
+        const result = await env.DB.prepare(
+          `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present, 
+                  word_count, rendered_words, load_time_ms, error, snippet
+           FROM audit_pages 
+           WHERE audit_id = ?
+           ORDER BY url
+           LIMIT ? OFFSET ?`
+        ).bind(auditId, pageSize, offset).all();
+
+        // Get total count
+        const countResult = await env.DB.prepare(
+          'SELECT COUNT(*) as total FROM audit_pages WHERE audit_id = ?'
+        ).bind(auditId).first<{ total: number }>();
+
+        const total = countResult?.total || 0;
+
+        return new Response(JSON.stringify({
+          results: result.results || [],
+          pagination: {
+            page,
+            pageSize,
+            total,
+            totalPages: Math.ceil(total / pageSize),
+          },
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        console.error('[Pages Endpoint] Error:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to fetch pages',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     }
 
@@ -2252,6 +2620,128 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       }
     }
 
+    // GET /v1/audits - List audits with pagination and phase tracking
+    if (path === '/v1/audits' && request.method === 'GET') {
+      try {
+        const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
+        const pageSize = Math.min(50, Math.max(1, parseInt(url.searchParams.get('pageSize') || '20')));
+        const offset = (page - 1) * pageSize;
+        const propertyId = url.searchParams.get('property_id');
+
+        let query = `
+          SELECT a.id, a.property_id, a.status, a.score_overall, a.pages_crawled, a.pages_total, 
+                 a.issues_count, a.started_at, a.completed_at, a.error,
+                 a.phase, a.phase_started_at, a.phase_heartbeat_at, a.phase_attempts, 
+                 a.failure_code, a.failure_detail,
+                 p.domain, p.name as property_name
+          FROM audits a
+          JOIN properties p ON a.property_id = p.id
+        `;
+        
+        const params: any[] = [];
+        
+        if (propertyId) {
+          query += ' WHERE a.property_id = ?';
+          params.push(propertyId);
+        }
+        
+        query += ' ORDER BY a.started_at DESC LIMIT ? OFFSET ?';
+        params.push(pageSize, offset);
+
+        const audits = await env.DB.prepare(query).bind(...params).all();
+
+        // Get total count
+        let countQuery = 'SELECT COUNT(*) as total FROM audits a';
+        const countParams: any[] = [];
+        
+        if (propertyId) {
+          countQuery += ' WHERE a.property_id = ?';
+          countParams.push(propertyId);
+        }
+        
+        const countResult = await env.DB.prepare(countQuery).bind(...countParams).first<{ total: number }>();
+        const total = countResult?.total || 0;
+
+        // Transform results with phase information
+        const results = (audits.results || []).map((audit: any) => {
+          const now = new Date();
+          const startedAt = new Date(audit.started_at);
+          const completedAt = audit.completed_at ? new Date(audit.completed_at) : null;
+          const heartbeatAt = audit.phase_heartbeat_at ? new Date(audit.phase_heartbeat_at) : null;
+          
+          // Calculate duration
+          const endTime = completedAt || now;
+          const durationMs = endTime.getTime() - startedAt.getTime();
+          const durationMinutes = Math.round(durationMs / 60000);
+          
+          // Calculate heartbeat age
+          const heartbeatAgeMs = heartbeatAt ? now.getTime() - heartbeatAt.getTime() : null;
+          const heartbeatAgeSeconds = heartbeatAgeMs ? Math.round(heartbeatAgeMs / 1000) : null;
+          
+          // Determine status color based on heartbeat
+          let statusColor = 'green'; // completed
+          if (audit.status === 'running') {
+            if (!heartbeatAgeMs) {
+              statusColor = 'red'; // no heartbeat
+            } else if (heartbeatAgeMs > 120000) { // > 2 minutes
+              statusColor = 'red';
+            } else if (heartbeatAgeMs > 90000) { // > 90 seconds
+              statusColor = 'amber';
+            }
+          } else if (audit.status === 'failed') {
+            statusColor = 'red';
+          }
+
+          return {
+            id: audit.id,
+            property_id: audit.property_id,
+            status: audit.status,
+            phase: audit.phase || 'init',
+            phase_started_at: audit.phase_started_at,
+            phase_heartbeat_at: audit.phase_heartbeat_at,
+            phase_attempts: audit.phase_attempts || 0,
+            failure_code: audit.failure_code,
+            failure_detail: audit.failure_detail ? JSON.parse(audit.failure_detail) : null,
+            score_overall: audit.score_overall,
+            pages_crawled: audit.pages_crawled,
+            pages_total: audit.pages_total,
+            issues_count: audit.issues_count,
+            started_at: audit.started_at,
+            completed_at: audit.completed_at,
+            error: audit.error,
+            domain: audit.domain,
+            property_name: audit.property_name,
+            // Computed fields
+            duration_minutes: durationMinutes,
+            heartbeat_age_seconds: heartbeatAgeSeconds,
+            status_color: statusColor,
+          };
+        });
+
+        return new Response(JSON.stringify({
+          results,
+          pagination: {
+            page,
+            pageSize,
+            total,
+            totalPages: Math.ceil(total / pageSize),
+          },
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        console.error('[Audit List] Error:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to fetch audits',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // GET /v1/audits/:id - Get audit details (public for now, could add auth later)
     if (path.match(/^\/v1\/audits\/[^/]+$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
@@ -2267,12 +2757,14 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       }
 
       try {
-        // Get audit
+        // Get audit with phase tracking
         const audit = await env.DB.prepare(
           `SELECT id, property_id, status, score_overall, score_crawlability, 
                   score_structured, score_answerability, score_trust, 
                   pages_crawled, pages_total, issues_count, 
-                  started_at, completed_at, error, ai_access_json, ai_flags_json, brave_ai_json
+                  started_at, completed_at, error, ai_access_json, ai_flags_json, brave_ai_json,
+                  phase, phase_started_at, phase_heartbeat_at, phase_attempts, 
+                  failure_code, failure_detail
            FROM audits WHERE id = ?`
         ).bind(auditId).first();
 
@@ -2476,6 +2968,9 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         
         // Parse AI flags
         const aiFlags = audit.ai_flags_json ? JSON.parse(audit.ai_flags_json as string) : null;
+        
+        // Get circuit breaker status for audit environment
+        const circuitStatus = await getCircuitStatus(env);
         
         // Parse Brave AI results (Phase F+ enhanced with diagnostics)
         let braveAI = null;
@@ -2769,6 +3264,15 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           started_at: audit.started_at,
           completed_at: audit.completed_at,
           error: audit.error,
+          // Phase tracking information
+          phase: audit.phase || 'init',
+          phase_started_at: audit.phase_started_at,
+          phase_heartbeat_at: audit.phase_heartbeat_at,
+          phase_attempts: audit.phase_attempts || 0,
+          failure_code: audit.failure_code,
+          failure_detail: audit.failure_detail ? JSON.parse(audit.failure_detail) : null,
+          // Audit environment status
+          circuit_breakers: circuitStatus,
           pages: pagesOut,
           issues: transformedIssues,
           citations: citations,

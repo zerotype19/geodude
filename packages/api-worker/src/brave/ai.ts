@@ -6,6 +6,7 @@
 
 import { uniq, clamp, extractPathname, pLimit, normalizeUrl, fuzzyTextSimilarity } from '../util';
 import { buildSmartQueries as buildSmartQueriesNew, type SmartQuery, type QueryBucket } from './queryBuilder';
+import { safeFetchJson } from '../safe-fetch';
 
 export type BraveMode = 'search' | 'summarizer';
 export type Provider = 'brave';
@@ -202,13 +203,14 @@ async function callBraveWebSearch(
     url.searchParams.set('country', 'us');
     url.searchParams.set('safesearch', 'moderate');
 
-    const response = await fetch(url.toString(), {
+    const response = await safeFetchJson(url.toString(), {
+      timeoutMs,
+      retries: 0, // We handle retries manually for rate limits
       headers: {
         'Accept': 'application/json',
         'Accept-Encoding': 'gzip',
         'X-Subscription-Token': apiKey
-      },
-      signal: controller.signal
+      }
     });
 
     clearTimeout(timeoutId);
@@ -223,14 +225,14 @@ async function callBraveWebSearch(
       return callBraveWebSearch(apiKey, query, domain, timeoutMs, retryCount + 1);
     }
 
-    const status = response.status;
+    const status = response.status || 0;
     let sourcesTotal = 0;
     let domainSources = 0;
     let domainPaths: string[] = [];
     let sourceUrls: string[] = []; // Phase F++ Gap #1: persist full URLs
 
-    if (response.ok) {
-      const data = await response.json();
+    if (response.ok && response.data) {
+      const data = response.data;
 
       // Extract sources from web results
       let sources: string[] = [];
@@ -311,24 +313,25 @@ async function callBraveSummarizer(
   try {
     const url = `https://api.search.brave.com/res/v1/summarizer/search?key=${encodeURIComponent(summarizerKey)}`;
 
-    const response = await fetch(url, {
+    const response = await safeFetchJson(url, {
+      timeoutMs,
+      retries: 0,
       headers: {
         'Accept': 'application/json',
         'Accept-Encoding': 'gzip',
         'X-Subscription-Token': apiKey
-      },
-      signal: controller.signal
+      }
     });
 
     clearTimeout(timeoutId);
 
-    const status = response.status;
+    const status = response.status || 0;
     let sourcesTotal = 0;
     let domainSources = 0;
     let domainPaths: string[] = [];
 
-    if (response.ok) {
-      const data = await response.json();
+    if (response.ok && response.data) {
+      const data = response.data;
 
       // Summarizer returns enrichments with sources
       let sources: string[] = [];

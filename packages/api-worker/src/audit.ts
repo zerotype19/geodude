@@ -149,9 +149,10 @@ export async function runAudit(
       include?: RegExp[];
       exclude?: RegExp[];
     };
+    auditId?: string; // Optional pre-created audit ID
   }
 ): Promise<string> {
-  const auditId = `aud_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const auditId = options?.auditId || `aud_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const maxPages = options?.maxPages ?? parseInt(env.AUDIT_MAX_PAGES || '100');
   
   // Get property details
@@ -166,11 +167,13 @@ export async function runAudit(
   const domain = property.domain;
   const baseUrl = `https://${domain}`;
   
-  // Initialize audit record
-  await env.DB.prepare(
-    `INSERT INTO audits (id, property_id, status, pages_total) 
-     VALUES (?, ?, 'running', 0)`
-  ).bind(auditId, propertyId).run();
+  // Initialize audit record (only if not pre-created)
+  if (!options?.auditId) {
+    await env.DB.prepare(
+      `INSERT INTO audits (id, property_id, status, pages_total) 
+       VALUES (?, ?, 'running', 0)`
+    ).bind(auditId, propertyId).run();
+  }
 
   const issues: AuditIssue[] = [];
   const pages: Array<{
