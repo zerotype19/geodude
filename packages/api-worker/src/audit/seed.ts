@@ -44,7 +44,7 @@ export async function seedFrontier(
     
     // 2. Discover all sitemaps using smart discovery
     const sitemapUrls = await discoverSitemaps(env, canonicalHost);
-    console.log(`[Seed] Discovered ${sitemapUrls.length} sitemap URLs`);
+    console.log(`[Seed] Discovered ${sitemapUrls.length} sitemap URLs: ${sitemapUrls.join(', ')}`);
     
     // 3. Parse all sitemaps to collect URLs
     const allUrls: string[] = [];
@@ -55,14 +55,18 @@ export async function seedFrontier(
     const childCap = 20; // Max child sitemaps to follow
     
     for (const sitemapUrl of sitemapUrls) {
+      console.log(`[Seed] Parsing sitemap: ${sitemapUrl}`);
       const result = await parseSitemap(env, sitemapUrl, { childCap, urlCap });
+      console.log(`[Seed] Sitemap result: ${result.urls.length} URLs, ${result.sitemapIndexCount} children, ${result.urlsetCount} urlset`);
       allUrls.push(...result.urls);
       sitemapIndexCount += result.sitemapIndexCount;
       urlsetCount += result.urlsetCount;
       
       // Follow child sitemaps (sitemap index)
       for (const childUrl of result.indexChildren) {
+        console.log(`[Seed] Parsing child sitemap: ${childUrl}`);
         const childResult = await parseSitemap(env, childUrl, { childCap: 0, urlCap });
+        console.log(`[Seed] Child result: ${childResult.urls.length} URLs`);
         allUrls.push(...childResult.urls);
         urlsetCount += childResult.urlsetCount;
       }
