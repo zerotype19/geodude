@@ -136,6 +136,11 @@ SITEMAP_URL_CAP = "500"         # Max sitemap URLs to seed
 CRAWL_MAX_URLS_IN_FRONTIER = "2000"  # Hard cap on frontier size
 CRAWL_MAX_ENQUEUE_PER_PAGE = "100"   # Max links to extract per page
 
+# Simple Mode: Sitemap-first BFS (stabilizer)
+CRAWL_SIMPLE_MODE = "1"              # turns on sitemap-first seeding
+CRAWL_SEED_REQUIRE_MIN = "20"        # require at least 20 seed URLs to proceed
+CRAWL_SEED_FALLBACK_HOME = "1"       # if sitemap < 20, enqueue homepage + path heuristics
+
 [browser]
 binding = "BROWSER"
 

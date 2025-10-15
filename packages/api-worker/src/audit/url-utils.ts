@@ -5,9 +5,11 @@
 export function normalizeUrl(raw: string, origin: string): string | null {
   try {
     const u = new URL(raw, origin);
-    // same host only
     const o = new URL(origin);
-    if (u.host !== o.host) return null;
+    
+    // Allow apex↔www and http↔https so BFS can expand
+    const stripWww = (h: string) => h.replace(/^www\./i, '');
+    if (stripWww(u.hostname) !== stripWww(o.hostname)) return null;
 
     u.hash = '';
     

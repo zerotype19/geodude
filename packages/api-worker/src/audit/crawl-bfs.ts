@@ -286,5 +286,23 @@ export async function crawlBatchBfs(
   // Tick-level observability
   console.log(`CRAWL_TICK {processed: ${processed}, pages: ${currentTotal}, analyzed_total: ${analyzedTotal}, pending: ${frontierStatus?.pending || 0}, visiting: ${frontierStatus?.visiting || 0}, ms: ${timeMs}}`);
   
+  // CRITICAL: If we should continue, schedule continuation and return immediately
+  if (shouldContinue) {
+    console.log(`SELF_CONTINUE { pending: ${remaining}, batch: ${opts.batchSize} }`);
+    
+    // Import and call selfContinue
+    const { selfContinue } = await import('./continue');
+    const continueResult = await selfContinue(env, auditId);
+    
+    if (continueResult) {
+      console.log(`[CrawlBFS] Scheduled continuation successfully`);
+    } else {
+      console.log(`[CrawlBFS] Failed to schedule continuation, will rely on watchdog`);
+    }
+    
+    // CRITICAL: Return immediately after scheduling continuation
+    return { processed, timeMs, shouldContinue: false, continuationScheduled: true };
+  }
+  
   return { processed, timeMs, shouldContinue };
 }

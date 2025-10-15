@@ -82,8 +82,17 @@ async function runCrawlTick(env: any, auditId: string) {
   if (!phaseState.crawl?.seeded) {
     console.log(`[AuditRunner] Seeding crawl frontier for ${domain}`);
     
-    // Get navigation links from homepage
-    const { navLinks } = await getHomeNavLinks(env, baseUrl);
+    const simpleMode = env.CRAWL_SIMPLE_MODE === "1";
+    let navLinks: string[] = [];
+    
+    // Skip nav extraction in simple mode
+    if (!simpleMode) {
+      // Get navigation links from homepage
+      const navResult = await getHomeNavLinks(env, baseUrl);
+      navLinks = navResult.navLinks;
+    } else {
+      console.log(`[AuditRunner] Simple mode enabled - skipping nav extraction`);
+    }
     
     // Get sitemap URLs if available
     const sitemapUrls = await loadSitemapUrls(env, baseUrl, { cap: parseInt(env.SITEMAP_URL_CAP || '500') });

@@ -18,6 +18,103 @@ export async function seedFrontier(
 ) {
   console.log(`[Seed] Seeding frontier for audit ${auditId} with origin ${origin}`);
   
+  const simpleMode = env.CRAWL_SIMPLE_MODE === "1";
+  const minRequired = parseInt(env.CRAWL_SEED_REQUIRE_MIN || "20");
+  const fallbackHome = env.CRAWL_SEED_FALLBACK_HOME === "1";
+  
+  let totalEnqueued = 0;
+  
+  // SIMPLE MODE: Sitemap-first approach
+  if (simpleMode) {
+    console.log(`[Seed] Using SIMPLE MODE: sitemap-first seeding`);
+    
+    // 1. Always seed homepage first
+    await enqueueUrl(env, auditId, origin, 0, 0, 'seed');
+    totalEnqueued++;
+    console.log(`[Seed] Added homepage: ${origin}`);
+    
+    // 2. Sitemap seeds @ depth 1, priority 0.5 (capped)
+    const sm = (opts.sitemapUrls ?? [])
+      .slice(0, opts.maxSitemap ?? 500)
+      .map(href => normalizeUrl(href, origin))
+      .filter((url): url is string => Boolean(url) && isValidPageUrl(url)) as string[];
+    
+    const uniqueSitemap = [...new Set(sm)];
+    for (const u of uniqueSitemap) {
+      await enqueueUrl(env, auditId, u, 1, 0.5, 'sitemap');
+      totalEnqueued++;
+    }
+    console.log(`[Seed] Added ${uniqueSitemap.length} sitemap URLs`);
+    
+    // 3. Check if we have enough seeds
+    if (totalEnqueued < minRequired) {
+      if (fallbackHome) {
+        // Add common path heuristics to reach minimum
+        const commonPaths = [
+          '/about', '/contact', '/support', '/help', '/faq', '/privacy', '/terms',
+          '/blog', '/news', '/products', '/services', '/pricing', '/features',
+          '/company', '/team', '/careers', '/press', '/investors', '/security'
+        ];
+        
+        for (const path of commonPaths) {
+          if (totalEnqueued >= minRequired) break;
+          const url = origin + path;
+          await enqueueUrl(env, auditId, url, 1, 0.8, 'fallback');
+          totalEnqueued++;
+        }
+        console.log(`[Seed] Added ${commonPaths.length} fallback paths`);
+      }
+      
+      // If still not enough, fail the seeding
+      if (totalEnqueued < minRequired) {
+        console.error(`[Seed] SEED_INSUFFICIENT_URLS: Only ${totalEnqueued} URLs enqueued, need ${minRequired}`);
+        await env.DB.prepare(`
+          UPDATE audits 
+          SET phase_state = json_set(
+            COALESCE(phase_state, '{}'), 
+            '$.crawl.seeded', 0,
+            '$.crawl.seeded_at', datetime('now'),
+            '$.crawl.seed_failure', 'SEED_INSUFFICIENT_URLS'
+          )
+          WHERE id = ?1
+        `).bind(auditId).run();
+        
+        return {
+          homepage: 1,
+          navLinks: 0,
+          sitemapUrls: uniqueSitemap.length,
+          total: totalEnqueued,
+          seeded: false,
+          reason: 'SEED_INSUFFICIENT_URLS'
+        };
+      }
+    }
+    
+    // Set seeded flag only if we have enough URLs
+    await env.DB.prepare(`
+      UPDATE audits 
+      SET phase_state = json_set(
+        COALESCE(phase_state, '{}'), 
+        '$.crawl.seeded', 1,
+        '$.crawl.seeded_at', datetime('now')
+      )
+      WHERE id = ?1
+    `).bind(auditId).run();
+    
+    console.log(`SEED_SITEMAP { discovered: ${uniqueSitemap.length}, enqueued: ${totalEnqueued}, seeded: 1, reason: 'success' }`);
+    
+    return {
+      homepage: 1,
+      navLinks: 0,
+      sitemapUrls: uniqueSitemap.length,
+      total: totalEnqueued,
+      seeded: true
+    };
+  }
+  
+  // LEGACY MODE: Original seeding logic
+  console.log(`[Seed] Using LEGACY MODE: homepage + nav + sitemap`);
+  
   // Always seed home @ depth 0 priority 0
   await enqueueUrl(env, auditId, origin, 0, 0, 'seed');
   console.log(`[Seed] Added homepage: ${origin}`);
