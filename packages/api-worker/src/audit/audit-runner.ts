@@ -76,7 +76,7 @@ async function runCrawlTick(env: any, auditId: string, ctx: any) {
   `).bind(auditId).run();
   
   if (demoteResult.changes > 0) {
-    console.log(`[AuditRunner] Demoted ${demoteResult.changes} stale visiting URLs to pending`);
+    console.log(`FRONTIER_RECOVER_VISITING { audit: ${auditId}, recovered: ${demoteResult.changes} }`);
   }
   
   // Import crawl functions
@@ -196,7 +196,7 @@ async function runCrawlTick(env: any, auditId: string, ctx: any) {
   
   // Tick-level observability
   const timeMs = Date.now() - Date.now(); // TODO: track actual tick start time
-  console.log(`CRAWL_TICK {processed: ${batch.processed}, pages: ${stateRow.pages}, analyzed_total: ${analyzedTotal}, pending: ${stateRow.pending}, visiting: ${stateRow.visiting}, ms: ${timeMs}}`);
+  console.log(`CRAWL_TICK { audit: ${auditId}, saved: ${batch.processed}, analyzed: ${analyzedTotal}, pending: ${stateRow.pending}, visiting: ${stateRow.visiting}, done: ${stateRow.done}, ms: ${timeMs} }`);
   
   // Return continuation info
   return { shouldContinue: !advanced && stateRow.pending > 0 }; // 🔴 always stop here

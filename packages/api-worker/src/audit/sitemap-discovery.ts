@@ -9,6 +9,11 @@ const CANDIDATES = [
   '/sitemap.txt',
   '/sitemap1.xml', '/sitemap2.xml', // common shards
   '/sitemap-index.xml',
+  '/sitemaps.xml',
+  '/sitemaps_index.xml',
+  '/sitemap-news.xml',       // Google News
+  '/sitemap-products.xml',   // E-commerce
+  '/sitemap-categories.xml', // E-commerce
 ];
 
 interface SafeFetchResult {
@@ -52,16 +57,36 @@ export async function discoverSitemaps(env: any, canonicalHost: string): Promise
   const hits: string[] = [];
   const promises = urlsToTry.map(async (url) => {
     try {
-      const r = await safeFetch(url, { 
-        timeoutMs: 12000, 
+      // Try HEAD first with browsery User-Agent
+      const UA = 'OptiviewAuditor/1.0 (+https://app.optiview.ai) Mozilla/5.0';
+      
+      let r = await safeFetch(url, { 
+        method: 'HEAD',
+        timeoutMs: 8000, 
+        followRedirects: true,
         headers: {
+          'User-Agent': UA,
           'Accept': 'application/xml,text/xml,application/octet-stream,*/*'
         }
       });
       
+      // If HEAD failed, try GET with decompression
+      if (!r.ok) {
+        r = await safeFetch(url, { 
+          timeoutMs: 12000,
+          followRedirects: true,
+          headers: {
+            'User-Agent': UA,
+            'Accept': 'application/xml,text/xml,application/octet-stream,*/*'
+          }
+        });
+      }
+      
       if (r.ok && looksLikeSitemap(r)) {
         const finalUrl = r.finalUrl ?? url;
-        console.log(`SITEMAP_ROOT_FETCH { url: "${finalUrl}", status: ${r.status || 200} }`);
+        const bytes = r.text?.length ?? 0;
+        const contentType = r.headers?.['content-type'] || '';
+        console.log(`SITEMAP_ROOT_FETCH { url: "${finalUrl}", status: ${r.status || 200}, ct: "${contentType}", bytes: ${bytes} }`);
         hits.push(finalUrl);
       }
     } catch (error) {
@@ -81,10 +106,15 @@ export async function discoverSitemaps(env: any, canonicalHost: string): Promise
 
 async function collectSitemapsFromRobots(env: any, bases: string[]): Promise<string[]> {
   const out: string[] = [];
+  const UA = 'OptiviewAuditor/1.0 (+https://app.optiview.ai) Mozilla/5.0';
   
   for (const base of bases) {
     try {
-      const r = await safeFetch(`${base}/robots.txt`, { timeoutMs: 6000 });
+      const r = await safeFetch(`${base}/robots.txt`, { 
+        timeoutMs: 6000,
+        headers: { 'User-Agent': UA },
+        followRedirects: true
+      });
       if (r.ok && r.text) {
         console.log(`[SitemapDiscovery] Parsing robots.txt from ${base}/robots.txt`);
         

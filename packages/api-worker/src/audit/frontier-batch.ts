@@ -32,7 +32,7 @@ export async function frontierBatchEnqueue(
     const result = await stmt.bind(...params).run();
     const inserted = result.changes || 0;
     
-    console.log(`SEED_ENQUEUE { attempted: ${unique.length}, inserted: ${inserted}, duplicates: ${unique.length - inserted} }`);
+    console.log(`SEED_ENQUEUE { audit: ${auditId}, attempted: ${unique.length}, inserted: ${inserted}, duplicates: ${unique.length - inserted} }`);
     
     return inserted;
   } catch (error) {

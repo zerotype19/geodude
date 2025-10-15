@@ -32,9 +32,15 @@ export async function seedFrontier(
     const { parseSitemap } = await import('./sitemap-parse');
     const { frontierBatchEnqueue, markSeeded } = await import('./frontier-batch');
     
-    // 1. Resolve canonical host first
+    // 1. Resolve canonical host first and store it
     const canonicalHost = await resolveCanonicalHost(env, origin);
     console.log(`[Seed] Using canonical host: ${canonicalHost}`);
+    
+    // Store canonical host in audit record
+    await env.DB.prepare(`
+      UPDATE audits SET canonical_host=?1 WHERE id=?2
+    `).bind(canonicalHost, auditId).run();
+    console.log(`CANONICAL_HOST_RESOLVED { audit: ${auditId}, to: ${canonicalHost} }`);
     
     // 2. Discover all sitemaps using smart discovery
     const sitemapUrls = await discoverSitemaps(env, canonicalHost);
@@ -101,7 +107,7 @@ export async function seedFrontier(
     if (inserted >= minRequired) {
       await markSeeded(env, auditId);
       
-      console.log(`SEED_SITEMAP { audit: ${auditId}, discovered: ${unique.length}, enqueued: ${inserted}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'smart' }`);
+      console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${finalUrls.length}, enqueued: ${inserted}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'smart' }`);
       
       return {
         homepage: 1,
@@ -131,7 +137,7 @@ export async function seedFrontier(
       if (totalInserted >= minRequired) {
         await markSeeded(env, auditId);
         
-        console.log(`SEED_SITEMAP { audit: ${auditId}, discovered: ${unique.length}, enqueued: ${totalInserted}, seeded: 1, fallback: ${fallbackInserted}, mode: 'smart+fallback' }`);
+        console.log(`SEED_SITEMAP { audit: ${auditId}, candidates: ${finalUrls.length + fallbackUrls.length}, enqueued: ${totalInserted}, seeded: 1, fallback: ${fallbackInserted}, mode: 'smart+fallback' }`);
         
         return {
           homepage: 1,

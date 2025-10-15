@@ -36,7 +36,7 @@ export async function parseSitemap(
       console.log(`[SitemapParse] Detected sitemap index`);
       
       // Extract child sitemap URLs using regex (more robust than DOM parsing)
-      const locMatches = Array.from(xml.matchAll(/<\s*loc\s*>\s*([^<]+)\s*<\s*\/loc\s*>/gi));
+      const locMatches = Array.from(xml.matchAll(/<\s*loc\b[^>]*>\s*([^<]+)\s*<\/\s*loc\s*>/gi));
       const locs = locMatches.map(m => m[1].trim()).slice(0, caps.childCap);
       
       console.log(`SITEMAP_INDEX_CHILDREN { url: "${sitemapUrl}", children: ${locs.length} }`);
@@ -51,7 +51,7 @@ export async function parseSitemap(
       console.log(`[SitemapParse] Detected URL set`);
       
       // Extract URLs using regex
-      const locMatches = Array.from(xml.matchAll(/<\s*loc\s*>\s*([^<]+)\s*<\s*\/loc\s*>/gi));
+      const locMatches = Array.from(xml.matchAll(/<\s*loc\b[^>]*>\s*([^<]+)\s*<\/\s*loc\s*>/gi));
       const urls = locMatches.map(m => m[1].trim()).slice(0, caps.urlCap);
       
       console.log(`SITEMAP_URLSET_PARSED { url: "${sitemapUrl}", urls: ${urls.length} }`);
