@@ -10,12 +10,27 @@ export function normalizeUrl(raw: string, origin: string): string | null {
     if (u.host !== o.host) return null;
 
     u.hash = '';
-    // strip common tracking params
+    
+    // Enhanced tracking params removal
     const trackingParams = [
       'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
-      'gclid', 'fbclid', 'ref', 'source', 'campaign'
+      'gclid', 'fbclid', 'ref', 'source', 'campaign', 'mc_cid', 'mc_eid',
+      'affiliate_id', 'clickid', 'medium', 'content', 'term'
     ];
     trackingParams.forEach(k => u.searchParams.delete(k));
+    
+    // Normalize trailing slashes consistently (keep trailing slash for root, remove for paths)
+    if (u.pathname !== '/' && u.pathname.endsWith('/')) {
+      u.pathname = u.pathname.slice(0, -1);
+    }
+    
+    // Lowercase host only (do NOT lowercase path)
+    u.hostname = u.hostname.toLowerCase();
+    
+    // Collapse index.html to / where safe
+    if (u.pathname.endsWith('/index.html') || u.pathname === '/index.html') {
+      u.pathname = u.pathname.replace(/\/index\.html$/, '/');
+    }
     
     return u.toString();
   } catch { 

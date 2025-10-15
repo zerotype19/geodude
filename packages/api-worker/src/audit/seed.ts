@@ -45,6 +45,19 @@ export async function seedFrontier(
   }
   console.log(`[Seed] Added ${uniqueSitemap.length} sitemap URLs`);
   
+  // Set immutable seeded flag - one-way state that can never be unset
+  await env.DB.prepare(`
+    UPDATE audits 
+    SET phase_state = json_set(
+      COALESCE(phase_state, '{}'), 
+      '$.crawl.seeded', 1,
+      '$.crawl.seeded_at', datetime('now')
+    )
+    WHERE id = ?1
+  `).bind(auditId).run();
+  
+  console.log(`[Seed] Set immutable seeded flag for audit ${auditId}`);
+  
   return {
     homepage: 1,
     navLinks: uniqueNav.length,

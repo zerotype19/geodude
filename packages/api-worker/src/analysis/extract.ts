@@ -4,6 +4,19 @@
  */
 
 export function analyzeHtml(html: string) {
+  // Performance caps to keep analysis under ~75-100ms/page
+  const MAX_HTML_SIZE = 1.5 * 1024 * 1024; // 1.5MB cap
+  const MAX_JSON_LD_NODES = 8;
+  
+  // Cap HTML size if too large
+  if (html.length > MAX_HTML_SIZE) {
+    html = html.slice(0, MAX_HTML_SIZE);
+  }
+  
+  // Remove script/style blocks to speed up regex passes
+  html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+  html = html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+  
   // Very forgiving parser: DOMParser if available; fallback regex for essentials
   const toText = (s?: string) => (s ?? '').trim().replace(/\s+/g, ' ').slice(0, 8000);
 
@@ -46,7 +59,7 @@ export function analyzeHtml(html: string) {
 
   // 9) JSON-LD types + author/dates
   const schemas = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
-    .slice(0, 8) // cap
+    .slice(0, MAX_JSON_LD_NODES) // cap for performance
     .flatMap(m => {
       try {
         const node = JSON.parse(m[1]);

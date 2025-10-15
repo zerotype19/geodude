@@ -98,11 +98,114 @@ export async function handleAnalysisRoutes(request: Request, env: any): Promise<
         LIMIT 100
       `).bind(auditId).all();
 
-      return new Response(JSON.stringify({ problems: problems.results }), {
+      // Add problem codes to each result
+      const problemsWithCodes = problems.results.map((row: any) => {
+        const problemCodes: string[] = [];
+        
+        if (row.h1_count === 0) problemCodes.push('NO_H1');
+        if (row.h1_count > 1) problemCodes.push('MULTI_H1');
+        if (!row.title) problemCodes.push('NO_TITLE');
+        if (!row.meta_description) problemCodes.push('NO_META_DESC');
+        if (!row.schema_types || row.schema_types === '') problemCodes.push('NO_SCHEMA');
+        if (!row.eeat_flags || !row.eeat_flags.includes('HAS_AUTHOR')) problemCodes.push('NO_AUTHOR');
+        if (!row.eeat_flags || !row.eeat_flags.includes('HAS_DATES')) problemCodes.push('NO_DATES');
+        
+        return {
+          ...row,
+          problem_codes: problemCodes
+        };
+      });
+
+      return new Response(JSON.stringify({ problems: problemsWithCodes }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     } catch (error) {
       return new Response(JSON.stringify({ error: 'Failed to fetch problems' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  // GET /v1/audits/:id/summary
+  const summaryMatch = path.match(/^\/v1\/audits\/([^\/]+)\/summary$/);
+  if (summaryMatch && method === 'GET') {
+    const auditId = summaryMatch[1];
+    
+    try {
+      // Get audit basic info
+      const audit = await env.DB.prepare(`
+        SELECT id, status, phase, phase_started_at, phase_heartbeat_at, created_at, completed_at,
+               (SELECT COUNT(*) FROM audit_pages WHERE audit_id = audits.id) as pages_crawled,
+               (SELECT COUNT(*) FROM audit_frontier WHERE audit_id = audits.id AND status = 'pending') as frontier_pending
+        FROM audits WHERE id = ?1
+      `).bind(auditId).first();
+
+      if (!audit) {
+        return new Response(JSON.stringify({ error: 'Audit not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Get coverage stats
+      const coverage = await env.DB.prepare(`
+        SELECT
+          COUNT(*) AS pages,
+          SUM(h1 IS NOT NULL AND h1!='') AS h1_ok,
+          SUM(h1_count=1) AS single_h1,
+          SUM(title IS NOT NULL AND title!='') AS title_ok,
+          SUM(meta_description IS NOT NULL AND meta_description!='') AS meta_ok,
+          SUM(schema_types LIKE '%Article%') AS schema_article,
+          SUM(schema_types LIKE '%Organization%') AS schema_organization,
+          SUM(eeat_flags LIKE '%HAS_AUTHOR%') AS has_author,
+          SUM(eeat_flags LIKE '%HAS_DATES%') AS has_dates
+        FROM audit_page_analysis WHERE audit_id=?1
+      `).bind(auditId).first();
+
+      // Get top schema types
+      const topSchemas = await env.DB.prepare(`
+        SELECT schema_types, COUNT(*) c
+        FROM audit_page_analysis
+        WHERE audit_id=?1 AND schema_types IS NOT NULL AND schema_types != ''
+        GROUP BY schema_types
+        ORDER BY c DESC
+        LIMIT 5
+      `).bind(auditId).all();
+
+      const summary = {
+        audit: {
+          id: audit.id,
+          status: audit.status,
+          phase: audit.phase,
+          phase_started_at: audit.phase_started_at,
+          phase_heartbeat_at: audit.phase_heartbeat_at,
+          created_at: audit.created_at,
+          completed_at: audit.completed_at,
+          pages_crawled: audit.pages_crawled,
+          frontier_pending: audit.frontier_pending
+        },
+        coverage: {
+          pages: coverage?.pages || 0,
+          h1_coverage: coverage?.pages ? Math.round((coverage.h1_ok / coverage.pages) * 100) : 0,
+          title_coverage: coverage?.pages ? Math.round((coverage.title_ok / coverage.pages) * 100) : 0,
+          meta_coverage: coverage?.pages ? Math.round((coverage.meta_ok / coverage.pages) * 100) : 0,
+          schema_article: coverage?.schema_article || 0,
+          schema_organization: coverage?.schema_organization || 0,
+          has_author: coverage?.has_author || 0,
+          has_dates: coverage?.has_dates || 0
+        },
+        top_schema_types: topSchemas.results.map((row: any) => ({
+          types: row.schema_types,
+          count: row.c
+        }))
+      };
+
+      return new Response(JSON.stringify(summary), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      return new Response(JSON.stringify({ error: 'Failed to fetch summary' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

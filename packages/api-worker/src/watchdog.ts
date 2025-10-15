@@ -24,11 +24,33 @@ export async function runWatchdog(env: any, config: WatchdogConfig = DEFAULT_CON
   reEnqueued: number;
   failed: number;
   errors: string[];
+  counters: {
+    visiting_demoted: number;
+    frontier_pending: number;
+    pages_crawled: number;
+    rewinds_to_crawl: number;
+    continuations_enqueued: number;
+    breaker_open_browser: boolean;
+    breaker_open_ai: boolean;
+    breaker_open_fetch: boolean;
+  };
 }> {
   const errors: string[] = [];
   let checked = 0;
   let reEnqueued = 0;
   let failed = 0;
+  
+  // Counters for observability
+  const counters = {
+    visiting_demoted: 0,
+    frontier_pending: 0,
+    pages_crawled: 0,
+    rewinds_to_crawl: 0,
+    continuations_enqueued: 0,
+    breaker_open_browser: false,
+    breaker_open_ai: false,
+    breaker_open_fetch: false,
+  };
 
   try {
     console.log('[Watchdog] Starting stuck audit check...');
@@ -43,6 +65,7 @@ export async function runWatchdog(env: any, config: WatchdogConfig = DEFAULT_CON
       `).run();
       
       if (recoveredResult.changes > 0) {
+        counters.visiting_demoted = recoveredResult.changes;
         console.log(`[Watchdog] visiting_recovered: ${recoveredResult.changes} stuck 'visiting' URLs back to 'pending'`);
       }
     } catch (error) {
@@ -94,17 +117,86 @@ export async function runWatchdog(env: any, config: WatchdogConfig = DEFAULT_CON
     if (frontierStuckAudits.length > 0) {
       console.log(`[Watchdog] Found ${frontierStuckAudits.length} audits with pending frontier but wrong phase`);
       
-      for (const audit of frontierStuckAudits) {
-        try {
-          await handleFrontierStuckAudit(audit, env);
-          reEnqueued++;
-        } catch (error) {
-          console.error(`[Watchdog] Error handling frontier stuck audit ${audit.id}:`, error);
-          errors.push(`Frontier stuck audit error: ${error instanceof Error ? error.message : String(error)}`);
+        for (const audit of frontierStuckAudits) {
+          try {
+            await handleFrontierStuckAudit(audit, env);
+            reEnqueued++;
+            counters.rewinds_to_crawl++;
+          } catch (error) {
+            console.error(`[Watchdog] Error handling frontier stuck audit ${audit.id}:`, error);
+            errors.push(`Frontier stuck audit error: ${error instanceof Error ? error.message : String(error)}`);
+          }
         }
-      }
     }
 
+    // Gather comprehensive audit metrics for alerts
+    try {
+      const runningAudits = await env.DB.prepare(`
+        SELECT id, phase, phase_heartbeat_at, 
+               (SELECT COUNT(*) FROM audit_pages WHERE audit_id = audits.id) as pages_crawled,
+               (SELECT COUNT(*) FROM audit_frontier WHERE audit_id = audits.id AND status = 'pending') as frontier_pending
+        FROM audits 
+        WHERE status = 'running'
+      `).all();
+
+      for (const audit of runningAudits.results) {
+        counters.frontier_pending += audit.frontier_pending;
+        counters.pages_crawled += audit.pages_crawled;
+
+        // Alert: AUDIT_STUCK when heartbeat age > 2m
+        if (audit.phase_heartbeat_at) {
+          const heartbeatAge = Date.now() - new Date(audit.phase_heartbeat_at).getTime();
+          if (heartbeatAge > 2 * 60 * 1000) { // 2 minutes
+            console.log(`[Watchdog] AUDIT_STUCK: ${audit.id} in phase ${audit.phase}, heartbeat ${Math.round(heartbeatAge/1000)}s old`);
+          }
+        }
+      }
+
+      // Alert: ALERT_CRAWL_UNDER_TARGET for finished audits
+      const finishedAudits = await env.DB.prepare(`
+        SELECT id, 
+               (SELECT COUNT(*) FROM audit_pages WHERE audit_id = audits.id) as pages_crawled,
+               (SELECT COUNT(*) FROM audit_frontier WHERE audit_id = audits.id AND status = 'pending') as frontier_pending,
+               json_extract(phase_state,'$.crawl.seeded') as seeded
+        FROM audits 
+        WHERE status = 'completed' AND created_at > datetime('now','-1 day')
+      `).all();
+
+      for (const audit of finishedAudits.results) {
+        if (audit.pages_crawled < 50 && audit.seeded == 1 && audit.frontier_pending == 0) {
+          console.log(`[Watchdog] ALERT_CRAWL_UNDER_TARGET: ${audit.id} has ${audit.pages_crawled} pages but frontier exhausted and seeded`);
+        }
+      }
+
+      // Alert: ALERT_MULTIPLE_H1 and ALERT_SCHEMA_GAP
+      const analysisStats = await env.DB.prepare(`
+        SELECT 
+          COUNT(*) as total_pages,
+          SUM(CASE WHEN h1_count != 1 THEN 1 ELSE 0 END) as multi_h1_pages,
+          SUM(CASE WHEN schema_types LIKE '%Article%' OR schema_types LIKE '%Organization%' THEN 1 ELSE 0 END) as schema_pages
+        FROM audit_page_analysis 
+        WHERE analyzed_at > datetime('now','-1 day')
+      `).first();
+
+      if (analysisStats && analysisStats.total_pages > 0) {
+        const multiH1Percent = (analysisStats.multi_h1_pages / analysisStats.total_pages) * 100;
+        const schemaPercent = (analysisStats.schema_pages / analysisStats.total_pages) * 100;
+
+        if (multiH1Percent > 20) {
+          console.log(`[Watchdog] ALERT_MULTIPLE_H1: ${multiH1Percent.toFixed(1)}% pages have multiple H1s`);
+        }
+
+        if (schemaPercent < 30) {
+          console.log(`[Watchdog] ALERT_SCHEMA_GAP: Only ${schemaPercent.toFixed(1)}% pages have Article/Organization schema`);
+        }
+      }
+
+    } catch (error) {
+      console.error('[Watchdog] Error gathering audit metrics:', error);
+    }
+
+    // Log comprehensive counters
+    console.log(`[Watchdog] COUNTERS: ${JSON.stringify(counters)}`);
     console.log(`[Watchdog] Completed: ${checked} checked, ${reEnqueued} re-enqueued, ${failed} failed, ${errors.length} errors`);
 
   } catch (error) {
@@ -113,7 +205,7 @@ export async function runWatchdog(env: any, config: WatchdogConfig = DEFAULT_CON
     errors.push(errorMsg);
   }
 
-  return { checked, reEnqueued, failed, errors };
+  return { checked, reEnqueued, failed, errors, counters };
 }
 
 /**
