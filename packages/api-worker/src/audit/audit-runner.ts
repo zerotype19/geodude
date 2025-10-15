@@ -67,13 +67,17 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
 async function runCrawlTick(env: any, auditId: string, ctx: any) {
   console.log(`[AuditRunner] Running crawl tick for ${auditId}`);
   
-  // Frontier safety: demote stale visiting URLs to pending
-  await env.DB.prepare(`
+  // TICK HYGIENE: Demote stale visiting URLs to pending (critical for continuation)
+  const demoteResult = await env.DB.prepare(`
     UPDATE audit_frontier 
     SET status='pending', updated_at=datetime('now')
     WHERE audit_id=?1 AND status='visiting' 
     AND DATETIME(updated_at) <= DATETIME('now', '-120 seconds')
   `).bind(auditId).run();
+  
+  if (demoteResult.changes > 0) {
+    console.log(`[AuditRunner] Demoted ${demoteResult.changes} stale visiting URLs to pending`);
+  }
   
   // Import crawl functions
   const { seedFrontier, getHomeNavLinks, loadSitemapUrls } = await import('./seed');
@@ -107,37 +111,19 @@ async function runCrawlTick(env: any, auditId: string, ctx: any) {
   if (!phaseState.crawl?.seeded) {
     console.log(`[AuditRunner] Seeding crawl frontier for ${domain}`);
     
-    const simpleMode = env.CRAWL_SIMPLE_MODE === "1";
-    let navLinks: string[] = [];
-    
-    // Skip nav extraction in simple mode
-    if (!simpleMode) {
-      // Get navigation links from homepage
-      const navResult = await getHomeNavLinks(env, baseUrl);
-      navLinks = navResult.navLinks;
-    } else {
-      console.log(`[AuditRunner] Simple mode enabled - skipping nav extraction`);
-    }
-    
-    // Get sitemap URLs if available
-    const sitemapResult = await loadSitemapUrls(env, baseUrl, { cap: parseInt(env.SITEMAP_URL_CAP || '500') });
-    const sitemapUrls = sitemapResult.urls;
-    
-    // Seed the frontier
+    // Seed the frontier using smart discovery
     const seedResult = await seedFrontier(env, auditId, baseUrl, {
-      navLinks,
-      sitemapUrls,
       maxSitemap: parseInt(env.SITEMAP_URL_CAP || '500')
     });
     
-    console.log(`[AuditRunner] Frontier seeded: ${seedResult.total} URLs`);
+    console.log(`[AuditRunner] Frontier seeded: ${seedResult.total} URLs, seeded: ${seedResult.seeded}`);
     
-    // Mark as seeded in phase_state
-    await env.DB.prepare(`
-      UPDATE audits 
-      SET phase_state = json_set(COALESCE(phase_state, '{}'), '$.crawl.seeded', 1)
-      WHERE id=?1
-    `).bind(auditId).run();
+    if (!seedResult.seeded) {
+      console.error(`[AuditRunner] Seeding failed: ${seedResult.reason || 'unknown'}`);
+      return { shouldContinue: false }; // Let watchdog handle failed seeding
+    }
+    
+    phaseState.crawl = { ...phaseState.crawl, seeded: 1, seeded_at: new Date().toISOString() };
   }
   
   // Run BFS crawl batch
@@ -198,8 +184,12 @@ async function runCrawlTick(env: any, auditId: string, ctx: any) {
   // Try to advance atomically
   const advanced = await tryAdvanceFromCrawl(env, auditId, maxPages);
   if (!advanced) {
-    console.log(`[AuditRunner] More work to do, relying on watchdog to continue`);
-    // Don't make HTTP requests to ourselves - let watchdog handle continuation
+    console.log(`[AuditRunner] More work to do, scheduling immediate continuation`);
+    // GUARANTEED CONTINUATION: Schedule next tick immediately if work remains
+    if (stateRow.pending > 0) {
+      console.log(`[AuditRunner] Scheduling immediate continuation via ctx.waitUntil (pending: ${stateRow.pending})`);
+      ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
+    }
   } else {
     console.log(`[AuditRunner] Successfully advanced from crawl to citations phase`);
   }

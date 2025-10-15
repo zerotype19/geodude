@@ -22,114 +22,154 @@ export async function seedFrontier(
   const minRequired = parseInt(env.CRAWL_SEED_REQUIRE_MIN || "20");
   const fallbackHome = env.CRAWL_SEED_FALLBACK_HOME === "1";
   
-  let totalEnqueued = 0;
-  
-  // SIMPLE MODE: Sitemap-first approach
+  // SIMPLE MODE: Smart sitemap-first approach
   if (simpleMode) {
-    console.log(`[Seed] Using SIMPLE MODE: sitemap-first seeding`);
+    console.log(`[Seed] Using SIMPLE MODE: smart sitemap-first seeding`);
     
-    // 1. Always seed homepage first
-    await enqueueUrl(env, auditId, origin, 0, 0, 'seed');
-    totalEnqueued++;
-    console.log(`[Seed] Added homepage: ${origin}`);
+    // Import new components
+    const { resolveCanonicalHost } = await import('./canonical-host');
+    const { discoverSitemaps } = await import('./sitemap-discovery');
+    const { parseSitemap } = await import('./sitemap-parse');
+    const { frontierBatchEnqueue, markSeeded } = await import('./frontier-batch');
     
-    // 2. Sitemap seeds @ depth 1, priority 0.5 (capped)
-    const sitemapResult = await loadSitemapUrls(env, origin, { cap: opts.maxSitemap ?? 500 });
-    const sm = sitemapResult.urls;
-    const sitemapIndexCount = sitemapResult.sitemapIndexCount;
-    const urlsetCount = sitemapResult.urlsetCount;
+    // 1. Resolve canonical host first
+    const canonicalHost = await resolveCanonicalHost(env, origin);
+    console.log(`[Seed] Using canonical host: ${canonicalHost}`);
     
-    const uniqueSitemap = [...new Set(sm)];
+    // 2. Discover all sitemaps using smart discovery
+    const sitemapUrls = await discoverSitemaps(env, canonicalHost);
+    console.log(`[Seed] Discovered ${sitemapUrls.length} sitemap URLs`);
     
-    // Batch enqueue with priority sorting
+    // 3. Parse all sitemaps to collect URLs
+    const allUrls: string[] = [];
+    let sitemapIndexCount = 0;
+    let urlsetCount = 0;
+    
+    const urlCap = parseInt(env.SITEMAP_URL_CAP || '500');
+    const childCap = 20; // Max child sitemaps to follow
+    
+    for (const sitemapUrl of sitemapUrls) {
+      const result = await parseSitemap(env, sitemapUrl, { childCap, urlCap });
+      allUrls.push(...result.urls);
+      sitemapIndexCount += result.sitemapIndexCount;
+      urlsetCount += result.urlsetCount;
+      
+      // Follow child sitemaps (sitemap index)
+      for (const childUrl of result.indexChildren) {
+        const childResult = await parseSitemap(env, childUrl, { childCap: 0, urlCap });
+        allUrls.push(...childResult.urls);
+        urlsetCount += childResult.urlsetCount;
+      }
+    }
+    
+    console.log(`[Seed] Collected ${allUrls.length} total URLs from sitemaps`);
+    
+    // 4. Normalize and deduplicate
+    const normalized = allUrls
+      .map(url => normalizeUrl(url, `https://${canonicalHost}`))
+      .filter((url): url is string => Boolean(url));
+    
+    const unique = [...new Set(normalized)];
+    console.log(`[Seed] After normalization: ${unique.length} unique URLs`);
+    
+    // 5. Batch enqueue with priority sorting
     const priorityPaths = ['pricing', 'product', 'help', 'support', 'docs', 'about', 'blog', 'contact', 'features', 'legal', 'terms'];
-    const sortedSitemap = uniqueSitemap.sort((a, b) => {
+    const sorted = unique.sort((a, b) => {
       const aPath = new URL(a).pathname.toLowerCase();
       const bPath = new URL(b).pathname.toLowerCase();
       
-      const aPriority = priorityPaths.some(path => aPath.includes(path)) ? 0 : 1;
-      const bPriority = priorityPaths.some(path => bPath.includes(path)) ? 0 : 1;
+      const aPriority = priorityPaths.some(path => aPath.includes(path)) ? 0.3 : 0.8;
+      const bPriority = priorityPaths.some(path => bPath.includes(path)) ? 0.3 : 0.8;
       
       return aPriority - bPriority;
     });
     
-    let enqueuedCount = 0;
-    for (const u of sortedSitemap) {
-      try {
-        await enqueueUrl(env, auditId, u, 1, 0.5, 'sitemap');
-        enqueuedCount++;
-        totalEnqueued++;
-      } catch (error) {
-        console.log(`[Seed] Failed to enqueue ${u}:`, error);
-      }
-    }
-    console.log(`[Seed] Added ${enqueuedCount}/${uniqueSitemap.length} sitemap URLs`);
+    // 6. Always include homepage
+    const homepageUrl = `https://${canonicalHost}/`;
+    const finalUrls = [homepageUrl, ...sorted.filter(url => url !== homepageUrl)];
     
-    // 3. Check if we have enough seeds
-    if (totalEnqueued < minRequired) {
-      if (fallbackHome) {
-        // Add common path heuristics to reach minimum
-        const commonPaths = [
-          '/about', '/contact', '/support', '/help', '/faq', '/privacy', '/terms',
-          '/blog', '/news', '/products', '/services', '/pricing', '/features',
-          '/company', '/team', '/careers', '/press', '/investors', '/security'
-        ];
-        
-        for (const path of commonPaths) {
-          if (totalEnqueued >= minRequired) break;
-          const url = origin + path;
-          await enqueueUrl(env, auditId, url, 1, 0.8, 'fallback');
-          totalEnqueued++;
-        }
-        console.log(`[Seed] Added ${commonPaths.length} fallback paths`);
-      }
+    // 7. Batch insert all URLs
+    const inserted = await frontierBatchEnqueue(env, auditId, finalUrls, { 
+      depth: 0, 
+      priorityBase: 0.5, 
+      source: 'sitemap' 
+    });
+    
+    console.log(`[Seed] Successfully enqueued ${inserted} URLs`);
+    
+    // 8. Check if we have enough seeds
+    if (inserted >= minRequired) {
+      await markSeeded(env, auditId);
       
-      // If still not enough, fail the seeding
-      if (totalEnqueued < minRequired) {
-        console.error(`[Seed] SEED_INSUFFICIENT_URLS: Only ${totalEnqueued} URLs enqueued, need ${minRequired}`);
-        await env.DB.prepare(`
-          UPDATE audits 
-          SET phase_state = json_set(
-            COALESCE(phase_state, '{}'), 
-            '$.crawl.seeded', 0,
-            '$.crawl.seeded_at', datetime('now'),
-            '$.crawl.seed_failure', 'SEED_INSUFFICIENT_URLS'
-          )
-          WHERE id = ?1
-        `).bind(auditId).run();
+      console.log(`SEED_SITEMAP { audit: ${auditId}, discovered: ${unique.length}, enqueued: ${inserted}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'smart' }`);
+      
+      return {
+        homepage: 1,
+        navLinks: 0,
+        sitemapUrls: unique.length,
+        total: inserted,
+        seeded: true
+      };
+    } else if (fallbackHome && inserted < minRequired) {
+      // 9. Fallback: add common paths if still below threshold
+      const commonPaths = [
+        '/about', '/contact', '/support', '/help', '/faq', '/privacy', '/terms',
+        '/blog', '/news', '/products', '/services', '/pricing', '/features',
+        '/company', '/team', '/careers', '/press', '/investors', '/security'
+      ];
+      
+      const fallbackUrls = commonPaths.map(path => `https://${canonicalHost}${path}`);
+      const fallbackInserted = await frontierBatchEnqueue(env, auditId, fallbackUrls, { 
+        depth: 1, 
+        priorityBase: 0.8, 
+        source: 'fallback' 
+      });
+      
+      const totalInserted = inserted + fallbackInserted;
+      console.log(`[Seed] Added ${fallbackInserted} fallback URLs, total: ${totalInserted}`);
+      
+      if (totalInserted >= minRequired) {
+        await markSeeded(env, auditId);
+        
+        console.log(`SEED_SITEMAP { audit: ${auditId}, discovered: ${unique.length}, enqueued: ${totalInserted}, seeded: 1, fallback: ${fallbackInserted}, mode: 'smart+fallback' }`);
         
         return {
           homepage: 1,
           navLinks: 0,
-          sitemapUrls: uniqueSitemap.length,
-          total: totalEnqueued,
-          seeded: false,
-          reason: 'SEED_INSUFFICIENT_URLS'
+          sitemapUrls: unique.length,
+          total: totalInserted,
+          seeded: true
         };
       }
     }
     
-    // Set seeded flag only if we have enough URLs
+    // 10. If still not enough, fail the seeding
+    console.error(`[Seed] SEED_INSUFFICIENT_URLS: Only ${inserted} URLs enqueued, need ${minRequired}`);
     await env.DB.prepare(`
       UPDATE audits 
       SET phase_state = json_set(
         COALESCE(phase_state, '{}'), 
-        '$.crawl.seeded', 1,
-        '$.crawl.seeded_at', datetime('now')
+        '$.crawl.seeded', 0,
+        '$.crawl.seeded_at', datetime('now'),
+        '$.crawl.seed_failure', 'SEED_INSUFFICIENT_URLS'
       )
       WHERE id = ?1
     `).bind(auditId).run();
     
-    console.log(`SEED_SITEMAP { audit: ${auditId}, discovered: ${uniqueSitemap.length}, enqueued: ${totalEnqueued}, seeded: 1, sitemapIndex: ${sitemapIndexCount}, urlsets: ${urlsetCount}, mode: 'simple' }`);
-    
     return {
       homepage: 1,
       navLinks: 0,
-      sitemapUrls: uniqueSitemap.length,
-      total: totalEnqueued,
-      seeded: true
+      sitemapUrls: unique.length,
+      total: inserted,
+      seeded: false,
+      reason: 'SEED_INSUFFICIENT_URLS'
     };
   }
+  
+  // LEGACY MODE: Original seeding logic
+  console.log(`[Seed] Using LEGACY MODE: homepage + nav + sitemap`);
+  
+  let totalEnqueued = 0;
   
   // LEGACY MODE: Original seeding logic
   console.log(`[Seed] Using LEGACY MODE: homepage + nav + sitemap`);
