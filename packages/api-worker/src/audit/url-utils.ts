@@ -40,7 +40,12 @@ export function normalizeUrl(raw: string, origin: string): string | null {
 
 export function isInternal(raw: string, origin: string): boolean {
   try { 
-    return new URL(raw, origin).host === new URL(origin).host; 
+    const target = new URL(raw, origin);
+    const base = new URL(origin);
+    
+    // Allow apex<->www and http<->https so BFS can expand
+    const stripWww = (h: string) => h.replace(/^www\./i, '');
+    return stripWww(target.hostname) === stripWww(base.hostname);
   } catch { 
     return false; 
   }
@@ -49,18 +54,41 @@ export function isInternal(raw: string, origin: string): boolean {
 export function extractLinks(html: string): string[] {
   const links: string[] = [];
   
-  // Simple regex to extract href attributes
+  // More comprehensive regex to extract href attributes
+  // Handle both single and double quotes, and various spacing
   const hrefRegex = /href\s*=\s*["']([^"']+)["']/gi;
   let match;
   
   while ((match = hrefRegex.exec(html)) !== null) {
-    const href = match[1];
-    if (href && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
+    const href = match[1].trim();
+    if (href && 
+        !href.startsWith('#') && 
+        !href.startsWith('mailto:') && 
+        !href.startsWith('tel:') &&
+        !href.startsWith('javascript:') &&
+        !href.startsWith('data:') &&
+        href.length > 0) {
       links.push(href);
     }
   }
   
-  return links;
+  // Also try to extract from src attributes (for some navigation patterns)
+  const srcRegex = /src\s*=\s*["']([^"']+)["']/gi;
+  while ((match = srcRegex.exec(html)) !== null) {
+    const src = match[1].trim();
+    if (src && 
+        !src.startsWith('#') && 
+        !src.startsWith('mailto:') && 
+        !src.startsWith('tel:') &&
+        !src.startsWith('javascript:') &&
+        !src.startsWith('data:') &&
+        src.length > 0 &&
+        (src.endsWith('.html') || src.endsWith('.htm') || src.includes('/'))) {
+      links.push(src);
+    }
+  }
+  
+  return [...new Set(links)]; // Remove duplicates
 }
 
 export function isValidPageUrl(url: string): boolean {

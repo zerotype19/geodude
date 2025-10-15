@@ -146,13 +146,19 @@ async function runCrawlTick(env: any, auditId: string) {
   const stateRow = await env.DB.prepare(`
     WITH pend AS (SELECT COUNT(*) AS c FROM audit_frontier WHERE audit_id=?1 AND status='pending'),
          visit AS (SELECT COUNT(*) AS c FROM audit_frontier WHERE audit_id=?1 AND status='visiting'),
+         done AS (SELECT COUNT(*) AS c FROM audit_frontier WHERE audit_id=?1 AND status='done'),
          pages AS (SELECT COUNT(*) AS c FROM audit_pages WHERE audit_id=?1),
          seeded AS (SELECT json_extract(phase_state,'$.crawl.seeded') AS seeded FROM audits WHERE id=?1)
-    SELECT pend.c AS pending, visit.c AS visiting, pages.c AS pages, seeded.seeded AS seeded
-    FROM pend, visit, pages, seeded
+    SELECT pend.c AS pending, visit.c AS visiting, done.c AS done, pages.c AS pages, seeded.seeded AS seeded
+    FROM pend, visit, done, pages, seeded
   `).bind(auditId).first<any>();
   
-  console.log(`[AuditRunner] Pre-gate state: ${stateRow.pending} pending, ${stateRow.visiting} visiting, ${stateRow.pages} pages, seeded=${stateRow.seeded}, batchProcessed=${batch.processed}`);
+  // Get analysis count for observability
+  const analyzedCount = await env.DB.prepare(`SELECT COUNT(*) as c FROM audit_page_analysis WHERE audit_id=?1`)
+    .bind(auditId).first<any>();
+  const analyzedTotal = Number(analyzedCount?.c ?? 0);
+  
+  console.log(`[AuditRunner] Pre-gate state: ${stateRow.pending} pending, ${stateRow.visiting} visiting, ${stateRow.done} done, ${stateRow.pages} pages, seeded=${stateRow.seeded}, batchProcessed=${batch.processed}`);
   
   // Try to advance atomically
   const advanced = await tryAdvanceFromCrawl(env, auditId, maxPages);
@@ -162,6 +168,10 @@ async function runCrawlTick(env: any, auditId: string) {
   } else {
     console.log(`[AuditRunner] Successfully advanced from crawl to citations phase`);
   }
+  
+  // Tick-level observability
+  const timeMs = Date.now() - Date.now(); // TODO: track actual tick start time
+  console.log(`CRAWL_TICK {processed: ${batch.processed}, pages: ${stateRow.pages}, analyzed_total: ${analyzedTotal}, pending: ${stateRow.pending}, visiting: ${stateRow.visiting}, ms: ${timeMs}}`);
   
   return; // 🔴 always stop here
 }

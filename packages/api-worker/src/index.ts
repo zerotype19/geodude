@@ -906,6 +906,12 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       return handleAnalysisRoutes(request, env);
     }
 
+    // Backfill analysis routes
+    if (path.includes('/backfill-analysis')) {
+      const { handleBackfillAnalysis } = await import('./routes/backfill-analysis');
+      return handleBackfillAnalysis(request, env);
+    }
+
     // POST /v1/botlogs/ingest - Admin-only AI bot log ingestion (Phase G)
     if (path === '/v1/botlogs/ingest' && request.method === 'POST') {
       return handleBotLogsIngest(request, env);
@@ -2837,10 +2843,10 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           );
         }
 
-        // Get pages
+        // Get pages with render telemetry
         const pagesResult = await env.DB.prepare(
           `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present, 
-                  word_count, rendered_words, snippet, load_time_ms, error
+                  word_count, rendered_words, snippet, load_time_ms, error, load_ms, content_type
            FROM audit_pages WHERE audit_id = ?
            ORDER BY url`
         ).bind(auditId).all();
@@ -2919,11 +2925,33 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           Organic: citations.filter(c => c.type === 'Organic').length
         };
 
-        // Compute rollups from pages for breakdown (use raw DB columns)
-        const totalPages = pages.results.length;
-        const pagesWithJsonLd = pages.results.filter((p: any) => (p.jsonld_count ?? 0) > 0).length;
-        const pagesWithTitle = pages.results.filter((p: any) => p.title && p.title.length > 0).length;
-        const pagesWithH1 = pages.results.filter((p: any) => p.has_h1).length;
+        // Compute rollups from NEW audit_page_analysis table for richer data
+        const analysisResult = await env.DB.prepare(
+          `SELECT
+            COUNT(*) AS total_pages,
+            SUM(CASE WHEN h1 IS NOT NULL AND h1!='' THEN 1 ELSE 0 END) AS h1_ok,
+            SUM(CASE WHEN h1_count=1 THEN 1 ELSE 0 END) AS single_h1,
+            SUM(CASE WHEN title IS NOT NULL AND title!='' THEN 1 ELSE 0 END) AS title_ok,
+            SUM(CASE WHEN meta_description IS NOT NULL AND meta_description!='' THEN 1 ELSE 0 END) AS meta_ok,
+            SUM(CASE WHEN schema_types IS NOT NULL AND schema_types!='' THEN 1 ELSE 0 END) AS schema_ok,
+            SUM(CASE WHEN eeat_flags LIKE '%HAS_AUTHOR%' THEN 1 ELSE 0 END) AS has_author,
+            SUM(CASE WHEN eeat_flags LIKE '%HAS_DATES%' THEN 1 ELSE 0 END) AS has_dates
+          FROM audit_page_analysis WHERE audit_id = ?`
+        ).bind(auditId).first();
+        
+        // Fallback to old pages table if no analysis data exists yet
+        const totalPages = (analysisResult?.total_pages ?? 0) > 0 
+          ? Number(analysisResult.total_pages)
+          : pages.results.length;
+        const pagesWithJsonLd = (analysisResult?.schema_ok ?? 0) > 0
+          ? Number(analysisResult.schema_ok)
+          : pages.results.filter((p: any) => (p.jsonld_count ?? 0) > 0).length;
+        const pagesWithTitle = (analysisResult?.title_ok ?? 0) > 0
+          ? Number(analysisResult.title_ok)
+          : pages.results.filter((p: any) => p.title && p.title.length > 0).length;
+        const pagesWithH1 = (analysisResult?.h1_ok ?? 0) > 0
+          ? Number(analysisResult.h1_ok)
+          : pages.results.filter((p: any) => p.has_h1).length;
         const pagesWithContent = pages.results.filter((p: any) => (p.rendered_words ?? p.word_count ?? 0) >= 120).length;
         const pages2xx = pages.results.filter((p: any) => (p.status_code ?? 0) >= 200 && (p.status_code ?? 0) < 300).length;
         
@@ -2948,9 +2976,9 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         const content120PlusPct = totalPages > 0 ? Math.round((pagesWithContent / totalPages) * 1000) / 10 : 0;
         const ok2xxPct = totalPages > 0 ? Math.round((pages2xx / totalPages) * 1000) / 10 : 0;
         
-        // Calculate average render time
+        // Calculate average render time from new telemetry columns
         const renderTimes = pages.results
-          .map((p: any) => p.load_time_ms)
+          .map((p: any) => p.load_ms || p.load_time_ms) // prefer new load_ms column
           .filter((t: number) => t && t > 0);
         const avgRenderMs = renderTimes.length > 0 
           ? Math.round(renderTimes.reduce((sum: number, t: number) => sum + t, 0) / renderTimes.length)
@@ -2997,6 +3025,59 @@ Sitemap: https://optiview.ai/sitemap.xml`;
             ok2xxPct,
             avgRenderMs,
           },
+        };
+        
+        // Calculate actual scores from analysis data
+        // Crawlability: 0-42 points (40% weight)
+        let crawlabilityPoints = 0;
+        if (!robotsMissing) crawlabilityPoints += 8; // robots.txt found
+        if (!sitemapMissing) crawlabilityPoints += 8; // sitemap referenced
+        const allowedBots = Object.values(aiBots).filter(Boolean).length;
+        crawlabilityPoints += (allowedBots / 7) * 26; // AI bot access (26 points max)
+        
+        // Structured: 0-30 points (30% weight)
+        let structuredPoints = 0;
+        structuredPoints += (jsonLdCoveragePct / 100) * 20; // JSON-LD coverage (20 points max)
+        if (siteFaqSchemaPresent) structuredPoints += 5; // FAQ schema (5 points)
+        if (siteFaqPagePresent) structuredPoints += 5; // FAQ page (5 points)
+        
+        // Answerability: 0-20 points (20% weight)
+        let answerabilityPoints = 0;
+        answerabilityPoints += (titleCoveragePct / 100) * 8; // Title coverage (8 points max)
+        answerabilityPoints += (h1CoveragePct / 100) * 8; // H1 coverage (8 points max)
+        answerabilityPoints += (content120PlusPct / 100) * 4; // Content length (4 points max)
+        
+        // Trust: 0-10 points (10% weight)
+        let trustPoints = 0;
+        trustPoints += (ok2xxPct / 100) * 8; // HTTP status (8 points max)
+        trustPoints += Math.min(2, avgRenderMs / 1000); // Render time bonus (2 points max)
+        
+        // Calculate percentages
+        const crawlabilityPct = Math.round((crawlabilityPoints / 42) * 100);
+        const structuredPct = Math.round((structuredPoints / 30) * 100);
+        const answerabilityPct = Math.round((answerabilityPoints / 20) * 100);
+        const trustPct = Math.round((trustPoints / 10) * 100);
+        
+        // Calculate overall score using weighted percentages
+        const totalPct = Math.round(
+          (crawlabilityPct * 0.4) +
+          (structuredPct * 0.3) +
+          (answerabilityPct * 0.2) +
+          (trustPct * 0.1)
+        );
+        
+        // Build scores object
+        const scores = {
+          total: totalPct,
+          crawlability: Math.round(crawlabilityPoints),
+          structured: Math.round(structuredPoints),
+          answerability: Math.round(answerabilityPoints),
+          trust: Math.round(trustPoints),
+          crawlabilityPct,
+          structuredPct,
+          answerabilityPct,
+          trustPct,
+          breakdown,
         };
         
         // Parse AI access probe results
@@ -3148,16 +3229,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           crawlers: { total: totalHits, byBot, lastSeen },  // Phase G
         };
 
-        // Transform scores from flat columns to nested object
-        // For failed audits, provide default scores to prevent frontend crashes
-        const scores = {
-          total: audit.score_overall || 0,
-          crawlability: audit.score_crawlability || 0,
-          structured: audit.score_structured || 0,
-          answerability: audit.score_answerability || 0,
-          trust: audit.score_trust || 0,
-          breakdown,
-        };
+        // Scores are now calculated from analysis data above
 
         // Transform issues to match frontend expectations
         const transformedIssues = (issues.results as any[]).map((issue: any) => ({

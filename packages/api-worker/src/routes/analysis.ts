@@ -135,7 +135,7 @@ export async function handleAnalysisRoutes(request: Request, env: any): Promise<
     try {
       // Get audit basic info
       const audit = await env.DB.prepare(`
-        SELECT id, status, phase, phase_started_at, phase_heartbeat_at, created_at, completed_at,
+        SELECT id, status, phase, phase_started_at, phase_heartbeat_at, started_at, completed_at,
                (SELECT COUNT(*) FROM audit_pages WHERE audit_id = audits.id) as pages_crawled,
                (SELECT COUNT(*) FROM audit_frontier WHERE audit_id = audits.id AND status = 'pending') as frontier_pending
         FROM audits WHERE id = ?1
@@ -180,7 +180,7 @@ export async function handleAnalysisRoutes(request: Request, env: any): Promise<
           phase: audit.phase,
           phase_started_at: audit.phase_started_at,
           phase_heartbeat_at: audit.phase_heartbeat_at,
-          created_at: audit.created_at,
+          started_at: audit.started_at,
           completed_at: audit.completed_at,
           pages_crawled: audit.pages_crawled,
           frontier_pending: audit.frontier_pending
@@ -195,7 +195,7 @@ export async function handleAnalysisRoutes(request: Request, env: any): Promise<
           has_author: coverage?.has_author || 0,
           has_dates: coverage?.has_dates || 0
         },
-        top_schema_types: topSchemas.results.map((row: any) => ({
+        top_schema_types: (topSchemas?.results || []).map((row: any) => ({
           types: row.schema_types,
           count: row.c
         }))
