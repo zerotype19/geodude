@@ -18,19 +18,34 @@ export async function frontierBatchEnqueue(
   const unique = [...new Set(normalized)];
   console.log(`[FrontierBatch] After normalization: ${unique.length} unique URLs`);
   
-  // Batch insert with ON CONFLICT DO NOTHING
-  const values = unique.map(url => `(?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`);
+  // Batch insert with duplicate handling
   const params = unique.flatMap(url => [auditId, url, opts.depth, opts.priorityBase, 'pending', opts.source]);
   
   try {
-    const stmt = env.DB.prepare(`
-      INSERT INTO audit_frontier (audit_id, url, depth, priority, status, discovered_from, created_at, updated_at)
-      VALUES ${values.join(', ')}
-      ON CONFLICT(audit_id, url) DO NOTHING
-    `);
+    // D1 doesn't support ON CONFLICT, so we need to insert one by one with error handling
+    let inserted = 0;
     
-    const result = await stmt.bind(...params).run();
-    const inserted = result.changes || 0;
+    for (let i = 0; i < unique.length; i++) {
+      try {
+        const url = unique[i];
+        const offset = i * 6; // Each URL has 6 parameters
+        const urlParams = params.slice(offset, offset + 6);
+        
+        const result = await env.DB.prepare(`
+          INSERT INTO audit_frontier (audit_id, url, depth, priority, status, discovered_from, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        `).bind(...urlParams).run();
+        
+        if (result.changes > 0) {
+          inserted++;
+        }
+      } catch (error) {
+        // Ignore duplicate key errors (SQLite error 19)
+        if (!error.message?.includes('UNIQUE constraint failed')) {
+          console.warn(`[FrontierBatch] Failed to insert URL ${unique[i]}:`, error);
+        }
+      }
+    }
     
     console.log(`SEED_ENQUEUE { audit: ${auditId}, attempted: ${unique.length}, inserted: ${inserted}, duplicates: ${unique.length - inserted} }`);
     
