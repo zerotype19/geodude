@@ -250,12 +250,22 @@ export async function loadSitemapUrls(
   try {
     console.log(`[Seed] Loading sitemap URLs for ${origin}`);
     
-    // Try common sitemap locations
+    // Try common sitemap locations (both www and non-www variants)
+    const baseOrigin = origin.replace(/^https?:\/\/(www\.)?/, 'https://');
+    const wwwOrigin = origin.replace(/^https?:\//, 'https://www.');
+    const nonWwwOrigin = origin.replace(/^https?:\/\/www\./, 'https://');
+    
     const sitemapUrls = [
-      `${origin}/sitemap.xml`,
-      `${origin}/sitemap_index.xml`,
-      `${origin}/sitemaps.xml`
-    ];
+      `${baseOrigin}/sitemap.xml`,
+      `${baseOrigin}/sitemap_index.xml`, 
+      `${baseOrigin}/sitemaps.xml`,
+      `${wwwOrigin}/sitemap.xml`,
+      `${wwwOrigin}/sitemap_index.xml`,
+      `${wwwOrigin}/sitemaps.xml`,
+      `${nonWwwOrigin}/sitemap.xml`,
+      `${nonWwwOrigin}/sitemap_index.xml`,
+      `${nonWwwOrigin}/sitemaps.xml`
+    ].filter((url, index, arr) => arr.indexOf(url) === index); // Remove duplicates
     
     const allUrls: string[] = [];
     let sitemapIndexCount = 0;
