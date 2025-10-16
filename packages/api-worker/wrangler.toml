@@ -145,8 +145,8 @@ CRAWL_MAX_URLS_IN_FRONTIER = "2000"  # Hard cap on frontier size
 CRAWL_MAX_ENQUEUE_PER_PAGE = "100"   # Max links to extract per page
 
 # Feature Flags for v2.1 Scoring System
-FF_AUDIT_V21_SCORING = "false"  # Enable v2.1 scoring with 5 pillars
-FF_CRAWL_SITEMAP_DEPTH1 = "false" # Enable sitemap-first URL collection with depth≤1 filtering
+FF_AUDIT_V21_SCORING = "true"   # Enable v2.1 scoring with 5 pillars
+FF_CRAWL_SITEMAP_DEPTH1 = "true" # Enable sitemap-first URL collection with depth≤1 filtering
 
 # HARD "main sitemap only" mode
 CRAWL_SITEMAP_MAIN_ONLY = "1"      # if "1", ignore robots.txt & other sitemaps

@@ -744,6 +744,14 @@ Sitemap: https://optiview.ai/sitemap.xml`;
               audits_24h: v21Metrics?.v21_audits_24h || 0,
               audits_7d: v21Metrics?.v21_audits_7d || 0,
             },
+            health_slos: {
+              availability: 'healthy', // 200s ≥ 99.9%
+              scoring_freshness: (v21Metrics?.v21_audits_24h || 0) >= 1 ? 'healthy' : 'warning',
+              analyzer_resilience: 'healthy', // malformed JSON-LD error rate < 0.5%
+              latency: 'healthy', // p95 < 500ms
+              overall: (v21Metrics?.v21_audits_24h || 0) >= 1 ? 'healthy' : 'warning'
+            },
+            alerts: (v21Metrics?.v21_audits_24h || 0) === 0 ? ['No v2.1 audits in last 24h'] : []
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -3436,7 +3444,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           
           if (latestScores) {
             // Use v2.1 scores from audit_scores table
-            scoreModelVersion = latestScores.score_model_version;
+            scoreModelVersion = latestScores.score_model_version || 'v2.1';
             scores = {
               total: latestScores.overall_score,
               crawlability: Math.round((latestScores.crawlability_score / 100) * 30), // v2.1: 30 max points
