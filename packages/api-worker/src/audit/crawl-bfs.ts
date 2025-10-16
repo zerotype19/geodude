@@ -137,15 +137,19 @@ export async function crawlBatchBfs(
       // Extract internal links (only if depth < maxDepth and we have content)
       if (depth < opts.maxDepth && res.html && res.html.length > 0) {
         try {
-          // Check frontier size before extracting more links
-          const frontierCount = await remainingCount(env, auditId);
-          const maxFrontier = parseInt(env.CRAWL_MAX_URLS_IN_FRONTIER || '2000');
-          if (frontierCount > maxFrontier) {
-            console.log(`[CrawlBFS] Frontier size ${frontierCount} exceeds limit ${maxFrontier}, skipping link extraction`);
-            continue;
-          }
+          // Extract and enqueue new links from this page (unless disabled)
+          if (env.CRAWL_DISABLE_LINK_DISCOVERY === "1") {
+            console.log(`[CrawlBFS] Link discovery disabled, skipping link extraction from ${url}`);
+          } else {
+            // Check frontier size before extracting more links
+            const frontierCount = await remainingCount(env, auditId);
+            const maxFrontier = parseInt(env.CRAWL_MAX_URLS_IN_FRONTIER || '2000');
+            if (frontierCount > maxFrontier) {
+              console.log(`[CrawlBFS] Frontier size ${frontierCount} exceeds limit ${maxFrontier}, skipping link extraction`);
+              continue;
+            }
 
-          const links = extractLinks(res.html);
+            const links = extractLinks(res.html);
           console.log(`[CrawlBFS] Extracted ${links.length} links from ${url}`);
           
           const newLinks: string[] = [];
@@ -221,6 +225,7 @@ export async function crawlBatchBfs(
             });
             
             console.log(`[CrawlBFS] Batch enqueued ${enqueued} new links from ${url} (frontier: ${frontierCount})`);
+            }
           }
         } catch (error) {
           console.error(`[CrawlBFS] Error extracting links from ${url}:`, error);
