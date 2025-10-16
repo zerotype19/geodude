@@ -9,7 +9,9 @@ import Citations from "../components/Citations";
 import BraveQueriesModal from "../components/BraveQueriesModal";
 import AIDebugModal from "../components/AIDebugModal";
 import VisibilityIntelligenceTab from "../components/VisibilityIntelligenceTab";
+import VisibilityTab from "../components/VisibilityTab";
 import { getBotMeta } from "../lib/botMeta";
+import { isV21, pct } from "../lib/format";
 
 // Helper function for score color coding
 const getScoreColor = (score: number): string => {
@@ -148,7 +150,23 @@ export default function PublicAudit() {
         marginBottom: 16 
       }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24 }}>Audit Report</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+            <h1 style={{ margin: 0, fontSize: 24 }}>Audit Report</h1>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              borderRadius: 20,
+              background: '#f1f5f9',
+              padding: '4px 12px',
+              fontSize: 12,
+              fontWeight: 500,
+              color: '#475569'
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
+              model {audit.scores?.score_model_version ?? "v1.0"}
+            </span>
+          </div>
           {audit.property ? (
             <p style={{ margin: '4px 0 0', fontSize: 14, opacity: 0.7 }}>
               <span style={{ fontWeight: 500 }}>{audit.property.name}</span>
@@ -496,7 +514,36 @@ export default function PublicAudit() {
         <ScoreCard title="Trust" value={audit.scores.trustPct}/>
         {/* v2.1: Show Visibility card only when present */}
         {typeof audit.scores.visibilityPct === 'number' && (
-          <ScoreCard title="Visibility" value={audit.scores.visibilityPct}/>
+          <div style={{
+            background: '#faf5ff',
+            border: '1px solid #d8b4fe',
+            borderRadius: 12,
+            padding: 20,
+            textAlign: 'center',
+            position: 'relative'
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#7c3aed', marginBottom: 8 }}>
+              Visibility
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }}>
+              {pct(audit.scores.visibilityPct)}
+            </div>
+            <div style={{ fontSize: 12, color: '#a855f7', opacity: 0.8 }}>
+              AI Assistant Readiness
+            </div>
+            <div style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              fontSize: 10,
+              background: '#e0e7ff',
+              color: '#3730a3',
+              padding: '2px 6px',
+              borderRadius: 8
+            }} title="New in v2.1 — measures AI assistant citations and discoverability across models.">
+              v2.1
+            </div>
+          </div>
         )}
       </div>
 
@@ -564,19 +611,80 @@ export default function PublicAudit() {
               marginBottom: 32,
               border: '1px solid #e2e8f0'
             }}>
-              <div style={{fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#1e293b'}}>Score Formula:</div>
-              <div style={{fontSize: 14, color: '#64748b', fontFamily: 'Monaco, monospace'}}>
-                {audit.scores.visibilityPct !== undefined 
-                  ? 'Overall = (Crawlability 30%) + (Structured 25%) + (Answerability 20%) + (Trust 15%) + (Visibility 10%)'
-                  : 'Overall = (Crawlability 40%) + (Structured 30%) + (Answerability 20%) + (Trust 10%)'
-                }
+              <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12}}>
+                <div style={{fontSize: 14, fontWeight: 600, color: '#1e293b'}}>Score Formula</div>
+                <span style={{
+                  fontSize: 12,
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  padding: '2px 8px',
+                  borderRadius: 12
+                }}>
+                  model {audit.scores?.score_model_version ?? "v1.0"}
+                </span>
+                {isV21(audit.scores) && (
+                  <span style={{
+                    fontSize: 12,
+                    background: '#faf5ff',
+                    color: '#7c3aed',
+                    padding: '2px 8px',
+                    borderRadius: 12
+                  }}>
+                    AI Visibility (new)
+                  </span>
+                )}
               </div>
-              <div style={{fontSize: 14, color: '#64748b', marginTop: 8}}>
-                <strong>Your Calculation:</strong> ({Math.round((audit.scores.crawlabilityPct || (audit.scores.crawlability / 42 * 100)) * 10) / 10}% × 0.4) + ({Math.round((audit.scores.structuredPct || (audit.scores.structured / 30 * 100)) * 10) / 10}% × 0.3) + ({Math.round((audit.scores.answerabilityPct || (audit.scores.answerability / 20 * 100)) * 10) / 10}% × 0.2) + ({Math.round((audit.scores.trustPct || (audit.scores.trust / 10 * 100)) * 10) / 10}% × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</strong>
-              </div>
-              <div style={{fontSize: 13, color: '#94a3b8', marginTop: 4, fontStyle: 'italic'}}>
-                Note: Component scores are converted to percentages (0-100%) before applying weights. Raw points: Crawlability {audit.scores.crawlability}/42, Structured {audit.scores.structured}/30, Answerability {audit.scores.answerability}/20, Trust {audit.scores.trust}/10.
-              </div>
+
+              {(() => {
+                const weights = isV21(audit.scores)
+                  ? [
+                      { key: "Crawlability", w: 30, s: audit.scores.crawlabilityPct || 0 },
+                      { key: "Structured", w: 25, s: audit.scores.structuredPct || 0 },
+                      { key: "Answerability", w: 20, s: audit.scores.answerabilityPct || 0 },
+                      { key: "Trust", w: 15, s: audit.scores.trustPct || 0 },
+                      ...(typeof audit.scores.visibilityPct === 'number' ? [{ key: "Visibility", w: 10, s: audit.scores.visibilityPct }] : []),
+                    ]
+                  : [
+                      { key: "Crawlability", w: 40, s: audit.scores.crawlabilityPct || 0 },
+                      { key: "Structured", w: 30, s: audit.scores.structuredPct || 0 },
+                      { key: "Answerability", w: 20, s: audit.scores.answerabilityPct || 0 },
+                      { key: "Trust", w: 10, s: audit.scores.trustPct || 0 },
+                    ];
+
+                return (
+                  <div style={{marginBottom: 16}}>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
+                      {weights.map((row) => (
+                        <div key={row.key} style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                          <div style={{width: 120, fontSize: 14, color: '#374151'}}>
+                            {row.key} <span style={{color: '#6b7280'}}>({row.w}%)</span>
+                          </div>
+                          <div style={{flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden'}}>
+                            <div style={{
+                              height: '100%',
+                              background: row.key === 'Visibility' ? '#7c3aed' : '#374151',
+                              width: `${Math.max(0, Math.min(100, row.s))}%`,
+                              transition: 'width 0.3s ease'
+                            }} />
+                          </div>
+                          <div style={{width: 40, textAlign: 'right', fontSize: 14, color: '#374151'}}>
+                            {pct(row.s)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{marginTop: 12, fontSize: 14, color: '#6b7280'}}>
+                      Overall = {weights.map((w, i) => (
+                        <span key={w.key}>
+                          {i > 0 && " + "}{w.key} {w.w}% × {pct(w.s)}
+                        </span>
+                      ))}
+                      <span> = <strong style={{color: '#3b82f6'}}>{pct(audit.scores.total)}</strong></span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Component Breakdowns */}
@@ -703,6 +811,51 @@ export default function PublicAudit() {
                 <div style={{fontSize: 13, color: '#475569'}}>
                   <strong>What we check:</strong> HTTP status codes, page load times, broken links, error detection, accessibility
                 </div>
+                
+                {/* v2.1: EEAT checklist */}
+                {isV21(audit.scores) && audit.eeat_summary && (
+                  <div style={{marginTop: 12, padding: 12, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0'}}>
+                    <div style={{fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8}}>E-E-A-T Signals</div>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 12}}>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                        <span style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: audit.eeat_summary.hasAuthor ? '#10b981' : '#ef4444'
+                        }} />
+                        <span style={{color: audit.eeat_summary.hasAuthor ? '#374151' : '#dc2626'}}>Author metadata</span>
+                      </div>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                        <span style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: audit.eeat_summary.hasDates ? '#10b981' : '#ef4444'
+                        }} />
+                        <span style={{color: audit.eeat_summary.hasDates ? '#374151' : '#dc2626'}}>Publication dates</span>
+                      </div>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                        <span style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: audit.eeat_summary.httpsOk ? '#10b981' : '#ef4444'
+                        }} />
+                        <span style={{color: audit.eeat_summary.httpsOk ? '#374151' : '#dc2626'}}>HTTPS & 200 OK</span>
+                      </div>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                        <span style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: audit.eeat_summary.hasMetaDescription ? '#10b981' : '#ef4444'
+                        }} />
+                        <span style={{color: audit.eeat_summary.hasMetaDescription ? '#374151' : '#dc2626'}}>Meta descriptions</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Visibility (v2.1) */}
@@ -781,13 +934,19 @@ export default function PublicAudit() {
           <IssuesTable issues={audit.issues || []}/>
         )}
         {activeTab === 'pages' && (
-          <PagesTable pages={audit.pages || []} auditId={id}/>
+          <PagesTable pages={audit.pages || []} scores={audit.scores}/>
         )}
         {activeTab === 'citations' && (
           <Citations auditId={id!} citations={audit.citations}/>
         )}
-        {activeTab === 'visibility' && import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
-          <VisibilityIntelligenceTab auditId={id!} domain={audit.domain || audit.url} projectId={audit.project_id} />
+        {activeTab === 'visibility' && (
+          isV21(audit.scores) ? (
+            <VisibilityTab visibilitySummary={audit.visibility_summary} />
+          ) : (
+            import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
+              <VisibilityIntelligenceTab auditId={id!} domain={audit.domain || audit.url} projectId={audit.project_id} />
+            )
+          )
         )}
       </div>
       

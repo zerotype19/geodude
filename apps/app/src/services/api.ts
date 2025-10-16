@@ -5,7 +5,23 @@ export type AuditIssue = {
   severity: string; 
   code: string; 
   message: string; 
-  url?: string 
+  url?: string;
+  issue_rule_version?: string; // v2.1: rule version
+};
+
+export type EEATSignals = {
+  hasAuthor?: boolean;
+  hasDates?: boolean;
+  httpsOk?: boolean;
+  hasMetaDescription?: boolean;
+};
+
+export type PageSignals = {
+  faqSchema?: boolean;
+  schemaTypes?: string[];
+  eeat?: EEATSignals;
+  aiCitations?: number;               // per URL
+  aiSources?: Record<string, number>; // e.g. { chatgpt: 2, brave: 5 }
 };
 
 export type AuditPage = { 
@@ -26,6 +42,11 @@ export type AuditPage = {
   aiAnswerQueries?: string[]; // Phase F+: Top 3 queries that cited this page
   aiAnswerMappings?: Array<{ reason: 'path' | 'canonical' | 'title_fuzzy'; confidence: number }>; // Phase F++: Mapping metadata
   aiHits?: number; // Phase G: Real AI crawler hits (30d)
+  eeat?: EEATSignals; // v2.1: E-E-A-T signals
+  pageSignals?: PageSignals; // v2.1: enhanced page signals
+  cites?: number; // v2.1: citation count alias
+  ai_brave?: number; // v2.1: Brave AI citations
+  ai_hits?: number; // v2.1: AI hits alias
 };
 
 export type ScoresBreakdown = {
@@ -205,6 +226,16 @@ export type CitationsSummary = {
   Organic: number;
 };
 
+export type VisibilitySummary = {
+  totalCitations: number;
+  bySource: Record<string, number>; // e.g. { brave: 5, chatgpt: 2, claude: 1, perplexity: 0 }
+  topUrls: Array<{
+    url: string;
+    total: number;
+    bySource: Record<string, number>;
+  }>;
+};
+
 export type Audit = { 
   id: string; 
   property_id: string; 
@@ -223,6 +254,8 @@ export type Audit = {
   entity_recommendations?: EntityRecommendations;
   citations?: Citation[];
   citationsSummary?: CitationsSummary;
+  eeat_summary?: EEATSignals; // v2.1: E-E-A-T summary
+  visibility_summary?: VisibilitySummary; // v2.1: visibility summary
 };
 
 export async function startAudit(opts: {

@@ -40,6 +40,9 @@ export default function Footer() {
           app.optiview.ai
         </a>
       </div>
+      <div style={{ color: '#9ca3af', fontSize: '11px', marginTop: '8px' }}>
+        Powered by Optiview Audit Engine v2.1 · Enhanced E-E-A-T + Visibility Intelligence
+      </div>
     </footer>
   );
 }
