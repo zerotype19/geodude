@@ -714,15 +714,14 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         const budgetUsed = parseInt((await env.RATE_LIMIT_KV.get(budgetKey)) || '0');
         const budgetMax = parseInt(env.CITATIONS_DAILY_BUDGET || '200');
 
-        // Get v2.1 scoring metrics
-        const v21Metrics = await env.DB.prepare(
+        // Get unified scoring metrics
+        const scoringMetrics = await env.DB.prepare(
           `SELECT 
-            COUNT(*) as total_v21_audits,
-            COUNT(CASE WHEN created_at >= datetime('now','-1 day') THEN 1 END) as v21_audits_24h,
-            COUNT(CASE WHEN created_at >= datetime('now','-7 days') THEN 1 END) as v21_audits_7d
-           FROM audit_scores 
-           WHERE score_model_version = 'v2.1'`
-        ).first<{ total_v21_audits: number; v21_audits_24h: number; v21_audits_7d: number }>();
+            COUNT(*) as total_audits,
+            COUNT(CASE WHEN created_at >= datetime('now','-1 day') THEN 1 END) as audits_24h,
+            COUNT(CASE WHEN created_at >= datetime('now','-7 days') THEN 1 END) as audits_7d
+           FROM audit_scores`
+        ).first<{ total_audits: number; audits_24h: number; audits_7d: number }>();
 
         return new Response(
           JSON.stringify({
@@ -738,19 +737,19 @@ Sitemap: https://optiview.ai/sitemap.xml`;
               remaining: Math.max(0, budgetMax - budgetUsed),
               max: budgetMax,
             },
-            v21_scoring: {
-              total_audits: v21Metrics?.total_v21_audits || 0,
-              audits_24h: v21Metrics?.v21_audits_24h || 0,
-              audits_7d: v21Metrics?.v21_audits_7d || 0,
+            scoring: {
+              total_audits: scoringMetrics?.total_audits || 0,
+              audits_24h: scoringMetrics?.audits_24h || 0,
+              audits_7d: scoringMetrics?.audits_7d || 0,
             },
             health_slos: {
               availability: 'healthy', // 200s ≥ 99.9%
-              scoring_freshness: (v21Metrics?.v21_audits_24h || 0) >= 1 ? 'healthy' : 'warning',
+              scoring_freshness: (scoringMetrics?.audits_24h || 0) >= 1 ? 'healthy' : 'warning',
               analyzer_resilience: 'healthy', // malformed JSON-LD error rate < 0.5%
               latency: 'healthy', // p95 < 500ms
-              overall: (v21Metrics?.v21_audits_24h || 0) >= 1 ? 'healthy' : 'warning'
+              overall: (scoringMetrics?.audits_24h || 0) >= 1 ? 'healthy' : 'warning'
             },
-            alerts: (v21Metrics?.v21_audits_24h || 0) === 0 ? ['No v2.1 audits in last 24h'] : []
+            alerts: (scoringMetrics?.audits_24h || 0) === 0 ? ['No audits in last 24h'] : []
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
