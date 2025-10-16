@@ -1,7 +1,13 @@
+import { queryAI, processCitations, generateDefaultQueries } from './connectors';
+
 export interface Env {
   DB: D1Database;
   RULES: KVNamespace;
   BROWSER: Browser;
+  OPENAI_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
+  PERPLEXITY_API_KEY?: string;
+  BRAVE_API_KEY?: string;
 }
 
 export interface AuditRequest {
@@ -9,6 +15,14 @@ export interface AuditRequest {
   root_url: string;
   max_pages?: number;
   config?: any;
+}
+
+export interface CitationsRequest {
+  project_id: string;
+  domain: string;
+  brand?: string;
+  sources: ('perplexity' | 'chatgpt' | 'claude' | 'brave')[];
+  queries?: string[];
 }
 
 export interface PageAnalysis {
@@ -145,6 +159,31 @@ export default {
 
       if (req.method === 'POST' && path === '/api/admin/seed-rules') {
         const result = await seedRules(env);
+        return new Response(JSON.stringify(result), { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+
+      // Citations endpoints
+      if (req.method === 'POST' && path === '/api/citations/run') {
+        const result = await runCitations(req, env);
+        return new Response(JSON.stringify(result), { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+
+      if (req.method === 'GET' && path.startsWith('/api/citations/summary')) {
+        const result = await getCitationsSummary(url.searchParams, env);
+        return new Response(JSON.stringify(result), { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+
+      if (req.method === 'GET' && path.startsWith('/api/citations/list')) {
+        const result = await getCitationsList(url.searchParams, env);
         return new Response(JSON.stringify(result), { 
           status: 200, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -772,7 +811,7 @@ function scorePage(analysis: PageAnalysis, weights: ScoringRules): ScoringResult
   // GEO Scoring
   const G1 = score0_3(analysis.factsBlock, true);
   const G2 = score0_3(hasProvenance(analysis.jsonldRaw), true);
-  const G3 = score0_3(analysis.refsBlock && analysis.outboundLinks >= 3);
+  const G3 = score0_3(analysis.refsBlock && analysis.outboundLinks >= 3, true);
   const G4 = score0_3(!!analysis.robots && analysis.parityPass, true);
   const G5 = score0_3(analysis.chunkable);
   const G6 = score0_3(analysis.hasStableAnchors);
@@ -867,3 +906,222 @@ async function computeSiteScores(db: D1Database, auditId: string): Promise<{ aeo
     geo: Math.round((result?.avg_geo || 0) * 100) / 100
   };
 }
+
+// Citations API Handlers
+
+async function runCitations(req: Request, env: Env) {
+  const body: CitationsRequest = await req.json();
+  const { project_id, domain, brand, sources, queries } = body;
+  
+  // Generate default queries if not provided
+  let finalQueries = queries;
+  if (!finalQueries || finalQueries.length === 0) {
+    // Get page titles from recent audit for this domain
+    const audit = await env.DB.prepare(`
+      SELECT title FROM audit_pages ap
+      JOIN audits a ON ap.audit_id = a.id
+      WHERE a.project_id = ? AND ap.url LIKE ?
+      ORDER BY ap.fetched_at DESC
+      LIMIT 10
+    `).bind(project_id, `%${domain}%`).all();
+    
+    const pageTitles = audit.results.map((r: any) => r.title).filter(Boolean);
+    finalQueries = generateDefaultQueries(domain, brand, pageTitles);
+  }
+  
+  const results = [];
+  const totalsBySource: Record<string, { total: number, cited: number }> = {};
+  
+  // Initialize totals
+  for (const source of sources) {
+    totalsBySource[source] = { total: 0, cited: 0 };
+  }
+  
+  // Process each source-query combination with concurrency control
+  for (const source of sources) {
+    for (const query of finalQueries.slice(0, 24)) { // Max 24 queries per run
+      try {
+        // Throttle requests
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        const result = await queryAI(source, query, env);
+        const processed = processCitations(result, domain);
+        
+        // Generate hash for deduplication
+        const answerHash = result.answer_text ? 
+          await crypto.subtle.digest('SHA-256', new TextEncoder().encode(result.answer_text))
+            .then(hash => Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')) :
+          null;
+        
+        // Store in database
+        const citationId = crypto.randomUUID();
+        await env.DB.prepare(`
+          INSERT INTO ai_citations 
+          (id, project_id, domain, ai_source, query, answer_hash, answer_excerpt, 
+           cited_urls, cited_match_count, first_match_url, confidence, error, occurred_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        `).bind(
+          citationId, project_id, domain, source, query, answerHash,
+          result.answer_text.slice(0, 500),
+          JSON.stringify(processed.cited_urls),
+          processed.cited_match_count,
+          processed.first_match_url,
+          result.confidence,
+          result.error || null
+        ).run();
+        
+        // Update referrals table
+        await env.DB.prepare(`
+          INSERT OR REPLACE INTO ai_referrals
+          (id, project_id, domain, ai_source, query, cited, count_urls, first_seen, last_seen)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 
+                  COALESCE((SELECT first_seen FROM ai_referrals WHERE project_id = ? AND domain = ? AND ai_source = ? AND query = ?), datetime('now')),
+                  datetime('now'))
+        `).bind(
+          crypto.randomUUID(), project_id, domain, source, query,
+          processed.cited_match_count > 0 ? 1 : 0,
+          processed.cited_match_count,
+          project_id, domain, source, query
+        ).run();
+        
+        // Update totals
+        totalsBySource[source].total++;
+        if (processed.cited_match_count > 0) {
+          totalsBySource[source].cited++;
+        }
+        
+        results.push({
+          source,
+          query,
+          cited: processed.cited_match_count > 0,
+          cited_count: processed.cited_match_count,
+          error: result.error
+        });
+        
+      } catch (error) {
+        console.error(`Error processing ${source} for query "${query}":`, error);
+        totalsBySource[source].total++;
+        
+        results.push({
+          source,
+          query,
+          cited: false,
+          cited_count: 0,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+  }
+  
+  // Calculate percentages
+  const citedPctBySource: Record<string, number> = {};
+  for (const [source, totals] of Object.entries(totalsBySource)) {
+    citedPctBySource[source] = totals.total > 0 ? 
+      Math.round((totals.cited / totals.total) * 100) : 0;
+  }
+  
+  return {
+    status: 'completed',
+    totalsBySource,
+    citedPctBySource,
+    results: results.slice(0, 50) // Limit response size
+  };
+}
+
+async function getCitationsSummary(searchParams: URLSearchParams, env: Env) {
+  const project_id = searchParams.get('project_id');
+  const domain = searchParams.get('domain');
+  
+  if (!project_id || !domain) {
+    throw new Error('project_id and domain are required');
+  }
+  
+  // Get summary by source
+  const summary = await env.DB.prepare(`
+    SELECT 
+      ai_source,
+      COUNT(*) as total_queries,
+      SUM(CASE WHEN cited_match_count > 0 THEN 1 ELSE 0 END) as cited_queries,
+      ROUND(AVG(CASE WHEN cited_match_count > 0 THEN 1.0 ELSE 0.0 END) * 100, 1) as cited_percentage,
+      MAX(occurred_at) as last_run
+    FROM ai_citations
+    WHERE project_id = ? AND domain = ?
+    GROUP BY ai_source
+    ORDER BY last_run DESC
+  `).bind(project_id, domain).all();
+  
+  // Get top cited URLs
+  const topUrls = await env.DB.prepare(`
+    SELECT 
+      first_match_url,
+      COUNT(*) as citation_count,
+      MAX(occurred_at) as last_seen
+    FROM ai_citations
+    WHERE project_id = ? AND domain = ? AND cited_match_count > 0 AND first_match_url IS NOT NULL
+    GROUP BY first_match_url
+    ORDER BY citation_count DESC, last_seen DESC
+    LIMIT 10
+  `).bind(project_id, domain).all();
+  
+  // Get top citing queries
+  const topQueries = await env.DB.prepare(`
+    SELECT 
+      query,
+      ai_source,
+      cited_match_count,
+      occurred_at
+    FROM ai_citations
+    WHERE project_id = ? AND domain = ? AND cited_match_count > 0
+    ORDER BY occurred_at DESC
+    LIMIT 10
+  `).bind(project_id, domain).all();
+  
+  return {
+    bySource: summary.results,
+    topCitedUrls: topUrls.results,
+    topCitingQueries: topQueries.results
+  };
+}
+
+async function getCitationsList(searchParams: URLSearchParams, env: Env) {
+  const project_id = searchParams.get('project_id');
+  const domain = searchParams.get('domain');
+  const source = searchParams.get('source');
+  const limit = parseInt(searchParams.get('limit') || '50');
+  const offset = parseInt(searchParams.get('offset') || '0');
+  
+  if (!project_id || !domain) {
+    throw new Error('project_id and domain are required');
+  }
+  
+  let whereClause = 'WHERE project_id = ? AND domain = ?';
+  const params = [project_id, domain];
+  
+  if (source) {
+    whereClause += ' AND ai_source = ?';
+    params.push(source);
+  }
+  
+  const citations = await env.DB.prepare(`
+    SELECT 
+      id, ai_source, query, answer_excerpt,
+      cited_urls, cited_match_count, first_match_url,
+      confidence, error, occurred_at
+    FROM ai_citations
+    ${whereClause}
+    ORDER BY occurred_at DESC
+    LIMIT ? OFFSET ?
+  `).bind(...params, limit, offset).all();
+  
+  // Parse cited_urls JSON and limit to top 5 for response
+  const processedCitations = citations.results.map((citation: any) => ({
+    ...citation,
+    cited_urls: JSON.parse(citation.cited_urls || '[]').slice(0, 5)
+  }));
+  
+  return {
+    citations: processedCitations,
+    hasMore: processedCitations.length === limit
+  };
+}
+
