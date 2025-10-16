@@ -31,7 +31,7 @@ id = "e037590f3aa9494cbd4d30d5fd6bc333"
 
 [[kv_namespaces]]
 binding = "KV_RULES"
-id = "f448590f3aa9494cbd4d30d5fd6bc337"
+id = "a72021aa0c10498cb169f4c49605a87d"
 
 # [[kv_namespaces]]
 # binding = "KV_VI_CACHE"

@@ -6,7 +6,7 @@
 set -e
 
 # Get KV namespace ID from wrangler.toml
-KV_RULES_ID="f448590f3aa9494cbd4d30d5fd6bc337"
+KV_RULES_ID="a72021aa0c10498cb169f4c49605a87d"
 
 case "${1:-status}" in
   "enable")
