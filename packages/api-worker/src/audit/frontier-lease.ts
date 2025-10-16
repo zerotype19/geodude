@@ -4,17 +4,24 @@
  */
 
 export async function leaseOneUrl(db: any, auditId: string): Promise<{url: string; depth: number} | null> {
-  // D1-safe single-row lease
+  // D1-safe single-row lease (two-step: SELECT then UPDATE)
   const row = await db.prepare(`
-    UPDATE audit_frontier
-    SET status='visiting', updated_at=CURRENT_TIMESTAMP
+    SELECT id, url, depth FROM audit_frontier
     WHERE audit_id=? AND status='pending'
     ORDER BY priority ASC, depth ASC, created_at ASC
     LIMIT 1
-    RETURNING url, depth
   `).bind(auditId).first();
   
-  return row ? { url: row.url, depth: row.depth } : null;
+  if (!row) return null;
+  
+  // Update the selected row to 'visiting'
+  await db.prepare(`
+    UPDATE audit_frontier
+    SET status='visiting', updated_at=CURRENT_TIMESTAMP
+    WHERE id=?
+  `).bind(row.id).run();
+  
+  return { url: row.url, depth: row.depth };
 }
 
 export async function markUrlDone(db: any, auditId: string, url: string): Promise<void> {
