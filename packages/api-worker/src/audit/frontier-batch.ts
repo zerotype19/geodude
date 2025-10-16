@@ -35,8 +35,8 @@ export async function enqueueBatch(
 ): Promise<number> {
   if (!items.length) return 0;
   
-  // Chunk items to keep SQL params under 999 limit (4 params per item, so max ~200 items, but be conservative)
-  const chunks = chunk(items, 50);
+  // Chunk items to keep SQL params under 999 limit (4 params per item, so max ~200 items, but be very conservative)
+  const chunks = chunk(items, 25);
   let total = 0;
   
   for (const c of chunks) {
