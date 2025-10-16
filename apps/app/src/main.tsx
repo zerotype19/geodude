@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import './index.css'
 import AuditsIndex from './routes/audits/index.tsx'
 import AuditDetail from './routes/audits/[id]/index.tsx'
 import AuditPages from './routes/audits/[id]/pages/index.tsx'
