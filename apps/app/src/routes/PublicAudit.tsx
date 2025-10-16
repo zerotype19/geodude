@@ -1,0 +1,901 @@
+import { useEffect, useState, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { getAudit, rerunAudit, type Audit } from "../services/api";
+import ScoreCard from "../components/ScoreCard";
+import IssuesTable from "../components/IssuesTable";
+import PagesTable from "../components/PagesTable";
+import EntityRecommendations from "../components/EntityRecommendations";
+import Citations from "../components/Citations";
+import BraveQueriesModal from "../components/BraveQueriesModal";
+import AIDebugModal from "../components/AIDebugModal";
+import VisibilityIntelligenceTab from "../components/VisibilityIntelligenceTab";
+import VisibilityTab from "../components/VisibilityTab";
+import { getBotMeta } from "../lib/botMeta";
+import { pct } from "../lib/format";
+
+// Helper function for score color coding
+const getScoreColor = (score: number): string => {
+  if (score > 70) return '#10b981'; // Green - Excellent (>70%)
+  if (score >= 40) return '#f59e0b'; // Orange - Good (40-70%)
+  return '#ef4444'; // Red - Needs Work (<40%)
+};
+
+export default function PublicAudit() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [audit, setAudit] = useState<Audit | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'scores' | 'issues' | 'pages' | 'citations' | 'visibility'>('scores');
+  const [rerunning, setRerunning] = useState(false);
+  const [showBraveModal, setShowBraveModal] = useState(false);
+  const [showDebugModal, setShowDebugModal] = useState(false);
+  
+  const hasApiKey = useMemo(() => !!localStorage.getItem('ov_api_key'), []);
+
+  // Read tab from URL on mount and when URL changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'citations' || tabParam === 'scores' || tabParam === 'issues' || tabParam === 'pages' || tabParam === 'visibility') {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    (async () => {
+      try { 
+        if (id) setAudit(await getAudit(id)); 
+      } catch (e: any) { 
+        setError(e?.message || "Failed to load"); 
+      }
+    })();
+  }, [id]);
+
+  async function handleRerun() {
+    if (!id) return;
+    try {
+      setRerunning(true);
+      const result = await rerunAudit(id);
+      
+      // Show success message before navigating
+      const newAuditUrl = `/a/${result.id}`;
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 9999;
+        font-size: 14px;
+        max-width: 400px;
+        cursor: pointer;
+      `;
+      notification.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <div style="font-weight: 600; margin-bottom: 4px;">✓ New audit started!</div>
+            <div style="opacity: 0.9;">Redirecting to audit ${result.id}...</div>
+          </div>
+          <button style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; padding: 0; margin-left: 12px; line-height: 1;">×</button>
+        </div>
+      `;
+      notification.onclick = () => notification.remove();
+      document.body.appendChild(notification);
+      
+      // Navigate after brief delay to show notification
+      setTimeout(() => {
+        setRerunning(false); // Reset state before navigation
+        notification.remove(); // Remove notification
+        navigate(newAuditUrl);
+      }, 800);
+    } catch (e: any) {
+      const isRateLimit = e?.message?.includes('Rate limit') || e?.message?.includes('429');
+      const message = isRateLimit 
+        ? 'Daily audit budget reached. Try again after 00:00 UTC.'
+        : e?.message || 'Re-run failed';
+      
+      // Show error notification
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ef4444;
+        color: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 9999;
+        font-size: 14px;
+        max-width: 400px;
+        cursor: pointer;
+      `;
+      notification.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 4px;">✕ Re-run Failed</div>
+        <div style="opacity: 0.9;">${message}</div>
+        <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">Click to dismiss</div>
+      `;
+      notification.onclick = () => {
+        notification.remove();
+        setRerunning(false); // Ensure state is reset when dismissed
+      };
+      document.body.appendChild(notification);
+      
+      // Auto-dismiss after 5 seconds and reset state
+      setTimeout(() => {
+        notification.remove();
+        setRerunning(false);
+      }, 5000);
+    } finally {
+      // Ensure state is always reset
+      setRerunning(false);
+    }
+  }
+
+  if (error) return <div className="card">{error}</div>;
+  if (!audit) return <div className="card">Loading…</div>;
+
+  return (
+    <>
+      {/* Header with Re-run button */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        marginBottom: 16 
+      }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+            <h1 style={{ margin: 0, fontSize: 24 }}>Audit Report</h1>
+          </div>
+          {audit.property ? (
+            <p style={{ margin: '4px 0 0', fontSize: 14, opacity: 0.7 }}>
+              <span style={{ fontWeight: 500 }}>{audit.property.name}</span>
+              {audit.property.name !== audit.property.domain && (
+                <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.6 }}>
+                  {audit.property.domain}
+                </span>
+              )}
+            </p>
+          ) : audit.domain && (
+            <p style={{ margin: '4px 0 0', fontSize: 14, opacity: 0.7 }}>
+              {audit.domain}
+            </p>
+          )}
+        </div>
+        {hasApiKey && (
+          <button
+            onClick={handleRerun}
+            disabled={rerunning}
+            style={{
+              padding: '8px 16px',
+              background: rerunning ? '#64748b' : '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: rerunning ? 'not-allowed' : 'pointer',
+              fontSize: 14,
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.2s',
+            }}
+            title="Start a fresh audit for this property"
+          >
+            {rerunning ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                <span>Re-running…</span>
+                <style>{`
+                  @keyframes spin {
+                    to { transform: rotate(360deg); }
+                  }
+                `}</style>
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                <span>Re-run Audit</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Critical AI Bot Blocking Alert */}
+      {audit.site?.flags?.aiBlocked && (
+        <div style={{
+          background: '#fee2e2',
+          border: '2px solid #ef4444',
+          borderRadius: 8,
+          padding: 20,
+          marginBottom: 24,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
+            <div style={{ fontSize: 24 }}>⚠️</div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ margin: '0 0 8px', color: '#991b1b', fontSize: 18, fontWeight: 600 }}>
+                AI Crawlers Are Blocked
+              </h3>
+              <p style={{ margin: '0 0 12px', color: '#7f1d1d', fontSize: 14, lineHeight: 1.6 }}>
+                {audit.site.flags.blockedBy === 'robots'
+                  ? 'Your robots.txt is blocking AI bots. This prevents AI assistants from discovering and citing your content.'
+                  : audit.site.flags.blockedBy === 'waf'
+                    ? `Your ${audit.site.flags.wafName || 'CDN/WAF'} is blocking AI bots. This prevents AI assistants from accessing your content.`
+                    : 'AI bots cannot reach your site. This prevents AI assistants from discovering and citing your content.'}
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: '#991b1b', fontWeight: 500 }}>
+                  Blocked bots: {audit.site.flags.blockedBots.join(', ')}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <a
+                  href={`https://www.google.com/search?q=how+to+allow+${audit.site.flags.blockedBy === 'robots' ? 'AI+bots+in+robots.txt' : audit.site.flags.wafName + '+AI+bots'}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: '8px 16px',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: 6,
+                    textDecoration: 'none',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    display: 'inline-block',
+                  }}
+                >
+                  {audit.site.flags.blockedBy === 'robots' ? 'Fix robots.txt' : `Configure ${audit.site.flags.wafName || 'WAF'}`}
+                </a>
+                <button
+                  onClick={() => setShowDebugModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'white',
+                    color: '#991b1b',
+                    border: '1px solid #fca5a5',
+                    borderRadius: 6,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'inline-block',
+                  }}
+                >
+                  View Debug Info
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="row">
+        <ScoreCard title="Overall" value={audit.scores.total}/>
+        
+        <div style={{ flex: 1 }}>
+          <ScoreCard title="Crawlability" value={audit.scores.crawlabilityPct}/>
+          {audit.scores.breakdown?.crawlability && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: audit.scores.breakdown.crawlability.robotsTxtFound ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                color: audit.scores.breakdown.crawlability.robotsTxtFound ? '#10b981' : '#ef4444',
+              }}>
+                robots.txt {audit.scores.breakdown.crawlability.robotsTxtFound ? '✓' : '✗'}
+              </span>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: audit.scores.breakdown.crawlability.sitemapOk ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                color: audit.scores.breakdown.crawlability.sitemapOk ? '#10b981' : '#ef4444',
+              }}>
+                sitemap {audit.scores.breakdown.crawlability.sitemapOk ? '✓' : '✗'}
+              </span>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: 'rgba(100,116,139,.15)',
+                color: '#64748b',
+              }} title="AI bots allowed">
+                AI bots: {Object.values(audit.scores.breakdown.crawlability.aiBots).filter(Boolean).length}/{Object.keys(audit.scores.breakdown.crawlability.aiBots).length}
+              </span>
+            </div>
+          )}
+          
+          {/* AI Bot Access Probe Results */}
+          {audit.site?.aiAccess && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: audit.site.aiAccess.summary.blocked > 0 ? 'rgba(239,68,68,.2)' : 'rgba(16,185,129,.2)',
+                color: audit.site.aiAccess.summary.blocked > 0 ? '#ef4444' : '#10b981',
+              }} title={`${audit.site.aiAccess.summary.blocked} blocked bots detected`}>
+                AI Access: {audit.site.aiAccess.summary.allowed}/{audit.site.aiAccess.summary.tested} {audit.site.aiAccess.summary.blocked > 0 ? '⚠' : '✓'}
+              </span>
+              {audit.site.aiAccess.summary.waf && (
+                <span style={{
+                  fontSize: 11,
+                  padding: '4px 8px',
+                  borderRadius: 12,
+                  background: 'rgba(251,191,36,.2)',
+                  color: '#fbbf24',
+                }} title="CDN/WAF detected">
+                  {audit.site.aiAccess.summary.waf}
+                </span>
+              )}
+              {/* Per-bot status badges */}
+              {Object.entries(audit.site.aiAccess.results).slice(0, 7).map(([bot, r]) => (
+                <span 
+                  key={bot} 
+                  title={`${bot}: ${r.status}${r.server ? ` (${r.server})` : ''}`}
+                  style={{
+                    fontSize: 10,
+                    padding: '3px 6px',
+                    borderRadius: 8,
+                    background: r.ok ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                    color: r.ok ? '#10b981' : '#ef4444',
+                  }}
+                >
+                  {bot}: {r.status}
+                </span>
+              ))}
+            </div>
+          )}
+          
+          
+          {/* Phase F+: Brave AI Queries Chip */}
+          {audit.site?.braveAI && (audit.site.braveAI.queriesTotal ?? 0) > 0 && (
+            <button
+              onClick={() => setShowBraveModal(true)}
+              style={{
+                marginTop: 8,
+                fontSize: 11,
+                padding: '6px 12px',
+                borderRadius: 12,
+                background: 'rgba(139,92,246,.15)',
+                color: '#8b5cf6',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 600,
+                transition: 'all 0.2s',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(139,92,246,.25)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(139,92,246,.15)';
+              }}
+              title={`Brave AI: ${audit.site.braveAI.resultsTotal ?? 0}/${audit.site.braveAI.queriesTotal ?? 0} queries with results${
+                audit.site.braveAI.diagnostics
+                  ? `\n\nBreakdown:\n• ${audit.site.braveAI.diagnostics.ok} OK\n• ${audit.site.braveAI.diagnostics.empty} No Answer\n• ${audit.site.braveAI.diagnostics.rate_limited} Rate-Limited\n• ${audit.site.braveAI.diagnostics.error} Error\n• ${audit.site.braveAI.diagnostics.timeout} Timeout${
+                      audit.site.braveAI.querySamples && audit.site.braveAI.querySamples.length > 0
+                        ? `\n\nSample queries:\n${audit.site.braveAI.querySamples.slice(0, 5).map(q => `• ${q}`).join('\n')}`
+                        : ''
+                    }`
+                  : ''
+              }`}
+            >
+              <span>🤖 Brave AI:</span>
+              <span style={{ fontWeight: 'bold' }}>
+                {audit.site.braveAI.resultsTotal ?? 0}/{audit.site.braveAI.queriesTotal ?? 0}
+              </span>
+              
+              {/* Status dots */}
+              {audit.site.braveAI.diagnostics && (
+                <span style={{ display: 'inline-flex', gap: 3, marginLeft: 2 }}>
+                  {audit.site.braveAI.diagnostics.ok > 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} title={`${audit.site.braveAI.diagnostics.ok} OK`} />
+                  )}
+                  {audit.site.braveAI.diagnostics.empty > 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#9ca3af' }} title={`${audit.site.braveAI.diagnostics.empty} Empty`} />
+                  )}
+                  {audit.site.braveAI.diagnostics.rate_limited > 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} title={`${audit.site.braveAI.diagnostics.rate_limited} Rate-Limited`} />
+                  )}
+                  {audit.site.braveAI.diagnostics.error > 0 && (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} title={`${audit.site.braveAI.diagnostics.error} Error`} />
+                  )}
+                </span>
+              )}
+              
+              <span style={{ fontSize: 9 }}>▸</span>
+            </button>
+          )}
+          
+          {/* Disabled state when no queries */}
+          {audit.site?.braveAI && (audit.site.braveAI.queriesTotal ?? 0) === 0 && (
+            <div style={{
+              marginTop: 8,
+              fontSize: 11,
+              padding: '6px 12px',
+              borderRadius: 12,
+              background: 'rgba(156,163,175,.1)',
+              color: '#9ca3af',
+              display: 'inline-block',
+            }}>
+              <span>🤖 Brave AI —</span>
+            </div>
+          )}
+        </div>
+        
+        <div style={{ flex: 1 }}>
+          <ScoreCard title="Structured" value={audit.scores.structuredPct}/>
+          {audit.scores.breakdown?.structured && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {/* FAQ Page (URL heuristic) */}
+              {audit.scores.breakdown.structured.faqPagePresent !== undefined && (
+                <span 
+                  style={{
+                    fontSize: 11,
+                    padding: '4px 8px',
+                    borderRadius: 12,
+                    background: audit.scores.breakdown.structured.faqPagePresent ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                    color: audit.scores.breakdown.structured.faqPagePresent ? '#10b981' : '#ef4444',
+                  }}
+                  title="Detected FAQ page by URL/title"
+                >
+                  FAQ page {audit.scores.breakdown.structured.faqPagePresent ? '✓' : '✗'}
+                </span>
+              )}
+              {/* FAQ Schema (JSON-LD FAQPage) */}
+              {audit.scores.breakdown.structured.faqSchemaPresent !== undefined && (
+                <span 
+                  style={{
+                    fontSize: 11,
+                    padding: '4px 8px',
+                    borderRadius: 12,
+                    background: audit.scores.breakdown.structured.faqSchemaPresent ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
+                    color: audit.scores.breakdown.structured.faqSchemaPresent ? '#10b981' : '#ef4444',
+                  }}
+                  title="Detected FAQPage JSON-LD schema"
+                >
+                  FAQ schema {audit.scores.breakdown.structured.faqSchemaPresent ? '✓' : '✗'}
+                </span>
+              )}
+              <span style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 12,
+                background: 'rgba(56,189,248,.15)',
+                color: '#38bdf8',
+              }}>
+                JSON-LD {Math.round(audit.scores.breakdown.structured.jsonLdCoveragePct)}%
+              </span>
+              {audit.scores.breakdown.structured.schemaTypes.length > 0 && (
+                <span style={{
+                  fontSize: 11,
+                  padding: '4px 8px',
+                  borderRadius: 12,
+                  background: 'rgba(99,102,241,.15)',
+                  color: '#6366f1',
+                }} title={audit.scores.breakdown.structured.schemaTypes.join(', ')}>
+                  Schemas: {audit.scores.breakdown.structured.schemaTypes.length}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <ScoreCard title="Answerability" value={audit.scores.answerabilityPct}/>
+        <ScoreCard title="Trust" value={audit.scores.trustPct}/>
+        {/* Show Visibility card only when present */}
+        {typeof audit.scores.visibilityPct === 'number' && (
+          <div style={{
+            background: '#faf5ff',
+            border: '1px solid #d8b4fe',
+            borderRadius: 12,
+            padding: 20,
+            textAlign: 'center',
+            position: 'relative'
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#7c3aed', marginBottom: 8 }}>
+              Visibility
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: '#7c3aed', marginBottom: 4 }}>
+              {pct(audit.scores.visibilityPct)}
+            </div>
+            <div style={{ fontSize: 12, color: '#a855f7', opacity: 0.8 }}>
+              AI Assistant Readiness
+            </div>
+          </div>
+        )}
+      </div>
+
+      {audit.entity_recommendations && (
+        <EntityRecommendations
+          auditId={audit.id}
+          orgName={audit.domain || 'Organization'}
+          recommendations={audit.entity_recommendations}
+        />
+      )}
+
+      <div className="tabs-container" style={{marginTop: 24}}>
+        {(['scores', 'issues', 'pages', 'citations', 'visibility'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => {
+              // Clean navigation: only keep tab param, remove query/provider/path filters
+              navigate(`${location.pathname}?tab=${tab}`, { replace: false });
+            }}
+            className={`tab-button ${activeTab === tab ? 'active' : ''}`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+        {import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
+          <button
+            onClick={() => {
+              navigate(`${location.pathname}?tab=visibility`, { replace: false });
+            }}
+            className={`tab-button ${activeTab === 'visibility' ? 'active' : ''}`}
+          >
+            Visibility Intelligence
+          </button>
+        )}
+      </div>
+
+      <div className="tab-content">
+        {activeTab === 'scores' && (
+          <div>
+            <div style={{display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8}}>
+              <h3 style={{marginTop:0, fontSize: 20, fontWeight: 600}}>Score Breakdown</h3>
+            </div>
+            <p style={{color: '#64748b', fontSize: 15, marginBottom: 32}}>
+              Your overall score is calculated from {audit.scores.visibilityPct !== undefined ? 'five' : 'four'} weighted components. Each component evaluates different aspects of your site's AI optimization.
+            </p>
+
+            {/* Score Formula */}
+            <div style={{
+              background: '#f8fafc',
+              padding: 20,
+              borderRadius: 8,
+              marginBottom: 32,
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12}}>
+                <div style={{fontSize: 14, fontWeight: 600, color: '#1e293b'}}>Score Formula</div>
+              </div>
+
+              {(() => {
+                const weights = [
+                  { key: "Crawlability", w: 30, s: audit.scores.crawlabilityPct || 0 },
+                  { key: "Structured", w: 25, s: audit.scores.structuredPct || 0 },
+                  { key: "Answerability", w: 20, s: audit.scores.answerabilityPct || 0 },
+                  { key: "Trust", w: 15, s: audit.scores.trustPct || 0 },
+                  ...(typeof audit.scores.visibilityPct === 'number' ? [{ key: "Visibility", w: 10, s: audit.scores.visibilityPct }] : []),
+                ];
+
+                return (
+                  <div style={{marginBottom: 16}}>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
+                      {weights.map((row) => (
+                        <div key={row.key} style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                          <div style={{width: 120, fontSize: 14, color: '#374151'}}>
+                            {row.key} <span style={{color: '#6b7280'}}>({row.w}%)</span>
+                          </div>
+                          <div style={{flex: 1, height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden'}}>
+                            <div style={{
+                              height: '100%',
+                              background: row.key === 'Visibility' ? '#7c3aed' : '#374151',
+                              width: `${Math.max(0, Math.min(100, row.s))}%`,
+                              transition: 'width 0.3s ease'
+                            }} />
+                          </div>
+                          <div style={{width: 40, textAlign: 'right', fontSize: 14, color: '#374151'}}>
+                            {pct(row.s)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{marginTop: 12, fontSize: 14, color: '#6b7280'}}>
+                      Overall = {weights.map((w, i) => (
+                        <span key={w.key}>
+                          {i > 0 && " + "}{w.key} {w.w}% × {pct(w.s)}
+                        </span>
+                      ))}
+                      <span> = <strong style={{color: '#3b82f6'}}>{pct(audit.scores.total)}</strong></span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Component Breakdowns */}
+            <div style={{display: 'grid', gap: 24}}>
+              {/* Crawlability */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 20
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>🤖 Crawlability</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      background: '#f3f4f6',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>40% weight</span>
+                  </div>
+                  <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor((audit.scores.crawlability / 42) * 100)}}>
+                    {audit.scores.crawlability}<span style={{fontSize: 16, color: '#94a3b8'}}>/42</span>
+                  </span>
+                </div>
+                <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                  Can AI bots access your content? We check robots.txt permissions, sitemap presence, and whether major AI crawlers (GPTBot, ClaudeBot, PerplexityBot, CCBot, etc.) are allowed.
+                </p>
+                <div style={{fontSize: 13, color: '#475569'}}>
+                  <strong>What we check:</strong> robots.txt validation, sitemap.xml reference, AI bot permissions, crawler access logs
+                </div>
+              </div>
+
+              {/* Structured Data */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 20
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>📊 Structured Data</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      background: '#f3f4f6',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>30% weight</span>
+                  </div>
+                  <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor((audit.scores.structured / 30) * 100)}}>
+                    {audit.scores.structured}<span style={{fontSize: 16, color: '#94a3b8'}}>/30</span>
+                  </span>
+                </div>
+                <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                  Do you have JSON-LD, FAQ schemas, and rich snippets? AI engines use structured data to understand your content and provide accurate answers.
+                </p>
+                <div style={{fontSize: 13, color: '#475569'}}>
+                  <strong>What we check:</strong> JSON-LD blocks, FAQPage schema, Organization/Article/Product schemas, schema.org compliance
+                </div>
+              </div>
+
+              {/* Answerability */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 20
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>💬 Answerability</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      background: '#f3f4f6',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>20% weight</span>
+                  </div>
+                  <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor((audit.scores.answerability / 20) * 100)}}>
+                    {audit.scores.answerability}<span style={{fontSize: 16, color: '#94a3b8'}}>/20</span>
+                  </span>
+                </div>
+                <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                  How well does your content answer user questions? We check for clear titles, H1 tags, and sufficient content depth (minimum 100 words recommended).
+                </p>
+                <div style={{fontSize: 13, color: '#475569'}}>
+                  <strong>What we check:</strong> Page titles, H1 tags, word count, content clarity, snippet quality
+                </div>
+              </div>
+
+              {/* Trust */}
+              <div style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 20
+              }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>🔒 Trust</span>
+                    <span style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      background: '#f3f4f6',
+                      padding: '2px 8px',
+                      borderRadius: 4
+                    }}>10% weight</span>
+                  </div>
+                  <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor((audit.scores.trust / 10) * 100)}}>
+                    {audit.scores.trust}<span style={{fontSize: 16, color: '#94a3b8'}}>/10</span>
+                  </span>
+                </div>
+                <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                  Are your pages accessible and performant? We check for 200 OK status codes, fast load times, and the absence of broken links or server errors.
+                </p>
+                <div style={{fontSize: 13, color: '#475569'}}>
+                  <strong>What we check:</strong> HTTP status codes, page load times, broken links, error detection, accessibility
+                </div>
+                
+                {/* EEAT checklist */}
+                {audit.eeat_summary && (
+                  <div style={{marginTop: 12, padding: 12, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0'}}>
+                    <div style={{fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8}}>E-E-A-T Signals</div>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 12}}>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                        <span style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: audit.eeat_summary.hasAuthor ? '#10b981' : '#ef4444'
+                        }} />
+                        <span style={{color: audit.eeat_summary.hasAuthor ? '#374151' : '#dc2626'}}>Author metadata</span>
+                      </div>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                        <span style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: audit.eeat_summary.hasDates ? '#10b981' : '#ef4444'
+                        }} />
+                        <span style={{color: audit.eeat_summary.hasDates ? '#374151' : '#dc2626'}}>Publication dates</span>
+                      </div>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                        <span style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: audit.eeat_summary.httpsOk ? '#10b981' : '#ef4444'
+                        }} />
+                        <span style={{color: audit.eeat_summary.httpsOk ? '#374151' : '#dc2626'}}>HTTPS & 200 OK</span>
+                      </div>
+                      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+                        <span style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: audit.eeat_summary.hasMetaDescription ? '#10b981' : '#ef4444'
+                        }} />
+                        <span style={{color: audit.eeat_summary.hasMetaDescription ? '#374151' : '#dc2626'}}>Meta descriptions</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Visibility */}
+              {typeof audit.scores.visibilityPct === 'number' && (
+                <div style={{
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  padding: 20
+                }}>
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                      <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>👁️ Visibility</span>
+                      <span style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        background: '#f3f4f6',
+                        padding: '2px 8px',
+                        borderRadius: 4
+                      }}>10% weight</span>
+                    </div>
+                    <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor(audit.scores.visibilityPct)}}>
+                      {audit.scores.visibility}<span style={{fontSize: 16, color: '#94a3b8'}}>/10</span>
+                    </span>
+                  </div>
+                  <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                    How visible is your content to AI engines? We check for citations, mentions, and presence in AI-generated responses.
+                  </p>
+                  <div style={{fontSize: 13, color: '#475569'}}>
+                    <strong>What we check:</strong> AI citations, Brave search presence, LLM mentions, visibility signals
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Scoring Guide */}
+            <div style={{
+              marginTop: 32,
+              padding: 20,
+              background: '#f0f9ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: 8
+            }}>
+              <div style={{fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e40af'}}>📈 Component Scoring Thresholds</div>
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12, fontSize: 13}}>
+                <div>
+                  <div style={{fontWeight: 600, color: '#10b981', marginBottom: 4}}>🟢 Excellent (70%+)</div>
+                  <div style={{color: '#475569', fontSize: 12}}>
+                    Crawl: 29+/42 • Struct: 21+/30 • Answer: 14+/20 • Trust: 7+/10
+                    {audit.scores.visibilityPct !== undefined && ' • Vis: 7+/10'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontWeight: 600, color: '#f59e0b', marginBottom: 4}}>🟡 Good (40-70%)</div>
+                  <div style={{color: '#475569', fontSize: 12}}>
+                    Crawl: 17-28 • Struct: 12-20 • Answer: 8-13 • Trust: 4-6
+                    {audit.scores.visibilityPct !== undefined && ' • Vis: 4-6'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontWeight: 600, color: '#ef4444', marginBottom: 4}}>🔴 Needs Work (&lt;40%)</div>
+                  <div style={{color: '#475569', fontSize: 12}}>
+                    Crawl: &lt;17 • Struct: &lt;12 • Answer: &lt;8 • Trust: &lt;4
+                    {audit.scores.visibilityPct !== undefined && ' • Vis: &lt;4'}
+                  </div>
+                </div>
+              </div>
+              <p style={{fontSize: 13, color: '#475569', marginTop: 12, marginBottom: 0}}>
+                💡 <strong>Tip:</strong> Check the Issues tab for specific recommendations on how to improve each component score. See <a href="https://optiview.ai/docs/audit" target="_blank" rel="noopener" style={{color: '#3b82f6'}}>full audit methodology</a>.
+              </p>
+            </div>
+          </div>
+        )}
+        {activeTab === 'issues' && (
+          <IssuesTable issues={audit.issues || []}/>
+        )}
+        {activeTab === 'pages' && (
+          <PagesTable pages={audit.pages || []} scores={audit.scores}/>
+        )}
+        {activeTab === 'citations' && (
+          <Citations auditId={id!} citations={audit.citations}/>
+        )}
+        {activeTab === 'visibility' && (
+          <VisibilityTab visibilitySummary={audit.visibility_summary} />
+        )}
+      </div>
+      
+      {/* Brave AI Queries Modal (Phase F+) */}
+      {showBraveModal && audit && (
+        <BraveQueriesModal 
+          auditId={audit.id}
+          isOpen={showBraveModal}
+          onClose={() => setShowBraveModal(false)}
+        />
+      )}
+
+      {/* AI Debug Modal */}
+      {showDebugModal && audit && (
+        <AIDebugModal 
+          auditId={audit.id}
+          isOpen={showDebugModal}
+          onClose={() => setShowDebugModal(false)}
+        />
+      )}
+    </>
+  );
+}
+

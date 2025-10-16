@@ -8,9 +8,12 @@
     "deploy": "turbo run deploy",
     "deploy:api": "cd packages/api-worker && npx wrangler deploy",
     "deploy:collector": "cd packages/collector-worker && npx wrangler deploy",
-    "deploy:workers": "pnpm deploy:api && pnpm deploy:collector",
+    "deploy:audit-worker": "cd packages/audit-worker && npx wrangler deploy",
+    "deploy:workers": "pnpm deploy:api && pnpm deploy:collector && pnpm deploy:audit-worker",
     "migrate:local": "wrangler d1 migrations apply optiview_db --local --file db/migrations/0001_init.sql && wrangler d1 migrations apply optiview_db --local --file db/migrations/0002_seed.sql",
-    "migrate": "wrangler d1 migrations apply optiview_db"
+    "migrate": "wrangler d1 migrations apply optiview_db",
+    "migrate:audit": "cd packages/audit-worker && npx wrangler d1 migrations apply optiview --remote",
+    "test:audit": "cd packages/audit-worker && ./test-deployment.sh"
   },
   "devDependencies": {
     "turbo": "^2.0.0"

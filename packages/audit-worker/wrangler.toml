@@ -1,0 +1,19 @@
+name = "optiview-audit-worker"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "optiview"
+database_id = "17970af4-bbeb-4eea-9684-1464293b137b"
+
+[[kv_namespaces]]
+binding = "RULES"
+id = "ede0baa1d4654ecb86a4d1faf7b5fd46"
+
+[browser]
+binding = "BROWSER"
+
+[triggers]
+crons = ["0 */6 * * *"]
