@@ -874,13 +874,7 @@ export default function PublicAudit() {
           <Citations auditId={id!} citations={audit.citations}/>
         )}
         {activeTab === 'visibility' && (
-          isV21(audit.scores) ? (
-            <VisibilityTab visibilitySummary={audit.visibility_summary} />
-          ) : (
-            import.meta.env.VITE_FEATURE_PHASE5_ANALYTICS === "true" && (
-              <VisibilityIntelligenceTab auditId={id!} domain={audit.domain || audit.url} projectId={audit.project_id} />
-            )
-          )
+          <VisibilityTab visibilitySummary={audit.visibility_summary} />
         )}
       </div>
       
