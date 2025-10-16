@@ -559,19 +559,6 @@ export default function PublicAudit() {
           <div>
             <div style={{display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8}}>
               <h3 style={{marginTop:0, fontSize: 20, fontWeight: 600}}>Score Breakdown</h3>
-              {audit.scores.score_model_version && (
-                <span style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: '#6b7280',
-                  background: '#f3f4f6',
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  border: '1px solid #e5e7eb'
-                }}>
-                  model {audit.scores.score_model_version}
-                </span>
-              )}
             </div>
             <p style={{color: '#64748b', fontSize: 15, marginBottom: 32}}>
               Your overall score is calculated from {audit.scores.visibilityPct !== undefined ? 'five' : 'four'} weighted components. Each component evaluates different aspects of your site's AI optimization.
