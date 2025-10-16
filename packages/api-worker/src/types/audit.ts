@@ -51,7 +51,6 @@ export type AuditScoresRow = {
   trust_score: number;
   visibility_score: number;
   overall_score: number;
-  score_model_version: string;
   created_at?: string;
 };
 

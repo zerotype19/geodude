@@ -24,9 +24,8 @@ import { runPhase, PHASE_CONFIGS } from './phase-runner';
 import { runAuditPhases } from './audit/audit-runner';
 import { getCircuitStatus } from './circuit-breaker';
 import { normalizeFromUrl } from './lib/domain';
-// v2.1 imports
-import { getAuditV21Scoring } from './utils/flags';
-import { getLatestAuditScores, getLegacyAuditScores, saveAuditScores } from './audit/db-helpers';
+// Unified audit engine imports
+import { getLatestAuditScores, saveAuditScores } from './audit/db-helpers';
 import { getVisibilityForAudit } from './audit/visibility-adapter';
 import { computeScoresV21 } from './audit/scoring-v21';
 import { analyzeHtmlV21 } from './audit/analyze-v21';
@@ -1979,121 +1978,45 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       }
     }
 
-    // POST /v1/audits/:id/reanalyze - Re-analyze existing audit with v2.1 (admin convenience)
+    // POST /v1/audits/:id/reanalyze - Re-analyze existing audit with unified engine
     if (path.match(/^\/v1\/audits\/[^/]+\/reanalyze$/) && request.method === 'POST') {
       const auditId = path.split('/')[3];
-      const url = new URL(request.url);
-      const model = url.searchParams.get('model') || 'v2.1';
 
       try {
-        // Get audit details
-        const audit = await env.DB.prepare(
-          'SELECT id, property_id, status FROM audits WHERE id = ?'
-        ).bind(auditId).first();
+        const { reanalyzeFromStoredHtml, rebuildIssuesUnified, recomputeUnifiedScores, getUnifiedAuditSummary } = await import('./services/audits');
 
-        if (!audit) {
-          return new Response(
-            JSON.stringify({ error: 'Audit not found' }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        console.log(`[Re-analyze] Starting unified re-analysis for audit ${auditId}`);
 
-        // Get property domain
-        const property = await env.DB.prepare(
-          'SELECT domain FROM properties WHERE id = ?'
-        ).bind(audit.property_id).first<{ domain: string }>();
+        // Step 1: Re-analyze from stored HTML
+        console.log(`[Re-analyze] Step 1: Re-analyzing from stored HTML`);
+        await reanalyzeFromStoredHtml(env.DB, auditId);
+        console.log(`[Re-analyze] Step 1: Complete`);
 
-        if (!property) {
-          return new Response(
-            JSON.stringify({ error: 'Property not found' }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        // Step 2: Rebuild issues with unified generator
+        console.log(`[Re-analyze] Step 2: Rebuilding issues`);
+        await rebuildIssuesUnified(env.DB, auditId);
+        console.log(`[Re-analyze] Step 2: Complete`);
 
-        // Get stored HTML from audit_pages
-        const pagesResult = await env.DB.prepare(
-          'SELECT url, status_code, body_text FROM audit_pages WHERE audit_id = ?'
-        ).bind(auditId).all();
+        // Step 3: Recompute scores
+        console.log(`[Re-analyze] Step 3: Recomputing scores`);
+        await recomputeUnifiedScores(env.DB, auditId);
+        console.log(`[Re-analyze] Step 3: Complete`);
 
-        if (!pagesResult.results || pagesResult.results.length === 0) {
-          return new Response(
-            JSON.stringify({ error: 'No pages found for re-analysis' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Re-analyze each page with v2.1 analyzer
-        const analysisData = [];
-        for (const page of pagesResult.results as any[]) {
-          if (page.body_text) {
-            const analysis = analyzeHtmlV21(page.url, page.body_text);
-            analysis.status = page.status_code;
-            analysisData.push(analysis);
-          }
-        }
-
-        // Get visibility data
-        const visibility = await getVisibilityForAudit(env.DB, auditId, property.domain);
-
-        // Get robots/sitemap data from issues
-        const issuesResult = await env.DB.prepare(
-          'SELECT issue_type FROM audit_issues WHERE audit_id = ?'
-        ).bind(auditId).all();
-
-        const issues = issuesResult.results as any[];
-        const robotsMissing = issues.some(i => 
-          i.issue_type === 'robots_missing' || i.issue_type === 'missing_robots_txt'
-        );
-        const sitemapMissing = issues.some(i => 
-          i.issue_type === 'sitemap_missing' || i.issue_type === 'missing_sitemap_reference'
-        );
-
-        // Compute v2.1 scores
-        const scores = computeScoresV21({
-          pages: analysisData,
-          robots: { gptbot: true, claude: true, perplexity: true, ccbot: true }, // Assume allowed for re-analysis
-          sitemapPresent: !sitemapMissing,
-          visibility
-        });
-
-        // Save new scores
-        await saveAuditScores(env.DB, auditId, scores, model);
-
-        // Generate new issues
-        const newIssues = generateIssuesFromAnalysis(analysisData, property.domain);
-
-        // Clear old issues and insert new ones
-        await env.DB.prepare('DELETE FROM audit_issues WHERE audit_id = ?').bind(auditId).run();
-        
-        for (const issue of newIssues) {
-          await env.DB.prepare(
-            `INSERT INTO audit_issues 
-             (audit_id, page_url, issue_type, category, severity, message, details, score_impact)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-          ).bind(
-            auditId,
-            issue.page_url ?? null,
-            issue.issue_type ?? '',
-            issue.category ?? 'general',
-            issue.severity ?? 'info',
-            issue.message ?? '',
-            issue.details ?? null,
-            issue.score_impact ? JSON.stringify(issue.score_impact) : null
-          ).run();
-        }
-
-        // Log metrics
-        logAuditMetrics(env, auditId, property.domain, model, scores, analysisData, []);
+        // Step 4: Get updated summary
+        console.log(`[Re-analyze] Step 4: Getting updated summary`);
+        const summary = await getUnifiedAuditSummary(env.DB, auditId);
+        console.log(`[Re-analyze] Step 4: Complete`);
 
         return new Response(
-          JSON.stringify({ 
-            success: true, 
-            model, 
-            scores,
-            issues_count: newIssues.length,
-            pages_analyzed: analysisData.length
+          JSON.stringify({
+            success: true,
+            model: 'unified',
+            scores: summary.scores,
+            issues_count: summary.issues_count,
+            pages_analyzed: summary.pages_total,
+            audit_id: auditId
           }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
 
       } catch (error) {
@@ -2101,7 +2024,8 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         return new Response(
           JSON.stringify({ 
             error: 'Re-analysis failed', 
-            message: error instanceof Error ? error.message : String(error) 
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
           }),
           { 
             status: 500, 
@@ -3223,7 +3147,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
 
         // Get issues with new structure
         const issues = await env.DB.prepare(
-          `SELECT page_url, issue_type, category, severity, message, details, score_impact
+          `SELECT page_url, issue_type, issue_id, category, severity, message, details, score_impact, issue_rule_version
            FROM audit_issues WHERE audit_id = ?
            ORDER BY category, severity DESC, page_url`
         ).bind(auditId).all();
@@ -3432,85 +3356,66 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           (trustPct * 0.1)
         );
         
-        // v2.1 Scoring System Integration
-        const useV21Scoring = await getAuditV21Scoring(env);
+        // Unified Scoring System - always use 5-pillar model
+        const latestScores = await getLatestAuditScores(env.DB, auditId);
         
         let scores: any;
-        let scoreModelVersion = "v1.0";
         
-        if (useV21Scoring) {
-          // Try to get v2.1 scores from audit_scores table
-          const latestScores = await getLatestAuditScores(env.DB, auditId);
+        if (latestScores) {
+          // Use unified scores from audit_scores table
+          scores = {
+            total: latestScores.overall_score,
+            crawlability: latestScores.crawlability_score,
+            structured: latestScores.structured_score,
+            answerability: latestScores.answerability_score,
+            trust: latestScores.trust_score,
+            visibility: latestScores.visibility_score,
+            crawlabilityPct: latestScores.crawlability_score,
+            structuredPct: latestScores.structured_score,
+            answerabilityPct: latestScores.answerability_score,
+            trustPct: latestScores.trust_score,
+            visibilityPct: latestScores.visibility_score,
+            breakdown,
+          };
+        } else {
+          // Compute scores on-the-fly if not in audit_scores table
+          const { recomputeUnifiedScores } = await import('./services/audits');
+          await recomputeUnifiedScores(env.DB, auditId);
           
-          if (latestScores) {
-            // Use v2.1 scores from audit_scores table
-            scoreModelVersion = latestScores.score_model_version || 'v2.1';
+          // Get the newly computed scores
+          const newScores = await getLatestAuditScores(env.DB, auditId);
+          if (newScores) {
             scores = {
-              total: latestScores.overall_score,
-              crawlability: Math.round((latestScores.crawlability_score / 100) * 30), // v2.1: 30 max points
-              structured: Math.round((latestScores.structured_score / 100) * 25),     // v2.1: 25 max points
-              answerability: Math.round((latestScores.answerability_score / 100) * 20), // v2.1: 20 max points
-              trust: Math.round((latestScores.trust_score / 100) * 15),               // v2.1: 15 max points
-              visibility: latestScores.visibility_score,                              // v2.1: new pillar
-              crawlabilityPct: latestScores.crawlability_score,
-              structuredPct: latestScores.structured_score,
-              answerabilityPct: latestScores.answerability_score,
-              trustPct: latestScores.trust_score,
-              visibilityPct: latestScores.visibility_score,
+              total: newScores.overall_score,
+              crawlability: newScores.crawlability_score,
+              structured: newScores.structured_score,
+              answerability: newScores.answerability_score,
+              trust: newScores.trust_score,
+              visibility: newScores.visibility_score,
+              crawlabilityPct: newScores.crawlability_score,
+              structuredPct: newScores.structured_score,
+              answerabilityPct: newScores.answerability_score,
+              trustPct: newScores.trust_score,
+              visibilityPct: newScores.visibility_score,
               breakdown,
-              score_model_version: scoreModelVersion,
             };
           } else {
-            // Fall back to legacy scores but mark as v1.0
-            const legacyScores = await getLegacyAuditScores(env.DB, auditId);
-            if (legacyScores) {
-              scores = {
-                total: legacyScores.overall,
-                crawlability: Math.round((legacyScores.crawlability / 100) * 42), // v1.0: 42 max points
-                structured: Math.round((legacyScores.structured / 100) * 30),     // v1.0: 30 max points
-                answerability: Math.round((legacyScores.answerability / 100) * 20), // v1.0: 20 max points
-                trust: Math.round((legacyScores.trust / 100) * 10),               // v1.0: 10 max points
-                crawlabilityPct: legacyScores.crawlability,
-                structuredPct: legacyScores.structured,
-                answerabilityPct: legacyScores.answerability,
-                trustPct: legacyScores.trust,
-                breakdown,
-                score_model_version: scoreModelVersion,
-              };
-            } else {
-              // Use calculated scores as fallback
-              scores = {
-                total: totalPct,
-                crawlability: Math.round(crawlabilityPoints),
-                structured: Math.round(structuredPoints),
-                answerability: Math.round(answerabilityPoints),
-                trust: Math.round(trustPoints),
-                crawlabilityPct: crawlabilityPct,
-                structuredPct: structuredPct,
-                answerabilityPct: answerabilityPct,
-                trustPct: trustPct,
-                breakdown,
-                score_model_version: scoreModelVersion,
-              };
-            }
+            // Fallback to calculated scores
+            scores = {
+              total: totalPct,
+              crawlability: crawlabilityPct,
+              structured: structuredPct,
+              answerability: answerabilityPct,
+              trust: trustPct,
+              visibility: 0,
+              crawlabilityPct: crawlabilityPct,
+              structuredPct: structuredPct,
+              answerabilityPct: answerabilityPct,
+              trustPct: trustPct,
+              visibilityPct: 0,
+              breakdown,
+            };
           }
-        } else {
-          // Legacy scoring system (v1.0)
-          scores = {
-            total: audit.score_overall ?? totalPct,
-            // Convert stored percentages back to raw points for proper display
-            crawlability: audit.score_crawlability ? Math.round((audit.score_crawlability / 100) * 42) : Math.round(crawlabilityPoints),
-            structured: audit.score_structured ? Math.round((audit.score_structured / 100) * 30) : Math.round(structuredPoints),
-            answerability: audit.score_answerability ? Math.round((audit.score_answerability / 100) * 20) : Math.round(answerabilityPoints),
-            trust: audit.score_trust ? Math.round((audit.score_trust / 100) * 10) : Math.round(trustPoints),
-            // Use stored percentages directly
-            crawlabilityPct: audit.score_crawlability ?? crawlabilityPct,
-            structuredPct: audit.score_structured ?? structuredPct,
-            answerabilityPct: audit.score_answerability ?? answerabilityPct,
-            trustPct: audit.score_trust ?? trustPct,
-            breakdown,
-            score_model_version: scoreModelVersion,
-          };
         }
         
         // Parse AI access probe results
@@ -3886,6 +3791,90 @@ Sitemap: https://optiview.ai/sitemap.xml`;
             error: 'Failed to fetch audit',
             message: error instanceof Error ? error.message : String(error),
           }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // POST /v1/audits/:id/rebuild-issues?model=v2.1 - Rebuild issues with specified version
+    if (path.match(/^\/v1\/audits\/[^/]+\/rebuild-issues$/) && request.method === 'POST') {
+      const auditId = path.split('/')[3];
+      const model = url.searchParams.get('model') || 'v2.1';
+      
+      if (!auditId) {
+        return new Response(
+          JSON.stringify({ error: 'Audit ID is required' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      try {
+        // Get existing analysis data
+        const analysisData = await env.DB.prepare(`
+          SELECT url, h1, h1_count, title, meta_description, canonical, robots_meta,
+                 schema_types, author, date_published, date_modified, images,
+                 headings_h2, headings_h3, outbound_links, word_count, eeat_flags
+          FROM audit_page_analysis
+          WHERE audit_id = ?
+        `).bind(auditId).all();
+
+        if (!analysisData.results || analysisData.results.length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'No analysis data found for this audit' }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Get domain for issues generation
+        const audit = await env.DB.prepare(`
+          SELECT p.domain FROM audits a
+          JOIN properties p ON a.property_id = p.id
+          WHERE a.id = ?
+        `).bind(auditId).first<{ domain: string }>();
+
+        if (!audit) {
+          return new Response(
+            JSON.stringify({ error: 'Audit not found' }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        // Use unified rebuild service
+        const { rebuildIssuesUnified } = await import('./services/audits');
+        await rebuildIssuesUnified(env.DB, auditId);
+
+        // Get count of generated issues
+        const countResult = await env.DB.prepare(
+          'SELECT COUNT(*) as count FROM audit_issues WHERE audit_id = ?'
+        ).bind(auditId).first<{ count: number }>();
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            issues_generated: countResult?.count || 0,
+            model_version: 'unified',
+            audit_id: auditId
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        console.error('Error rebuilding issues:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to rebuild issues' }),
           {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

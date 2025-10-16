@@ -7,13 +7,12 @@ import { AuditScoresRow } from "../types/audit";
 export async function saveAuditScores(
   db: D1Database, 
   auditId: string, 
-  scores: { crawlability: number; structured: number; answerability: number; trust: number; visibility: number; overall: number },
-  modelVersion: string = "v2.1"
+  scores: { crawlability: number; structured: number; answerability: number; trust: number; visibility: number; overall: number }
 ): Promise<void> {
   await db.prepare(
     `INSERT INTO audit_scores 
-     (audit_id, crawlability_score, structured_score, answerability_score, trust_score, visibility_score, overall_score, score_model_version)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+     (audit_id, crawlability_score, structured_score, answerability_score, trust_score, visibility_score, overall_score)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     auditId,
     scores.crawlability,
@@ -21,8 +20,7 @@ export async function saveAuditScores(
     scores.answerability,
     scores.trust,
     scores.visibility,
-    scores.overall,
-    modelVersion
+    scores.overall
   ).run();
 }
 

@@ -8,6 +8,7 @@ import { ISSUE_THRESHOLDS } from './issue-thresholds';
 export interface AuditIssue {
   page_url?: string;
   issue_type: string;
+  issue_id?: string; // Stable ID for documentation lookup
   category: 'crawlability' | 'structured' | 'answerability' | 'trust';
   severity: 'low' | 'medium' | 'high' | 'critical';
   message: string;
@@ -18,7 +19,6 @@ export interface AuditIssue {
     max_points: number;
     explanation: string;
   };
-  issue_rule_version?: string; // v2.1 for new rules
 }
 
 export interface PageAnalysis {
@@ -43,7 +43,8 @@ export interface PageAnalysis {
 
 export function generateIssuesFromAnalysis(
   analysisData: PageAnalysis[],
-  domain: string
+  domain: string,
+  opts: { thresholds?: Partial<typeof ISSUE_THRESHOLDS> } = {}
 ): AuditIssue[] {
   const issues: AuditIssue[] = [];
   
@@ -178,6 +179,7 @@ export function generateIssuesFromAnalysis(
   if (!hasFaqSchema) {
     issues.push({
       issue_type: 'missing_faq_schema',
+      issue_id: 'structured.missing_faqpage',
       category: 'structured',
       severity: 'medium',
       message: 'No FAQPage schema found across audited pages',
@@ -188,7 +190,6 @@ export function generateIssuesFromAnalysis(
         max_points: 30,
         explanation: 'Missing FAQ schema prevents AI engines from understanding your Q&A content, costing 5 points (17% of structured data score).'
       },
-      issue_rule_version: 'v2.1'
     });
   }
 
@@ -342,6 +343,7 @@ export function generateIssuesFromAnalysis(
     if (urls.length >= ISSUE_THRESHOLDS.duplicateTitleCount) {
       issues.push({
         issue_type: 'duplicate_titles',
+        issue_id: 'answer.duplicate_titles',
         category: 'answerability',
         severity: 'medium',
         message: `Title "${title}" is used on ${urls.length} pages`,
@@ -352,7 +354,6 @@ export function generateIssuesFromAnalysis(
           max_points: 20,
           explanation: 'Duplicate titles confuse AI engines about page uniqueness, costing 1 point (5% of answerability score).'
         },
-        issue_rule_version: 'v2.1'
       });
     }
   }
@@ -362,6 +363,7 @@ export function generateIssuesFromAnalysis(
     if (urls.length >= ISSUE_THRESHOLDS.duplicateH1Count) {
       issues.push({
         issue_type: 'duplicate_h1s',
+        issue_id: 'answer.duplicate_h1s',
         category: 'answerability',
         severity: 'medium',
         message: `H1 "${h1}" is used on ${urls.length} pages`,
@@ -372,7 +374,6 @@ export function generateIssuesFromAnalysis(
           max_points: 20,
           explanation: 'Duplicate H1 tags confuse AI engines about page structure, costing 1 point (5% of answerability score).'
         },
-        issue_rule_version: 'v2.1'
       });
     }
   }
@@ -386,6 +387,7 @@ export function generateIssuesFromAnalysis(
   if (noindexPages.length > 0) {
     issues.push({
       issue_type: 'robots_noindex_detected',
+      issue_id: 'crawl.robots_noindex',
       category: 'crawlability',
       severity: 'high',
       message: `${noindexPages.length} page(s) have robots noindex directive`,
@@ -396,7 +398,6 @@ export function generateIssuesFromAnalysis(
         max_points: 30,
         explanation: 'Pages with noindex directive prevent AI engines from accessing content, significantly impacting crawlability score.'
       },
-      issue_rule_version: 'v2.1'
     });
   }
 
@@ -407,6 +408,7 @@ export function generateIssuesFromAnalysis(
   if (canonicalMismatches.length > 0) {
     issues.push({
       issue_type: 'canonical_mismatch_detected',
+      issue_id: 'crawl.canonical_mismatch',
       category: 'crawlability',
       severity: 'medium',
       message: `${canonicalMismatches.length} page(s) have canonical URL mismatches`,
@@ -417,7 +419,6 @@ export function generateIssuesFromAnalysis(
         max_points: 30,
         explanation: 'Canonical URL mismatches can confuse AI engines about the preferred page URL, impacting crawlability.'
       },
-      issue_rule_version: 'v2.1'
     });
   }
 
@@ -425,6 +426,7 @@ export function generateIssuesFromAnalysis(
   if (authorCoverage < ISSUE_THRESHOLDS.minAuthorCoverage) {
     issues.push({
       issue_type: 'low_author_coverage_v21',
+      issue_id: 'trust.missing_author_dates',
       category: 'trust',
       severity: 'low',
       message: `Only ${authorCoverage.toFixed(1)}% of pages have author information`,
@@ -435,7 +437,6 @@ export function generateIssuesFromAnalysis(
         max_points: 15,
         explanation: 'Low author coverage reduces E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness) signals, costing 2 points (13% of trust score).'
       },
-      issue_rule_version: 'v2.1'
     });
   }
 
@@ -443,6 +444,7 @@ export function generateIssuesFromAnalysis(
   if (dateCoverage < ISSUE_THRESHOLDS.minDateCoverage) {
     issues.push({
       issue_type: 'low_date_coverage_v21',
+      issue_id: 'trust.missing_author_dates',
       category: 'trust',
       severity: 'low',
       message: `Only ${dateCoverage.toFixed(1)}% of pages have publication or modification dates`,
@@ -453,25 +455,28 @@ export function generateIssuesFromAnalysis(
         max_points: 15,
         explanation: 'Low date coverage reduces AI understanding of content freshness, costing 1 point (7% of trust score).'
       },
-      issue_rule_version: 'v2.1'
     });
   }
   
-  // Add v2.1 specific issues with rule versioning
+  // Add analysis complete marker
   issues.push({
-    issue_type: 'v21_analysis_complete',
+    issue_type: 'analysis_complete',
+    issue_id: 'system.analysis_complete',
     category: 'structured',
     severity: 'info',
-    message: 'Analysis completed with v2.1 scoring rules',
-    details: 'This audit uses the enhanced v2.1 scoring system with improved issue detection and 5-pillar scoring.',
+    message: 'Analysis completed with unified scoring rules',
+    details: 'This audit uses the unified scoring system with 5-pillar scoring and comprehensive issue detection.',
     score_impact: {
       pillar: 'Overall',
       points_lost: 0,
       max_points: 100,
-      explanation: 'v2.1 analysis provides more comprehensive issue detection and scoring.'
-    },
-    issue_rule_version: 'v2.1'
+      explanation: 'Unified analysis provides comprehensive issue detection and scoring.'
+    }
   });
 
-  return issues;
+  // Add issue_id to all issues that don't have them
+  return issues.map(issue => ({
+    ...issue,
+    issue_id: issue.issue_id || `${issue.category}.${issue.issue_type}`
+  }));
 }

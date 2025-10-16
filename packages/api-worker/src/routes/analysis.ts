@@ -254,5 +254,90 @@ export async function handleAnalysisRoutes(request: Request, env: any): Promise<
     }
   }
 
+  // POST /v1/audits/:id/rebuild-issues?model=v2.1
+  const rebuildIssuesMatch = path.match(/^\/v1\/audits\/([^\/]+)\/rebuild-issues$/);
+  if (rebuildIssuesMatch && method === 'POST') {
+    const auditId = rebuildIssuesMatch[1];
+    const model = url.searchParams.get('model') || 'v2.1';
+    
+    try {
+      // Get existing analysis data
+      const analysisData = await env.DB.prepare(`
+        SELECT url, h1, h1_count, title, meta_description, canonical, robots_meta,
+               schema_types, author, date_published, date_modified, images,
+               headings_h2, headings_h3, outbound_links, word_count, eeat_flags
+        FROM audit_page_analysis
+        WHERE audit_id = ?
+      `).bind(auditId).all();
+
+      if (!analysisData.results || analysisData.results.length === 0) {
+        return new Response(JSON.stringify({ error: 'No analysis data found for this audit' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Get domain for issues generation
+      const audit = await env.DB.prepare(`
+        SELECT p.domain FROM audits a
+        JOIN properties p ON a.property_id = p.id
+        WHERE a.id = ?
+      `).bind(auditId).first<{ domain: string }>();
+
+      if (!audit) {
+        return new Response(JSON.stringify({ error: 'Audit not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Generate issues with specified version
+      const { generateIssuesFromAnalysis, ISSUE_RULE_VERSION } = await import('../audit/issues-generator');
+      const issues = generateIssuesFromAnalysis(analysisData.results, audit.domain, { 
+        ruleVersion: model === 'v2.1' ? ISSUE_RULE_VERSION : 'v1.0' 
+      });
+
+      // Clear existing issues for this audit
+      await env.DB.prepare(`
+        DELETE FROM audit_issues WHERE audit_id = ?
+      `).bind(auditId).run();
+
+      // Insert new issues
+      for (const issue of issues) {
+        await env.DB.prepare(`
+          INSERT INTO audit_issues 
+          (audit_id, page_url, issue_type, issue_id, category, severity, message, details, score_impact, issue_rule_version)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          auditId,
+          issue.page_url || null,
+          issue.issue_type,
+          issue.issue_id || null,
+          issue.category,
+          issue.severity,
+          issue.message,
+          issue.details || null,
+          JSON.stringify(issue.score_impact),
+          issue.issue_rule_version || 'v1.0'
+        ).run();
+      }
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        issues_generated: issues.length,
+        model_version: model,
+        audit_id: auditId
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.error('Error rebuilding issues:', error);
+      return new Response(JSON.stringify({ error: 'Failed to rebuild issues' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
   return new Response('Not Found', { status: 404, headers: corsHeaders });
 }
