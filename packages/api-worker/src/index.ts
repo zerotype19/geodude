@@ -2407,7 +2407,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
 
         // 2) Issues for that page
         const pageIssues = await env.DB.prepare(
-          `SELECT issue_type, severity, message, page_url, details
+          `SELECT issue_id, category, severity, message, page_url
            FROM audit_issues
            WHERE audit_id = ? AND page_url = ?
            ORDER BY
@@ -2417,7 +2417,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
                WHEN 'warning' THEN 1 
                ELSE 0 
              END DESC,
-             issue_type ASC`
+             category ASC`
         ).bind(auditId, pageRow.url).all();
 
         // 3) Lightweight page score breakdown (use rendered_words)
@@ -3145,9 +3145,9 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           })),
         };
 
-        // Get issues with new structure
+        // Get issues with unified structure
         const issues = await env.DB.prepare(
-          `SELECT page_url, issue_type, issue_id, category, severity, message, details, score_impact, issue_rule_version
+          `SELECT page_url, issue_id, category, severity, message
            FROM audit_issues WHERE audit_id = ?
            ORDER BY category, severity DESC, page_url`
         ).bind(auditId).all();
