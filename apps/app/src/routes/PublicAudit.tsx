@@ -280,7 +280,7 @@ export default function PublicAudit() {
         <ScoreCard title="Overall" value={audit.scores.total}/>
         
         <div style={{ flex: 1 }}>
-          <ScoreCard title="Crawlability" value={audit.scores.crawlabilityPct || (audit.scores.crawlability / 42 * 100)}/>
+          <ScoreCard title="Crawlability" value={audit.scores.crawlabilityPct}/>
           {audit.scores.breakdown?.crawlability && (
             <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <span style={{
@@ -435,7 +435,7 @@ export default function PublicAudit() {
         </div>
         
         <div style={{ flex: 1 }}>
-          <ScoreCard title="Structured" value={audit.scores.structuredPct || (audit.scores.structured / 30 * 100)}/>
+          <ScoreCard title="Structured" value={audit.scores.structuredPct}/>
           {audit.scores.breakdown?.structured && (
             <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {/* FAQ Page (URL heuristic) */}
@@ -492,8 +492,8 @@ export default function PublicAudit() {
           )}
         </div>
         
-        <ScoreCard title="Answerability" value={audit.scores.answerabilityPct || (audit.scores.answerability / 20 * 100)}/>
-        <ScoreCard title="Trust" value={audit.scores.trustPct || (audit.scores.trust / 10 * 100)}/>
+        <ScoreCard title="Answerability" value={audit.scores.answerabilityPct}/>
+        <ScoreCard title="Trust" value={audit.scores.trustPct}/>
       </div>
 
       {audit.entity_recommendations && (
