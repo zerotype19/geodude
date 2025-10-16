@@ -574,43 +574,16 @@ export default function PublicAudit() {
             }}>
               <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12}}>
                 <div style={{fontSize: 14, fontWeight: 600, color: '#1e293b'}}>Score Formula</div>
-                <span style={{
-                  fontSize: 12,
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  padding: '2px 8px',
-                  borderRadius: 12
-                }}>
-                  model {audit.scores?.score_model_version ?? "v1.0"}
-                </span>
-                {isV21(audit.scores) && (
-                  <span style={{
-                    fontSize: 12,
-                    background: '#faf5ff',
-                    color: '#7c3aed',
-                    padding: '2px 8px',
-                    borderRadius: 12
-                  }}>
-                    AI Visibility (new)
-                  </span>
-                )}
               </div>
 
               {(() => {
-                const weights = isV21(audit.scores)
-                  ? [
-                      { key: "Crawlability", w: 30, s: audit.scores.crawlabilityPct || 0 },
-                      { key: "Structured", w: 25, s: audit.scores.structuredPct || 0 },
-                      { key: "Answerability", w: 20, s: audit.scores.answerabilityPct || 0 },
-                      { key: "Trust", w: 15, s: audit.scores.trustPct || 0 },
-                      ...(typeof audit.scores.visibilityPct === 'number' ? [{ key: "Visibility", w: 10, s: audit.scores.visibilityPct }] : []),
-                    ]
-                  : [
-                      { key: "Crawlability", w: 40, s: audit.scores.crawlabilityPct || 0 },
-                      { key: "Structured", w: 30, s: audit.scores.structuredPct || 0 },
-                      { key: "Answerability", w: 20, s: audit.scores.answerabilityPct || 0 },
-                      { key: "Trust", w: 10, s: audit.scores.trustPct || 0 },
-                    ];
+                const weights = [
+                  { key: "Crawlability", w: 30, s: audit.scores.crawlabilityPct || 0 },
+                  { key: "Structured", w: 25, s: audit.scores.structuredPct || 0 },
+                  { key: "Answerability", w: 20, s: audit.scores.answerabilityPct || 0 },
+                  { key: "Trust", w: 15, s: audit.scores.trustPct || 0 },
+                  ...(typeof audit.scores.visibilityPct === 'number' ? [{ key: "Visibility", w: 10, s: audit.scores.visibilityPct }] : []),
+                ];
 
                 return (
                   <div style={{marginBottom: 16}}>
