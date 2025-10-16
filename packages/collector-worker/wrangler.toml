@@ -2,11 +2,8 @@ name = "geodude-collector"
 main = "src/index.ts"
 compatibility_date = "2024-11-20"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "optiview_db"
-database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+# All D1 databases and bindings removed
+# This worker is now disabled
 
 [vars]
 HASH_SALT = "prod_salt_6bd61859686eebd3e0caa31f2192ac83"
-

@@ -1,9 +1,0 @@
-/* 
-  X-Frame-Options: DENY
-  X-Content-Type-Options: nosniff
-  Referrer-Policy: strict-origin-when-cross-origin
-  Content-Security-Policy: default-src 'self'; connect-src 'self' https://api.optiview.ai https://www.google-analytics.com; img-src 'self' data: https://www.google.com; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'
-
-/admin*
-  X-Robots-Tag: noindex, nofollow
-  Cache-Control: no-store
