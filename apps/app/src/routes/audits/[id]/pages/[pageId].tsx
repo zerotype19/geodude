@@ -42,7 +42,7 @@ interface CheckResult {
   };
 }
 
-const API_BASE = 'https://optiview-audit-worker.workers.dev';
+const API_BASE = 'https://api.optiview.ai';
 
 export default function PageDetail() {
   const { id, pageId } = useParams<{ id: string; pageId: string }>();
