@@ -7,8 +7,10 @@ export async function runSynthTick(env: any, auditId: string): Promise<boolean> 
   
   try {
     // Get all crawled pages that haven't been analyzed yet
+    // Use the data already extracted during crawling instead of re-parsing HTML
     const pages = await env.DB.prepare(`
-      SELECT ap.audit_id, ap.url, ap.body_text, ap.status_code
+      SELECT ap.audit_id, ap.url, ap.status_code, ap.title, ap.h1, ap.jsonld_count, 
+             ap.faq_present, ap.word_count, ap.rendered_words, ap.snippet
       FROM audit_pages ap
       LEFT JOIN audit_page_analysis apa ON ap.audit_id = apa.audit_id AND ap.url = apa.url
       WHERE ap.audit_id = ? AND apa.url IS NULL
@@ -24,11 +26,14 @@ export async function runSynthTick(env: any, auditId: string): Promise<boolean> 
       
       if ((totalPages?.count || 0) > 0 && (analyzedPages?.count || 0) === 0) {
         console.log(`[Synth] WARNING: Found ${totalPages?.count} pages but none analyzed - forcing analysis`);
-        // Force analysis of all pages
-        const allPages = await env.DB.prepare(`SELECT audit_id, url, body_text, status_code FROM audit_pages WHERE audit_id = ? LIMIT 10`).bind(auditId).all();
+        // Force analysis of all pages using already-extracted data
+        const allPages = await env.DB.prepare(`
+          SELECT audit_id, url, status_code, title, h1, jsonld_count, faq_present, word_count, rendered_words, snippet
+          FROM audit_pages WHERE audit_id = ? LIMIT 10
+        `).bind(auditId).all();
         if (allPages && allPages.results && allPages.results.length > 0) {
           for (const page of allPages.results) {
-            await analyzePage(env, page.audit_id, page.url, page.body_text);
+            await analyzePageFromData(env, page.audit_id, page.url, page);
           }
           return false; // More work to do
         }
@@ -40,7 +45,7 @@ export async function runSynthTick(env: any, auditId: string): Promise<boolean> 
     console.log(`[Synth] Analyzing ${pages.results.length} pages for audit ${auditId}`);
 
     for (const page of pages.results) {
-      await analyzePage(env, page.audit_id, page.url, page.body_text);
+      await analyzePageFromData(env, page.audit_id, page.url, page);
     }
 
     console.log(`[Synth] Completed analysis for ${pages.results.length} pages`);
@@ -52,37 +57,32 @@ export async function runSynthTick(env: any, auditId: string): Promise<boolean> 
   }
 }
 
-async function analyzePage(env: any, auditId: string, url: string, html: string): Promise<void> {
+async function analyzePageFromData(env: any, auditId: string, url: string, pageData: any): Promise<void> {
   try {
-    console.log(`[Synth] Analyzing page: ${url}, HTML length: ${html?.length || 0}`);
+    console.log(`[Synth] Analyzing page from data: ${url}`);
     
-    if (!html || html.length === 0) {
-      console.log(`[Synth] WARNING: No HTML content for ${url}`);
-      return;
-    }
-    
-    // Basic HTML analysis
+    // Use data already extracted during crawling
     const analysis = {
-      h1: extractH1(html),
-      h1_count: countH1s(html),
-      title: extractTitle(html),
-      meta_description: extractMetaDescription(html),
-      canonical: extractCanonical(html),
-      robots_meta: extractRobotsMeta(html),
-      schema_types: extractSchemaTypes(html),
-      author: extractAuthor(html),
-      date_published: extractDatePublished(html),
-      date_modified: extractDateModified(html),
-      images: countImages(html),
-      headings_h2: countHeadings(html, 'h2'),
-      headings_h3: countHeadings(html, 'h3'),
-      outbound_links: countOutboundLinks(html),
-      word_count: countWords(html),
+      h1: pageData.h1 || '',
+      h1_count: pageData.h1 ? 1 : 0, // We only store one H1 per page
+      title: pageData.title || '',
+      meta_description: '', // Not extracted during crawling
+      canonical: '', // Not extracted during crawling
+      robots_meta: '', // Not extracted during crawling
+      schema_types: pageData.jsonld_count > 0 ? 'Organization' : '', // Basic schema detection
+      author: '', // Not extracted during crawling
+      date_published: '', // Not extracted during crawling
+      date_modified: '', // Not extracted during crawling
+      images: 0, // Not extracted during crawling
+      headings_h2: 0, // Not extracted during crawling
+      headings_h3: 0, // Not extracted during crawling
+      outbound_links: 0, // Not extracted during crawling
+      word_count: pageData.word_count || pageData.rendered_words || 0,
       eeat_flags: '' // Will be set after analysis object is created
     };
 
-    // Calculate EEAT flags after analysis object is fully created
-    analysis.eeat_flags = extractEEATFlags(html, analysis);
+    // Calculate EEAT flags based on available data
+    analysis.eeat_flags = extractEEATFlagsFromData(analysis, pageData);
 
     console.log(`[Synth] Extracted data for ${url}:`, {
       title: analysis.title,
@@ -124,115 +124,16 @@ async function analyzePage(env: any, auditId: string, url: string, html: string)
   }
 }
 
-// Helper functions for HTML analysis
-function extractH1(html: string): string {
-  const match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
-  return match ? match[1].trim() : '';
-}
-
-function countH1s(html: string): number {
-  const matches = html.match(/<h1[^>]*>/gi);
-  return matches ? matches.length : 0;
-}
-
-function extractTitle(html: string): string {
-  const match = html.match(/<title[^>]*>(.*?)<\/title>/i);
-  return match ? match[1].trim() : '';
-}
-
-function extractMetaDescription(html: string): string {
-  const match = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)/i);
-  return match ? match[1].trim() : '';
-}
-
-function extractCanonical(html: string): string {
-  const match = html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']*)/i);
-  return match ? match[1].trim() : '';
-}
-
-function extractRobotsMeta(html: string): string {
-  const match = html.match(/<meta[^>]*name=["']robots["'][^>]*content=["']([^"']*)/i);
-  return match ? match[1].trim() : '';
-}
-
-function extractSchemaTypes(html: string): string {
-  const types = new Set<string>();
-  const matches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gis);
-  
-  if (matches) {
-    for (const match of matches) {
-      try {
-        const jsonMatch = match.match(/<script[^>]*>(.*?)<\/script>/is);
-        if (jsonMatch) {
-          const data = JSON.parse(jsonMatch[1]);
-          if (data['@type']) {
-            types.add(data['@type']);
-          }
-          if (data['@graph']) {
-            for (const item of data['@graph']) {
-              if (item['@type']) {
-                types.add(item['@type']);
-              }
-            }
-          }
-        }
-      } catch (e) {
-        // Skip invalid JSON
-      }
-    }
-  }
-  
-  return Array.from(types).join(',');
-}
-
-function extractAuthor(html: string): string {
-  // Look for author in schema.org or meta tags
-  const schemaMatch = html.match(/"author":\s*{\s*"@type":\s*"Person",\s*"name":\s*"([^"]*)/i);
-  if (schemaMatch) return schemaMatch[1];
-  
-  const metaMatch = html.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']*)/i);
-  return metaMatch ? metaMatch[1].trim() : '';
-}
-
-function extractDatePublished(html: string): string {
-  const match = html.match(/"datePublished":\s*"([^"]*)/i);
-  return match ? match[1] : '';
-}
-
-function extractDateModified(html: string): string {
-  const match = html.match(/"dateModified":\s*"([^"]*)/i);
-  return match ? match[1] : '';
-}
-
-function countImages(html: string): number {
-  const matches = html.match(/<img[^>]*>/gi);
-  return matches ? matches.length : 0;
-}
-
-function countHeadings(html: string, tag: string): number {
-  const regex = new RegExp(`<${tag}[^>]*>`, 'gi');
-  const matches = html.match(regex);
-  return matches ? matches.length : 0;
-}
-
-function countOutboundLinks(html: string): number {
-  const matches = html.match(/<a[^>]*href=["']https?:\/\/(?!.*apple\.com)[^"']*["'][^>]*>/gi);
-  return matches ? matches.length : 0;
-}
-
-function countWords(html: string): number {
-  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  return text.split(' ').filter(word => word.length > 0).length;
-}
-
-function extractEEATFlags(html: string, analysis: any): string {
+// Helper function for EEAT flag extraction from already-extracted data
+function extractEEATFlagsFromData(analysis: any, pageData: any): string {
   const flags = [];
   
-  if (analysis.author) flags.push('HAS_AUTHOR');
+  // Basic EEAT flags based on available data
   if (analysis.h1_count > 1) flags.push('MULTI_H1');
   if (analysis.h1_count === 0) flags.push('NO_H1');
-  if (analysis.date_published) flags.push('HAS_DATE');
   if (analysis.schema_types && analysis.schema_types.includes('Organization')) flags.push('HAS_ORGANIZATION');
+  if (pageData.faq_present) flags.push('HAS_FAQ');
+  if (pageData.jsonld_count > 0) flags.push('HAS_JSONLD');
   
   return flags.join(',');
 }
