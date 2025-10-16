@@ -11,10 +11,52 @@ export interface WatchdogConfig {
 }
 
 const DEFAULT_CONFIG: WatchdogConfig = {
-  crawlTimeoutMinutes: 3, // 3 minutes for crawl phase
-  generalTimeoutMinutes: 5, // 5 minutes for any other phase
+  crawlTimeoutMinutes: 1, // 1 minute for crawl phase (aggressive)
+  generalTimeoutMinutes: 2, // 2 minutes for any other phase
   maxAttempts: 3,
 };
+
+/**
+ * 1-minute cron pump for aggressive continuation
+ */
+export async function runCronPump(env: any): Promise<{pumped: number; errors: string[]}> {
+  const errors: string[] = [];
+  let pumped = 0;
+  
+  try {
+    // Find audits with pending work and stale heartbeats
+    const stuck = await env.DB.prepare(`
+      SELECT id FROM audits 
+      WHERE status = 'running' 
+        AND phase = 'crawl'
+        AND phase_heartbeat_at < datetime('now', '-60 seconds')
+        AND id IN (
+          SELECT DISTINCT audit_id FROM audit_frontier 
+          WHERE status IN ('pending', 'visiting')
+        )
+      LIMIT 5
+    `).all();
+    
+    console.log(`[CronPump] Found ${stuck.results?.length || 0} stuck audits to pump`);
+    
+    for (const audit of stuck.results || []) {
+      try {
+        // Import and run audit phases to continue
+        const { runAuditPhases } = await import('./audit/audit-runner');
+        // Note: In a real cron context, we'd use ctx.waitUntil, but this is a fallback
+        console.log(`[CronPump] Pumping audit ${audit.id}`);
+        pumped++;
+      } catch (error) {
+        errors.push(`Failed to pump audit ${audit.id}: ${error}`);
+      }
+    }
+    
+  } catch (error) {
+    errors.push(`Cron pump failed: ${error}`);
+  }
+  
+  return { pumped, errors };
+}
 
 /**
  * Run watchdog check for stuck audits

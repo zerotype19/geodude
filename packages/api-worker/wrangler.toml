@@ -127,9 +127,11 @@ VI_CACHE_TTL_SEC = "172800"
 VI_RECENCY_HOURS = "6"
 
 # BFS Crawl Throughput Knobs (PR-Fix-5)
-PAGE_BATCH_SIZE = "2"           # Process 2 pages per tick (reduced for stability)
-CRAWL_TIMEBOX_MS = "25000"      # 25s per tick (was 20s)
-CRAWL_TICK_BUDGET_MS = "18000"  # 18s CPU budget per tick (leaves margin for waitUntil)
+PAGE_BATCH_SIZE = "1"           # 1 page per tick (tiny ticks)
+CRAWL_TIMEBOX_MS = "8000"       # ~8s CPU budget per tick
+CRAWL_TICK_BUDGET_MS = "8000"   # ~8s CPU budget per tick
+VISITING_TTL_MS = "60000"       # demote stuck visits after 60s
+ANALYZE_DURING_CRAWL = "0"      # defer analysis to backfill
 MAX_LINKS_ENQUEUE_PER_TICK = "80" # Cap enqueues per tick to prevent timeouts
 CRAWL_MAX_PAGES = "50"          # Target 50 pages per audit
 CRAWL_MAX_DEPTH = "3"           # Max crawl depth
@@ -163,5 +165,5 @@ enabled = true
 # CLAUDE_API_KEY = "your-claude-api-key-here"
 
 [triggers]
-crons = ["0 6 * * 1", "0 3 * * *", "*/5 * * * *", "0 */6 * * *"]
+crons = ["0 6 * * 1", "0 3 * * *", "*/1 * * * *", "0 */6 * * *"]  # 1-minute pump for aggressive continuation
 

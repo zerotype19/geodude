@@ -13,16 +13,17 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
   console.log(`[AuditRunner] Current phase: ${phase}`);
 
   switch (phase) {
-    case 'crawl': {
-      const result = await runCrawlTick(env, auditId, ctx);      // returns continuation info
-      
-      // If work remains, schedule immediate next tick via ctx.waitUntil
-      if (result.shouldContinue) {
-        console.log(`[AuditRunner] Scheduling immediate continuation via ctx.waitUntil`);
-        ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
-      }
-      return;                                // 🔴 never run another phase in same tick
-    }
+           case 'crawl': {
+             const { runTinyCrawlTick } = await import('./crawl-tiny');
+             const result = await runTinyCrawlTick(env, auditId, ctx);      // returns continuation info
+             
+             // Always chain the next tick if work remains
+             if (result.shouldContinue) {
+               console.log(`[AuditRunner] Scheduling immediate continuation via ctx.waitUntil`);
+               ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
+             }
+             return;                                // 🔴 never run another phase in same tick
+           }
     case 'citations': {
       // bounce-back guard lives at top of citations phase
       const { ensureCrawlCompleteOrRewind } = await import('./bounce-back');
@@ -55,7 +56,7 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
     }
     default:
       // discovery/robots/sitemap/probes should ALSO return after each chunk
-      await runPhaseOnce(env, auditId, phase);
+      await runPhaseOnce(env, auditId, phase, ctx);
       
       // Schedule next phase via ctx.waitUntil
       console.log(`[AuditRunner] Scheduling next phase via ctx.waitUntil`);
@@ -238,7 +239,7 @@ async function finalizeAudit(env: any, auditId: string) {
   `).bind(auditId).run();
 }
 
-async function runPhaseOnce(env: any, auditId: string, phase: string) {
+async function runPhaseOnce(env: any, auditId: string, phase: string, ctx: any) {
   console.log(`[AuditRunner] Running phase ${phase} for ${auditId}`);
   
   // Get audit details
@@ -306,8 +307,12 @@ async function runPhaseOnce(env: any, auditId: string, phase: string) {
     
     case 'sitemap': {
       console.log(`[AuditRunner] Sitemap phase for ${domain}`);
-      const { checkSitemap } = await import('../crawl');
-      await checkSitemap(baseUrl, []); // TODO: Pass sitemap URLs from robots
+      
+      // Use new seeding logic for main-only mode
+      const { seedFrontier } = await import('./seed');
+      const seedResult = await seedFrontier(env, auditId, baseUrl, ctx);
+      
+      console.log(`[AuditRunner] Sitemap seeding: ${seedResult.seeded} URLs seeded`);
       
       // Advance to probes
       await env.DB.prepare(`
