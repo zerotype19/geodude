@@ -53,6 +53,9 @@ export async function seedFrontier(
     
     // Removed unused urlCap and childCap - using simple approach
     
+    // SIMPLE APPROACH: Just take the first 50 URLs from sitemap and crawl them
+    const maxPages = parseInt(env.CRAWL_MAX_PAGES || '50');
+    
          // SIMPLE APPROACH: Only process the main sitemap.xml (first one found)
          const mainSitemapUrl = sitemapUrls.find(url => url.includes('/sitemap.xml') && !url.includes('autopush') && !url.includes('image') && !url.includes('video'));
          
@@ -73,9 +76,6 @@ export async function seedFrontier(
          }
     
     console.log(`[Seed] Collected ${allUrls.length} total URLs from sitemaps`);
-    
-    // SIMPLE APPROACH: Just take the first 50 URLs from sitemap and crawl them
-    const maxPages = parseInt(env.CRAWL_MAX_PAGES || '50');
     
     // 4. Normalize and deduplicate
     const normalized = allUrls
