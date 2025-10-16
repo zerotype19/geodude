@@ -24,6 +24,14 @@ import { runPhase, PHASE_CONFIGS } from './phase-runner';
 import { runAuditPhases } from './audit/audit-runner';
 import { getCircuitStatus } from './circuit-breaker';
 import { normalizeFromUrl } from './lib/domain';
+// v2.1 imports
+import { getAuditV21Scoring } from './utils/flags';
+import { getLatestAuditScores, getLegacyAuditScores, saveAuditScores } from './audit/db-helpers';
+import { getVisibilityForAudit } from './audit/visibility-adapter';
+import { computeScoresV21 } from './audit/scoring-v21';
+import { analyzeHtmlV21 } from './audit/analyze-v21';
+import { generateIssuesFromAnalysis } from './audit/issues-generator';
+import { logAuditMetrics } from './utils/logging';
 
 interface Env {
   DB: D1Database;
@@ -80,6 +88,7 @@ interface Env {
   KV_VI_CACHE?: KVNamespace;
   KV_VI_RULES?: KVNamespace;
   KV_VI_SEEDS?: KVNamespace;
+  KV_RULES?: KVNamespace; // For feature flags
   // Additional API Keys (secrets)
   PERPLEXITY_API_KEY?: string;
   CLAUDE_API_KEY?: string;
@@ -706,6 +715,16 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         const budgetUsed = parseInt((await env.RATE_LIMIT_KV.get(budgetKey)) || '0');
         const budgetMax = parseInt(env.CITATIONS_DAILY_BUDGET || '200');
 
+        // Get v2.1 scoring metrics
+        const v21Metrics = await env.DB.prepare(
+          `SELECT 
+            COUNT(*) as total_v21_audits,
+            COUNT(CASE WHEN created_at >= datetime('now','-1 day') THEN 1 END) as v21_audits_24h,
+            COUNT(CASE WHEN created_at >= datetime('now','-7 days') THEN 1 END) as v21_audits_7d
+           FROM audit_scores 
+           WHERE score_model_version = 'v2.1'`
+        ).first<{ total_v21_audits: number; v21_audits_24h: number; v21_audits_7d: number }>();
+
         return new Response(
           JSON.stringify({
             status: 'ok',
@@ -719,6 +738,11 @@ Sitemap: https://optiview.ai/sitemap.xml`;
               used: budgetUsed,
               remaining: Math.max(0, budgetMax - budgetUsed),
               max: budgetMax,
+            },
+            v21_scoring: {
+              total_audits: v21Metrics?.total_v21_audits || 0,
+              audits_24h: v21Metrics?.v21_audits_24h || 0,
+              audits_7d: v21Metrics?.v21_audits_7d || 0,
             },
           }),
           {
@@ -1947,6 +1971,138 @@ Sitemap: https://optiview.ai/sitemap.xml`;
       }
     }
 
+    // POST /v1/audits/:id/reanalyze - Re-analyze existing audit with v2.1 (admin convenience)
+    if (path.match(/^\/v1\/audits\/[^/]+\/reanalyze$/) && request.method === 'POST') {
+      const auditId = path.split('/')[3];
+      const url = new URL(request.url);
+      const model = url.searchParams.get('model') || 'v2.1';
+
+      try {
+        // Get audit details
+        const audit = await env.DB.prepare(
+          'SELECT id, property_id, status FROM audits WHERE id = ?'
+        ).bind(auditId).first();
+
+        if (!audit) {
+          return new Response(
+            JSON.stringify({ error: 'Audit not found' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Get property domain
+        const property = await env.DB.prepare(
+          'SELECT domain FROM properties WHERE id = ?'
+        ).bind(audit.property_id).first<{ domain: string }>();
+
+        if (!property) {
+          return new Response(
+            JSON.stringify({ error: 'Property not found' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Get stored HTML from audit_pages
+        const pagesResult = await env.DB.prepare(
+          'SELECT url, status_code, body_text FROM audit_pages WHERE audit_id = ?'
+        ).bind(auditId).all();
+
+        if (!pagesResult.results || pagesResult.results.length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'No pages found for re-analysis' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Re-analyze each page with v2.1 analyzer
+        const analysisData = [];
+        for (const page of pagesResult.results as any[]) {
+          if (page.body_text) {
+            const analysis = analyzeHtmlV21(page.url, page.body_text);
+            analysis.status = page.status_code;
+            analysisData.push(analysis);
+          }
+        }
+
+        // Get visibility data
+        const visibility = await getVisibilityForAudit(env.DB, auditId, property.domain);
+
+        // Get robots/sitemap data from issues
+        const issuesResult = await env.DB.prepare(
+          'SELECT issue_type FROM audit_issues WHERE audit_id = ?'
+        ).bind(auditId).all();
+
+        const issues = issuesResult.results as any[];
+        const robotsMissing = issues.some(i => 
+          i.issue_type === 'robots_missing' || i.issue_type === 'missing_robots_txt'
+        );
+        const sitemapMissing = issues.some(i => 
+          i.issue_type === 'sitemap_missing' || i.issue_type === 'missing_sitemap_reference'
+        );
+
+        // Compute v2.1 scores
+        const scores = computeScoresV21({
+          pages: analysisData,
+          robots: { gptbot: true, claude: true, perplexity: true, ccbot: true }, // Assume allowed for re-analysis
+          sitemapPresent: !sitemapMissing,
+          visibility
+        });
+
+        // Save new scores
+        await saveAuditScores(env.DB, auditId, scores, model);
+
+        // Generate new issues
+        const newIssues = generateIssuesFromAnalysis(analysisData, property.domain);
+
+        // Clear old issues and insert new ones
+        await env.DB.prepare('DELETE FROM audit_issues WHERE audit_id = ?').bind(auditId).run();
+        
+        for (const issue of newIssues) {
+          await env.DB.prepare(
+            `INSERT INTO audit_issues 
+             (audit_id, page_url, issue_type, category, severity, message, details, score_impact)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+          ).bind(
+            auditId,
+            issue.page_url ?? null,
+            issue.issue_type ?? '',
+            issue.category ?? 'general',
+            issue.severity ?? 'info',
+            issue.message ?? '',
+            issue.details ?? null,
+            issue.score_impact ? JSON.stringify(issue.score_impact) : null
+          ).run();
+        }
+
+        // Log metrics
+        logAuditMetrics(env, auditId, property.domain, model, scores, analysisData, []);
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            model, 
+            scores,
+            issues_count: newIssues.length,
+            pages_analyzed: analysisData.length
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+
+      } catch (error) {
+        console.error(`[Re-analyze] Failed for audit ${auditId}:`, error);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Re-analysis failed', 
+            message: error instanceof Error ? error.message : String(error) 
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    }
+
     // GET /v1/audits/:id/citations - Get citations for audit with pagination and filtering
     if (path.match(/^\/v1\/audits\/[^/]+\/citations$/) && request.method === 'GET') {
       const auditId = path.split('/')[3];
@@ -2994,36 +3150,74 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           );
         }
 
-        // Get pages with render telemetry
+        // Get pages with analysis data for rich information
         const pagesResult = await env.DB.prepare(
-          `SELECT url, status_code, title, h1, has_h1, jsonld_count, faq_present, 
-                  word_count, rendered_words, snippet, load_time_ms, error, load_ms, content_type
-           FROM audit_pages WHERE audit_id = ?
-           ORDER BY url`
+          `SELECT 
+            ap.url, 
+            ap.status_code,
+            apa.title,
+            apa.h1,
+            apa.h1_count,
+            apa.meta_description,
+            apa.canonical,
+            apa.robots_meta,
+            apa.schema_types,
+            apa.author,
+            apa.date_published,
+            apa.date_modified,
+            apa.images,
+            apa.headings_h2,
+            apa.headings_h3,
+            apa.outbound_links,
+            apa.word_count,
+            apa.eeat_flags,
+            ap.jsonld_count,
+            ap.faq_present,
+            ap.rendered_words,
+            ap.snippet,
+            ap.load_time_ms,
+            ap.load_ms,
+            ap.error
+          FROM audit_pages ap
+          LEFT JOIN audit_page_analysis apa ON ap.audit_id = apa.audit_id AND ap.url = apa.url
+          WHERE ap.audit_id = ?
+          ORDER BY ap.url`
         ).bind(auditId).all();
         
-        // Normalize field names to camelCase
+        // Normalize field names to camelCase and use analysis data
         const pages = {
           results: (pagesResult.results || []).map((p: any) => ({
             url: p.url,
             statusCode: p.status_code,
-            title: p.title,
-            h1: p.h1,
-            hasH1: !!p.has_h1,
+            title: p.title || null,
+            h1: p.h1 || null,
+            hasH1: (p.h1_count || 0) > 0,
+            metaDescription: p.meta_description || null,
+            canonical: p.canonical || null,
+            robotsMeta: p.robots_meta || null,
+            schemaTypes: p.schema_types && typeof p.schema_types === 'string' ? p.schema_types.split(',').map((s: string) => s.trim()) : [],
+            author: p.author || null,
+            datePublished: p.date_published || null,
+            dateModified: p.date_modified || null,
+            images: p.images && typeof p.images === 'string' ? p.images.split(',').map((s: string) => s.trim()) : [],
+            headingsH2: p.headings_h2 && typeof p.headings_h2 === 'string' ? p.headings_h2.split(',').map((s: string) => s.trim()) : [],
+            headingsH3: p.headings_h3 && typeof p.headings_h3 === 'string' ? p.headings_h3.split(',').map((s: string) => s.trim()) : [],
+            outboundLinks: p.outbound_links && typeof p.outbound_links === 'string' ? p.outbound_links.split(',').map((s: string) => s.trim()) : [],
             jsonLdCount: p.jsonld_count ?? 0,
-            faqOnPage: !!p.faq_present, // Per-page FAQ detection
-            words: p.rendered_words ?? p.word_count ?? 0,
+            faqOnPage: !!p.faq_present,
+            words: p.word_count ?? p.rendered_words ?? 0,
             snippet: p.snippet,
-            loadTimeMs: p.load_time_ms,
+            loadTimeMs: p.load_ms || p.load_time_ms,
             error: p.error,
+            eeatFlags: p.eeat_flags && typeof p.eeat_flags === 'string' ? p.eeat_flags.split(',').map((s: string) => s.trim()) : [],
           })),
         };
 
-        // Get issues
+        // Get issues with new structure
         const issues = await env.DB.prepare(
-          `SELECT page_url, issue_type, severity, message, details
+          `SELECT page_url, issue_type, category, severity, message, details, score_impact
            FROM audit_issues WHERE audit_id = ?
-           ORDER BY severity DESC, page_url`
+           ORDER BY category, severity DESC, page_url`
         ).bind(auditId).all();
 
         // Get property domain and site description for entity recommendations
@@ -3085,12 +3279,14 @@ Sitemap: https://optiview.ai/sitemap.xml`;
             SUM(CASE WHEN title IS NOT NULL AND title!='' THEN 1 ELSE 0 END) AS title_ok,
             SUM(CASE WHEN meta_description IS NOT NULL AND meta_description!='' THEN 1 ELSE 0 END) AS meta_ok,
             SUM(CASE WHEN schema_types IS NOT NULL AND schema_types!='' THEN 1 ELSE 0 END) AS schema_ok,
+            SUM(CASE WHEN word_count >= 120 THEN 1 ELSE 0 END) AS content_120_plus,
             SUM(CASE WHEN eeat_flags LIKE '%HAS_AUTHOR%' THEN 1 ELSE 0 END) AS has_author,
-            SUM(CASE WHEN eeat_flags LIKE '%HAS_DATES%' THEN 1 ELSE 0 END) AS has_dates
+            SUM(CASE WHEN eeat_flags LIKE '%HAS_DATES%' THEN 1 ELSE 0 END) AS has_dates,
+            GROUP_CONCAT(DISTINCT schema_types) AS all_schema_types
           FROM audit_page_analysis WHERE audit_id = ?`
         ).bind(auditId).first();
         
-        // Fallback to old pages table if no analysis data exists yet
+        // Use analysis data when available, fallback to old pages table
         const totalPages = (analysisResult?.total_pages ?? 0) > 0 
           ? Number(analysisResult.total_pages)
           : pages.results.length;
@@ -3103,8 +3299,15 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         const pagesWithH1 = (analysisResult?.h1_ok ?? 0) > 0
           ? Number(analysisResult.h1_ok)
           : pages.results.filter((p: any) => p.has_h1).length;
-        const pagesWithContent = pages.results.filter((p: any) => (p.rendered_words ?? p.word_count ?? 0) >= 120).length;
+        const pagesWithContent = (analysisResult?.content_120_plus ?? 0) > 0
+          ? Number(analysisResult.content_120_plus)
+          : pages.results.filter((p: any) => (p.rendered_words ?? p.word_count ?? 0) >= 120).length;
         const pages2xx = pages.results.filter((p: any) => (p.status_code ?? 0) >= 200 && (p.status_code ?? 0) < 300).length;
+        
+        // Extract schema types from analysis data
+        const schemaTypes = analysisResult?.all_schema_types 
+          ? [...new Set(analysisResult.all_schema_types.split(',').map((s: string) => s.trim()).filter(Boolean))]
+          : [];
         
         // FAQ detection (separate page vs schema)
         const siteFaqSchemaPresent = pages.results.some((p: any) => p.faq_present); // Has FAQPage JSON-LD
@@ -3129,7 +3332,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         
         // Calculate average render time from new telemetry columns
         const renderTimes = pages.results
-          .map((p: any) => p.load_ms || p.load_time_ms) // prefer new load_ms column
+          .map((p: any) => p.loadTimeMs) // use the mapped field
           .filter((t: number) => t && t > 0);
         const avgRenderMs = renderTimes.length > 0 
           ? Math.round(renderTimes.reduce((sum: number, t: number) => sum + t, 0) / renderTimes.length)
@@ -3137,8 +3340,12 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         
         // Check robots/sitemap from issues (we can reconstruct this)
         const issuesArr = issues.results as any[];
-        const robotsMissing = issuesArr.some((i: any) => i.issue_type === 'robots_missing');
-        const sitemapMissing = issuesArr.some((i: any) => i.issue_type === 'sitemap_missing');
+        const robotsMissing = issuesArr.some((i: any) => 
+          i.issue_type === 'robots_missing' || i.issue_type === 'missing_robots_txt'
+        );
+        const sitemapMissing = issuesArr.some((i: any) => 
+          i.issue_type === 'sitemap_missing' || i.issue_type === 'missing_sitemap_reference'
+        );
         const aiBotsBlocked = issuesArr.find((i: any) => i.issue_type === 'robots_blocks_ai');
         
         // Parse blocked bots from issue message if present
@@ -3165,7 +3372,7 @@ Sitemap: https://optiview.ai/sitemap.xml`;
             jsonLdCoveragePct,
             faqSchemaPresent: siteFaqSchemaPresent,
             faqPagePresent: siteFaqPagePresent,
-            schemaTypes: [], // TODO: extract from pages if we store them
+            schemaTypes: schemaTypes,
           },
           answerability: {
             titleCoveragePct,
@@ -3217,20 +3424,86 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           (trustPct * 0.1)
         );
         
-        // Use stored database scores if available, otherwise use calculated scores
-        // Note: Database stores percentages (0-100), not raw points
-        const scores = {
-          total: audit.score_overall ?? totalPct,
-          crawlability: audit.score_crawlability ?? Math.round(crawlabilityPoints),
-          structured: audit.score_structured ?? Math.round(structuredPoints),
-          answerability: audit.score_answerability ?? Math.round(answerabilityPoints),
-          trust: audit.score_trust ?? Math.round(trustPoints),
-          crawlabilityPct: audit.score_crawlability ?? crawlabilityPct,
-          structuredPct: audit.score_structured ?? structuredPct,
-          answerabilityPct: audit.score_answerability ?? answerabilityPct,
-          trustPct: audit.score_trust ?? trustPct,
-          breakdown,
-        };
+        // v2.1 Scoring System Integration
+        const useV21Scoring = await getAuditV21Scoring(env);
+        
+        let scores: any;
+        let scoreModelVersion = "v1.0";
+        
+        if (useV21Scoring) {
+          // Try to get v2.1 scores from audit_scores table
+          const latestScores = await getLatestAuditScores(env.DB, auditId);
+          
+          if (latestScores) {
+            // Use v2.1 scores from audit_scores table
+            scoreModelVersion = latestScores.score_model_version;
+            scores = {
+              total: latestScores.overall_score,
+              crawlability: Math.round((latestScores.crawlability_score / 100) * 30), // v2.1: 30 max points
+              structured: Math.round((latestScores.structured_score / 100) * 25),     // v2.1: 25 max points
+              answerability: Math.round((latestScores.answerability_score / 100) * 20), // v2.1: 20 max points
+              trust: Math.round((latestScores.trust_score / 100) * 15),               // v2.1: 15 max points
+              visibility: latestScores.visibility_score,                              // v2.1: new pillar
+              crawlabilityPct: latestScores.crawlability_score,
+              structuredPct: latestScores.structured_score,
+              answerabilityPct: latestScores.answerability_score,
+              trustPct: latestScores.trust_score,
+              visibilityPct: latestScores.visibility_score,
+              breakdown,
+              score_model_version: scoreModelVersion,
+            };
+          } else {
+            // Fall back to legacy scores but mark as v1.0
+            const legacyScores = await getLegacyAuditScores(env.DB, auditId);
+            if (legacyScores) {
+              scores = {
+                total: legacyScores.overall,
+                crawlability: Math.round((legacyScores.crawlability / 100) * 42), // v1.0: 42 max points
+                structured: Math.round((legacyScores.structured / 100) * 30),     // v1.0: 30 max points
+                answerability: Math.round((legacyScores.answerability / 100) * 20), // v1.0: 20 max points
+                trust: Math.round((legacyScores.trust / 100) * 10),               // v1.0: 10 max points
+                crawlabilityPct: legacyScores.crawlability,
+                structuredPct: legacyScores.structured,
+                answerabilityPct: legacyScores.answerability,
+                trustPct: legacyScores.trust,
+                breakdown,
+                score_model_version: scoreModelVersion,
+              };
+            } else {
+              // Use calculated scores as fallback
+              scores = {
+                total: totalPct,
+                crawlability: Math.round(crawlabilityPoints),
+                structured: Math.round(structuredPoints),
+                answerability: Math.round(answerabilityPoints),
+                trust: Math.round(trustPoints),
+                crawlabilityPct: crawlabilityPct,
+                structuredPct: structuredPct,
+                answerabilityPct: answerabilityPct,
+                trustPct: trustPct,
+                breakdown,
+                score_model_version: scoreModelVersion,
+              };
+            }
+          }
+        } else {
+          // Legacy scoring system (v1.0)
+          scores = {
+            total: audit.score_overall ?? totalPct,
+            // Convert stored percentages back to raw points for proper display
+            crawlability: audit.score_crawlability ? Math.round((audit.score_crawlability / 100) * 42) : Math.round(crawlabilityPoints),
+            structured: audit.score_structured ? Math.round((audit.score_structured / 100) * 30) : Math.round(structuredPoints),
+            answerability: audit.score_answerability ? Math.round((audit.score_answerability / 100) * 20) : Math.round(answerabilityPoints),
+            trust: audit.score_trust ? Math.round((audit.score_trust / 100) * 10) : Math.round(trustPoints),
+            // Use stored percentages directly
+            crawlabilityPct: audit.score_crawlability ?? crawlabilityPct,
+            structuredPct: audit.score_structured ?? structuredPct,
+            answerabilityPct: audit.score_answerability ?? answerabilityPct,
+            trustPct: audit.score_trust ?? trustPct,
+            breakdown,
+            score_model_version: scoreModelVersion,
+          };
+        }
         
         // Parse AI access probe results
         const aiAccessRaw = audit.ai_access_json ? JSON.parse(audit.ai_access_json as string) : null;
@@ -3383,14 +3656,15 @@ Sitemap: https://optiview.ai/sitemap.xml`;
 
         // Scores are now calculated from analysis data above
 
-        // Transform issues to match frontend expectations
+        // Transform issues to match frontend expectations with new structure
         const transformedIssues = (issues.results as any[]).map((issue: any) => ({
-          category: issue.issue_type?.split('_')[0] || 'general',
+          category: issue.category || issue.issue_type?.split('_')[0] || 'general',
           severity: issue.severity,
           code: issue.issue_type,
           message: issue.message,
           url: issue.page_url,
           details: issue.details,
+          score_impact: issue.score_impact ? JSON.parse(issue.score_impact) : null
         }));
 
         // Build citation counts per page path
@@ -3483,12 +3757,24 @@ Sitemap: https://optiview.ai/sitemap.xml`;
             title: p.title ?? null,
             h1: p.h1 ?? null,
             hasH1: p.hasH1 ?? false,
+            metaDescription: p.metaDescription ?? null,
+            canonical: p.canonical ?? null,
+            robotsMeta: p.robotsMeta ?? null,
+            schemaTypes: p.schemaTypes ?? [],
+            author: p.author ?? null,
+            datePublished: p.datePublished ?? null,
+            dateModified: p.dateModified ?? null,
+            images: p.images ?? [],
+            headingsH2: p.headingsH2 ?? [],
+            headingsH3: p.headingsH3 ?? [],
+            outboundLinks: p.outboundLinks ?? [],
             jsonLdCount: p.jsonLdCount ?? 0,
             faqOnPage: p.faqOnPage ?? null,
             words: p.words ?? null,
             snippet: p.snippet ?? null,
             loadTimeMs: p.loadTimeMs ?? null,
             error: p.error ?? null,
+            eeatFlags: p.eeatFlags ?? [],
             citationCount: countsByPath.get(path) || 0,
             aiAnswers: braveAnswersByPath.get(path) || 0,  // Brave AI answer count
             aiAnswerQueries,  // Phase F+: Queries that cited this page
@@ -3541,6 +3827,12 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           } : null,
           site_description: property?.site_description || null,
           scores: scores,
+          // Legacy score fields for backward compatibility
+          score_overall: scores.total,
+          score_crawlability: scores.crawlabilityPct,
+          score_structured: scores.structuredPct,
+          score_answerability: scores.answerabilityPct,
+          score_trust: scores.trustPct,
           site: site,
           pages_crawled: audit.pages_crawled,
           pages_total: audit.pages_total,

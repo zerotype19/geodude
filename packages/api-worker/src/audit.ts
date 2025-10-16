@@ -700,15 +700,17 @@ export async function runAudit(
     for (const issue of issues) {
       await env.DB.prepare(
         `INSERT INTO audit_issues 
-         (audit_id, page_url, issue_type, severity, message, details)
-         VALUES (?, ?, ?, ?, ?, ?)`
+         (audit_id, page_url, issue_type, category, severity, message, details, score_impact)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         auditId,
         issue.page_url ?? null,
         issue.issue_type ?? '',
+        issue.category ?? 'general',
         issue.severity ?? 'info',
         issue.message ?? '',
-        issue.details ?? null
+        issue.details ?? null,
+        issue.score_impact ? JSON.stringify(issue.score_impact) : null
       ).run();
     }
 

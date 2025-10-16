@@ -90,7 +90,22 @@ export default function PagesTable({ pages }: { pages: AuditPage[] }) {
                   <span style={{ color: '#999' }}>—</span>
                 )}
               </td>
-              <td>{p.jsonLdCount ?? 0}</td>
+              <td>
+                {p.jsonLdCount ?? 0}
+                {p.schemaTypes?.includes('FAQPage') && (
+                  <span style={{
+                    marginLeft: 8,
+                    fontSize: 11,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    background: '#f0f9ff',
+                    color: '#1e40af',
+                    border: '1px solid #bfdbfe'
+                  }}>
+                    FAQ
+                  </span>
+                )}
+              </td>
               {anyFaq && <td>{p.faqOnPage ? "Yes" : "—"}</td>}
               <td style={{ textAlign: 'right' }} className="tabular-nums">
                 {(p.citationCount ?? 0) > 0 && auditId ? (

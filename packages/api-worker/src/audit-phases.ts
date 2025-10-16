@@ -462,6 +462,14 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
     
     console.log(`[AuditPhases] Found ${analysisData.results?.length || 0} analyzed pages`);
     
+    // Generate issues from analysis data
+    const { generateIssuesFromAnalysis } = await import('./audit/issues-generator');
+    const generatedIssues = generateIssuesFromAnalysis(analysisData.results || [], domain);
+    console.log(`[AuditPhases] Generated ${generatedIssues.length} issues from analysis`);
+    
+    // Update the issues array with generated issues
+    issues = generatedIssues;
+    
     const structuredData = {
       siteFaqSchemaPresent: analysisData.results?.some((p: any) => p.schema_types?.includes('FAQPage')) || false,
       siteFaqPagePresent: analysisData.results?.some((p: any) => {
@@ -550,15 +558,17 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
     for (const issue of issues) {
       await env.DB.prepare(
         `INSERT INTO audit_issues 
-         (audit_id, page_url, issue_type, severity, message, details)
-         VALUES (?, ?, ?, ?, ?, ?)`
+         (audit_id, page_url, issue_type, category, severity, message, details, score_impact)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         auditId,
         issue.page_url ?? null,
         issue.issue_type ?? '',
+        issue.category ?? 'general',
         issue.severity ?? 'info',
         issue.message ?? '',
-        issue.details ?? null
+        issue.details ?? null,
+        issue.score_impact ? JSON.stringify(issue.score_impact) : null
       ).run();
     }
 

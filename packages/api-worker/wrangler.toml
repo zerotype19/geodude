@@ -29,6 +29,10 @@ id = "05aa79aa479d44f7a599735e03ad2a78"
 binding = "HEURISTICS"
 id = "e037590f3aa9494cbd4d30d5fd6bc333"
 
+[[kv_namespaces]]
+binding = "KV_RULES"
+id = "f448590f3aa9494cbd4d30d5fd6bc337"
+
 # [[kv_namespaces]]
 # binding = "KV_VI_CACHE"
 # id = "f148590f3aa9494cbd4d30d5fd6bc334"
@@ -139,6 +143,10 @@ NAV_SEED_LIMIT = "75"           # Max nav links to seed (was 50)
 SITEMAP_URL_CAP = "500"         # Max sitemap URLs to seed
 CRAWL_MAX_URLS_IN_FRONTIER = "2000"  # Hard cap on frontier size
 CRAWL_MAX_ENQUEUE_PER_PAGE = "100"   # Max links to extract per page
+
+# Feature Flags for v2.1 Scoring System
+FF_AUDIT_V21_SCORING = "false"  # Enable v2.1 scoring with 5 pillars
+FF_CRAWL_SITEMAP_DEPTH1 = "false" # Enable sitemap-first URL collection with depth≤1 filtering
 
 # HARD "main sitemap only" mode
 CRAWL_SITEMAP_MAIN_ONLY = "1"      # if "1", ignore robots.txt & other sitemaps

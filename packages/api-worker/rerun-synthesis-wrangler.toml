@@ -1,0 +1,12 @@
+name = "rerun-synthesis"
+main = "rerun-synthesis.js"
+compatibility_date = "2024-11-20"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "optiview_db"
+database_id = "975fb94d-9fac-4fd9-b8e2-41444f488334"
+
+[vars]
+USER_AGENT = "OptiviewAuditBot/1.0 (+https://www.optiview.ai)"

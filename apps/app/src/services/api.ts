@@ -16,6 +16,7 @@ export type AuditPage = {
   hasH1: boolean;
   jsonLdCount: number;
   faqOnPage?: boolean | null; // Keep for Page Report but not required in Pages table
+  schemaTypes?: string[]; // v2.1: Schema types found on page
   words: number | null;  // null for older audits or render failures
   snippet?: string | null;
   loadTimeMs?: number | null;
@@ -156,15 +157,18 @@ export type SiteMeta = {
 
 export type Scores = { 
   total: number;                  // 0-100% (weighted overall)
-  crawlability: number;           // raw points (0-42)
-  structured: number;             // raw points (0-30)
+  crawlability: number;           // raw points (0-42 v1.0, 0-30 v2.1)
+  structured: number;             // raw points (0-30 v1.0, 0-25 v2.1)
   answerability: number;          // raw points (0-20)
-  trust: number;                  // raw points (0-10)
+  trust: number;                  // raw points (0-10 v1.0, 0-15 v2.1)
+  visibility?: number;            // v2.1: raw points (0-10)
   crawlabilityPct?: number;       // percentage (0-100%)
   structuredPct?: number;         // percentage (0-100%)
   answerabilityPct?: number;      // percentage (0-100%)
   trustPct?: number;              // percentage (0-100%)
+  visibilityPct?: number;         // v2.1: percentage (0-100%)
   breakdown?: ScoresBreakdown;
+  score_model_version?: string;   // v2.1: scoring model version
 };
 
 export type EntityRecommendations = {

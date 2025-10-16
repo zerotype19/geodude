@@ -494,6 +494,10 @@ export default function PublicAudit() {
         
         <ScoreCard title="Answerability" value={audit.scores.answerabilityPct}/>
         <ScoreCard title="Trust" value={audit.scores.trustPct}/>
+        {/* v2.1: Show Visibility card only when present */}
+        {typeof audit.scores.visibilityPct === 'number' && (
+          <ScoreCard title="Visibility" value={audit.scores.visibilityPct}/>
+        )}
       </div>
 
       {audit.entity_recommendations && (
@@ -505,7 +509,7 @@ export default function PublicAudit() {
       )}
 
       <div className="tabs-container" style={{marginTop: 24}}>
-        {(['scores', 'issues', 'pages', 'citations'] as const).map(tab => (
+        {(['scores', 'issues', 'pages', 'citations', 'visibility'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => {
@@ -532,9 +536,24 @@ export default function PublicAudit() {
       <div className="tab-content">
         {activeTab === 'scores' && (
           <div>
-            <h3 style={{marginTop:0, fontSize: 20, fontWeight: 600}}>Score Breakdown</h3>
+            <div style={{display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8}}>
+              <h3 style={{marginTop:0, fontSize: 20, fontWeight: 600}}>Score Breakdown</h3>
+              {audit.scores.score_model_version && (
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  background: '#f3f4f6',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  border: '1px solid #e5e7eb'
+                }}>
+                  model {audit.scores.score_model_version}
+                </span>
+              )}
+            </div>
             <p style={{color: '#64748b', fontSize: 15, marginBottom: 32}}>
-              Your overall score is calculated from four weighted components. Each component evaluates different aspects of your site's AI optimization.
+              Your overall score is calculated from {audit.scores.visibilityPct !== undefined ? 'five' : 'four'} weighted components. Each component evaluates different aspects of your site's AI optimization.
             </p>
 
             {/* Score Formula */}
@@ -547,7 +566,10 @@ export default function PublicAudit() {
             }}>
               <div style={{fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#1e293b'}}>Score Formula:</div>
               <div style={{fontSize: 14, color: '#64748b', fontFamily: 'Monaco, monospace'}}>
-                Overall = (Crawlability 40%) + (Structured 30%) + (Answerability 20%) + (Trust 10%)
+                {audit.scores.visibilityPct !== undefined 
+                  ? 'Overall = (Crawlability 30%) + (Structured 25%) + (Answerability 20%) + (Trust 15%) + (Visibility 10%)'
+                  : 'Overall = (Crawlability 40%) + (Structured 30%) + (Answerability 20%) + (Trust 10%)'
+                }
               </div>
               <div style={{fontSize: 14, color: '#64748b', marginTop: 8}}>
                 <strong>Your Calculation:</strong> ({Math.round((audit.scores.crawlabilityPct || (audit.scores.crawlability / 42 * 100)) * 10) / 10}% × 0.4) + ({Math.round((audit.scores.structuredPct || (audit.scores.structured / 30 * 100)) * 10) / 10}% × 0.3) + ({Math.round((audit.scores.answerabilityPct || (audit.scores.answerability / 20 * 100)) * 10) / 10}% × 0.2) + ({Math.round((audit.scores.trustPct || (audit.scores.trust / 10 * 100)) * 10) / 10}% × 0.1) = <strong style={{color: '#3b82f6'}}>{Math.max(0, Math.min(100, Math.round(audit.scores.total || 0)))}%</strong>
@@ -682,6 +704,39 @@ export default function PublicAudit() {
                   <strong>What we check:</strong> HTTP status codes, page load times, broken links, error detection, accessibility
                 </div>
               </div>
+
+              {/* Visibility (v2.1) */}
+              {typeof audit.scores.visibilityPct === 'number' && (
+                <div style={{
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  padding: 20
+                }}>
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                      <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>👁️ Visibility</span>
+                      <span style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: '#6b7280',
+                        background: '#f3f4f6',
+                        padding: '2px 8px',
+                        borderRadius: 4
+                      }}>10% weight</span>
+                    </div>
+                    <span style={{fontSize: 24, fontWeight: 700, color: getScoreColor(audit.scores.visibilityPct)}}>
+                      {audit.scores.visibility}<span style={{fontSize: 16, color: '#94a3b8'}}>/10</span>
+                    </span>
+                  </div>
+                  <p style={{fontSize: 14, color: '#64748b', marginBottom: 12}}>
+                    How visible is your content to AI engines? We check for citations, mentions, and presence in AI-generated responses.
+                  </p>
+                  <div style={{fontSize: 13, color: '#475569'}}>
+                    <strong>What we check:</strong> AI citations, Brave search presence, LLM mentions, visibility signals
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Scoring Guide */}
@@ -696,15 +751,24 @@ export default function PublicAudit() {
               <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12, fontSize: 13}}>
                 <div>
                   <div style={{fontWeight: 600, color: '#10b981', marginBottom: 4}}>🟢 Excellent (70%+)</div>
-                  <div style={{color: '#475569', fontSize: 12}}>Crawl: 29+/42 • Struct: 21+/30 • Answer: 14+/20 • Trust: 7+/10</div>
+                  <div style={{color: '#475569', fontSize: 12}}>
+                    Crawl: 29+/42 • Struct: 21+/30 • Answer: 14+/20 • Trust: 7+/10
+                    {audit.scores.visibilityPct !== undefined && ' • Vis: 7+/10'}
+                  </div>
                 </div>
                 <div>
                   <div style={{fontWeight: 600, color: '#f59e0b', marginBottom: 4}}>🟡 Good (40-70%)</div>
-                  <div style={{color: '#475569', fontSize: 12}}>Crawl: 17-28 • Struct: 12-20 • Answer: 8-13 • Trust: 4-6</div>
+                  <div style={{color: '#475569', fontSize: 12}}>
+                    Crawl: 17-28 • Struct: 12-20 • Answer: 8-13 • Trust: 4-6
+                    {audit.scores.visibilityPct !== undefined && ' • Vis: 4-6'}
+                  </div>
                 </div>
                 <div>
                   <div style={{fontWeight: 600, color: '#ef4444', marginBottom: 4}}>🔴 Needs Work (&lt;40%)</div>
-                  <div style={{color: '#475569', fontSize: 12}}>Crawl: &lt;17 • Struct: &lt;12 • Answer: &lt;8 • Trust: &lt;4</div>
+                  <div style={{color: '#475569', fontSize: 12}}>
+                    Crawl: &lt;17 • Struct: &lt;12 • Answer: &lt;8 • Trust: &lt;4
+                    {audit.scores.visibilityPct !== undefined && ' • Vis: &lt;4'}
+                  </div>
                 </div>
               </div>
               <p style={{fontSize: 13, color: '#475569', marginTop: 12, marginBottom: 0}}>
