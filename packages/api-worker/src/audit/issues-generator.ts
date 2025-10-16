@@ -87,7 +87,9 @@ export function generateIssuesFromAnalysis(
     if (canonical) siteStats.pagesWithCanonicals++;
     if (schemaTypes) {
       siteStats.pagesWithSchema++;
-      schemaTypes.split(',').forEach(type => siteStats.schemaTypes.add(type.trim()));
+      // Handle both string (legacy) and array (v2.1) formats
+      const types = Array.isArray(schemaTypes) ? schemaTypes : schemaTypes.split(',');
+      types.forEach(type => siteStats.schemaTypes.add(type.trim()));
     }
     if (author) siteStats.pagesWithAuthors++;
     if (datePublished || dateModified) siteStats.pagesWithDates++;
@@ -419,8 +421,7 @@ export function generateIssuesFromAnalysis(
     });
   }
 
-  // Check for missing author info (v2.1 rule)
-  const authorCoverage = (siteStats.pagesWithAuthors / siteStats.totalPages) * 100;
+  // Check for missing author info (v2.1 rule) - use existing authorCoverage
   if (authorCoverage < ISSUE_THRESHOLDS.minAuthorCoverage) {
     issues.push({
       issue_type: 'low_author_coverage_v21',
@@ -438,8 +439,7 @@ export function generateIssuesFromAnalysis(
     });
   }
 
-  // Check for missing date info (v2.1 rule)
-  const dateCoverage = (siteStats.pagesWithDates / siteStats.totalPages) * 100;
+  // Check for missing date info (v2.1 rule) - use existing dateCoverage
   if (dateCoverage < ISSUE_THRESHOLDS.minDateCoverage) {
     issues.push({
       issue_type: 'low_date_coverage_v21',
