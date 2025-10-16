@@ -25,7 +25,6 @@ function formatUrl(url?: string) {
 }
 
 type FilterState = {
-  v21Only: boolean;
   hideDuplicates: boolean;
   category: string | null;
 };
@@ -74,7 +73,6 @@ function CategorySelect({ value, onChange, options }: { value: string | null; on
 export default function IssuesTable({ issues }: { issues: AuditIssue[] }) {
   const location = useLocation();
   const [filters, setFilters] = useState<FilterState>({
-    v21Only: false,
     hideDuplicates: false,
     category: null
   });
@@ -84,10 +82,6 @@ export default function IssuesTable({ issues }: { issues: AuditIssue[] }) {
 
   const filteredIssues = useMemo(() => {
     let filtered = issues || [];
-    
-    if (filters.v21Only) {
-      filtered = filtered.filter(issue => issue.issue_rule_version === 'v2.1');
-    }
     
     if (filters.category) {
       filtered = filtered.filter(issue => issue.category.toLowerCase() === filters.category?.toLowerCase());
@@ -115,11 +109,6 @@ export default function IssuesTable({ issues }: { issues: AuditIssue[] }) {
       {/* Filters */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         <Toggle 
-          value={filters.v21Only} 
-          onChange={(v) => setFilters(prev => ({ ...prev, v21Only: v }))} 
-          label="v2.1 only" 
-        />
-        <Toggle 
           value={filters.hideDuplicates} 
           onChange={(v) => setFilters(prev => ({ ...prev, hideDuplicates: v }))} 
           label="Hide duplicates" 
@@ -137,7 +126,6 @@ export default function IssuesTable({ issues }: { issues: AuditIssue[] }) {
             <th style={{ width: "100px" }}>Severity</th>
             <th style={{ width: "120px" }}>Category</th>
             <th>Message</th>
-            <th style={{ width: "80px" }}>Rule</th>
             <th style={{ width: "250px" }}>Page</th>
           </tr>
         </thead>
@@ -147,9 +135,6 @@ export default function IssuesTable({ issues }: { issues: AuditIssue[] }) {
               <td>{badge(i.severity)}</td>
               <td style={{ textTransform: "capitalize" }}>{i.category}</td>
               <td>{i.message}</td>
-              <td style={{ fontSize: 12, color: '#6b7280' }}>
-                {i.issue_rule_version ?? "v1.0"}
-              </td>
               <td style={{ fontSize: "12px", wordBreak: "break-all" }}>
                 {i.url && auditId ? (
                   <Link

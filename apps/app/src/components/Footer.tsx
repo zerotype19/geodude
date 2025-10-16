@@ -41,7 +41,7 @@ export default function Footer() {
         </a>
       </div>
       <div style={{ color: '#9ca3af', fontSize: '11px', marginTop: '8px' }}>
-        Powered by Optiview Audit Engine v2.1 · Enhanced E-E-A-T + Visibility Intelligence
+        Powered by Optiview Audit Engine · Enhanced E-E-A-T + Visibility Intelligence
       </div>
     </footer>
   );

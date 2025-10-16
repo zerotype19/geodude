@@ -2,7 +2,6 @@ import { Link, useLocation } from "react-router-dom";
 import { useState, useMemo } from "react";
 import type { AuditPage, Scores } from "../services/api";
 import { b64u } from "../services/api";
-import { isV21 } from "../lib/format";
 
 function formatUrl(url: string) {
   try {
@@ -16,7 +15,7 @@ function formatUrl(url: string) {
 export default function PagesTable({ pages, scores, auditId }: { pages: AuditPage[]; scores?: Scores; auditId?: string }) {
   const location = useLocation();
   const [sortBy, setSortBy] = useState<{ key: string; dir: 'asc' | 'desc' }>(() => 
-    isV21(scores) ? { key: 'cites', dir: 'desc' } : { key: 'words', dir: 'desc' }
+    ({ key: 'cites', dir: 'desc' })
   );
   
   // Extract audit ID from path: /a/:auditId (fallback if not passed as prop)

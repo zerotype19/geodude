@@ -6,7 +6,6 @@ export type AuditIssue = {
   code: string; 
   message: string; 
   url?: string;
-  issue_rule_version?: string; // v2.1: rule version
 };
 
 export type EEATSignals = {
@@ -32,7 +31,7 @@ export type AuditPage = {
   hasH1: boolean;
   jsonLdCount: number;
   faqOnPage?: boolean | null; // Keep for Page Report but not required in Pages table
-  schemaTypes?: string[]; // v2.1: Schema types found on page
+  schemaTypes?: string[]; // Schema types found on page
   words: number | null;  // null for older audits or render failures
   snippet?: string | null;
   loadTimeMs?: number | null;
@@ -42,11 +41,11 @@ export type AuditPage = {
   aiAnswerQueries?: string[]; // Phase F+: Top 3 queries that cited this page
   aiAnswerMappings?: Array<{ reason: 'path' | 'canonical' | 'title_fuzzy'; confidence: number }>; // Phase F++: Mapping metadata
   aiHits?: number; // Phase G: Real AI crawler hits (30d)
-  eeat?: EEATSignals; // v2.1: E-E-A-T signals
-  pageSignals?: PageSignals; // v2.1: enhanced page signals
-  cites?: number; // v2.1: citation count alias
-  ai_brave?: number; // v2.1: Brave AI citations
-  ai_hits?: number; // v2.1: AI hits alias
+  eeat?: EEATSignals; // E-E-A-T signals
+  pageSignals?: PageSignals; // enhanced page signals
+  cites?: number; // citation count alias
+  ai_brave?: number; // Brave AI citations
+  ai_hits?: number; // AI hits alias
 };
 
 export type ScoresBreakdown = {
@@ -178,18 +177,17 @@ export type SiteMeta = {
 
 export type Scores = { 
   total: number;                  // 0-100% (weighted overall)
-  crawlability: number;           // raw points (0-42 v1.0, 0-30 v2.1)
-  structured: number;             // raw points (0-30 v1.0, 0-25 v2.1)
+  crawlability: number;           // raw points (0-30)
+  structured: number;             // raw points (0-25)
   answerability: number;          // raw points (0-20)
-  trust: number;                  // raw points (0-10 v1.0, 0-15 v2.1)
-  visibility?: number;            // v2.1: raw points (0-10)
+  trust: number;                  // raw points (0-15)
+  visibility?: number;            // raw points (0-10)
   crawlabilityPct?: number;       // percentage (0-100%)
   structuredPct?: number;         // percentage (0-100%)
   answerabilityPct?: number;      // percentage (0-100%)
   trustPct?: number;              // percentage (0-100%)
-  visibilityPct?: number;         // v2.1: percentage (0-100%)
+  visibilityPct?: number;         // percentage (0-100%)
   breakdown?: ScoresBreakdown;
-  score_model_version?: string;   // v2.1: scoring model version
 };
 
 export type EntityRecommendations = {
@@ -254,8 +252,8 @@ export type Audit = {
   entity_recommendations?: EntityRecommendations;
   citations?: Citation[];
   citationsSummary?: CitationsSummary;
-  eeat_summary?: EEATSignals; // v2.1: E-E-A-T summary
-  visibility_summary?: VisibilitySummary; // v2.1: visibility summary
+  eeat_summary?: EEATSignals; // E-E-A-T summary
+  visibility_summary?: VisibilitySummary; // visibility summary
 };
 
 export async function startAudit(opts: {

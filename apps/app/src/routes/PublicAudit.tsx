@@ -11,7 +11,7 @@ import AIDebugModal from "../components/AIDebugModal";
 import VisibilityIntelligenceTab from "../components/VisibilityIntelligenceTab";
 import VisibilityTab from "../components/VisibilityTab";
 import { getBotMeta } from "../lib/botMeta";
-import { isV21, pct } from "../lib/format";
+import { pct } from "../lib/format";
 
 // Helper function for score color coding
 const getScoreColor = (score: number): string => {
@@ -152,20 +152,6 @@ export default function PublicAudit() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
             <h1 style={{ margin: 0, fontSize: 24 }}>Audit Report</h1>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              borderRadius: 20,
-              background: '#f1f5f9',
-              padding: '4px 12px',
-              fontSize: 12,
-              fontWeight: 500,
-              color: '#475569'
-            }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
-              model {audit.scores?.score_model_version ?? "v1.0"}
-            </span>
           </div>
           {audit.property ? (
             <p style={{ margin: '4px 0 0', fontSize: 14, opacity: 0.7 }}>
@@ -512,7 +498,7 @@ export default function PublicAudit() {
         
         <ScoreCard title="Answerability" value={audit.scores.answerabilityPct}/>
         <ScoreCard title="Trust" value={audit.scores.trustPct}/>
-        {/* v2.1: Show Visibility card only when present */}
+        {/* Show Visibility card only when present */}
         {typeof audit.scores.visibilityPct === 'number' && (
           <div style={{
             background: '#faf5ff',
@@ -530,18 +516,6 @@ export default function PublicAudit() {
             </div>
             <div style={{ fontSize: 12, color: '#a855f7', opacity: 0.8 }}>
               AI Assistant Readiness
-            </div>
-            <div style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              fontSize: 10,
-              background: '#e0e7ff',
-              color: '#3730a3',
-              padding: '2px 6px',
-              borderRadius: 8
-            }} title="New in v2.1 — measures AI assistant citations and discoverability across models.">
-              v2.1
             </div>
           </div>
         )}
@@ -812,8 +786,8 @@ export default function PublicAudit() {
                   <strong>What we check:</strong> HTTP status codes, page load times, broken links, error detection, accessibility
                 </div>
                 
-                {/* v2.1: EEAT checklist */}
-                {isV21(audit.scores) && audit.eeat_summary && (
+                {/* EEAT checklist */}
+                {audit.eeat_summary && (
                   <div style={{marginTop: 12, padding: 12, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0'}}>
                     <div style={{fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8}}>E-E-A-T Signals</div>
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, fontSize: 12}}>
@@ -858,7 +832,7 @@ export default function PublicAudit() {
                 )}
               </div>
 
-              {/* Visibility (v2.1) */}
+              {/* Visibility */}
               {typeof audit.scores.visibilityPct === 'number' && (
                 <div style={{
                   background: 'white',

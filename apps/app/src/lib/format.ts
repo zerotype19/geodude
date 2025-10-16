@@ -1,8 +1,3 @@
-import { Scores } from '../services/api';
-
-export const isV21 = (scores?: Partial<Scores>) =>
-  (scores?.score_model_version ?? "v1.0") === "v2.1";
-
 export const pct = (n?: number) => `${Math.round((n ?? 0))}%`;
 
 export const formatNumber = (n?: number) => {
