@@ -474,7 +474,18 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
 
     // Use analysis data for score calculation
     const scores = calculateScoresFromAnalysis(analysisData.results || [], issues, crawlabilityData, structuredData);
-    return { scores, structuredData };
+    
+    // Convert raw points to percentages for storage
+    const scoresWithPercentages = {
+      ...scores,
+      overall: scores.overall, // Already a percentage
+      crawlability: Math.round((scores.crawlability / 42) * 100), // Convert to percentage
+      structured: Math.round((scores.structured / 30) * 100), // Convert to percentage
+      answerability: Math.round((scores.answerability / 20) * 100), // Convert to percentage
+      trust: Math.round((scores.trust / 10) * 100), // Convert to percentage
+    };
+    
+    return { scores: scoresWithPercentages, structuredData };
   });
 
   if (!synthResult.success) {
@@ -493,6 +504,13 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
     
     const scores = synthResult.data.scores;
     
+    // Get actual counts from database
+    const pageCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM audit_pages WHERE audit_id = ?`).bind(auditId).first();
+    const issueCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM audit_issues WHERE audit_id = ?`).bind(auditId).first();
+    
+    const actualPagesTotal = pageCount?.count || 0;
+    const actualIssuesCount = issueCount?.count || 0;
+
     // Update audit record
     await env.DB.prepare(
       `UPDATE audits 
@@ -516,9 +534,9 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
       scores.structured ?? 0,
       scores.answerability ?? 0,
       scores.trust ?? 0,
-      pages.length ?? 0,
-      pages.length ?? 0, // Use actual pages processed instead of urlsTotal
-      issues.length ?? 0,
+      actualPagesTotal,
+      actualPagesTotal,
+      actualIssuesCount,
       aiAccess ? JSON.stringify(aiAccess) : null,
       null, // aiFlags
       braveQueryLogs.length > 0 ? JSON.stringify({ queries: braveQueryLogs }) : null,

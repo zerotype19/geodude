@@ -3218,16 +3218,17 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         );
         
         // Use stored database scores if available, otherwise use calculated scores
+        // Note: Database stores percentages (0-100), not raw points
         const scores = {
           total: audit.score_overall ?? totalPct,
           crawlability: audit.score_crawlability ?? Math.round(crawlabilityPoints),
           structured: audit.score_structured ?? Math.round(structuredPoints),
           answerability: audit.score_answerability ?? Math.round(answerabilityPoints),
           trust: audit.score_trust ?? Math.round(trustPoints),
-          crawlabilityPct: audit.score_crawlability ? Math.round((audit.score_crawlability / 42) * 100) : crawlabilityPct,
-          structuredPct: audit.score_structured ? Math.round((audit.score_structured / 30) * 100) : structuredPct,
-          answerabilityPct: audit.score_answerability ? Math.round((audit.score_answerability / 20) * 100) : answerabilityPct,
-          trustPct: audit.score_trust ? Math.round((audit.score_trust / 10) * 100) : trustPct,
+          crawlabilityPct: audit.score_crawlability ?? crawlabilityPct,
+          structuredPct: audit.score_structured ?? structuredPct,
+          answerabilityPct: audit.score_answerability ?? answerabilityPct,
+          trustPct: audit.score_trust ?? trustPct,
           breakdown,
         };
         
