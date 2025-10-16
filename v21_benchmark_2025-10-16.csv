@@ -1,0 +1,2 @@
+audit_id,domain,timestamp,model_version,overall_v21,overall_v1,delta_overall,crawlability_v21,structured_v21,answerability_v21,trust_v21,visibility_v21,pages_crawled,issues_count
+aud_1760616884674_hmddpnay8,apple.com,2025-10-16T17:54:52.642Z,v2.1,67.88,67.88,0.00,78.87,100.00,66.10,40.00,0.00,50,31

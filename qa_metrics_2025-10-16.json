@@ -1,0 +1,13 @@
+[
+  {
+    "timestamp": "2025-10-16T18:05:23.561Z",
+    "v21_audits_24h": 5,
+    "v21_audits_7d": 5,
+    "avg_v21_overall": 0,
+    "avg_v21_visibility": 0,
+    "audits_with_visibility": 0,
+    "error_rate": 0,
+    "system_health": "healthy",
+    "alerts": []
+  }
+]

@@ -1,0 +1,7 @@
+audit_id,domain,metric,v1_score,v21_score,delta
+"aud_1760616884674_hmddpnay8","apple.com",overall,67.88,67.88,0.00
+"aud_1760616884674_hmddpnay8","apple.com",crawlability,78.87,78.87,0.00
+"aud_1760616884674_hmddpnay8","apple.com",structured,100.00,100.00,0.00
+"aud_1760616884674_hmddpnay8","apple.com",answerability,66.10,66.10,0.00
+"aud_1760616884674_hmddpnay8","apple.com",trust,40.00,40.00,0.00
+"aud_1760616884674_hmddpnay8","apple.com",visibility,0,0.00,0.00
