@@ -45,8 +45,7 @@ export async function runTinyCrawlTick(
         status_code=excluded.status_code,
         load_ms=excluded.load_ms,
         content_type=excluded.content_type,
-        body_text=excluded.body_text,
-        updated_at=CURRENT_TIMESTAMP
+        body_text=excluded.body_text
     `).bind(
       auditId,
       leased.url,
@@ -78,24 +77,24 @@ export async function runTinyCrawlTick(
         await env.DB.prepare(`
           INSERT INTO audit_page_analysis (
             audit_id, url, h1, title, meta_description, canonical, robots_meta,
-            schema_types, author, date_published, date_modified, images_count,
-            headings_count, outbound_links_count, word_count, eeat_flags,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            schema_types, author, date_published, date_modified, images,
+            headings_h2, headings_h3, outbound_links, word_count, eeat_flags,
+            analyzed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
           ON CONFLICT(audit_id, url) DO UPDATE SET
             h1=excluded.h1, title=excluded.title, meta_description=excluded.meta_description,
             canonical=excluded.canonical, robots_meta=excluded.robots_meta,
             schema_types=excluded.schema_types, author=excluded.author,
             date_published=excluded.date_published, date_modified=excluded.date_modified,
-            images_count=excluded.images_count, headings_count=excluded.headings_count,
-            outbound_links_count=excluded.outbound_links_count, word_count=excluded.word_count,
-            eeat_flags=excluded.eeat_flags, updated_at=CURRENT_TIMESTAMP
+            images=excluded.images, headings_h2=excluded.headings_h2, headings_h3=excluded.headings_h3,
+            outbound_links=excluded.outbound_links, word_count=excluded.word_count,
+            eeat_flags=excluded.eeat_flags, analyzed_at=CURRENT_TIMESTAMP
         `).bind(
           auditId, leased.url, analysis.h1, analysis.title, analysis.metaDescription,
           analysis.canonical, analysis.robotsMeta, analysis.schemaTypes, analysis.author,
           analysis.datePublished, analysis.dateModified, analysis.imagesCount,
-          analysis.headingsCount, analysis.outboundLinksCount, analysis.wordCount,
-          analysis.eeatFlags
+          analysis.headingsH2Count, analysis.headingsH3Count, analysis.outboundLinksCount, 
+          analysis.wordCount, analysis.eeatFlags
         ).run();
         
         console.log(`[TinyCrawl] Analyzed page: ${leased.url}`);

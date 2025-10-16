@@ -6,7 +6,7 @@
 export async function leaseOneUrl(db: any, auditId: string): Promise<{url: string; depth: number} | null> {
   // D1-safe single-row lease (two-step: SELECT then UPDATE)
   const row = await db.prepare(`
-    SELECT id, url, depth FROM audit_frontier
+    SELECT url, depth FROM audit_frontier
     WHERE audit_id=? AND status='pending'
     ORDER BY priority ASC, depth ASC, created_at ASC
     LIMIT 1
@@ -14,12 +14,12 @@ export async function leaseOneUrl(db: any, auditId: string): Promise<{url: strin
   
   if (!row) return null;
   
-  // Update the selected row to 'visiting'
+  // Update the selected row to 'visiting' using composite key
   await db.prepare(`
     UPDATE audit_frontier
     SET status='visiting', updated_at=CURRENT_TIMESTAMP
-    WHERE id=?
-  `).bind(row.id).run();
+    WHERE audit_id=? AND url=?
+  `).bind(auditId, row.url).run();
   
   return { url: row.url, depth: row.depth };
 }
