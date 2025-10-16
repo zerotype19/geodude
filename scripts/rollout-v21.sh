@@ -11,20 +11,20 @@ KV_RULES_ID="a72021aa0c10498cb169f4c49605a87d"
 case "${1:-status}" in
   "enable")
     echo "🚀 Enabling v2.1 scoring system..."
-    wrangler kv:key put --namespace-id $KV_RULES_ID flags/audit_v21_scoring true
-    wrangler kv:key put --namespace-id $KV_RULES_ID flags/crawl_sitemap_depth1 true
+    wrangler kv key put --namespace-id $KV_RULES_ID flags/audit_v21_scoring true --remote
+    wrangler kv key put --namespace-id $KV_RULES_ID flags/crawl_sitemap_depth1 true --remote
     echo "✅ v2.1 scoring enabled"
     ;;
   "disable")
     echo "🔄 Disabling v2.1 scoring system..."
-    wrangler kv:key put --namespace-id $KV_RULES_ID flags/audit_v21_scoring false
-    wrangler kv:key put --namespace-id $KV_RULES_ID flags/crawl_sitemap_depth1 false
+    wrangler kv key put --namespace-id $KV_RULES_ID flags/audit_v21_scoring false --remote
+    wrangler kv key put --namespace-id $KV_RULES_ID flags/crawl_sitemap_depth1 false --remote
     echo "✅ v2.1 scoring disabled"
     ;;
   "status")
     echo "📊 Checking v2.1 scoring status..."
-    echo "Audit v2.1 scoring: $(wrangler kv:key get --namespace-id $KV_RULES_ID flags/audit_v21_scoring || echo 'not set')"
-    echo "Crawl sitemap depth1: $(wrangler kv:key get --namespace-id $KV_RULES_ID flags/crawl_sitemap_depth1 || echo 'not set')"
+    echo "Audit v2.1 scoring: $(wrangler kv key get --namespace-id $KV_RULES_ID flags/audit_v21_scoring --remote || echo 'not set')"
+    echo "Crawl sitemap depth1: $(wrangler kv key get --namespace-id $KV_RULES_ID flags/crawl_sitemap_depth1 --remote || echo 'not set')"
     echo ""
     echo "Health check:"
     curl -s "https://geodude-api.kevin-mcgovern.workers.dev/status" | jq '.v21_scoring'

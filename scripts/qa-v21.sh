@@ -14,13 +14,13 @@ echo "================================"
 # Test 1: Flag OFF → create audit
 echo ""
 echo "Test 1: Flag OFF → create audit"
-wrangler kv:key put --namespace-id $KV_RULES_ID flags/audit_v21_scoring false
+wrangler kv key put --namespace-id $KV_RULES_ID flags/audit_v21_scoring false --remote
 echo "✅ Flags disabled"
 
 # Test 2: Flag ON → create audit
 echo ""
 echo "Test 2: Flag ON → create audit"
-wrangler kv:key put --namespace-id $KV_RULES_ID flags/audit_v21_scoring true
+wrangler kv key put --namespace-id $KV_RULES_ID flags/audit_v21_scoring true --remote
 echo "✅ Flags enabled"
 
 # Test 3: Health check
