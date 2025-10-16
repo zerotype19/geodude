@@ -1,0 +1,142 @@
+{
+  "A1": {
+    "title": "Answer-first design",
+    "weight": 15,
+    "tooltip": "Put the answer at the top with jump links and a scannable list/table.",
+    "description": "A concise answer in the first ~600–800 chars, jump links/ToC, a scannable list/table near the top.",
+    "howToWin": "Add a 2–4 sentence answer at the top. Include a 'Jump to' ToC with in-page anchors. Use a step list or table if procedural/comparative."
+  },
+  "A2": {
+    "title": "Topical cluster integrity",
+    "weight": 15,
+    "tooltip": "Belongs to a tight cluster with pillar links and breadcrumb.",
+    "description": "Page links to/from a pillar; breadcrumb present; cluster-internal links use descriptive anchors.",
+    "howToWin": "Create a pillar ('/topic/') and 6–15 focused subpages; interlink them; add breadcrumbs."
+  },
+  "A3": {
+    "title": "Host / site-level authority",
+    "weight": 15,
+    "tooltip": "Clear Organization & Author identity with valid schema.",
+    "description": "Valid Organization + Person JSON-LD, About/Contact, author pages.",
+    "howToWin": "Add Organization schema site-wide; author bios with credentials; visible editorial standards."
+  },
+  "A4": {
+    "title": "Originality & effort",
+    "weight": 12,
+    "tooltip": "Unique assets & method—hard to copy.",
+    "description": "Unique assets: data tables, tools, diagrams, code; references/method notes.",
+    "howToWin": "Publish a downloadable asset (CSV/JSON, calculator, diagram) and explain your method."
+  },
+  "A5": {
+    "title": "Schema accuracy & breadth",
+    "weight": 10,
+    "tooltip": "Correct JSON-LD for the page intent; no errors.",
+    "description": "Valid JSON-LD types (Article, HowTo, FAQPage, QAPage, Product, BreadcrumbList)—no errors.",
+    "howToWin": "Use server-rendered JSON-LD; minimum viable properties per type; validate."
+  },
+  "A6": {
+    "title": "Crawlability & canonicals",
+    "weight": 10,
+    "tooltip": "Self-canonical, unique title/H1; crawlable.",
+    "description": "Self-canonical; unique title/H1; not noindex; no duplicate canonicals in cluster.",
+    "howToWin": "One canonical per URL; dedupe similar pages; stable titles/H1s."
+  },
+  "A7": {
+    "title": "UX & performance proxies",
+    "weight": 8,
+    "tooltip": "Stable above-the-fold; no jumpy layout.",
+    "description": "No big CLS above the fold; images have width/height; proper viewport; lazy-load below fold.",
+    "howToWin": "Reserve image space; avoid layout shifts near the answer block."
+  },
+  "A8": {
+    "title": "Sitemaps & discoverability",
+    "weight": 6,
+    "tooltip": "Sitemap present & fresh.",
+    "description": "/sitemap.xml exists; fresh lastmod; child sitemaps valid.",
+    "howToWin": "Generate per-section sitemaps; keep lastmod accurate."
+  },
+  "A9": {
+    "title": "Freshness & stability",
+    "weight": 5,
+    "tooltip": "Shows updates; links work; URLs stay put.",
+    "description": "dateModified present and increasing; internal links not 404; URL stable.",
+    "howToWin": "Update cadence by topic; keep URLs stable; maintain link health."
+  },
+  "A10": {
+    "title": "AI Overviews readiness",
+    "weight": 4,
+    "tooltip": "Complete, safe, and well-cited answer for AIO.",
+    "description": "Clear task framing, steps/pros-cons/safety notes, at least one credible external citation.",
+    "howToWin": "Add a 'Summary' + 'Steps' + 'Considerations/Safety' + 'Sources' section."
+  },
+  "G1": {
+    "title": "Citable 'Key Facts' block",
+    "weight": 15,
+    "tooltip": "3–7 atomic facts near the top (anchored).",
+    "description": "'Key facts / At-a-glance' near top; 3–7 atomic bullets; optional anchors per fact.",
+    "howToWin": "Add a facts box with stable IDs (#fact-eligibility-2025)."
+  },
+  "G2": {
+    "title": "Provenance schema",
+    "weight": 15,
+    "tooltip": "Author, publisher, dates + citation/isBasedOn/license in JSON-LD.",
+    "description": "Article/CreativeWork with author, publisher, datePublished, dateModified, citation, isBasedOn, license.",
+    "howToWin": "Include sources in JSON-LD, not just on page."
+  },
+  "G3": {
+    "title": "Evidence density",
+    "weight": 12,
+    "tooltip": "Good references & real data tables.",
+    "description": "References section; outbound links to high-trust domains; tables/footnotes present.",
+    "howToWin": "Add References with primary sources and in-page tables (not images)."
+  },
+  "G4": {
+    "title": "AI crawler access & parity",
+    "weight": 12,
+    "tooltip": "Bots allowed/denied intentionally; content matches rendered.",
+    "description": "robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks.",
+    "howToWin": "Set your desired allow/deny; ensure server HTML contains key content/schema."
+  },
+  "G5": {
+    "title": "Chunkability & structure",
+    "weight": 10,
+    "tooltip": "Chunked content with summary & glossary.",
+    "description": "Short paragraphs; semantic headings; glossary; TL;DR summary.",
+    "howToWin": "Add TL;DR, Glossary, and keep sections small and well-labeled."
+  },
+  "G6": {
+    "title": "Canonical fact URLs",
+    "weight": 8,
+    "tooltip": "Stable URLs/anchors for individual facts.",
+    "description": "One URL per fact topic; stable anchor names.",
+    "howToWin": "Split omnibus pages; add stable anchors for linkable facts."
+  },
+  "G7": {
+    "title": "Dataset availability",
+    "weight": 8,
+    "tooltip": "Provide CSV/JSON with versions.",
+    "description": "Downloadable CSV/JSON with version notes.",
+    "howToWin": "Host a /datasets/ file per table; link it from the page."
+  },
+  "G8": {
+    "title": "Policy transparency",
+    "weight": 6,
+    "tooltip": "Clear license/AI policy shown & in schema.",
+    "description": "Visible content license/AI reuse stance in UI + JSON-LD license.",
+    "howToWin": "Add a site-wide policy page and link it; include license in schema."
+  },
+  "G9": {
+    "title": "Update hygiene",
+    "weight": 7,
+    "tooltip": "Changelog + dateModified kept in sync.",
+    "description": "Visible changelog/'What changed' and dateModified aligned.",
+    "howToWin": "Add a small changelog block or <details> with edits and dates."
+  },
+  "G10": {
+    "title": "Cluster ↔ evidence linking",
+    "weight": 7,
+    "tooltip": "Pillars link to a sources hub and back.",
+    "description": "Pillars link to a /sources hub; hub links back.",
+    "howToWin": "Build a central Sources/Research page; link both ways."
+  }
+}

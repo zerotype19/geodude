@@ -6,6 +6,7 @@ import AuditDetail from './routes/audits/[id]/index.tsx'
 import AuditPages from './routes/audits/[id]/pages/index.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
 import ScoreGuide from './routes/ScoreGuide.tsx'
+import HelpScoring from './routes/help/scoring.tsx'
 
 function Navigation() {
   const location = useLocation()
@@ -62,6 +63,7 @@ function App() {
             <Route path="/audits/:id/pages" element={<AuditPages />} />
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
             <Route path="/score-guide" element={<ScoreGuide />} />
+            <Route path="/help/scoring" element={<HelpScoring />} />
           </Routes>
         </main>
       </div>
