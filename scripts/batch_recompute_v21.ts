@@ -24,6 +24,8 @@ interface RecomputeResult {
   domain: string;
   success: boolean;
   v21_overall?: number;
+  v1_overall?: number;
+  score_delta?: number;
   error?: string;
   duration_ms: number;
 }
@@ -42,11 +44,29 @@ async function fetchAudits(limit: number = 10): Promise<Audit[]> {
   ];
 }
 
+async function getCurrentAuditScores(auditId: string): Promise<{ v1_overall?: number; v21_overall?: number }> {
+  try {
+    const response = await fetch(`${API_BASE}/v1/audits/${auditId}`);
+    if (!response.ok) return {};
+    
+    const audit = await response.json();
+    return {
+      v1_overall: audit.scores?.total,
+      v21_overall: audit.scores?.overall
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function recomputeAudit(auditId: string): Promise<RecomputeResult> {
   const startTime = Date.now();
   
   try {
     console.log(`🔄 Recomputing audit ${auditId}...`);
+    
+    // Get current scores for comparison
+    const currentScores = await getCurrentAuditScores(auditId);
     
     const response = await fetch(`${API_BASE}/v1/audits/${auditId}/recompute?model=v2.1`, {
       method: 'POST',
@@ -63,13 +83,19 @@ async function recomputeAudit(auditId: string): Promise<RecomputeResult> {
     const result = await response.json();
     const duration = Date.now() - startTime;
 
-    console.log(`✅ ${auditId}: v2.1 overall = ${result.scores?.overall || 'N/A'}% (${duration}ms)`);
+    const v21Overall = result.scores?.overall;
+    const v1Overall = currentScores.v1_overall;
+    const scoreDelta = v21Overall && v1Overall ? v21Overall - v1Overall : undefined;
+
+    console.log(`✅ ${auditId}: v1.0=${v1Overall?.toFixed(1)}% → v2.1=${v21Overall?.toFixed(1)}% (Δ${scoreDelta?.toFixed(1)}%) (${duration}ms)`);
 
     return {
       audit_id: auditId,
       domain: result.domain || 'unknown',
       success: true,
-      v21_overall: result.scores?.overall,
+      v21_overall: v21Overall,
+      v1_overall: v1Overall,
+      score_delta: scoreDelta,
       duration_ms: duration,
     };
 
@@ -154,6 +180,26 @@ async function main() {
       console.log(`  - ${result.audit_id}: ${result.error}`);
     });
   }
+
+  // Export results to CSV
+  const csvFilename = `v21_recompute_results_${new Date().toISOString().split('T')[0]}.csv`;
+  const csvContent = [
+    'audit_id,domain,success,v1_overall,v21_overall,score_delta,duration_ms,error',
+    ...results.map(r => [
+      r.audit_id,
+      r.domain,
+      r.success,
+      r.v1_overall?.toFixed(2) || '',
+      r.v21_overall?.toFixed(2) || '',
+      r.score_delta?.toFixed(2) || '',
+      r.duration_ms,
+      r.error || ''
+    ].join(','))
+  ].join('\n');
+
+  const fs = require('fs');
+  fs.writeFileSync(csvFilename, csvContent);
+  console.log(`📊 Results exported to: ${csvFilename}`);
 
   console.log('');
   console.log('🎉 Batch recompute complete!');
