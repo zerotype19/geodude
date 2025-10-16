@@ -54,7 +54,11 @@ export async function seedFrontierMainOnly(
 function safeNormalize(u: string, host: string) {
   try {
     const url = new URL(u);
-    if (url.host !== host) return null;      // stay on canonical host only
+    
+    // Allow both www and non-www variants of the same domain
+    const normalizeHost = (h: string) => h.replace(/^www\./, '');
+    if (normalizeHost(url.host) !== normalizeHost(host)) return null;
+    
     url.hash = '';
     
     // optional: strip tracking params
