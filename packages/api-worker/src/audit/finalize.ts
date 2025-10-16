@@ -58,7 +58,14 @@ export async function finalizeAudit(env: any, auditId: string): Promise<void> {
 
     console.log(`[Finalize] Calculated scores: overall=${overallScore}, crawl=${crawlScore}, struct=${structScore}, answer=${answerScore}, trust=${trustScore}`);
 
-    // Update audit with scores
+    // Get actual counts from database
+    const pageCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM audit_pages WHERE audit_id = ?`).bind(auditId).first();
+    const issueCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM audit_issues WHERE audit_id = ?`).bind(auditId).first();
+    
+    const actualPagesTotal = pageCount?.count || 0;
+    const actualIssuesCount = issueCount?.count || 0;
+
+    // Update audit with scores and counts
     await env.DB.prepare(`
       UPDATE audits 
       SET 
@@ -67,11 +74,13 @@ export async function finalizeAudit(env: any, auditId: string): Promise<void> {
         score_structured = ?,
         score_answerability = ?,
         score_trust = ?,
+        pages_total = ?,
+        issues_count = ?,
         status = 'completed',
         completed_at = CURRENT_TIMESTAMP,
         phase_heartbeat_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).bind(overallScore, crawlScore, structScore, answerScore, trustScore, auditId).run();
+    `).bind(overallScore, crawlScore, structScore, answerScore, trustScore, actualPagesTotal, actualIssuesCount, auditId).run();
 
     console.log(`[Finalize] Successfully finalized audit ${auditId} with overall score ${overallScore}%`);
 
