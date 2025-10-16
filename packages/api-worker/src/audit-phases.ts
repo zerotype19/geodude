@@ -10,7 +10,7 @@ import { withCircuitBreaker } from './circuit-breaker';
 import { checkRobotsTxt, checkSitemap, probeAiAccess } from './crawl';
 import { renderPage } from './render';
 import { runSmartBraveQueries } from './brave/ai';
-import { calculateScores } from './score';
+import { calculateScores, calculateScoresFromAnalysis } from './score';
 import { extractJSONLD, extractTitle, extractH1, detectFAQ, countWords, extractOrganization } from './html';
 
 /**
@@ -232,7 +232,7 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
 
   const domain = property.domain;
   const baseUrl = `https://${domain}`;
-  const maxPages = parseInt(env.AUDIT_MAX_PAGES || '5'); // Reduced from 100 to 5 for faster execution
+  const maxPages = parseInt(env.CRAWL_MAX_PAGES || '50'); // Use CRAWL_MAX_PAGES for consistency
 
   let crawlabilityData: any;
   let aiAccess: any;
@@ -331,7 +331,7 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
     const batchSize = parseInt(env.PAGE_BATCH_SIZE || '2');
     const deadlineMs = parseInt(env.CRAWL_TIMEBOX_MS || '20000');
     const maxDepth = parseInt(env.CRAWL_MAX_DEPTH || '3');
-    const maxPages = parseInt(env.CRAWL_MAX_PAGES || '50');
+    // Use the same maxPages variable from the function scope for consistency
     
     console.log(`[AuditPhases] Running BFS batch: batch size ${batchSize}, deadline ${deadlineMs}ms, max depth ${maxDepth}, max pages ${maxPages}`);
     
@@ -350,8 +350,8 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
 
     if (!advanced) {
       // We still have pending work or haven't hit the goal → continue crawling
-      console.log(`[AuditPhases] More work to do, self-dispatching continuation`);
-      await selfContinue(env, auditId); // Always return after this
+      console.log(`[AuditPhases] More work to do, yielding to cron pump`);
+      // No more self-calling - rely on cron pump
       return { pages: [], issues: [], urlsTotal: 0, urlsProcessed: batch.processed };
     }
     
@@ -438,19 +438,42 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
       return { scores: {} }; // Don't run synth yet
     }
 
-    console.log(`[AuditPhases] Calculating scores for ${domain}`);
+    console.log(`[AuditPhases] Running page analysis and score calculation for ${domain}`);
+    
+    // First, run page analysis to populate audit_page_analysis table
+    const { runSynthTick } = await import('./audit/synth');
+    const analysisComplete = await runSynthTick(env, auditId);
+    
+    if (!analysisComplete) {
+      console.log(`[AuditPhases] Page analysis not complete, more work needed`);
+      return { scores: {} }; // More work to do
+    }
+    
+    console.log(`[AuditPhases] Page analysis complete, calculating scores`);
+    
+    // Get analysis data from audit_page_analysis table
+    const analysisData = await env.DB.prepare(`
+      SELECT url, h1, h1_count, title, meta_description, canonical, robots_meta,
+             schema_types, author, date_published, date_modified, images,
+             headings_h2, headings_h3, outbound_links, word_count, eeat_flags
+      FROM audit_page_analysis 
+      WHERE audit_id = ?
+    `).bind(auditId).all();
+    
+    console.log(`[AuditPhases] Found ${analysisData.results?.length || 0} analyzed pages`);
     
     const structuredData = {
-      siteFaqSchemaPresent: pages.some(p => p.faq_present),
-      siteFaqPagePresent: pages.some(p => {
+      siteFaqSchemaPresent: analysisData.results?.some((p: any) => p.schema_types?.includes('FAQPage')) || false,
+      siteFaqPagePresent: analysisData.results?.some((p: any) => {
         const url = p.url.toLowerCase();
         const title = (p.title || '').toLowerCase();
         return url.includes('/faq') || title.includes('faq');
-      }),
-      schemaTypes: [],
+      }) || false,
+      schemaTypes: analysisData.results?.map((p: any) => p.schema_types).filter(Boolean) || [],
     };
 
-    const scores = calculateScores(pages, issues, crawlabilityData, structuredData);
+    // Use analysis data for score calculation
+    const scores = calculateScoresFromAnalysis(analysisData.results || [], issues, crawlabilityData, structuredData);
     return { scores, structuredData };
   });
 
@@ -494,7 +517,7 @@ export async function runAuditPhases(auditId: string, env: Env): Promise<string>
       scores.answerability ?? 0,
       scores.trust ?? 0,
       pages.length ?? 0,
-      crawlResult.data.urlsTotal ?? 0,
+      pages.length ?? 0, // Use actual pages processed instead of urlsTotal
       issues.length ?? 0,
       aiAccess ? JSON.stringify(aiAccess) : null,
       null, // aiFlags
@@ -563,10 +586,4 @@ async function setPhaseState(env: any, auditId: string, phase: string, state: an
   }
 }
 
-/**
- * Self-dispatch audit continuation using reliable helper
- */
-async function selfContinue(env: any, auditId: string): Promise<boolean> {
-  const { selfContinue: reliableSelfContinue } = await import('./audit/continue');
-  return await reliableSelfContinue(env, auditId);
-}
+// Removed selfContinue function - no more HTTP self-calling

@@ -7,20 +7,55 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
   console.log(`[AuditRunner] Running single phase for audit ${auditId}, resume=${resume}`);
   
   // Always re-read current phase from DB
-  const auditRow = await env.DB.prepare(`SELECT phase FROM audits WHERE id=?1`).bind(auditId).first<any>();
+  const auditRow = await env.DB.prepare(`SELECT phase, pages_crawled FROM audits WHERE id=?1`).bind(auditId).first<any>();
   const phase = auditRow?.phase ?? 'init';
+  const pagesCrawled = auditRow?.pages_crawled ?? 0;
   
-  console.log(`[AuditRunner] Current phase: ${phase}`);
+  console.log(`[AuditRunner] Current phase: ${phase}, pages_crawled: ${pagesCrawled}`);
+  
+  // Check if crawl is already complete and skip to analysis phases
+  const maxPages = parseInt(env.CRAWL_MAX_PAGES ?? '50');
+  if (pagesCrawled >= maxPages && ['discovery', 'robots', 'sitemap', 'probes', 'crawl'].includes(phase)) {
+    console.log(`[AuditRunner] Crawl already complete (${pagesCrawled}/${maxPages}), skipping to citations phase`);
+    await env.DB.prepare(`
+      UPDATE audits 
+      SET phase='citations', phase_started_at=datetime('now'), phase_heartbeat_at=datetime('now')
+      WHERE id=? AND status='running'
+    `).bind(auditId).run();
+    
+    // Re-read the updated phase
+    const updatedRow = await env.DB.prepare(`SELECT phase FROM audits WHERE id=?1`).bind(auditId).first<any>();
+    const updatedPhase = updatedRow?.phase ?? 'citations';
+    console.log(`[AuditRunner] Updated phase: ${updatedPhase}`);
+    
+    // Continue with the updated phase
+    return runAuditPhases(env, ctx, { auditId, resume });
+  }
 
   switch (phase) {
            case 'crawl': {
-             const { runTinyCrawlTick } = await import('./crawl-tiny');
-             const result = await runTinyCrawlTick(env, auditId, ctx);      // returns continuation info
+             const { runHybridCrawlTick } = await import('./crawl-hybrid');
+             const result = await runHybridCrawlTick(env, auditId, ctx);      // returns continuation info
              
-             // Always chain the next tick if work remains
-             if (result.shouldContinue) {
-               console.log(`[AuditRunner] Scheduling immediate continuation via ctx.waitUntil`);
-               ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
+             // Hybrid tiny-tick: chains up to CHAIN_MAX times, then yields to cron
+             console.log(`[AuditRunner] Hybrid tiny-tick complete, shouldContinue: ${result.shouldContinue}`);
+             
+             // If crawl is complete, transition to citations phase
+             if (!result.shouldContinue) {
+               const { ensureCrawlCompleteOrRewind } = await import('./bounce-back');
+               const crawlComplete = await ensureCrawlCompleteOrRewind(env, auditId, parseInt(env.CRAWL_MAX_PAGES ?? '50'));
+               if (crawlComplete) {
+                 console.log(`[AuditRunner] Crawl complete, transitioning to citations phase`);
+                 await env.DB.prepare(`
+                   UPDATE audits 
+                   SET phase='citations', phase_started_at=datetime('now'), phase_heartbeat_at=datetime('now')
+                   WHERE id=? AND status='running'
+                 `).bind(auditId).run();
+                 
+                 // Schedule next phase
+                // Yield to cron pump instead of self-calling
+                console.log(`[AuditRunner] Yielding to cron pump for continuation`);
+               }
              }
              return;                                // 🔴 never run another phase in same tick
            }
@@ -31,26 +66,44 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
       if (!ok) return;                       // rewound; continuation scheduled
       await runCitationsTick(env, auditId);  // a single batch
       
-      // Schedule next phase
-      console.log(`[AuditRunner] Scheduling next phase (synth) via ctx.waitUntil`);
-      ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
+      // Yield to cron pump for next phase
+      console.log(`[AuditRunner] Yielding to cron pump for next phase (synth)`);
       return;
     }
     case 'synth': {
       const { ensureCrawlCompleteOrRewind } = await import('./bounce-back');
       const ok = await ensureCrawlCompleteOrRewind(env, auditId, parseInt(env.CRAWL_MAX_PAGES ?? '50'));
       if (!ok) return;
-      await runSynthTick(env, auditId);      // a single batch if needed
       
-      // Schedule next phase
-      console.log(`[AuditRunner] Scheduling next phase (finalize) via ctx.waitUntil`);
-      ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
+      const { runSynthTick } = await import('./synth');
+      const synthComplete = await runSynthTick(env, auditId);      // a single batch if needed
+      
+      if (synthComplete) {
+        // Synthesis is complete, transition to finalize phase
+        console.log(`[AuditRunner] Synthesis complete, transitioning to finalize phase`);
+        await env.DB.prepare(`
+          UPDATE audits 
+          SET phase='finalize', phase_started_at=datetime('now'), phase_heartbeat_at=datetime('now')
+          WHERE id=? AND status='running'
+        `).bind(auditId).run();
+        
+        // Run finalize phase immediately
+        const { finalizeAudit } = await import('./finalize');
+        await finalizeAudit(env, auditId);
+        console.log(`[AuditRunner] Audit ${auditId} completed with scores`);
+        return;
+      }
+      
+      // Yield to cron pump for more synthesis work
+      console.log(`[AuditRunner] Yielding to cron pump for more synthesis work`);
       return;
     }
     case 'finalize': {
       const { ensureCrawlCompleteOrRewind } = await import('./bounce-back');
       const ok = await ensureCrawlCompleteOrRewind(env, auditId, parseInt(env.CRAWL_MAX_PAGES ?? '50'));
       if (!ok) return;
+      
+      const { finalizeAudit } = await import('./finalize');
       await finalizeAudit(env, auditId);
       return;
     }
@@ -58,9 +111,8 @@ export async function runAuditPhases(env: any, ctx: any, { auditId, resume }: { 
       // discovery/robots/sitemap/probes should ALSO return after each chunk
       await runPhaseOnce(env, auditId, phase, ctx);
       
-      // Schedule next phase via ctx.waitUntil
-      console.log(`[AuditRunner] Scheduling next phase via ctx.waitUntil`);
-      ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
+      // Yield to cron pump for next phase
+      console.log(`[AuditRunner] Yielding to cron pump for next phase`);
       return;
   }
 }
@@ -188,8 +240,7 @@ async function runCrawlTick(env: any, auditId: string, ctx: any) {
     console.log(`[AuditRunner] More work to do, scheduling immediate continuation`);
     // GUARANTEED CONTINUATION: Schedule next tick immediately if work remains
     if (stateRow.pending > 0) {
-      console.log(`[AuditRunner] Scheduling immediate continuation via ctx.waitUntil (pending: ${stateRow.pending})`);
-      ctx.waitUntil(runAuditPhases(env, ctx, { auditId, resume: true }));
+      console.log(`[AuditRunner] Yielding to cron pump for immediate continuation (pending: ${stateRow.pending})`);
     }
   } else {
     console.log(`[AuditRunner] Successfully advanced from crawl to citations phase`);

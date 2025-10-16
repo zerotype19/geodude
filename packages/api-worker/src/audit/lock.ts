@@ -1,42 +1,25 @@
 /**
- * Idempotency lock helpers for audit continuation
- * Prevents double continuations and race conditions
+ * Single-Flight Lock per Audit
+ * Prevents overlapping ticks from running simultaneously
  */
 
-export async function tryAcquireLock(env: any, auditId: string, ttlMs = 45000): Promise<boolean> {
-  const now = Date.now();
-  const until = new Date(now + ttlMs).toISOString();
-  
-  const row = await env.DB.prepare(
-    `SELECT locked_until FROM audit_locks WHERE audit_id=?1`
-  ).bind(auditId).first<any>();
+export async function tryAcquireLock(db: any, auditId: string): Promise<boolean> {
+  // expire locks after 30s (more generous timeout)
+  await db.prepare(`
+    DELETE FROM audit_locks
+    WHERE audit_id = ? AND locked_until < datetime('now')
+  `).bind(auditId).run();
 
-  if (!row) {
-    // No lock exists, acquire it
-    await env.DB.prepare(
-      `INSERT INTO audit_locks(audit_id, locked_until) VALUES(?1, ?2)`
-    ).bind(auditId, until).run();
-    console.log(`[Lock] Acquired new lock for audit ${auditId} until ${until}`);
-    return true;
-  }
+  // try to acquire lock
+  const got = await db.prepare(`
+    INSERT OR IGNORE INTO audit_locks (audit_id, locked_until)
+    VALUES (?, datetime('now', '+30 seconds'))
+  `).bind(auditId).run();
 
-  const expired = !row.locked_until || Date.parse(row.locked_until) <= now;
-  if (expired) {
-    // Lock expired, update it
-    await env.DB.prepare(
-      `UPDATE audit_locks SET locked_until=?2 WHERE audit_id=?1`
-    ).bind(auditId, until).run();
-    console.log(`[Lock] Renewed expired lock for audit ${auditId} until ${until}`);
-    return true;
-  }
-  
-  console.log(`[Lock] Lock busy for audit ${auditId} until ${row.locked_until}`);
-  return false;
+  return got.meta?.changes > 0;
 }
 
-export async function releaseLock(env: any, auditId: string): Promise<void> {
-  await env.DB.prepare(
-    `UPDATE audit_locks SET locked_until=NULL WHERE audit_id=?1`
-  ).bind(auditId).run();
-  console.log(`[Lock] Released lock for audit ${auditId}`);
+export async function releaseLock(db: any, auditId: string): Promise<void> {
+  await db.prepare(`DELETE FROM audit_locks WHERE audit_id = ?`)
+    .bind(auditId).run();
 }

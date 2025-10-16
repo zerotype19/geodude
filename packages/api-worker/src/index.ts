@@ -242,6 +242,20 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     const hour = new Date().getUTCHours();
     
+                // Process audit crawl queue every minute (ALWAYS run this first)
+                const { runCronPump } = await import('./watchdog');
+                try {
+                  const result = await runCronPump(env);
+                  if (result.pumped > 0) {
+                    console.log(`[CronPump] Pumped ${result.pumped} audits`);
+                  }
+                  if (result.errors.length > 0) {
+                    console.error(`[CronPump] Errors: ${result.errors.join(', ')}`);
+                  }
+                } catch (error) {
+                  console.error('[CronPump] Error:', error);
+                }
+                
                 // Process visibility queue every 5 minutes (any hour)
                 if (env.FEATURE_ASSISTANT_VISIBILITY === 'true') {
                   console.log('[VisibilityProcessor] Processing queue...');
@@ -1041,6 +1055,143 @@ Sitemap: https://optiview.ai/sitemap.xml`;
         console.error('[Audit Retry] Error:', error);
         return new Response(JSON.stringify({ 
           error: 'Failed to retry audit',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // POST /v1/audits/rescore - Manually rescore a completed audit
+    if (path === '/v1/audits/rescore' && request.method === 'POST') {
+      try {
+        const body = await request.json() as { audit_id: string };
+        const { audit_id: auditId } = body;
+
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'audit_id is required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get current audit state
+        const audit = await env.DB.prepare(
+          'SELECT id, status, pages_crawled FROM audits WHERE id = ?'
+        ).bind(auditId).first<{ id: string; status: string; pages_crawled: number }>();
+
+        if (!audit) {
+          return new Response(JSON.stringify({ error: 'Audit not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (audit.status !== 'completed') {
+          return new Response(JSON.stringify({ error: 'Can only rescore completed audits' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        console.log(`[Rescore] Starting manual rescore for audit ${auditId}`);
+
+        // Force re-analysis by clearing existing analysis data
+        await env.DB.prepare(`DELETE FROM audit_page_analysis WHERE audit_id = ?`).bind(auditId).run();
+        
+        // Reset audit to synth phase to trigger re-analysis
+        await env.DB.prepare(`
+          UPDATE audits 
+          SET phase='synth', phase_started_at=datetime('now'), phase_heartbeat_at=datetime('now')
+          WHERE id=? AND status='completed'
+        `).bind(auditId).run();
+
+        // Trigger the synthesis and finalization phases
+        const { runSynthTick } = await import('./audit/synth');
+        const { finalizeAudit } = await import('./audit/finalize');
+        
+        // Run synthesis to analyze all pages
+        let synthComplete = false;
+        let attempts = 0;
+        while (!synthComplete && attempts < 10) {
+          synthComplete = await runSynthTick(env, auditId);
+          attempts++;
+          console.log(`[Rescore] Synthesis attempt ${attempts}, complete: ${synthComplete}`);
+        }
+
+        // Run finalization to calculate scores
+        await finalizeAudit(env, auditId);
+        
+        console.log(`[Rescore] Manual rescore completed for audit ${auditId}`);
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          audit_id: auditId,
+          message: 'Audit rescore completed successfully'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        console.error('[Rescore] Error:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to rescore audit',
+          details: error instanceof Error ? error.message : String(error)
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // GET /v1/audits/{id}/analysis - Check analysis data for an audit
+    if (path.startsWith('/v1/audits/') && path.endsWith('/analysis') && request.method === 'GET') {
+      try {
+        const auditId = path.split('/')[3];
+        
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'Audit ID is required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get analysis data
+        const analysisData = await env.DB.prepare(`
+          SELECT url, title, h1, h1_count, word_count, schema_types, analyzed_at
+          FROM audit_page_analysis 
+          WHERE audit_id = ?
+          ORDER BY analyzed_at DESC
+          LIMIT 5
+        `).bind(auditId).all();
+
+        // Get page data from audit_pages
+        const pageData = await env.DB.prepare(`
+          SELECT url, body_text, status_code
+          FROM audit_pages 
+          WHERE audit_id = ?
+          ORDER BY created_at DESC
+          LIMIT 5
+        `).bind(auditId).all();
+
+        return new Response(JSON.stringify({
+          audit_id: auditId,
+          analysis_data: analysisData.results,
+          page_data: pageData.results?.map(p => ({
+            url: p.url,
+            status_code: p.status_code,
+            body_text_length: p.body_text?.length || 0,
+            body_text_preview: p.body_text?.substring(0, 200) || 'No content'
+          }))
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        console.error('[Analysis Debug] Error:', error);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to get analysis data',
           details: error instanceof Error ? error.message : String(error)
         }), {
           status: 500,
@@ -3066,17 +3217,17 @@ Sitemap: https://optiview.ai/sitemap.xml`;
           (trustPct * 0.1)
         );
         
-        // Build scores object
+        // Use stored database scores if available, otherwise use calculated scores
         const scores = {
-          total: totalPct,
-          crawlability: Math.round(crawlabilityPoints),
-          structured: Math.round(structuredPoints),
-          answerability: Math.round(answerabilityPoints),
-          trust: Math.round(trustPoints),
-          crawlabilityPct,
-          structuredPct,
-          answerabilityPct,
-          trustPct,
+          total: audit.score_overall ?? totalPct,
+          crawlability: audit.score_crawlability ?? Math.round(crawlabilityPoints),
+          structured: audit.score_structured ?? Math.round(structuredPoints),
+          answerability: audit.score_answerability ?? Math.round(answerabilityPoints),
+          trust: audit.score_trust ?? Math.round(trustPoints),
+          crawlabilityPct: audit.score_crawlability ? Math.round((audit.score_crawlability / 42) * 100) : crawlabilityPct,
+          structuredPct: audit.score_structured ? Math.round((audit.score_structured / 30) * 100) : structuredPct,
+          answerabilityPct: audit.score_answerability ? Math.round((audit.score_answerability / 20) * 100) : answerabilityPct,
+          trustPct: audit.score_trust ? Math.round((audit.score_trust / 10) * 100) : trustPct,
           breakdown,
         };
         

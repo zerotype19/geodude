@@ -66,8 +66,9 @@ BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 CITATIONS_MAX_PER_QUERY = "5"
 CITATIONS_DAILY_BUDGET = "200"
 FROM_EMAIL = "Optiview <no-reply@optiview.ai>"
-RENDER_MODE = "browser"
-RENDER_TIMEOUT_MS = "8000"
+RENDER_MODE = "basic_only"            # never attempt headless
+RENDER_TIMEOUT_MS = "8000"            # Browser rendering timeout
+FETCH_TIMEOUT_MS = "5000"             # 5s per page
 RENDER_MAX_PAGES = "100"
 # Phase F+ Brave AI Configuration
 BRAVE_MAX_QUERIES = "50"            # Soft cap per audit (was 20)
@@ -100,7 +101,6 @@ FAQ_ALLOWLIST = "/faq,/support/faq,/help/faq,/frequently-asked-questions"
 FEATURE_ASSISTANT_VISIBILITY = "true"
 FEATURE_EEAT_SCORING = "false"
 BROWSER_CLUSTER_MAX = "2"
-FETCH_TIMEOUT_MS = "20000"
 VISIBILITY_RATE_LIMIT_PER_PROJECT = "30"
 ALLOWED_ANSWER_ENGINES = "perplexity,claude-web"
 GA4_REGEX_SNIPPET_URL = ""
@@ -128,8 +128,8 @@ VI_RECENCY_HOURS = "6"
 
 # BFS Crawl Throughput Knobs (PR-Fix-5)
 PAGE_BATCH_SIZE = "1"           # 1 page per tick (tiny ticks)
-CRAWL_TIMEBOX_MS = "8000"       # ~8s CPU budget per tick
-CRAWL_TICK_BUDGET_MS = "8000"   # ~8s CPU budget per tick
+CRAWL_TIMEBOX_MS = "8000"       # worker CPU budget per tick
+CRAWL_TICK_BUDGET_MS = "8000"   # worker CPU budget per tick
 VISITING_TTL_MS = "60000"       # demote stuck visits after 60s
 ANALYZE_DURING_CRAWL = "0"      # defer analysis to backfill
 MAX_LINKS_ENQUEUE_PER_TICK = "80" # Cap enqueues per tick to prevent timeouts
@@ -144,7 +144,10 @@ CRAWL_MAX_ENQUEUE_PER_PAGE = "100"   # Max links to extract per page
 CRAWL_SITEMAP_MAIN_ONLY = "1"      # if "1", ignore robots.txt & other sitemaps
 CRAWL_SITEMAP_URL_LIMIT = "50"     # seed at most 50 URLs, full stop
 CRAWL_DISABLE_LINK_DISCOVERY = "1" # if "1", do NOT enqueue links from pages
-ENQUEUE_BATCH_SIZE = "20"          # <= 20 items per INSERT to stay under 999 params
+ENQUEUE_BATCH_SIZE = "20"          # <= 80 SQL params
+CHAIN_MAX = "3"                    # max consecutive chains before yielding (reduced to avoid 522s)
+CHAIN_SOFT_DEADLINE_MS = "10000"   # stop chaining if tick + chaining nears 10s (reduced)
+RESPECTFUL_MODE = "hybrid"         # hybrid (not cron-only)
 
 [browser]
 binding = "BROWSER"

@@ -28,11 +28,20 @@ export async function runCronPump(env: any): Promise<{pumped: number; errors: st
     const stuck = await env.DB.prepare(`
       SELECT id FROM audits 
       WHERE status = 'running' 
-        AND phase = 'crawl'
         AND phase_heartbeat_at < datetime('now', '-60 seconds')
-        AND id IN (
-          SELECT DISTINCT audit_id FROM audit_frontier 
-          WHERE status IN ('pending', 'visiting')
+        AND (
+          -- Crawl phase with pending work
+          (phase = 'crawl' AND (
+            id IN (
+              SELECT DISTINCT audit_id FROM audit_frontier 
+              WHERE status IN ('pending', 'visiting')
+            )
+            OR pages_crawled < 50
+            OR (pages_crawled >= 50 AND phase_heartbeat_at < datetime('now', '-120 seconds'))
+          ))
+          OR
+          -- Other phases (citations, synth, etc.) with stale heartbeats
+          (phase != 'crawl' AND phase_heartbeat_at < datetime('now', '-60 seconds'))
         )
       LIMIT 5
     `).all();
@@ -43,8 +52,11 @@ export async function runCronPump(env: any): Promise<{pumped: number; errors: st
       try {
         // Import and run audit phases to continue
         const { runAuditPhases } = await import('./audit/audit-runner');
-        // Note: In a real cron context, we'd use ctx.waitUntil, but this is a fallback
         console.log(`[CronPump] Pumping audit ${audit.id}`);
+        
+        // Actually run the audit phases to continue crawling
+        // In cron context, ctx is null, so we need to handle this properly
+        await runAuditPhases(env, { waitUntil: () => {} }, { auditId: audit.id, resume: true }); // Mock ctx for cron
         pumped++;
       } catch (error) {
         errors.push(`Failed to pump audit ${audit.id}: ${error}`);
@@ -567,13 +579,12 @@ async function handleFrontierStuckAudit(
     WHERE id=?1
   `).bind(audit.id).run();
   
-  // Self-continue to resume crawling
-  const { selfContinue } = await import('./audit/continue');
-  const success = await selfContinue(env, audit.id);
-  
-  if (success) {
-    console.log(`[Watchdog] Successfully rewound audit ${audit.id} to crawl phase and dispatched continuation`);
-  } else {
-    console.error(`[Watchdog] Failed to dispatch continuation for rewound audit ${audit.id}`);
+  // Direct function call to resume crawling (no HTTP requests)
+  try {
+    const { runAuditPhases } = await import('./audit/audit-runner');
+    await runAuditPhases(env, { waitUntil: () => {} }, { auditId: audit.id, resume: true });
+    console.log(`[Watchdog] Successfully rewound audit ${audit.id} to crawl phase and ran phases directly`);
+  } catch (error) {
+    console.error(`[Watchdog] Failed to run phases for rewound audit ${audit.id}:`, error);
   }
 }

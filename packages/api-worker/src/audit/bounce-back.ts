@@ -44,9 +44,14 @@ export async function ensureCrawlCompleteOrRewind(env: any, auditId: string, max
       WHERE id=?1 AND status='running'
     `).bind(auditId).run();
 
-    // Import and call selfContinue
-    const { selfContinue } = await import('./continue');
-    await selfContinue(env, auditId);
+    // Direct function call instead of HTTP request
+    try {
+      const { runAuditPhases } = await import('./audit-runner');
+      await runAuditPhases(env, { waitUntil: () => {} }, { auditId, resume: true });
+      console.log(`[BounceBack] Successfully continued audit ${auditId} after rewind`);
+    } catch (error) {
+      console.error(`[BounceBack] Failed to continue audit ${auditId} after rewind:`, error);
+    }
     return false; // do not run this phase
   }
   

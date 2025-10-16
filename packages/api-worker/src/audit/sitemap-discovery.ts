@@ -65,22 +65,25 @@ export async function discoverSitemaps(env: any, canonicalHost: string): Promise
       // Use GET directly since we need the content for looksLikeSitemap
       const UA = 'OptiviewAuditor/1.0 (+https://app.optiview.ai) Mozilla/5.0';
       
-      const r = await safeFetch(url, { 
-        timeoutMs: 12000,
-        followRedirects: true,
-        headers: {
-          'User-Agent': UA,
-          'Accept': 'application/xml,text/xml,application/octet-stream,*/*'
-        }
-      });
-      
-        if (r.ok && looksLikeSitemap(r)) {
-          const finalUrl = r.finalUrl ?? url;
-          const bytes = r.text?.length ?? 0;
-          const contentType = r.headers?.['content-type'] || '';
-          console.log(`SITEMAP_ROOT_FETCH { url: "${finalUrl}", status: ${r.status || 200}, ct: "${contentType}", bytes: ${bytes} }`);
-          hits.push(finalUrl);
-        }
+               const r = await safeFetch(url, { 
+                 timeoutMs: 12000,
+                 followRedirects: true,
+                 headers: {
+                   'User-Agent': UA,
+                   'Accept': 'application/xml,text/xml,application/octet-stream,*/*'
+                 }
+               });
+               
+               if (r.ok && looksLikeSitemap(r)) {
+                 const finalUrl = r.finalUrl ?? url;
+                 const bytes = r.text?.length ?? 0;
+                 const contentType = r.headers?.['content-type'] || '';
+                 console.log(`SITEMAP_ROOT_FETCH { url: "${finalUrl}", status: ${r.status || 200}, ct: "${contentType}", bytes: ${bytes} }`);
+                 hits.push(finalUrl);
+               } else if (!r.ok) {
+                 // Cancel body for failed requests to avoid CF warnings
+                 console.log(`[SitemapDiscovery] Failed to fetch ${url}: ${r.status}`);
+               }
       } catch (error) {
         // Silent fail for individual candidates
       }

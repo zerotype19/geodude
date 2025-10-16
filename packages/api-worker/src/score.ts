@@ -370,3 +370,32 @@ function calculateTrust(
     breakdown 
   };
 }
+
+/**
+ * Calculate scores from analysis data instead of raw page data
+ */
+export function calculateScoresFromAnalysis(
+  analysisData: any[],
+  issues: AuditIssue[],
+  crawlability?: CrawlabilityData,
+  structured?: StructuredData,
+  crawlersTotal30d?: number
+): Scores {
+  // Convert analysis data to page-like format for existing calculation functions
+  const pages: AuditPage[] = analysisData.map((analysis: any) => ({
+    url: analysis.url,
+    status_code: 200, // Assume 200 for analyzed pages
+    title: analysis.title,
+    h1: analysis.h1,
+    has_h1: (analysis.h1_count || 0) > 0,
+    jsonld_count: analysis.schema_types ? analysis.schema_types.split(',').length : 0,
+    faq_present: analysis.schema_types?.includes('FAQPage') || false,
+    word_count: analysis.word_count || 0,
+    rendered_words: analysis.word_count || 0,
+    load_time_ms: 0, // Not available in analysis data
+    error: null
+  }));
+
+  // Use existing calculation functions
+  return calculateScores(pages, issues, crawlability, structured, crawlersTotal30d);
+}
