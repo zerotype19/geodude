@@ -51,41 +51,26 @@ export async function seedFrontier(
     let sitemapIndexCount = 0;
     let urlsetCount = 0;
     
-    const urlCap = parseInt(env.SITEMAP_URL_CAP || '500');
-    const childCap = 20; // Max child sitemaps to follow
+    // Removed unused urlCap and childCap - using simple approach
     
-    // CRITICAL: Limit sitemap discovery to prevent worker timeouts
-    const maxSitemapsToProcess = 3; // Only process first 3 sitemaps
-    const maxUrlsPerSitemap = 100;  // Only take first 100 URLs per sitemap
-    
-    // Process sitemaps with limits to prevent timeouts
-    let sitemapsProcessed = 0;
-    for (const sitemapUrl of sitemapUrls) {
-      if (sitemapsProcessed >= maxSitemapsToProcess) {
-        console.log(`[Seed] Limiting to ${maxSitemapsToProcess} sitemaps to prevent timeout`);
-        break;
-      }
-      
-      console.log(`[Seed] Parsing sitemap: ${sitemapUrl}`);
-      const result = await parseSitemap(env, sitemapUrl, { childCap, urlCap: maxUrlsPerSitemap });
-      console.log(`[Seed] Sitemap result: ${result.urls.length} URLs, ${result.sitemapIndexCount} children, ${result.urlsetCount} urlset`);
-      allUrls.push(...result.urls);
-      sitemapIndexCount += result.sitemapIndexCount;
-      urlsetCount += result.urlsetCount;
-      
-      // Follow child sitemaps (sitemap index) - limit to prevent timeout
-      const maxChildren = Math.min(result.indexChildren.length, 5); // Only first 5 children
-      for (let i = 0; i < maxChildren; i++) {
-        const childUrl = result.indexChildren[i];
-        console.log(`[Seed] Parsing child sitemap: ${childUrl}`);
-        const childResult = await parseSitemap(env, childUrl, { childCap: 0, urlCap: maxUrlsPerSitemap });
-        console.log(`[Seed] Child result: ${childResult.urls.length} URLs`);
-        allUrls.push(...childResult.urls);
-        urlsetCount += childResult.urlsetCount;
-      }
-      
-      sitemapsProcessed++;
-    }
+         // SIMPLE APPROACH: Only process the main sitemap.xml (first one found)
+         const mainSitemapUrl = sitemapUrls.find(url => url.includes('/sitemap.xml') && !url.includes('autopush') && !url.includes('image') && !url.includes('video'));
+         
+         if (mainSitemapUrl) {
+           console.log(`[Seed] Processing main sitemap: ${mainSitemapUrl}`);
+           const result = await parseSitemap(env, mainSitemapUrl, { childCap: 0, urlCap: maxPages }); // Only get maxPages URLs
+           console.log(`[Seed] Main sitemap result: ${result.urls.length} URLs`);
+           allUrls.push(...result.urls);
+           sitemapIndexCount = 1;
+           urlsetCount = result.urls.length;
+         } else {
+           console.log(`[Seed] No main sitemap.xml found, using first sitemap: ${sitemapUrls[0]}`);
+           const result = await parseSitemap(env, sitemapUrls[0], { childCap: 0, urlCap: maxPages });
+           console.log(`[Seed] First sitemap result: ${result.urls.length} URLs`);
+           allUrls.push(...result.urls);
+           sitemapIndexCount = 1;
+           urlsetCount = result.urls.length;
+         }
     
     console.log(`[Seed] Collected ${allUrls.length} total URLs from sitemaps`);
     
