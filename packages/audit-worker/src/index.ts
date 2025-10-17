@@ -3,8 +3,22 @@ import { queryAI, processCitations, generateDefaultQueries } from './connectors'
 // Bot Identity Configuration
 const BOT_UA = "OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)";
 
-// Failure Handling Configuration
-const MAX_RUN_MS = 2 * 60 * 1000; // 2 minutes max runtime
+// Crawl/scoring budget for one run
+const HARD_TIME_MS = 120_000;          // 2 minutes total budget per audit
+const PER_REQUEST_BUDGET_MS = 25_000;  // keep each call under CF 30s
+const CONCURRENCY = 8;                 // parallel page fetch/analyze
+const PER_PAGE_TIMEOUT_MS = 4_000;     // each page gets 4s max
+
+// Completion policy
+const TARGET_MIN_PAGES = 40;           // we're happy at 40+
+const TARGET_MAX_PAGES = 60;           // don't exceed this
+const MAX_DISCOVER = 120;              // cap discovered queue
+
+// Rendering toggle (off for now)
+const RENDER_ENABLED = false;          // disable browser rendering until fixed
+
+// Legacy constants (keeping for compatibility)
+const MAX_RUN_MS = HARD_TIME_MS;
 const PROGRESS_CHECK_INTERVAL = 15_000; // Check every 15 seconds
 
 // Non-crawlable platforms (require login or are web apps, not content sites)
@@ -29,6 +43,7 @@ export interface Env {
   DB: D1Database;
   RULES: KVNamespace;
   BROWSER: Browser;
+  BASE_URL?: string; // For self-chaining batch requests
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
   CLAUDE_API_KEY?: string;
@@ -116,6 +131,23 @@ async function fetchWithIdentity(url: string, init: RequestInit = {}, env: Env) 
   if (!headers.has("user-agent")) headers.set("user-agent", BOT_UA);
   headers.set("X-Optiview-Bot", "audit");
   return fetch(url, { ...init, headers, cf: { cacheTtl: 0 } });
+}
+
+// Fast fetch with timeout (no rendering)
+async function fetchPageWithTimeout(url: string, ms: number, env: Env): Promise<string | null> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetchWithIdentity(url, { signal: ctrl.signal }, env);
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("text/html")) return null;
+    return await res.text();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 function hostKey(u: URL): string {
@@ -336,6 +368,14 @@ export default {
           const reason = body.reason || 'manual_failure';
           await markAuditFailed(env, auditId, reason);
           return new Response(JSON.stringify({ status: 'failed', reason }), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        if (path === `/api/audits/${auditId}/continue`) {
+          const result = await continueAuditBatch(auditId, env);
+          return new Response(JSON.stringify(result), { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           });
@@ -664,6 +704,197 @@ async function monitorProgress(env: Env, auditId: string) {
   setTimeout(() => check(), PROGRESS_CHECK_INTERVAL);
 }
 
+// Simple pMap implementation for concurrency control
+async function pMap<T, R>(
+  items: T[],
+  mapper: (item: T, index: number) => Promise<R>,
+  options: { concurrency: number }
+): Promise<R[]> {
+  const results: R[] = [];
+  const executing: Promise<void>[] = [];
+  
+  for (const [index, item] of items.entries()) {
+    const promise = Promise.resolve().then(() => mapper(item, index)).then(result => {
+      results[index] = result;
+    });
+    
+    executing.push(promise);
+    
+    if (executing.length >= options.concurrency) {
+      await Promise.race(executing);
+      executing.splice(executing.findIndex(p => p === promise), 1);
+    }
+  }
+  
+  await Promise.all(executing);
+  return results;
+}
+
+// Batch processing handler - processes URLs in manageable chunks
+async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
+  const started = Date.now();
+  
+  // 1) Load audit
+  const audit: any = await env.DB.prepare(
+    "SELECT * FROM audits WHERE id = ?"
+  ).bind(auditId).first();
+  
+  if (!audit || audit.status !== 'running') {
+    return { ok: true, reason: 'not-running', finalized: false };
+  }
+  
+  const auditStartedMs = new Date(audit.started_at).getTime();
+  
+  // 2) Get next batch of URLs to process
+  const queueResult = await env.DB.prepare(
+    "SELECT url FROM audit_pages WHERE audit_id = ? AND id NOT IN (SELECT page_id FROM audit_page_analysis) LIMIT ?"
+  ).bind(auditId, TARGET_MAX_PAGES).all();
+  
+  const queue = (queueResult.results || []).map((r: any) => r.url);
+  
+  if (queue.length === 0) {
+    // No more URLs to process
+    const totals = await getAuditStats(env, auditId);
+    if (totals.pages_analyzed === 0) {
+      await markAuditFailed(env, auditId, 'no_crawlable_pages_found');
+      return { ok: true, finalized: true, reason: 'no_pages', totals };
+    }
+    
+    // Finalize
+    await finalizeAudit(env, auditId, 'queue_empty');
+    return { ok: true, finalized: true, reason: 'queue_empty', totals };
+  }
+  
+  let analyzed = 0;
+  
+  // 3) Process in parallel with time budget
+  await pMap(queue, async (url) => {
+    if (Date.now() - started > PER_REQUEST_BUDGET_MS) return; // stay < 30s
+    
+    // Check robots.txt
+    try {
+      const urlObj = new URL(url);
+      const rules = await getRobots(env, urlObj);
+      if (!isAllowedByRobots(rules, urlObj.pathname)) {
+        console.log(`[ROBOTS] Disallowed: ${url}`);
+        return;
+      }
+    } catch (e) {
+      console.error(`[ROBOTS ERROR] ${url}:`, e);
+      return;
+    }
+    
+    // Fetch with timeout (no rendering)
+    const html = await fetchPageWithTimeout(url, PER_PAGE_TIMEOUT_MS, env);
+    if (!html) return;
+    
+    // Extract and score
+    try {
+      const extract = await extractAll(html, url);
+      const weights = await loadWeights(env.RULES);
+      const scores = scorePage(extract, weights);
+      
+      // Get page_id
+      const pageRow: any = await env.DB.prepare(
+        "SELECT id FROM audit_pages WHERE audit_id = ? AND url = ?"
+      ).bind(auditId, url).first();
+      
+      if (!pageRow) {
+        console.error(`[BATCH] Page not found in audit_pages: ${url}`);
+        return;
+      }
+      
+      // Save analysis
+      await env.DB.prepare(
+        `INSERT INTO audit_page_analysis 
+         (id, page_id, title, h1, canonical, schema_types, jsonld, checks_json, aeo_score, geo_score, analyzed_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      ).bind(
+        crypto.randomUUID(),
+        pageRow.id,
+        extract.title || '',
+        extract.h1 || '',
+        extract.canonical || '',
+        JSON.stringify(extract.schemaTypes || []),
+        JSON.stringify(extract.jsonldRaw || []),
+        JSON.stringify(scores.items || []),
+        scores.aeo,
+        scores.geo
+      ).run();
+      
+      analyzed++;
+      console.log(`Processed: ${url} (AEO: ${scores.aeo}, GEO: ${scores.geo})`);
+    } catch (error: any) {
+      console.error(`[SCORE ERROR] ${url}:`, error.message);
+    }
+  }, { concurrency: CONCURRENCY });
+  
+  // 4) Check completion policy
+  const totals = await getAuditStats(env, auditId);
+  const elapsed = Date.now() - auditStartedMs;
+  
+  const hitTarget = totals.pages_analyzed >= TARGET_MIN_PAGES;
+  const hitHardTime = elapsed >= HARD_TIME_MS;
+  const hitMaxPages = totals.pages_analyzed >= TARGET_MAX_PAGES;
+  const queueEmpty = queue.length < TARGET_MAX_PAGES && analyzed === queue.length;
+  
+  if (hitTarget || hitHardTime || hitMaxPages || queueEmpty) {
+    const reason = hitHardTime ? 'time_budget_reached'
+                 : hitMaxPages ? 'max_pages_reached'
+                 : hitTarget ? 'target_min_pages_met'
+                 : 'queue_empty';
+    
+    await finalizeAudit(env, auditId, reason);
+    return { ok: true, finalized: true, reason, totals };
+  }
+  
+  // 5) Chain the next batch (self-call)
+  const baseUrl = env.BASE_URL || 'https://api.optiview.ai';
+  fetch(`${baseUrl}/api/audits/${auditId}/continue`, { method: 'POST' })
+    .catch(err => console.error('[CHAIN] Continue failed:', err));
+  
+  return { ok: true, finalized: false, analyzed, totals };
+}
+
+// Helper to get audit stats
+async function getAuditStats(env: Env, auditId: string): Promise<{ pages_analyzed: number; pages_discovered: number }> {
+  const stats: any = await env.DB.prepare(
+    `SELECT 
+       (SELECT COUNT(*) FROM audit_page_analysis apa JOIN audit_pages ap ON apa.page_id = ap.id WHERE ap.audit_id = ?) as pages_analyzed,
+       (SELECT COUNT(*) FROM audit_pages WHERE audit_id = ?) as pages_discovered`
+  ).bind(auditId, auditId).first();
+  
+  return {
+    pages_analyzed: stats?.pages_analyzed || 0,
+    pages_discovered: stats?.pages_discovered || 0
+  };
+}
+
+// Helper to finalize audit with scores
+async function finalizeAudit(env: Env, auditId: string, reason: string): Promise<void> {
+  // Compute site scores from analyzed pages
+  const scores: any = await env.DB.prepare(
+    `SELECT AVG(aeo_score) as aeo, AVG(geo_score) as geo 
+     FROM audit_page_analysis apa 
+     JOIN audit_pages ap ON apa.page_id = ap.id 
+     WHERE ap.audit_id = ?`
+  ).bind(auditId).first();
+  
+  const aeo = Math.round((scores?.aeo || 0) * 100) / 100;
+  const geo = Math.round((scores?.geo || 0) * 100) / 100;
+  
+  await env.DB.prepare(
+    `UPDATE audits 
+     SET status = 'complete', 
+         aeo_score = ?, 
+         geo_score = ?, 
+         finished_at = datetime('now')
+     WHERE id = ?`
+  ).bind(aeo, geo, auditId).run();
+  
+  console.log(`[FINALIZED] ${auditId}: ${reason} (AEO: ${aeo}, GEO: ${geo})`);
+}
+
 // API Route Handlers
 
 async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
@@ -697,16 +928,26 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     "INSERT INTO audits (id, project_id, root_url, site_description, started_at, status, config_json) VALUES (?, ?, ?, ?, datetime('now'), 'running', ?)"
   ).bind(id, project_id, root_url, site_description || null, JSON.stringify(config)).run();
 
-  // Start progress monitoring
-  ctx.waitUntil(monitorProgress(env, id));
-  
-  // Start crawl in background with error handling
+  // Discover URLs and populate audit_pages (do this in background but ensure it starts)
   ctx.waitUntil((async () => {
     try {
-      await runCrawl({ audit_id: id, root_url, site_description, max_pages }, env);
+      console.log(`[DISCOVER] Starting URL discovery for: ${root_url}`);
+      const urls = await discoverUrls(root_url, env, Math.min(max_pages, MAX_DISCOVER));
+      
+      // Insert discovered URLs into audit_pages
+      for (const url of urls) {
+        await env.DB.prepare(
+          "INSERT INTO audit_pages (id, audit_id, url, fetched_at) VALUES (?, ?, ?, datetime('now'))"
+        ).bind(crypto.randomUUID(), id, url).run();
+      }
+      
+      console.log(`[DISCOVER] Inserted ${urls.length} URLs for audit ${id}`);
+      
+      // Directly call continueAuditBatch instead of fetching
+      await continueAuditBatch(id, env);
     } catch (error: any) {
-      console.error(`[CRAWL ERROR] ${id}:`, error);
-      await markAuditFailed(env, id, `crawl_error: ${error.message || 'unknown'}`);
+      console.error(`[DISCOVER ERROR] ${id}:`, error);
+      await markAuditFailed(env, id, `discover_error: ${error.message || 'unknown'}`);
     }
   })());
 

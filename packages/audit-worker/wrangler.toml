@@ -16,6 +16,7 @@ id = "ede0baa1d4654ecb86a4d1faf7b5fd46"
 binding = "BROWSER"
 
 [vars]
+BASE_URL = "https://api.optiview.ai"
 PROXY_FETCH_ENDPOINT = "https://fetch.optiview.ai"
 CITATIONS_MAX_CONCURRENCY = "3"
 CITATIONS_THROTTLE_MS = "400"
