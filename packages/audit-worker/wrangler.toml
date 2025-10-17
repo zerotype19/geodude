@@ -22,4 +22,4 @@ CITATIONS_MAX_CONCURRENCY = "3"
 CITATIONS_THROTTLE_MS = "400"
 
 [triggers]
-crons = ["0 */6 * * *", "0 14 * * 1"]
+crons = ["0 */6 * * *", "0 14 * * 1", "0 * * * *"]

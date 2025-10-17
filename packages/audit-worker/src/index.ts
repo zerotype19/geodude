@@ -253,6 +253,44 @@ export interface ScoringResult {
   items: CheckResult[];
 }
 
+// Auto-finalize stuck audits (called by cron)
+async function autoFinalizeStuckAudits(env: Env): Promise<void> {
+  console.log('[AUTO-FINALIZE] Checking for stuck audits...');
+  
+  // Find audits that are stuck in "running" state with enough pages analyzed
+  const stuckAudits = await env.DB.prepare(
+    `SELECT a.id, 
+            (SELECT COUNT(*) FROM audit_page_analysis apa 
+             JOIN audit_pages ap ON apa.page_id = ap.id 
+             WHERE ap.audit_id = a.id) as pages_analyzed
+     FROM audits a
+     WHERE a.status = 'running' 
+       AND datetime(a.started_at) < datetime('now', '-10 minutes')
+     ORDER BY a.started_at DESC
+     LIMIT 50`
+  ).all();
+  
+  let finalized = 0;
+  
+  for (const audit of (stuckAudits.results || [])) {
+    const auditData = audit as { id: string; pages_analyzed: number };
+    
+    if (auditData.pages_analyzed >= TARGET_MIN_PAGES) {
+      // Has enough pages - finalize it
+      await finalizeAudit(env, auditData.id, 'auto_finalize_stuck');
+      finalized++;
+      console.log(`[AUTO-FINALIZE] Finalized stuck audit ${auditData.id} (${auditData.pages_analyzed} pages)`);
+    } else if (auditData.pages_analyzed === 0) {
+      // No pages analyzed after 10 minutes - mark as failed
+      await markAuditFailed(env, auditData.id, 'timeout_no_pages_after_10min');
+      finalized++;
+      console.log(`[AUTO-FINALIZE] Failed stuck audit ${auditData.id} (0 pages)`);
+    }
+  }
+  
+  console.log(`[AUTO-FINALIZE] Processed ${finalized} stuck audits`);
+}
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log('[CRON] Scheduled event:', event.cron);
@@ -260,6 +298,11 @@ export default {
     if (event.cron === '0 14 * * 1') {
       // Weekly citations run (Mondays 14:00 UTC)
       await runWeeklyCitations(env);
+    }
+    
+    if (event.cron === '0 * * * *') {
+      // Hourly: Auto-finalize stuck audits
+      await autoFinalizeStuckAudits(env);
     }
   },
 
@@ -838,6 +881,9 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
   const hitMaxPages = totals.pages_analyzed >= TARGET_MAX_PAGES;
   const queueEmpty = queue.length < TARGET_MAX_PAGES && analyzed === queue.length;
   
+  // Log progress
+  console.log(`[BATCH] ${auditId} pages=${totals.pages_analyzed}/${totals.pages_discovered} elapsed=${elapsed}ms`);
+  
   if (hitTarget || hitHardTime || hitMaxPages || queueEmpty) {
     const reason = hitHardTime ? 'time_budget_reached'
                  : hitMaxPages ? 'max_pages_reached'
@@ -848,12 +894,10 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
     return { ok: true, finalized: true, reason, totals };
   }
   
-  // 5) Chain the next batch (self-call)
-  const baseUrl = env.BASE_URL || 'https://api.optiview.ai';
-  fetch(`${baseUrl}/api/audits/${auditId}/continue`, { method: 'POST' })
-    .catch(err => console.error('[CHAIN] Continue failed:', err));
-  
-  return { ok: true, finalized: false, analyzed, totals };
+  // 5) Chain the next batch synchronously (recursive in-process call)
+  console.log(`[BATCH] ${auditId} chaining next batch...`);
+  const nextBatch = await continueAuditBatch(auditId, env);
+  return { ok: true, finalized: false, analyzed, totals, chained: true, next: nextBatch };
 }
 
 // Helper to get audit stats
