@@ -652,9 +652,12 @@ async function runCrawl({ audit_id, root_url, site_description, max_pages }: any
   try {
     // Discover URLs
     const discovered = await discoverUrls(root_url, env);
-    const queue = [...discovered].slice(0, max_pages);
+    
+    // Prioritize URLs by depth (closest to homepage first)
+    const finalOrigin = await resolveFinalUrl(root_url, env);
+    const queue = prioritizeUrls(discovered, finalOrigin, max_pages);
 
-    console.log(`Starting crawl for ${queue.length} URLs`);
+    console.log(`Starting crawl for ${queue.length} URLs (prioritized by depth)`);
 
     // Process each URL
     for (const url of queue) {
@@ -937,6 +940,74 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env): Promise<s
     }
   }
   return pages;
+}
+
+// Helper to calculate URL depth (path segments from root)
+function getUrlDepth(url: string, rootOrigin: URL): number {
+  try {
+    const urlObj = new URL(url);
+    if (urlObj.origin !== rootOrigin.origin) return 999; // Different origin = lowest priority
+    
+    const path = urlObj.pathname.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
+    if (!path) return 0; // Homepage
+    
+    const segments = path.split('/').filter(s => s.length > 0);
+    return segments.length;
+  } catch {
+    return 999;
+  }
+}
+
+// Prioritize URLs by depth, favoring those closest to homepage
+function prioritizeUrls(urls: string[], rootOrigin: URL, maxUrls: number): string[] {
+  // Ensure homepage is included if not already
+  const homepageUrl = rootOrigin.toString();
+  const urlSet = new Set(urls);
+  if (!urlSet.has(homepageUrl) && !urlSet.has(homepageUrl + '/')) {
+    urls = [homepageUrl, ...urls];
+  }
+  
+  // Group URLs by depth
+  const byDepth: Map<number, string[]> = new Map();
+  
+  for (const url of urls) {
+    const depth = getUrlDepth(url, rootOrigin);
+    if (!byDepth.has(depth)) {
+      byDepth.set(depth, []);
+    }
+    byDepth.get(depth)!.push(url);
+  }
+  
+  // Sort depths (0 = homepage, 1 = first level, etc.)
+  const sortedDepths = Array.from(byDepth.keys()).sort((a, b) => a - b);
+  
+  // Log depth distribution
+  const depthStats: Record<number, number> = {};
+  for (const depth of sortedDepths) {
+    depthStats[depth] = byDepth.get(depth)!.length;
+  }
+  console.log(`[CRAWL] URL depth distribution:`, JSON.stringify(depthStats));
+  
+  // Build prioritized list
+  const prioritized: string[] = [];
+  
+  for (const depth of sortedDepths) {
+    const urlsAtDepth = byDepth.get(depth)!;
+    
+    // Shuffle URLs at same depth to avoid bias
+    const shuffled = urlsAtDepth.sort(() => Math.random() - 0.5);
+    
+    for (const url of shuffled) {
+      prioritized.push(url);
+      if (prioritized.length >= maxUrls) {
+        console.log(`[CRAWL] Prioritization complete: ${prioritized.length} URLs selected (max depth: ${depth})`);
+        return prioritized;
+      }
+    }
+  }
+  
+  console.log(`[CRAWL] Prioritized ${prioritized.length} URLs across ${sortedDepths.length} depth levels`);
+  return prioritized;
 }
 
 async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
