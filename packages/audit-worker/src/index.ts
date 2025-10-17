@@ -910,122 +910,210 @@ async function computeSiteScores(db: D1Database, auditId: string): Promise<{ aeo
 // Citations API Handlers
 
 async function runCitations(req: Request, env: Env) {
-  const body: CitationsRequest = await req.json();
-  const { project_id, domain, brand, sources, queries } = body;
-  
-  // Generate default queries if not provided
-  let finalQueries = queries;
-  if (!finalQueries || finalQueries.length === 0) {
-    // Get page titles from recent audit for this domain
-    const audit = await env.DB.prepare(`
-      SELECT title FROM audit_pages ap
-      JOIN audits a ON ap.audit_id = a.id
-      WHERE a.project_id = ? AND ap.url LIKE ?
-      ORDER BY ap.fetched_at DESC
-      LIMIT 10
-    `).bind(project_id, `%${domain}%`).all();
+  const runId = crypto.randomUUID();
+  try {
+    console.log('[CITATIONS] Starting citations run:', runId);
+    const body: CitationsRequest = await req.json();
+    const { project_id, domain, brand, sources, queries } = body;
     
-    const pageTitles = audit.results.map((r: any) => r.title).filter(Boolean);
-    finalQueries = generateDefaultQueries(domain, brand, pageTitles);
-  }
-  
-  const results = [];
-  const totalsBySource: Record<string, { total: number, cited: number }> = {};
-  
-  // Initialize totals
-  for (const source of sources) {
-    totalsBySource[source] = { total: 0, cited: 0 };
-  }
-  
-  // Process each source-query combination with concurrency control
-  for (const source of sources) {
-    for (const query of finalQueries.slice(0, 24)) { // Max 24 queries per run
-      try {
-        // Throttle requests
-        await new Promise(resolve => setTimeout(resolve, 400));
+    console.log('[CITATIONS] Request params:', { project_id, domain, sources: sources.length, queries: queries?.length });
+    
+    // Log the run start
+    await env.DB.prepare(`
+      INSERT INTO citations_runs 
+      (id, project_id, domain, started_at, status, total_queries, by_source)
+      VALUES (?, ?, ?, datetime('now'), 'running', ?, ?)
+    `).bind(
+      runId, 
+      project_id, 
+      domain, 
+      sources.length * 24, // Max queries per source
+      JSON.stringify(sources.reduce((acc, source) => ({ ...acc, [source]: { total: 0, cited: 0 } }), {}))
+    ).run();
+    
+    // Generate default queries if not provided
+    let finalQueries = queries;
+    if (!finalQueries || finalQueries.length === 0) {
+      console.log('[CITATIONS] Generating default queries');
+      // Get page titles from recent audit for this domain
+      const audit = await env.DB.prepare(`
+        SELECT apa.title FROM audit_page_analysis apa
+        JOIN audit_pages ap ON apa.page_id = ap.id
+        JOIN audits a ON ap.audit_id = a.id
+        WHERE a.project_id = ? AND ap.url LIKE ?
+        ORDER BY ap.fetched_at DESC
+        LIMIT 10
+      `).bind(project_id, `%${domain}%`).all();
+      
+      const pageTitles = audit.results.map((r: any) => r.title).filter(Boolean);
+      finalQueries = generateDefaultQueries(domain, brand, pageTitles);
+      console.log('[CITATIONS] Generated queries:', finalQueries.length);
+    }
+    
+    const results = [];
+    const errors = [];
+    const totalsBySource: Record<string, { total: number, cited: number }> = {};
+    
+    // Initialize totals
+    for (const source of sources) {
+      totalsBySource[source] = { total: 0, cited: 0 };
+    }
+    
+    // Process each source-query combination with concurrency control
+    for (const source of sources) {
+      console.log(`[CITATIONS] Processing source: ${source}`);
+      for (const query of finalQueries.slice(0, 24)) { // Max 24 queries per run
+        try {
+          // Throttle requests
+          await new Promise(resolve => setTimeout(resolve, 400));
+          
+          console.log(`[CITATIONS] Querying ${source}: "${query}"`);
+          const result = await queryAI(source, query, env);
+          console.log(`[CITATIONS] Got result from ${source}:`, { hasAnswer: !!result.answer_text, hasUrls: result.cited_urls.length, error: result.error });
+          
+          const processed = processCitations(result, domain);
         
-        const result = await queryAI(source, query, env);
-        const processed = processCitations(result, domain);
-        
-        // Generate hash for deduplication
-        const answerHash = result.answer_text ? 
-          await crypto.subtle.digest('SHA-256', new TextEncoder().encode(result.answer_text))
-            .then(hash => Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')) :
-          null;
-        
-        // Store in database
-        const citationId = crypto.randomUUID();
-        await env.DB.prepare(`
-          INSERT INTO ai_citations 
-          (id, project_id, domain, ai_source, query, answer_hash, answer_excerpt, 
-           cited_urls, cited_match_count, first_match_url, confidence, error, occurred_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-        `).bind(
-          citationId, project_id, domain, source, query, answerHash,
-          result.answer_text.slice(0, 500),
-          JSON.stringify(processed.cited_urls),
-          processed.cited_match_count,
-          processed.first_match_url,
-          result.confidence,
-          result.error || null
-        ).run();
-        
-        // Update referrals table
-        await env.DB.prepare(`
-          INSERT OR REPLACE INTO ai_referrals
-          (id, project_id, domain, ai_source, query, cited, count_urls, first_seen, last_seen)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 
-                  COALESCE((SELECT first_seen FROM ai_referrals WHERE project_id = ? AND domain = ? AND ai_source = ? AND query = ?), datetime('now')),
-                  datetime('now'))
-        `).bind(
-          crypto.randomUUID(), project_id, domain, source, query,
-          processed.cited_match_count > 0 ? 1 : 0,
-          processed.cited_match_count,
-          project_id, domain, source, query
-        ).run();
-        
-        // Update totals
-        totalsBySource[source].total++;
-        if (processed.cited_match_count > 0) {
-          totalsBySource[source].cited++;
+          // Generate hash for deduplication
+          const answerHash = result.answer_text ? 
+            await crypto.subtle.digest('SHA-256', new TextEncoder().encode(result.answer_text))
+              .then(hash => Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')) :
+            null;
+          
+          console.log(`[CITATIONS] Storing result for ${source}`);
+          // Store in database
+          const citationId = crypto.randomUUID();
+          await env.DB.prepare(`
+            INSERT INTO ai_citations 
+            (id, project_id, domain, ai_source, query, answer_hash, answer_excerpt, 
+             cited_urls, cited_match_count, first_match_url, confidence, error, occurred_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          `).bind(
+            citationId, project_id, domain, source, query, answerHash,
+            result.answer_text?.slice(0, 500) || '',
+            JSON.stringify(processed.cited_urls),
+            processed.cited_match_count,
+            processed.first_match_url,
+            result.confidence || 0,
+            result.error || null
+          ).run();
+          
+          // Update referrals table
+          await env.DB.prepare(`
+            INSERT OR REPLACE INTO ai_referrals
+            (id, project_id, domain, ai_source, query, cited, count_urls, first_seen, last_seen)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 
+                    COALESCE((SELECT first_seen FROM ai_referrals WHERE project_id = ? AND domain = ? AND ai_source = ? AND query = ?), datetime('now')),
+                    datetime('now'))
+          `).bind(
+            crypto.randomUUID(), project_id, domain, source, query,
+            processed.cited_match_count > 0 ? 1 : 0,
+            processed.cited_match_count,
+            project_id, domain, source, query
+          ).run();
+          
+          // Update totals
+          totalsBySource[source].total++;
+          if (processed.cited_match_count > 0) {
+            totalsBySource[source].cited++;
+          }
+          
+          results.push({
+            source,
+            query,
+            cited: processed.cited_match_count > 0,
+            cited_count: processed.cited_match_count,
+            error: result.error
+          });
+          
+        } catch (error) {
+          console.error(`[CITATIONS] Error processing ${source} for query "${query}":`, error);
+          errors.push({
+            source,
+            query,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+          
+          totalsBySource[source].total++;
+          
+          results.push({
+            source,
+            query,
+            cited: false,
+            cited_count: 0,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
         }
-        
-        results.push({
-          source,
-          query,
-          cited: processed.cited_match_count > 0,
-          cited_count: processed.cited_match_count,
-          error: result.error
-        });
-        
-      } catch (error) {
-        console.error(`Error processing ${source} for query "${query}":`, error);
-        totalsBySource[source].total++;
-        
-        results.push({
-          source,
-          query,
-          cited: false,
-          cited_count: 0,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
       }
     }
+    
+    // Calculate percentages
+    const citedPctBySource: Record<string, number> = {};
+    for (const [source, totals] of Object.entries(totalsBySource)) {
+      citedPctBySource[source] = totals.total > 0 ? 
+        Math.round((totals.cited / totals.total) * 100) : 0;
+    }
+    
+    console.log('[CITATIONS] Run completed:', { totalResults: results.length, errors: errors.length });
+    
+    // Calculate totals
+    const totalQueries = Object.values(totalsBySource).reduce((sum, t) => sum + t.total, 0);
+    const totalCitations = Object.values(totalsBySource).reduce((sum, t) => sum + t.cited, 0);
+    const overallCitedPct = totalQueries > 0 ? Math.round((totalCitations / totalQueries) * 100) : 0;
+    
+    // Update run completion
+    await env.DB.prepare(`
+      UPDATE citations_runs 
+      SET completed_at = datetime('now'), 
+          status = 'completed',
+          total_queries = ?,
+          total_citations = ?,
+          cited_pct = ?,
+          by_source = ?,
+          errors_count = ?
+      WHERE id = ?
+    `).bind(
+      totalQueries,
+      totalCitations,
+      overallCitedPct,
+      JSON.stringify(totalsBySource),
+      errors.length,
+      runId
+    ).run();
+    
+    return {
+      status: 'completed',
+      runId,
+      totalsBySource,
+      citedPctBySource,
+      results: results.slice(0, 50), // Limit response size
+      errors: errors.slice(0, 10) // Include first 10 errors for debugging
+    };
+    
+  } catch (error) {
+    console.error('[CITATIONS] Top-level error:', error);
+    
+    // Update run with error status
+    try {
+      await env.DB.prepare(`
+        UPDATE citations_runs 
+        SET completed_at = datetime('now'), 
+            status = 'error'
+        WHERE id = ?
+      `).bind(runId).run();
+    } catch (dbError) {
+      console.error('[CITATIONS] Failed to update run status:', dbError);
+    }
+    
+    return {
+      status: 'error',
+      runId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      totalsBySource: {},
+      citedPctBySource: {},
+      results: [],
+      errors: []
+    };
   }
-  
-  // Calculate percentages
-  const citedPctBySource: Record<string, number> = {};
-  for (const [source, totals] of Object.entries(totalsBySource)) {
-    citedPctBySource[source] = totals.total > 0 ? 
-      Math.round((totals.cited / totals.total) * 100) : 0;
-  }
-  
-  return {
-    status: 'completed',
-    totalsBySource,
-    citedPctBySource,
-    results: results.slice(0, 50) // Limit response size
-  };
 }
 
 async function getCitationsSummary(searchParams: URLSearchParams, env: Env) {
