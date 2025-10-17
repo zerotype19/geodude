@@ -1162,20 +1162,29 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
   
   // Apply render gap penalty (SPA visibility risk)
   const avgRenderGap = await getAverageRenderGap(env, auditId);
-  let spaPenalty = 0;
+  let aeoPenalty = 0;
+  let geoPenalty = 0;
   
+  // 2025 Update: Softer AEO penalty threshold, stricter GEO threshold
   if (avgRenderGap !== null) {
+    // AEO: Only penalize severe cases (<30% static visibility)
     if (avgRenderGap < 0.3) {
-      spaPenalty = 10; // Severe: <30% content in static HTML
-      console.log(`[SPA PENALTY] ${auditId}: -10 points (gap: ${Math.round(avgRenderGap * 100)}%)`);
+      aeoPenalty = 5; // Reduced visibility of key schema and copy in raw HTML
+      console.log(`[AEO PENALTY] ${auditId}: -5 points (gap: ${Math.round(avgRenderGap * 100)}%)`);
+    }
+    
+    // GEO: Stricter penalty for LLM crawler visibility
+    if (avgRenderGap < 0.3) {
+      geoPenalty = 10; // Severe: LLM crawlers miss most content
+      console.log(`[GEO PENALTY] ${auditId}: -10 points (gap: ${Math.round(avgRenderGap * 100)}%)`);
     } else if (avgRenderGap < 0.5) {
-      spaPenalty = 5; // Moderate: <50% content in static HTML
-      console.log(`[SPA PENALTY] ${auditId}: -5 points (gap: ${Math.round(avgRenderGap * 100)}%)`);
+      geoPenalty = 5; // Moderate: Some content not visible to LLM crawlers
+      console.log(`[GEO PENALTY] ${auditId}: -5 points (gap: ${Math.round(avgRenderGap * 100)}%)`);
     }
   }
   
-  const aeo = Math.max(0, Math.round((baseAeo - spaPenalty) * 100) / 100);
-  const geo = Math.round(baseGeo * 100) / 100;
+  const aeo = Math.max(0, Math.round((baseAeo - aeoPenalty) * 100) / 100);
+  const geo = Math.max(0, Math.round((baseGeo - geoPenalty) * 100) / 100);
   
   await env.DB.prepare(
     `UPDATE audits 

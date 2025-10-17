@@ -8,7 +8,7 @@
 * **Per-page checks:** 21 items (A1–A11 for AEO, G1–G10 for GEO). Each scores **0–3**:
   * **0** Missing, **1** Partial, **2** Meets, **3** Exceeds.
 * **Weights:** Each check has a weight (ranging from 4 to 15). Your page score = Σ(weight × score/3). Site score = average of page scores.
-* **Site-level penalties:** AEO scores may be reduced by 5-10 points if average render visibility is below 50% (SPA risk).
+* **Site-level penalties:** AEO scores may receive up to a -5 point penalty if average render visibility falls below 30% (reduced visibility of key schema and copy in raw HTML). GEO scores may receive a -5 to -10 point penalty if average render visibility is below 50%.
 * **Top Blockers:** highest-impact low scores. **Quick Wins:** easiest high-impact fixes.
 * **Evidence:** In page details, expand a check to see *why* it scored (detected schema, facts count, links, etc.).
 
@@ -26,9 +26,9 @@
 **Why it matters:** Reduces pogo-sticking; aligns with engagement-re-ranking and snippet eligibility.
 **How to win:**
 * Add a **2–4 sentence answer** at the top.
-* Include a **"Jump to"** ToC with in-page anchors.
+* Optionally include a short **"Jump to"** table of contents with in-page anchors if the topic benefits from it.
 * Use a **step list** or **table** if procedural/comparative.
-**Checklist:** answer block, ToC, H2 steps, short paragraphs.
+**Checklist:** answer block, optional ToC, H2 steps, short paragraphs.
 **Tooltip:** *"Put the answer at the top with jump links and a scannable list/table."*
 
 ### A2 — Topical cluster integrity (15) {#a2-topical-cluster-integrity}
@@ -52,7 +52,7 @@
 ### A5 — Schema accuracy & breadth (10) {#a5-schema-accuracy-breadth}
 
 **Checks:** Valid JSON-LD types (`Article`, `HowTo`, `FAQPage`, `QAPage`, `Product`, `BreadcrumbList`)—no errors.
-**Win:** Use server-rendered JSON-LD; minimum viable properties per type; validate.
+**Win:** Use server-rendered JSON-LD; minimum viable properties per type; validate. **Note:** FAQPage and HowTo rich results have been deprecated or limited in most search surfaces since 2023. Use these schema types only when genuinely relevant — focus primarily on `Article`, `WebPage`, `HowTo` (instructional), or `Product` where applicable.
 **Tooltip:** *"Correct JSON-LD for the page intent; no errors."*
 
 ### A6 — Crawlability & canonicals (10) {#a6-crawlability-canonicals}
@@ -81,9 +81,11 @@
 
 ### A10 — AI Overviews readiness (4) {#a10-ai-overviews-readiness}
 
-**Checks:** Clear task framing, steps/pros-cons/safety notes, at least one credible external citation.
+**Checks:** Clear task framing, steps/pros-cons/safety notes, includes a short 'Sources' section with credible outbound references.
 **Win:** Add a "Summary" + "Steps" + "Considerations/Safety" + "Sources" section.
 **Tooltip:** *"Complete, safe, and well-cited answer for AIO."*
+
+**Note:** Google continues to evolve how AI Overviews select and link sources. Inclusion may change over time even for compliant pages. Monitor traffic and impression shifts across updates.
 
 ### A11 — Render Visibility (SPA Risk) (10) {#a11-render-visibility-spa-risk}
 
@@ -138,8 +140,23 @@
 ### G4 — AI crawler access & parity (12) {#g4-ai-crawler-access-parity}
 
 **Checks:** robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks.
+**Why it matters:** Ensures AI systems can access and properly parse your content for citation and training purposes.
 **Win:** Set your desired allow/deny; ensure server HTML contains key content/schema.
 **Tooltip:** *"Bots allowed/denied intentionally; content matches rendered."*
+
+**Note:** While most AI crawlers respect robots.txt, real-world tests show occasional non-compliance — for example, PerplexityBot sometimes disregards disallow rules, and Claude-Web has been observed over-crawling until blocked. Optiview checks for actual access logs to confirm crawler behavior.
+
+#### Google-Extended (Training Access)
+
+Controls whether Google may use your content for AI model training (separate from normal Googlebot crawling).
+
+**Example robots snippet:**
+```
+User-agent: Google-Extended
+Disallow: /
+```
+
+**Tip:** Blocking Google-Extended will *not* prevent your site from being indexed or appearing in Google Search or AI Overviews — it only affects training access.
 
 ### G5 — Chunkability & structure (10) {#g5-chunkability-structure}
 

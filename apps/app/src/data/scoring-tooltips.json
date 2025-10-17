@@ -4,7 +4,7 @@
     "weight": 15,
     "tooltip": "Put the answer at the top with jump links and a scannable list/table.",
     "description": "A concise answer in the first ~600–800 chars, jump links/ToC, a scannable list/table near the top.",
-    "howToWin": "Add a 2–4 sentence answer at the top. Include a 'Jump to' ToC with in-page anchors. Use a step list or table if procedural/comparative."
+    "howToWin": "Add a 2–4 sentence answer at the top. Optionally include a short 'Jump to' table of contents with in-page anchors if the topic benefits from it. Use a step list or table if procedural/comparative."
   },
   "A2": {
     "title": "Topical cluster integrity",
@@ -32,7 +32,7 @@
     "weight": 10,
     "tooltip": "Correct JSON-LD for the page intent; no errors.",
     "description": "Valid JSON-LD types (Article, HowTo, FAQPage, QAPage, Product, BreadcrumbList)—no errors.",
-    "howToWin": "Use server-rendered JSON-LD; minimum viable properties per type; validate."
+    "howToWin": "Use server-rendered JSON-LD; minimum viable properties per type; validate. Note: FAQPage and HowTo rich results have been deprecated or limited in most search surfaces since 2023. Use these schema types only when genuinely relevant — focus primarily on Article, WebPage, or Product where applicable."
   },
   "A6": {
     "title": "Crawlability & canonicals",
@@ -66,8 +66,8 @@
     "title": "AI Overviews readiness",
     "weight": 4,
     "tooltip": "Complete, safe, and well-cited answer for AIO.",
-    "description": "Clear task framing, steps/pros-cons/safety notes, at least one credible external citation.",
-    "howToWin": "Add a 'Summary' + 'Steps' + 'Considerations/Safety' + 'Sources' section."
+    "description": "Clear task framing, steps/pros-cons/safety notes, includes a short 'Sources' section with credible outbound references.",
+    "howToWin": "Add a 'Summary' + 'Steps' + 'Considerations/Safety' + 'Sources' section. Note: Google continues to evolve how AI Overviews select and link sources. Inclusion may change over time even for compliant pages."
   },
   "A11": {
     "title": "Render Visibility (SPA Risk)",
@@ -101,8 +101,8 @@
     "title": "AI crawler access & parity",
     "weight": 12,
     "tooltip": "Bots allowed/denied intentionally; content matches rendered.",
-    "description": "robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks.",
-    "howToWin": "Set your desired allow/deny; ensure server HTML contains key content/schema."
+    "description": "robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks. Note: Real-world tests show occasional non-compliance — PerplexityBot sometimes disregards disallow rules, and Claude-Web has been observed over-crawling.",
+    "howToWin": "Set your desired allow/deny; ensure server HTML contains key content/schema. For Google training access, use User-agent: Google-Extended. Blocking Google-Extended will NOT prevent your site from appearing in Google Search or AI Overviews — it only affects training access."
   },
   "G5": {
     "title": "Chunkability & structure",
