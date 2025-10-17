@@ -22,8 +22,17 @@ function Navigation() {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link to="/" className="text-xl font-bold text-gray-900">
-                Optiview
+              <Link 
+                to="/" 
+                className="text-xl font-black tracking-tight"
+                style={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}
+              >
+                OPTIVIEW.AI
               </Link>
             </div>
             {/* Desktop Navigation */}

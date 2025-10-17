@@ -3,21 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Optiview - AI Search Optimization & Visibility Intelligence</title>
-    <meta name="description" content="Optimize your website for AI search engines. Get comprehensive AEO/GEO audits, track AI citations, and improve visibility in ChatGPT, Claude, and Perplexity.">
+    <title>OPTIVIEW.AI - AI Search Optimization</title>
+    <meta name="description" content="Optimize your website for AI search engines. Get AEO/GEO audits and track citations from ChatGPT, Claude, and Perplexity.">
     
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://optiview.ai/">
-    <meta property="og:title" content="Optiview - AI Search Optimization Platform">
-    <meta property="og:description" content="Optimize for AI search engines. Get AEO/GEO audits and track citations from ChatGPT, Claude, and Perplexity.">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://optiview.ai/">
-    <meta property="twitter:title" content="Optiview - AI Search Optimization Platform">
-    <meta property="twitter:description" content="Optimize for AI search engines. Get AEO/GEO audits and track citations.">
-
     <style>
         * { 
             margin: 0; 
@@ -29,319 +17,203 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
             line-height: 1.6; 
             color: #1f2937;
-            background: #ffffff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
         
         /* Header */
         header {
-            background: white;
-            border-bottom: 1px solid #e5e7eb;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             padding: 20px 0;
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
         nav {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         
         .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #3b82f6;
+            font-size: 1.75rem;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             text-decoration: none;
         }
         
         .nav-cta {
-            background: #3b82f6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 10px 24px;
+            padding: 12px 28px;
             border-radius: 8px;
             text-decoration: none;
             font-weight: 600;
             font-size: 0.95rem;
-            transition: background 0.2s;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
         
         .nav-cta:hover {
-            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
         }
         
-        /* Hero Section */
-        .hero {
-            max-width: 1200px;
+        /* Main Container */
+        .container {
+            max-width: 900px;
             margin: 0 auto;
-            padding: 80px 20px;
+            padding: 80px 24px 60px;
+        }
+        
+        /* Hero */
+        .hero {
             text-align: center;
+            margin-bottom: 60px;
         }
         
         h1 {
-            font-size: 3.5rem;
-            font-weight: 800;
-            color: #111827;
+            font-size: 4rem;
+            font-weight: 900;
+            color: white;
             margin-bottom: 24px;
             line-height: 1.1;
+            letter-spacing: -0.02em;
         }
         
-        .gradient-text {
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.95);
+            margin-bottom: 40px;
+            font-weight: 400;
+        }
+        
+        @media (max-width: 768px) {
+            .subtitle { font-size: 1.15rem; }
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: white;
+            color: #764ba2;
+            padding: 18px 48px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Features */
+        .features {
+            background: white;
+            border-radius: 16px;
+            padding: 48px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            margin-bottom: 60px;
+        }
+        
+        @media (max-width: 768px) {
+            .features { padding: 32px 24px; }
+        }
+        
+        .features h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-        }
-        
-        .hero-subtitle {
-            font-size: 1.35rem;
-            color: #6b7280;
-            margin-bottom: 40px;
-            max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.6;
-        }
-        
-        .hero-cta {
-            display: inline-block;
-            background: #3b82f6;
-            color: white;
-            padding: 18px 40px;
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 1.15rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
-        }
-        
-        .hero-cta:hover {
-            background: #2563eb;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-        }
-        
-        /* Features Section */
-        .features {
-            background: #f9fafb;
-            padding: 80px 20px;
-        }
-        
-        .features-container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .section-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #111827;
+            margin-bottom: 32px;
             text-align: center;
-            margin-bottom: 16px;
         }
         
-        .section-subtitle {
-            font-size: 1.15rem;
-            color: #6b7280;
-            text-align: center;
-            margin-bottom: 60px;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .features-grid {
+        .feature-list {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 32px;
+            gap: 24px;
         }
         
-        .feature-card {
-            background: white;
-            padding: 32px;
-            border-radius: 16px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
+        .feature-item {
+            border-left: 4px solid;
+            border-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%) 1;
+            padding-left: 20px;
         }
         
-        .feature-card:hover {
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-            transform: translateY(-4px);
-        }
-        
-        .feature-icon {
-            font-size: 2.5rem;
-            margin-bottom: 16px;
-        }
-        
-        .feature-card h3 {
-            font-size: 1.4rem;
+        .feature-item h3 {
+            font-size: 1.25rem;
             font-weight: 700;
-            color: #111827;
-            margin-bottom: 12px;
-        }
-        
-        .feature-card p {
-            font-size: 1rem;
-            color: #6b7280;
-            line-height: 1.7;
-        }
-        
-        /* Stats Section */
-        .stats {
-            padding: 80px 20px;
-            background: white;
-        }
-        
-        .stats-container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 48px;
-            text-align: center;
-        }
-        
-        .stat-number {
-            font-size: 3rem;
-            font-weight: 800;
-            color: #3b82f6;
+            color: #1f2937;
             margin-bottom: 8px;
         }
         
-        .stat-label {
-            font-size: 1.1rem;
+        .feature-item p {
             color: #6b7280;
-            font-weight: 500;
-        }
-        
-        /* CTA Section */
-        .cta-section {
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            padding: 80px 20px;
-            text-align: center;
-        }
-        
-        .cta-content {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        
-        .cta-section h2 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: white;
-            margin-bottom: 20px;
-        }
-        
-        .cta-section p {
-            font-size: 1.2rem;
-            color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 40px;
-        }
-        
-        .cta-button-white {
-            display: inline-block;
-            background: white;
-            color: #3b82f6;
-            padding: 18px 40px;
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 1.15rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
-        }
-        
-        .cta-button-white:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            line-height: 1.6;
         }
         
         /* Footer */
         footer {
-            background: #111827;
-            color: #9ca3af;
-            padding: 60px 20px 40px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 32px 0;
+            margin-top: 60px;
         }
         
-        .footer-container {
+        .footer-content {
             max-width: 1200px;
             margin: 0 auto;
+            padding: 0 24px;
+            text-align: center;
         }
         
-        .footer-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 40px;
-            margin-bottom: 40px;
-        }
-        
-        .footer-column h4 {
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
             margin-bottom: 16px;
+            flex-wrap: wrap;
         }
         
-        .footer-column ul {
-            list-style: none;
-        }
-        
-        .footer-column li {
-            margin-bottom: 12px;
-        }
-        
-        .footer-column a {
-            color: #9ca3af;
+        .footer-links a {
+            color: #6b7280;
             text-decoration: none;
+            font-size: 0.95rem;
             transition: color 0.2s;
         }
         
-        .footer-column a:hover {
-            color: #3b82f6;
+        .footer-links a:hover {
+            color: #764ba2;
         }
         
-        .footer-bottom {
-            border-top: 1px solid #374151;
-            padding-top: 32px;
-            text-align: center;
-            color: #6b7280;
+        .footer-text {
+            color: #9ca3af;
+            font-size: 0.85rem;
         }
         
-        /* Responsive */
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2.5rem;
-            }
-            
-            .hero-subtitle {
-                font-size: 1.15rem;
-            }
-            
-            .section-title {
-                font-size: 2rem;
-            }
-            
-            .features-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 32px;
-            }
-            
-            .cta-section h2 {
-                font-size: 2rem;
-            }
+        .footer-text a {
+            color: #9ca3af;
+            text-decoration: none;
+        }
+        
+        .footer-text a:hover {
+            color: #764ba2;
         }
     </style>
 </head>
@@ -349,146 +221,68 @@
     <!-- Header -->
     <header>
         <nav>
-            <a href="/" class="logo">Optiview</a>
+            <a href="/" class="logo">OPTIVIEW.AI</a>
             <a href="https://app.optiview.ai" class="nav-cta">Launch App</a>
         </nav>
     </header>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <h1>
-            Optimize for <span class="gradient-text">AI Search</span>
-        </h1>
-        <p class="hero-subtitle">
-            Get comprehensive AEO/GEO audits, track AI citations, and improve your visibility in ChatGPT, Claude, and Perplexity.
-        </p>
-        <a href="https://app.optiview.ai" class="hero-cta">Start Free Audit →</a>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features">
-        <div class="features-container">
-            <h2 class="section-title">Everything you need for AI visibility</h2>
-            <p class="section-subtitle">
-                Comprehensive tools to understand and improve how AI systems discover, understand, and cite your content.
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Hero -->
+        <div class="hero">
+            <h1>Optimize for AI Search</h1>
+            <p class="subtitle">
+                Get comprehensive AEO/GEO audits and track citations from ChatGPT, Claude, and Perplexity.
             </p>
+            <a href="https://app.optiview.ai" class="cta-button">Start Free Audit →</a>
+        </div>
+
+        <!-- Features -->
+        <div class="features">
+            <h2>Everything you need for AI visibility</h2>
             
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🎯</div>
+            <div class="feature-list">
+                <div class="feature-item">
                     <h3>AEO/GEO Audits</h3>
-                    <p>Comprehensive scoring across 21 checks for Answer Engine Optimization (AEO) and Generative Engine Optimization (GEO). Get actionable insights on what's working and what needs improvement.</p>
+                    <p>Comprehensive scoring across 21 checks for Answer Engine Optimization and Generative Engine Optimization. Get actionable insights on what's working and what needs improvement.</p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon">📊</div>
+                <div class="feature-item">
                     <h3>Visibility Intelligence</h3>
                     <p>Track citations from ChatGPT, Claude, Perplexity, and Brave Search. See exactly how AI systems reference your content and discover new opportunities.</p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon">🔍</div>
+                <div class="feature-item">
                     <h3>Page-Level Analysis</h3>
                     <p>Deep dive into individual page performance with detailed breakdowns of schema, structure, facts, references, and AI crawler accessibility.</p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon">🚀</div>
-                    <h3>SPA Detection</h3>
+                <div class="feature-item">
+                    <h3>SPA Detection & Render Visibility</h3>
                     <p>Identify JavaScript rendering issues that prevent AI crawlers from seeing your content. Get alerts for critical visibility gaps.</p>
                 </div>
                 
-                <div class="feature-card">
-                    <div class="feature-icon">✅</div>
+                <div class="feature-item">
                     <h3>Top Blockers & Quick Wins</h3>
                     <p>Prioritized recommendations showing high-impact issues to fix first and easy optimizations for quick improvements.</p>
                 </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">📈</div>
-                    <h3>Scoring Guide</h3>
-                    <p>Understand exactly how each check is scored with detailed explanations, examples, and best practices for every optimization signal.</p>
-                </div>
             </div>
         </div>
-    </section>
-
-    <!-- Stats Section -->
-    <section class="stats">
-        <div class="stats-container">
-            <h2 class="section-title">Built for the future of search</h2>
-            <div class="stats-grid">
-                <div class="stat">
-                    <div class="stat-number">21</div>
-                    <div class="stat-label">AEO/GEO Checks</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-number">4</div>
-                    <div class="stat-label">AI Sources Tracked</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-number">100+</div>
-                    <div class="stat-label">Pages Analyzed per Audit</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="cta-section">
-        <div class="cta-content">
-            <h2>Ready to optimize for AI search?</h2>
-            <p>Run your first audit in seconds. No credit card required.</p>
-            <a href="https://app.optiview.ai" class="cta-button-white">Start Free Audit</a>
-        </div>
-    </section>
+    </div>
 
     <!-- Footer -->
     <footer>
-        <div class="footer-container">
-            <div class="footer-grid">
-                <div class="footer-column">
-                    <h4>Product</h4>
-                    <ul>
-                        <li><a href="https://app.optiview.ai">Launch App</a></li>
-                        <li><a href="https://app.optiview.ai/score-guide">Scoring Guide</a></li>
-                        <li><a href="/docs/audit.html">Documentation</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer-column">
-                    <h4>Resources</h4>
-                    <ul>
-                        <li><a href="/docs/faq.html">FAQ</a></li>
-                        <li><a href="/docs/bots.html">Bot Policy</a></li>
-                        <li><a href="/status.html">System Status</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer-column">
-                    <h4>Company</h4>
-                    <ul>
-                        <li><a href="mailto:hello@optiview.ai">Contact</a></li>
-                        <li><a href="/docs/security.html">Security</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer-column">
-                    <h4>Legal</h4>
-                    <ul>
-                        <li><a href="https://app.optiview.ai/terms">Terms of Use</a></li>
-                        <li><a href="https://app.optiview.ai/privacy">Privacy Policy</a></li>
-                        <li><a href="https://app.optiview.ai/methodology">Data Sources & Methodology</a></li>
-                    </ul>
-                </div>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="https://app.optiview.ai">Launch App</a>
+                <a href="https://app.optiview.ai/score-guide">Scoring Guide</a>
+                <a href="https://app.optiview.ai/terms">Terms</a>
+                <a href="https://app.optiview.ai/privacy">Privacy</a>
+                <a href="https://app.optiview.ai/methodology">Methodology</a>
             </div>
-            
-            <div class="footer-bottom">
-                <p>&copy; 2025 Optiview.ai — All rights reserved.</p>
-                <p style="font-size: 0.85em; opacity: 0.7; margin-top: 8px;">
-                    Scores and recommendations are heuristic indicators only; no warranties or guarantees implied.
-                </p>
-            </div>
+            <p class="footer-text">
+                © 2025 <a href="/">OPTIVIEW.AI</a> — Scores are heuristic indicators only.
+            </p>
         </div>
     </footer>
 </body>
