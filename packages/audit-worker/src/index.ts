@@ -433,6 +433,14 @@ export default {
         });
       }
 
+      if (req.method === 'POST' && path === '/api/admin/finalize-stuck') {
+        await autoFinalizeStuckAudits(env);
+        return new Response(JSON.stringify({ ok: true, message: 'Auto-finalize completed' }), { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
+      }
+
       // Citations endpoints
       if (req.method === 'POST' && path === '/api/citations/run') {
         const result = await runCitations(req, env);
