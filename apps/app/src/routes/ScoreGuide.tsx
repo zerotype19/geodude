@@ -64,15 +64,29 @@ const ScoreGuide: React.FC = () => {
               ),
               // Style paragraphs
               p: ({ node, ...props }) => (
-                <p className="text-gray-700 leading-relaxed my-3" {...props} />
+                <p className="text-gray-700 leading-relaxed my-3 flex-wrap" {...props} />
               ),
-              // Style code blocks
-              code: ({ node, inline, ...props }) => 
-                inline ? (
-                  <code className="bg-gray-800 text-green-400 px-2 py-0.5 rounded text-sm font-mono whitespace-nowrap" {...props} />
+              // Style code blocks - inline code should stay inline
+              code: ({ node, inline, className, children, ...props }) => {
+                // Force inline rendering for code elements
+                const isInline = inline !== false;
+                
+                return isInline ? (
+                  <code 
+                    className="inline-block bg-gray-800 text-green-400 px-2 py-0.5 mx-0.5 rounded text-sm font-mono align-baseline"
+                    {...props}
+                  >
+                    {children}
+                  </code>
                 ) : (
-                  <code className="block bg-gray-800 text-green-400 p-4 rounded text-sm overflow-x-auto my-4" {...props} />
-                ),
+                  <code 
+                    className="block bg-gray-800 text-green-400 p-4 rounded text-sm overflow-x-auto my-4 font-mono"
+                    {...props}
+                  >
+                    {children}
+                  </code>
+                );
+              },
               // Style pre blocks
               pre: ({ node, ...props }) => (
                 <pre className="bg-gray-800 text-green-400 p-4 rounded text-sm overflow-x-auto my-4" {...props} />
