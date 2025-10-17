@@ -488,71 +488,187 @@ function parseHTML(html: string) {
   };
 }
 
-async function discoverUrls(rootUrl: string): Promise<string[]> {
-  const urls = new Set<string>();
-  const urlObj = new URL(rootUrl);
-  
-  try {
-    // Try sitemap first
-    const sitemapUrl = `${urlObj.origin}/sitemap.xml`;
-    const sitemapRes = await fetch(sitemapUrl, { cf: { cacheTtl: 0 } });
-    
-    if (sitemapRes.ok) {
-      const sitemapText = await sitemapRes.text();
-      const urlMatches = sitemapText.match(/<loc>(.*?)<\/loc>/g);
-      
-      if (urlMatches) {
-        for (const match of urlMatches) {
-          const url = match.replace(/<\/?loc>/g, '');
-          if (url.startsWith(urlObj.origin)) {
-            urls.add(url);
-          }
-        }
-        return Array.from(urls);
-      }
-    }
-  } catch (error) {
-    console.log('Sitemap discovery failed, falling back to BFS:', error);
+// Helper functions for redirect-aware crawling
+async function resolveFinalUrl(input: string): Promise<URL> {
+  // Default fetch in Workers follows redirects. We rely on res.url for the final URL.
+  const res = await fetch(input, { cf: { cacheTtl: 0 } });
+  // If host is blocking HTML, still trust res.url for canonical origin.
+  const finalUrl = new URL(res.url || input);
+  return finalUrl;
+}
+
+function flipWww(u: URL): URL[] {
+  const host = u.hostname;
+  const naked = host.replace(/^www\./, "");
+  const isWww = host.startsWith("www.");
+  const flipped = isWww ? naked : `www.${naked}`;
+  const variants = [new URL(u.toString())];
+  const alt = new URL(u.toString());
+  alt.hostname = flipped;
+  variants.push(alt);
+  return variants;
+}
+
+function etld1(hostname: string): string {
+  // minimal: strip leading 'www.' only; for full eTLD+1 use a PSL library later
+  return hostname.toLowerCase().replace(/^www\./, "");
+}
+
+function sameSite(base: URL, candidate: URL): boolean {
+  return etld1(base.hostname) === etld1(candidate.hostname) && base.protocol === candidate.protocol;
+}
+
+async function fetchTextMaybeGzip(url: string): Promise<string|null> {
+  const res = await fetch(url, { cf:{ cacheTtl: 0 } });
+  if (!res.ok) return null;
+  const ct = res.headers.get("content-type") || "";
+  // Most gz sitemaps set application/x-gzip or octet-stream
+  if (url.endsWith(".gz")) {
+    const ab = await res.arrayBuffer();
+    // Workers don't expose zlib; prefer to rely on server's Content-Encoding gzip auto-decompress
+    // If needed, add a tiny gzip lib or proxy via Browser Rendering. For now assume server sends XML uncompressed
+    try { return new TextDecoder().decode(ab); } catch { return null; }
+  }
+  return await res.text();
+}
+
+async function discoverSitemaps(finalOrigin: URL): Promise<string[]> {
+  const candidates: string[] = [];
+  const tryUrls = new Set<string>();
+
+  // robots.txt
+  for (const u of flipWww(finalOrigin)) {
+    tryUrls.add(new URL("/robots.txt", u.origin).toString());
   }
 
-  // Fallback to BFS from root
-  const visited = new Set<string>();
-  const queue = [rootUrl];
-  
-  while (queue.length > 0 && urls.size < 1000) {
-    const currentUrl = queue.shift()!;
-    if (visited.has(currentUrl)) continue;
-    
-    visited.add(currentUrl);
-    urls.add(currentUrl);
-    
-    try {
-      const res = await fetch(currentUrl, { cf: { cacheTtl: 0 } });
-      if (!res.ok) continue;
-      
-      const html = await res.text();
-      const doc = parseHTML(html);
-      
-      const links = doc.querySelectorAll('a[href]');
-      for (const link of links) {
-        const href = link.getAttribute('href');
-        if (!href) continue;
-        
-        try {
-          const linkUrl = new URL(href, currentUrl);
-          if (linkUrl.origin === urlObj.origin && !visited.has(linkUrl.href)) {
-            queue.push(linkUrl.href);
-          }
-        } catch {
-          // Invalid URL, skip
-        }
+  // standard locations
+  for (const u of flipWww(finalOrigin)) {
+    tryUrls.add(new URL("/sitemap.xml", u.origin).toString());
+    tryUrls.add(new URL("/sitemap_index.xml", u.origin).toString());
+  }
+
+  const discovered: string[] = [];
+  for (const url of tryUrls) {
+    const text = await fetchTextMaybeGzip(url);
+    if (!text) continue;
+
+    if (url.endsWith("/robots.txt")) {
+      // Parse "Sitemap: <url>" lines
+      const lines = text.split(/\r?\n/);
+      for (const line of lines) {
+        const m = line.match(/^\s*Sitemap:\s*(\S+)\s*$/i);
+        if (m) discovered.push(m[1]);
       }
-    } catch (error) {
-      console.error(`Failed to fetch ${currentUrl}:`, error);
+    } else {
+      // Direct sitemap location
+      discovered.push(url);
     }
   }
+
+  // Expand index files into child sitemaps
+  const out: string[] = [];
+  for (const siteUrl of discovered) {
+    const xml = await fetchTextMaybeGzip(siteUrl);
+    if (!xml) continue;
+    if (/<sitemapindex/i.test(xml)) {
+      const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+      let m; while ((m = re.exec(xml))) out.push(m[1]);
+    } else {
+      out.push(siteUrl);
+    }
+  }
+
+  // Dedup
+  return [...new Set(out)];
+}
+
+async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL)=>boolean): Promise<string[]> {
+  const urls: string[] = [];
+  for (const sm of sitemapUrls) {
+    const xml = await fetchTextMaybeGzip(sm);
+    if (!xml) continue;
+    if (/<urlset/i.test(xml)) {
+      const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+      let m; while ((m = re.exec(xml))) {
+        try {
+          const u = new URL(m[1]);
+          if (hostAllow(u)) urls.push(u.toString());
+        } catch { /* ignore bad */ }
+      }
+    } else if (/<sitemapindex/i.test(xml)) {
+      // already expanded above; safe to ignore
+    }
+  }
+  return [...new Set(urls)];
+}
+
+async function bfsCrawl(finalOrigin: URL, maxPages: number): Promise<string[]> {
+  const visited = new Set<string>();
+  const queue: string[] = [finalOrigin.toString()];
+  const pages: string[] = [];
+
+  while (queue.length && pages.length < maxPages) {
+    const next = queue.shift()!;
+    if (visited.has(next)) continue;
+    visited.add(next);
+
+    const res = await fetch(next, { cf: { cacheTtl: 0 } });
+    // Canonicalize to final URL after redirect
+    const finalUrl = new URL(res.url || next);
+    const html = (await res.text()) || "";
+    pages.push(finalUrl.toString());
+
+    // Extract links using regex (faster than parseHTML)
+    const links = Array.from(html.matchAll(/<a\s+[^>]*href=['"]([^'"]+)['"]/gi))
+      .map(m => m[1]).slice(0, 500);
+
+    for (const href of links) {
+      try {
+        const u = new URL(href, finalUrl);       // resolve relative URLs
+        if (!sameSite(finalOrigin, u)) continue; // stay on same site
+        const abs = u.toString().split("#")[0];
+        if (!visited.has(abs)) queue.push(abs);
+      } catch { /* ignore bad URLs */ }
+    }
+  }
+  return pages;
+}
+
+async function discoverUrls(rootUrl: string): Promise<string[]> {
+  console.log(`[CRAWL] Starting URL discovery for: ${rootUrl}`);
   
-  return Array.from(urls);
+  // Step 1: Resolve final URL after redirects
+  const finalOrigin = await resolveFinalUrl(rootUrl);
+  console.log(`[CRAWL] Final origin after redirects: ${finalOrigin.toString()}`);
+  
+  // Step 2: Try sitemap discovery
+  const sitemaps = await discoverSitemaps(finalOrigin);
+  console.log(`[CRAWL] Found ${sitemaps.length} sitemaps`);
+  
+  let urls: string[] = [];
+  
+  if (sitemaps.length > 0) {
+    // Step 3: Extract URLs from sitemaps
+    const hostAllow = (u: URL) => sameSite(finalOrigin, u);
+    urls = await extractUrlsFromSitemaps(sitemaps, hostAllow);
+    console.log(`[CRAWL] Extracted ${urls.length} URLs from sitemaps`);
+  }
+  
+  // Step 4: Fallback to BFS if no sitemap URLs found
+  if (urls.length === 0) {
+    console.log(`[CRAWL] No sitemap URLs found, falling back to BFS`);
+    urls = await bfsCrawl(finalOrigin, 1000);
+    console.log(`[CRAWL] BFS discovered ${urls.length} URLs`);
+  }
+  
+  // Step 5: Guardrail - mark as failed if still no URLs
+  if (urls.length === 0) {
+    console.error(`[CRAWL] No pages discovered for ${rootUrl} -> ${finalOrigin.toString()}`);
+    throw new Error(`No pages discovered. Final origin: ${finalOrigin.toString()}`);
+  }
+  
+  console.log(`[CRAWL] Total URLs discovered: ${urls.length}`);
+  return urls;
 }
 
 async function fetchPage(url: string) {
