@@ -85,7 +85,7 @@ const ScoringItem: React.FC<ScoringItemProps> = ({
             </div>
             <div className="pt-2 border-t border-gray-100">
               <Link 
-                to="/help/scoring" 
+                to="/score-guide" 
                 className="text-xs text-blue-600 hover:text-blue-800"
               >
                 Learn more →

@@ -30,7 +30,7 @@ export default function CheckPill({
   const handleClick = (e: React.MouseEvent) => {
     if (showGuideLink) {
       e.preventDefault();
-      window.open(`/help/scoring${meta.guideAnchor}`, '_blank');
+      window.open(`/score-guide${meta.guideAnchor}`, '_blank');
     }
   };
 
