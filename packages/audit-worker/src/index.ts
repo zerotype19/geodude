@@ -231,6 +231,14 @@ export default {
         });
       }
 
+      if (req.method === 'GET' && path === '/api/audits') {
+        const result = await getAuditsList(url.searchParams, env);
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       if (req.method === 'GET' && path.startsWith('/api/audits/')) {
         const auditId = path.split('/')[3];
         if (!auditId) {
@@ -472,6 +480,50 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   ctx.waitUntil(runCrawl({ audit_id: id, root_url, max_pages }, env));
 
   return { audit_id: id, status: 'running' };
+}
+
+async function getAuditsList(searchParams: URLSearchParams, env: Env) {
+  const limit = parseInt(searchParams.get('limit') || '50');
+  const offset = parseInt(searchParams.get('offset') || '0');
+  
+  const results = await env.DB.prepare(`
+    SELECT 
+      id,
+      project_id,
+      root_url,
+      started_at,
+      finished_at,
+      status,
+      aeo_score,
+      geo_score,
+      config_json
+    FROM audits 
+    ORDER BY started_at DESC
+    LIMIT ? OFFSET ?
+  `).bind(limit, offset).all();
+
+  // Get page stats for each audit
+  const auditsWithStats = await Promise.all(
+    results.results.map(async (audit: any) => {
+      const pageStats = await env.DB.prepare(
+        "SELECT COUNT(*) as total, AVG(aeo_score) as avg_aeo, AVG(geo_score) as avg_geo FROM audit_page_analysis apa JOIN audit_pages ap ON apa.page_id = ap.id WHERE ap.audit_id = ?"
+      ).bind(audit.id).first();
+
+      return {
+        ...audit,
+        pages_analyzed: pageStats?.total || 0,
+        avg_aeo_score: pageStats?.avg_aeo || 0,
+        avg_geo_score: pageStats?.avg_geo || 0
+      };
+    })
+  );
+
+  return {
+    audits: auditsWithStats,
+    total: auditsWithStats.length,
+    limit,
+    offset
+  };
 }
 
 async function getAudit(auditId: string, env: Env) {

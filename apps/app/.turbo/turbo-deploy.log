@@ -1,0 +1,21 @@
+
+> @geodude/app@ deploy /Users/kevinmcgovern/geodude/geodude/apps/app
+> wrangler pages deploy dist --project-name=geodude-app
+
+
+ ⛅️ wrangler 4.24.3 (update available 4.43.0)
+─────────────────────────────────────────────
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mWarning: Your working directory is a git repo and has uncommitted changes[0m
+
+  To silence this warning, pass in --commit-dirty=true
+
+
+✨ Compiled Worker successfully
+Uploading... (1/3)
+Uploading... (2/3)
+Uploading... (3/3)
+✨ Success! Uploaded 2 files (1 already uploaded) (2.80 sec)
+
+✨ Uploading Functions bundle
+🌎 Deploying...
+✨ Deployment complete! Take a peek over at https://839fb12e.geodude-app.pages.dev

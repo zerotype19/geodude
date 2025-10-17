@@ -33,9 +33,12 @@ export default function AuditsIndex() {
 
   const fetchAudits = async () => {
     try {
-      // For now, we'll create a mock list since we don't have a list endpoint
-      // In production, you'd add GET /api/audits to the worker
-      setAudits([]);
+      const response = await fetch(`${API_BASE}/api/audits`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch audits');
+      }
+      const data = await response.json();
+      setAudits(data.audits || []);
     } catch (error) {
       console.error('Failed to fetch audits:', error);
     } finally {

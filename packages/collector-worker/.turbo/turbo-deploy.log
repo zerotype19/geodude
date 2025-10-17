@@ -1,0 +1,23 @@
+
+> @geodude/collector-worker@ deploy /Users/kevinmcgovern/geodude/geodude/packages/collector-worker
+> wrangler deploy
+
+
+ ⛅️ wrangler 3.114.15 (update available 4.43.0)
+-----------------------------------------------
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+
+  Please update to the latest version to prevent critical errors.
+  Run `npm install --save-dev wrangler@4` to update to the latest version.
+  After installation, run Wrangler with `npx wrangler`.
+
+
+Total Upload: 0.28 KiB / gzip: 0.22 KiB
+Your worker has access to the following bindings:
+- Vars:
+  - HASH_SALT: "prod_salt_6bd61859686eebd3e0caa31f219..."
+Uploaded geodude-collector (3.76 sec)
+Deployed geodude-collector triggers (4.65 sec)
+  https://geodude-collector.kevin-mcgovern.workers.dev
+Current Version ID: 82204f43-1606-4420-9c87-d671286f86d2

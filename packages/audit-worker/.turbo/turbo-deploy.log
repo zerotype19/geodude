@@ -1,0 +1,41 @@
+
+> optiview-audit-worker@1.0.0 deploy /Users/kevinmcgovern/geodude/geodude/packages/audit-worker
+> wrangler deploy
+
+
+ ⛅️ wrangler 3.114.15 (update available 4.43.0)
+-----------------------------------------------
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+
+  Please update to the latest version to prevent critical errors.
+  Run `npm install --save-dev wrangler@4` to update to the latest version.
+  After installation, run Wrangler with `npx wrangler`.
+
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mYou are about to publish a Workers Service that was last published via the Cloudflare Dashboard.[0m
+
+  Edits that have been made via the dashboard will be overridden by your local code and config.
+
+
+? Would you like to continue?
+🤖 Using fallback value in non-interactive context: yes
+Total Upload: 89.16 KiB / gzip: 21.37 KiB
+Worker Startup Time: 14 ms
+Your worker has access to the following bindings:
+- KV Namespaces:
+  - RULES: ede0baa1d4654ecb86a4d1faf7b5fd46
+- D1 Databases:
+  - DB: optiview (17970af4-bbeb-4eea-9684-1464293b137b)
+- Browser:
+  - Name: BROWSER
+- Vars:
+  - PROXY_FETCH_ENDPOINT: "https://fetch.optiview.ai"
+  - CITATIONS_MAX_CONCURRENCY: "3"
+  - CITATIONS_THROTTLE_MS: "400"
+Uploaded optiview-audit-worker (8.98 sec)
+Deployed optiview-audit-worker triggers (2.96 sec)
+  https://optiview-audit-worker.kevin-mcgovern.workers.dev
+  schedule: 0 */6 * * *
+  schedule: 0 14 * * 1
+Current Version ID: 7330a324-3769-4b4c-b216-538288233c6f

@@ -1,0 +1,32 @@
+
+> @optiview/reco-consumer@0.1.0 deploy /Users/kevinmcgovern/geodude/geodude/packages/reco-consumer
+> wrangler deploy
+
+
+ ⛅️ wrangler 3.114.15 (update available 4.43.0)
+-----------------------------------------------
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mThe version of Wrangler you are using is now out-of-date.[0m
+
+  Please update to the latest version to prevent critical errors.
+  Run `npm install --save-dev wrangler@4` to update to the latest version.
+  After installation, run Wrangler with `npx wrangler`.
+
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mCannot find base config file "../../tsconfig.base.json"[0m [tsconfig.json]
+
+    tsconfig.json:2:13:
+[37m      2 │   "extends": [32m"../../tsconfig.base.json"[37m,
+        ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+
+Total Upload: 21.62 KiB / gzip: 5.12 KiB
+Worker Startup Time: 12 ms
+Your worker has access to the following bindings:
+- Vars:
+  - OPENAI_API_BASE: "https://api.openai.com/v1"
+  - OPENAI_MODEL: "gpt-4.5-turbo"
+Uploaded geodude-reco-consumer (8.35 sec)
+Deployed geodude-reco-consumer triggers (1.37 sec)
+  https://geodude-reco-consumer.kevin-mcgovern.workers.dev
+Current Version ID: 9a620d00-51be-46b6-ae76-7a8d6e1680e9
