@@ -759,23 +759,72 @@ async function markAuditFailed(env: Env, auditId: string, reason: string) {
 
 function isEmptyOrErrorPage(html: string): boolean {
   const len = html.length;
-  if (len < 500) return true; // Very short page
+  
+  // Too short to be a real page (but allow for minimal HTML + JS SPA shells)
+  if (len < 200) {
+    console.log(`[EMPTY CHECK] Too short: ${len} bytes`);
+    return true;
+  }
   
   const lower = html.toLowerCase();
-  const badPhrases = [
+  
+  // If it has a DOCTYPE and either a title or body tag, it's probably valid
+  // (even if it's a SPA that loads content via JS)
+  const hasDoctype = lower.includes('<!doctype');
+  const hasTitle = lower.includes('<title');
+  const hasBody = lower.includes('<body');
+  const hasHead = lower.includes('<head');
+  
+  // If page has proper HTML structure, check for error phrases more carefully
+  if (hasDoctype && (hasTitle || (hasHead && hasBody))) {
+    // For pages with valid structure, only check for critical error phrases
+    // (not "coming soon" which is common in e-commerce product listings)
+    const criticalErrorPhrases = [
+      "domain parked",
+      "this domain is for sale",
+      "page cannot be displayed",
+      "site not found",
+      "error 404"
+    ];
+    
+    const foundCriticalError = criticalErrorPhrases.find(phrase => lower.includes(phrase));
+    if (foundCriticalError) {
+      console.log(`[EMPTY CHECK] Found critical error phrase: "${foundCriticalError}"`);
+      return true;
+    }
+    
+    console.log(`[EMPTY CHECK] Valid HTML detected with proper structure`);
+    return false; // Looks like a valid HTML page
+  }
+  
+  // For pages WITHOUT proper HTML structure, be more strict
+  const allBadPhrases = [
     "unsupported service",
     "not configured for this service",
     "domain parked",
     "coming soon",
-    "page cannot be displayed",
-    "this domain is for sale",
     "under construction",
+    "this domain is for sale",
+    "page cannot be displayed",
     "site not found",
     "error 404",
     "access denied"
   ];
   
-  return badPhrases.some(phrase => lower.includes(phrase));
+  const foundBadPhrase = allBadPhrases.find(phrase => lower.includes(phrase));
+  if (foundBadPhrase) {
+    console.log(`[EMPTY CHECK] No HTML structure + error phrase: "${foundBadPhrase}"`);
+    return true;
+  }
+  
+  // If page is under 500 bytes and doesn't have basic HTML structure, reject it
+  if (len < 500) {
+    console.log(`[EMPTY CHECK] Small page without structure`);
+    return true;
+  }
+  
+  console.log(`[EMPTY CHECK] Defaulting to false (valid)`);
+  return false;
 }
 
 function isBlockedHost(url: string): boolean {
@@ -812,20 +861,9 @@ async function precheckDomain(url: string, env: Env): Promise<{
       };
     }
     
-    // Fetch with manual redirect to detect redirect chains
-    const res = await fetchWithIdentity(url, { redirect: 'manual' }, env);
-    
-    // Handle redirects
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get('location');
-      if (location) {
-        const finalUrl = new URL(location, url).href;
-        return {
-          ok: true,
-          finalUrl
-        };
-      }
-    }
+    // Fetch with automatic redirect following (up to 20 redirects by default)
+    // This handles: 301/302 redirects, Cloudflare Waiting Room, and challenge pages
+    const res = await fetchWithIdentity(url, { redirect: 'follow' }, env);
     
     // Check for errors
     if (res.status >= 400) {
@@ -835,16 +873,28 @@ async function precheckDomain(url: string, env: Env): Promise<{
       };
     }
     
+    // Get the final URL after redirects
+    const finalUrl = res.url;
+    
     // Check if page is empty or error page
     const html = await res.text();
+    const htmlPreview = html.slice(0, 300).replace(/\s+/g, ' ');
+    console.log(`[PRECHECK] ${url} -> status=${res.status}, size=${html.length}, finalUrl=${finalUrl}`);
+    console.log(`[PRECHECK HTML] First 300 chars: ${htmlPreview}`);
+    
     if (isEmptyOrErrorPage(html)) {
+      console.log(`[PRECHECK EMPTY] ${url} failed: HTML too short (${html.length} bytes) or contains error phrases`);
       return {
         ok: false,
         reason: 'domain_error_or_empty_page'
       };
     }
     
-    return { ok: true };
+    // Return success with final URL if it changed
+    return {
+      ok: true,
+      finalUrl: finalUrl !== url ? finalUrl : undefined
+    };
   } catch (error: any) {
     return {
       ok: false,
