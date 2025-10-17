@@ -855,6 +855,20 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
         return;
       }
       
+      // Update audit_pages with fetch metadata
+      await env.DB.prepare(
+        `UPDATE audit_pages 
+         SET status_code = ?, 
+             content_type = ?, 
+             html_static = ?
+         WHERE id = ?`
+      ).bind(
+        200, // We only process successful fetches
+        'text/html',
+        html.slice(0, 200000), // Truncate to 200k chars
+        pageRow.id
+      ).run();
+      
       // Save analysis
       await env.DB.prepare(
         `INSERT INTO audit_page_analysis 
