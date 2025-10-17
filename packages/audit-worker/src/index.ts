@@ -81,6 +81,15 @@ export interface ScoringResult {
 }
 
 export default {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    console.log('[CRON] Scheduled event:', event.cron);
+    
+    if (event.cron === '0 14 * * 1') {
+      // Weekly citations run (Mondays 14:00 UTC)
+      await runWeeklyCitations(env);
+    }
+  },
+
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     const path = url.pathname;
@@ -195,9 +204,17 @@ export default {
 
       if (req.method === 'GET' && path.startsWith('/api/citations/list')) {
         const result = await getCitationsList(url.searchParams, env);
-        return new Response(JSON.stringify(result), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (req.method === 'GET' && path.startsWith('/api/insights')) {
+        const result = await getInsights(url.searchParams, env);
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
@@ -1062,12 +1079,17 @@ async function runCitations(req: Request, env: Env) {
     let finalQueries = queries;
     if (!finalQueries || finalQueries.length === 0) {
       console.log('[CITATIONS] Generating default queries');
-      // Get page titles from recent audit for this domain
+      // Get page titles from recent audit for this domain (path depth ≤ 2, title length 12-60)
       const audit = await env.DB.prepare(`
-        SELECT apa.title FROM audit_page_analysis apa
+        SELECT apa.title, ap.url FROM audit_page_analysis apa
         JOIN audit_pages ap ON apa.page_id = ap.id
         JOIN audits a ON ap.audit_id = a.id
         WHERE a.project_id = ? AND ap.url LIKE ?
+        AND apa.title IS NOT NULL 
+        AND LENGTH(apa.title) BETWEEN 12 AND 60
+        AND (
+          LENGTH(ap.url) - LENGTH(REPLACE(ap.url, '/', '')) <= 3
+        )
         ORDER BY ap.fetched_at DESC
         LIMIT 10
       `).bind(project_id, `%${domain}%`).all();
@@ -1089,7 +1111,9 @@ async function runCitations(req: Request, env: Env) {
     // Process each source-query combination with concurrency control
     for (const source of sources) {
       console.log(`[CITATIONS] Processing source: ${source}`);
-      for (const query of finalQueries.slice(0, 24)) { // Max 24 queries per run
+      // Global cap: max 24 queries per run (configurable)
+      const MAX_QUERIES = 24;
+      for (const query of finalQueries.slice(0, MAX_QUERIES)) {
         try {
           // Throttle requests
           await new Promise(resolve => setTimeout(resolve, 400));
@@ -1338,5 +1362,220 @@ async function getCitationsList(searchParams: URLSearchParams, env: Env) {
     citations: processedCitations,
     hasMore: processedCitations.length === limit
   };
+}
+
+async function getInsights(params: URLSearchParams, env: Env) {
+  const project_id = params.get('project_id');
+  const domain = params.get('domain');
+  const audit_id = params.get('audit_id');
+
+  if (!project_id || !domain) {
+    return { error: 'project_id and domain are required' };
+  }
+
+  try {
+    // Get scoring data from audit
+    let auditData = null;
+    if (audit_id) {
+      const auditResult = await env.DB.prepare(`
+        SELECT * FROM audits WHERE id = ? AND project_id = ?
+      `).bind(audit_id, project_id).first();
+      
+      if (auditResult) {
+        auditData = auditResult;
+      }
+    }
+
+    // Get page analysis data for scoring insights
+    const pagesResult = await env.DB.prepare(`
+      SELECT apa.checks_json, apa.aeo_score, apa.geo_score
+      FROM audit_page_analysis apa
+      JOIN audit_pages ap ON apa.page_id = ap.id
+      JOIN audits a ON ap.audit_id = a.id
+      WHERE a.project_id = ? AND a.root_url LIKE ?
+      ORDER BY ap.fetched_at DESC
+      LIMIT 20
+    `).bind(project_id, `%${domain}%`).all();
+
+    // Analyze scoring data
+    const allChecks: Array<{id: string, score: number, weight: number}> = [];
+    pagesResult.results.forEach((page: any) => {
+      try {
+        const checks = JSON.parse(page.checks_json || '[]');
+        allChecks.push(...checks);
+      } catch (e) {
+        // Skip invalid JSON
+      }
+    });
+
+    // Calculate top issues (weight × (3 - score) descending)
+    const checkAverages: Record<string, {score: number, weight: number, count: number}> = {};
+    allChecks.forEach(check => {
+      if (!checkAverages[check.id]) {
+        checkAverages[check.id] = { score: 0, weight: check.weight, count: 0 };
+      }
+      checkAverages[check.id].score += check.score;
+      checkAverages[check.id].count += 1;
+    });
+
+    const topIssues = Object.entries(checkAverages)
+      .map(([id, data]) => ({
+        code: id,
+        score: data.score / data.count,
+        weight: data.weight,
+        impact: data.weight * (3 - (data.score / data.count))
+      }))
+      .sort((a, b) => b.impact - a.impact)
+      .slice(0, 5)
+      .map(issue => ({
+        code: issue.code,
+        score: Math.round(issue.score),
+        weight: issue.weight,
+        impact: issue.impact > 30 ? 'high' : issue.impact > 15 ? 'medium' : 'low',
+        why: getIssueDescription(issue.code, issue.score)
+      }));
+
+    // Calculate quick wins (low score + high weight + easy to implement)
+    const quickWins = Object.entries(checkAverages)
+      .map(([id, data]) => ({
+        code: id,
+        score: data.score / data.count,
+        weight: data.weight
+      }))
+      .filter(check => check.score < 2 && check.weight >= 8) // Low score, decent weight
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 5)
+      .map(win => ({
+        code: win.code,
+        action: getQuickWinAction(win.code),
+        est_lift: win.weight >= 15 ? 'high' : win.weight >= 10 ? 'med' : 'low'
+      }));
+
+    // Get citations data
+    const citationsSummary = await getCitationsSummary(params, env);
+    
+    const visibilitySummary = {
+      by_source: citationsSummary.bySource.map((source: any) => ({
+        source: source.ai_source,
+        cited_pct: source.cited_percentage,
+        mentions: source.total_queries
+      })),
+      last_run: citationsSummary.bySource[0]?.last_run || null
+    };
+
+    return {
+      top_issues: topIssues,
+      quick_wins: quickWins,
+      visibility_summary: visibilitySummary
+    };
+
+  } catch (error) {
+    console.error('[INSIGHTS] Error:', error);
+    return {
+      error: 'Failed to generate insights',
+      top_issues: [],
+      quick_wins: [],
+      visibility_summary: { by_source: [], last_run: null }
+    };
+  }
+}
+
+function getIssueDescription(code: string, score: number): string {
+  const descriptions: Record<string, string> = {
+    'A1': 'No answer block; no jump links',
+    'A2': 'Weak topical cluster; missing pillar links',
+    'A3': 'Missing site authority signals',
+    'A4': 'Content lacks originality markers',
+    'A5': 'Schema errors or missing structured data',
+    'A6': 'Crawlability issues; missing canonicals',
+    'A7': 'UX/performance problems',
+    'A8': 'Missing or outdated sitemaps',
+    'A9': 'Content freshness issues',
+    'A10': 'Not ready for AI Overviews',
+    'G1': 'No citable facts block',
+    'G2': 'Missing provenance schema',
+    'G3': 'Insufficient evidence density',
+    'G4': 'AI crawler access issues',
+    'G5': 'Poor content chunkability',
+    'G6': 'Missing canonical fact URLs',
+    'G7': 'No dataset availability',
+    'G8': 'Missing policy transparency',
+    'G9': 'Update hygiene problems',
+    'G10': 'Poor cluster-to-evidence linking'
+  };
+  return descriptions[code] || 'Unknown issue';
+}
+
+function getQuickWinAction(code: string): string {
+  const actions: Record<string, string> = {
+    'A1': 'Add answer block with jump links to key sections',
+    'A3': 'Add Organization & Person JSON-LD site-wide',
+    'G2': 'Add citation/isBasedOn/license to JSON-LD',
+    'G4': 'Fix robots.txt and ensure SPA parity',
+    'G1': 'Create facts block with 3-7 atomic facts',
+    'A8': 'Generate and submit updated sitemap',
+    'G8': 'Add clear license/AI policy to schema',
+    'A5': 'Fix JSON-LD errors and add missing schema',
+    'G5': 'Structure content with clear headings and sections',
+    'G6': 'Add stable URLs for individual facts'
+  };
+  return actions[code] || 'Review and improve this area';
+}
+
+// Weekly Citations Automation
+async function runWeeklyCitations(env: Env) {
+  try {
+    console.log('[CRON] Starting weekly citations run');
+    
+    // Find recent audits (last 30 days) and group by domain
+    const recentAudits = await env.DB.prepare(`
+      SELECT DISTINCT 
+        project_id,
+        root_url,
+        MAX(started_at) as last_audit
+      FROM audits 
+      WHERE started_at > datetime('now', '-30 days')
+        AND status = 'complete'
+        AND pages_analyzed > 0
+      GROUP BY project_id, root_url
+      ORDER BY last_audit DESC
+      LIMIT 10
+    `).all();
+
+    console.log(`[CRON] Found ${recentAudits.results.length} recent audits to process`);
+
+    for (const audit of recentAudits.results as any[]) {
+      try {
+        const domain = new URL(audit.root_url).hostname;
+        console.log(`[CRON] Processing citations for ${domain}`);
+        
+        // Create a mock request for runCitations
+        const mockRequest = new Request('https://api.optiview.ai/api/citations/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            project_id: audit.project_id,
+            domain: domain,
+            sources: ['chatgpt', 'claude', 'perplexity', 'brave']
+          })
+        });
+
+        const result = await runCitations(mockRequest, env);
+        console.log(`[CRON] Citations completed for ${domain}:`, result.status);
+        
+        // Small delay between domains
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } catch (error) {
+        console.error(`[CRON] Failed to process ${audit.root_url}:`, error);
+        // Continue with next domain
+      }
+    }
+
+    console.log('[CRON] Weekly citations run completed');
+    
+  } catch (error) {
+    console.error('[CRON] Weekly citations run failed:', error);
+  }
 }
 

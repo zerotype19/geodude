@@ -17,6 +17,37 @@ export interface ConnectorEnv {
   BRAVE_API_KEY?: string;
 }
 
+// Retry helper function
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 1,
+  backoffMs: number = 800
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Only retry on 429/5xx errors
+      if (attempt < maxRetries && 
+          (lastError.message.includes('429') || 
+           lastError.message.includes('5') ||
+           lastError.message.includes('timeout'))) {
+        console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${backoffMs}ms`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+        continue;
+      }
+      
+      throw lastError;
+    }
+  }
+  
+  throw lastError;
+}
+
 // Helper function to normalize URLs and match domain
 function normalizeUrl(url: string): string {
   try {
@@ -110,7 +141,8 @@ export async function queryChatGPT(query: string, env: ConnectorEnv): Promise<Co
   }
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const data = await withRetry(async () => {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
@@ -137,7 +169,8 @@ export async function queryChatGPT(query: string, env: ConnectorEnv): Promise<Co
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    return await response.json();
+    });
     const answer_text = data.choices?.[0]?.message?.content || '';
     
     // Try to extract JSON sources from the response
@@ -331,7 +364,7 @@ export function generateDefaultQueries(
   const domainName = domain.replace(/^www\./, '');
   const brandName = brand || domainName.split('.')[0];
   
-  // Core queries
+  // Core seed queries
   queries.push(`what is ${brandName}`);
   queries.push(`what is ${domainName}`);
   queries.push(`site:${domainName} best pages`);
@@ -342,12 +375,33 @@ export function generateDefaultQueries(
   // Add top page titles (filtered for pillar-like content)
   if (pageTitles) {
     const pillarTitles = pageTitles
-      .filter(title => title.length >= 12 && title.length <= 60)
-      .slice(0, 6);
+      .filter(title => {
+        // Filter for pillar-like content: length 12-60, not too generic
+        if (title.length < 12 || title.length > 60) return false;
+        // Skip generic titles
+        const genericWords = ['home', 'about', 'contact', 'privacy', 'terms', 'login', 'signup'];
+        const lowerTitle = title.toLowerCase();
+        if (genericWords.some(word => lowerTitle.includes(word))) return false;
+        return true;
+      })
+      .map(title => title.trim()) // Remove whitespace
+      .filter((title, index, arr) => arr.indexOf(title) === index) // Remove exact duplicates
+      .slice(0, 7); // Take top 7
     
     queries.push(...pillarTitles);
   }
   
-  // Dedupe and limit to 12
-  return [...new Set(queries)].slice(0, 12);
+  // Case-insensitive deduplication and cleanup
+  const seen = new Set<string>();
+  const uniqueQueries = queries
+    .map(q => q.trim())
+    .filter(q => {
+      const lower = q.toLowerCase();
+      if (seen.has(lower)) return false;
+      seen.add(lower);
+      return q.length > 0;
+    });
+  
+  // Limit to 12 total
+  return uniqueQueries.slice(0, 12);
 }
