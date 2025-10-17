@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import CitationsTab from '/src/components/CitationsTab';
+import CheckPill from '/src/components/CheckPill';
+import ScoreBadge from '/src/components/ScoreBadge';
+import ScoreLegend from '/src/components/ScoreLegend';
+import CheckCategories from '/src/components/CheckCategories';
 
 interface Audit {
   id: string;
@@ -210,6 +214,43 @@ export default function AuditDetail() {
     return unique;
   };
 
+  const getAllCheckScores = () => {
+    const allChecks: CheckResult[] = [];
+    
+    pages.forEach(page => {
+      if (page.checks_json) {
+        try {
+          const checks = JSON.parse(page.checks_json);
+          allChecks.push(...checks);
+        } catch (e) {
+          console.error('Failed to parse checks:', e);
+        }
+      }
+    });
+
+    // Group by check ID and calculate average scores
+    const checkAverages: Record<string, { score: number, weight: number, count: number }> = {};
+    
+    allChecks.forEach(check => {
+      if (!checkAverages[check.id]) {
+        checkAverages[check.id] = { score: 0, weight: check.weight, count: 0 };
+      }
+      checkAverages[check.id].score += check.score;
+      checkAverages[check.id].count += 1;
+    });
+
+    // Calculate averages
+    const scores: Record<string, { score: number; weight: number }> = {};
+    Object.entries(checkAverages).forEach(([id, data]) => {
+      scores[id] = {
+        score: Math.round(data.score / data.count),
+        weight: data.weight
+      };
+    });
+
+    return scores;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -374,45 +415,23 @@ export default function AuditDetail() {
           <>
             {/* Score Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">A</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">AEO Score</dt>
-                    <dd className={`text-2xl font-semibold ${getScoreColor(audit.aeo_score)}`}>
-                      {audit.aeo_score ? Math.round(audit.aeo_score) : 'N/A'}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ScoreBadge
+            score={audit.aeo_score}
+            label="AEO Score"
+            icon="A"
+            iconColor="bg-blue-500"
+            penalty={audit.aeo_score && audit.avg_aeo_score ? Math.round(audit.avg_aeo_score - audit.aeo_score) : undefined}
+            penaltyReason={audit.aeo_score && audit.avg_aeo_score && audit.avg_aeo_score - audit.aeo_score > 0 
+              ? "SPA visibility penalty applied (-5 to -10 points for low render gap)" 
+              : undefined}
+          />
 
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">G</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">GEO Score</dt>
-                    <dd className={`text-2xl font-semibold ${getScoreColor(audit.geo_score)}`}>
-                      {audit.geo_score ? Math.round(audit.geo_score) : 'N/A'}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ScoreBadge
+            score={audit.geo_score}
+            label="GEO Score"
+            icon="G"
+            iconColor="bg-green-500"
+          />
 
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="p-5">
@@ -435,6 +454,11 @@ export default function AuditDetail() {
           </div>
         </div>
 
+        {/* Score Legend */}
+        <div className="mb-8">
+          <ScoreLegend />
+        </div>
+
         {/* Top Blockers & Quick Wins */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Top Blockers */}
@@ -450,13 +474,14 @@ export default function AuditDetail() {
                 <div className="space-y-3">
                   {topBlockers.map((blocker, index) => (
                     <div key={blocker.id} className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium text-gray-900">{blocker.id}</span>
-                        <p className="text-sm text-gray-600">Weight: {blocker.weight}</p>
+                      <CheckPill 
+                        code={blocker.id} 
+                        weight={blocker.weight} 
+                        score={Math.round(blocker.score)}
+                      />
+                      <div className="text-xs text-gray-500">
+                        Impact: {Math.round(blocker.impact)}
                       </div>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCheckScoreColor(Math.round(blocker.score))}`}>
-                        {Math.round(blocker.score)}/3
-                      </span>
                     </div>
                   ))}
                 </div>
@@ -476,20 +501,23 @@ export default function AuditDetail() {
               ) : (
                 <div className="space-y-3">
                   {quickWins.map((win, index) => (
-                    <div key={win.id} className="flex items-center justify-between">
-                      <div>
-                        <span className="font-medium text-gray-900">{win.id}</span>
-                        <p className="text-sm text-gray-600">Weight: {win.weight}</p>
-                      </div>
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                        0/3
-                      </span>
+                    <div key={win.id}>
+                      <CheckPill 
+                        code={win.id} 
+                        weight={win.weight} 
+                        score={0}
+                      />
                     </div>
                   ))}
                 </div>
               )}
             </div>
           </div>
+        </div>
+
+        {/* Check Categories */}
+        <div className="mb-8">
+          <CheckCategories scores={getAllCheckScores()} />
         </div>
 
         {/* Pages List */}

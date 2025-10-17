@@ -372,29 +372,42 @@ export function generateDefaultQueries(
   
   // If we have site description, use it to generate relevant queries
   if (siteDescription && siteDescription.length > 10) {
-    // Extract key topics from description
-    // Add primary query about the site's purpose
+    // Add primary brand query
     queries.push(`what is ${brandName}`);
     
-    // Generate queries based on description keywords
-    const descWords = siteDescription.toLowerCase()
+    // Extract meaningful multi-word phrases (2-3 words)
+    const cleanDesc = siteDescription.toLowerCase()
       .replace(/[^\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 4 && !['about', 'website', 'offers', 'provides'].includes(w));
+      .replace(/\s+/g, ' ')
+      .trim();
     
-    // Take first 3 significant keywords for topic queries
-    const topKeywords = [...new Set(descWords)].slice(0, 3);
-    topKeywords.forEach(keyword => {
-      queries.push(`${keyword} ${brandName}`);
-      queries.push(`${brandName} ${keyword}`);
-    });
+    const words = cleanDesc.split(' ');
+    const stopwords = ['the', 'and', 'for', 'with', 'about', 'from', 'that', 'this', 'your', 'our', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 'will', 'would', 'could', 'should'];
     
-    // Add query combining brand with description concept
-    if (descWords.length > 0) {
-      const firstFewWords = siteDescription.split(/\s+/).slice(0, 8).join(' ');
-      if (firstFewWords.length > 15) {
-        queries.push(firstFewWords);
+    // Extract 2-word phrases
+    for (let i = 0; i < words.length - 1; i++) {
+      const phrase = `${words[i]} ${words[i + 1]}`;
+      if (words[i].length > 3 && words[i + 1].length > 3 && 
+          !stopwords.includes(words[i]) && !stopwords.includes(words[i + 1])) {
+        queries.push(phrase);
+        // Also add brand-specific version
+        if (queries.length < 10) {
+          queries.push(`${phrase} ${brandName}`);
+        }
       }
+    }
+    
+    // Extract 3-word phrases for richer context
+    for (let i = 0; i < Math.min(words.length - 2, 5); i++) {
+      const phrase = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
+      if (phrase.length > 15 && phrase.length < 60) {
+        queries.push(phrase);
+      }
+    }
+    
+    // Add full description as a query if it's a good length
+    if (siteDescription.length > 20 && siteDescription.length < 150) {
+      queries.push(siteDescription.slice(0, 100));
     }
   }
   

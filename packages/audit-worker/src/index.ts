@@ -14,8 +14,11 @@ const TARGET_MIN_PAGES = 40;           // we're happy at 40+
 const TARGET_MAX_PAGES = 60;           // don't exceed this
 const MAX_DISCOVER = 120;              // cap discovered queue
 
-// Rendering toggle (off for now)
-const RENDER_ENABLED = false;          // disable browser rendering until fixed
+// Rendering configuration
+const RENDER_MODE: "static" | "rendered" | "dual" = "dual"; // dual: fetch both static + rendered
+const MAX_RENDER_PAGES = 10;           // only render top 10 pages per audit
+const RENDER_TIMEOUT_MS = 8_000;       // 8s max render time per page
+const STATIC_TIMEOUT_MS = 4_000;       // static fetch timeout (fast)
 
 // Legacy constants (keeping for compatibility)
 const MAX_RUN_MS = HARD_TIME_MS;
@@ -148,6 +151,150 @@ async function fetchPageWithTimeout(url: string, ms: number, env: Env): Promise<
   } finally {
     clearTimeout(t);
   }
+}
+
+// Browser rendering helper for JavaScript-heavy pages
+async function browserRender(url: string, env: Env): Promise<string | null> {
+  try {
+    if (!env.BROWSER) {
+      console.warn('[RENDER] Browser binding not available');
+      return null;
+    }
+    
+    const browser = await env.BROWSER.launch();
+    const page = await browser.newPage();
+    
+    // Set timeout and user agent
+    await page.setUserAgent(BOT_UA);
+    
+    // Navigate and wait for network idle
+    await page.goto(url, { 
+      waitUntil: 'networkidle0',
+      timeout: RENDER_TIMEOUT_MS 
+    });
+    
+    // Get rendered HTML
+    const html = await page.content();
+    
+    await page.close();
+    await browser.close();
+    
+    return html || null;
+  } catch (err) {
+    const error = err as Error;
+    console.error(`[RENDER_FAIL] ${url}:`, error.message);
+    return null;
+  }
+}
+
+// Compute render gap ratio (1.0 = fully same, 0.0 = empty static)
+function computeRenderGap(staticHtml: string | null, renderedHtml: string | null): number | null {
+  if (!staticHtml || !renderedHtml) return null;
+  
+  // Normalize whitespace for comparison
+  const staticLen = staticHtml.replace(/\s+/g, ' ').length;
+  const renderedLen = renderedHtml.replace(/\s+/g, ' ').length;
+  
+  if (renderedLen === 0) return null;
+  
+  // Ratio of static to rendered (1 = fully same, 0 = empty static)
+  return Math.min(1.0, staticLen / renderedLen);
+}
+
+// Detect if a page is likely a SPA (Single Page Application)
+function isLikelySPA(html: string): boolean {
+  if (!html || html.length < 100) return true; // Too small = likely SPA shell
+  
+  // Remove script tags, style tags, and comments to focus on content
+  const contentHtml = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, ''); // Remove head entirely
+  
+  // Extract body content
+  const bodyMatch = contentHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const bodyContent = bodyMatch ? bodyMatch[1] : contentHtml;
+  
+  // Remove all HTML tags to get text content
+  const textContent = bodyContent
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // SPA indicators:
+  // 1. Very little text content in body (< 200 chars)
+  const hasMinimalContent = textContent.length < 200;
+  
+  // 2. Presence of SPA root div patterns
+  const hasSPARoot = /<div[^>]*id=["'](root|app|__next|__nuxt)[^>]*>/i.test(bodyContent);
+  
+  // 3. Body is mostly just one div
+  const divCount = (bodyContent.match(/<div/gi) || []).length;
+  const hasMinimalStructure = divCount <= 3;
+  
+  // 4. Check for common SPA framework markers
+  const hasSPAMarkers = 
+    /data-react/i.test(html) ||
+    /ng-version|ng-app/i.test(html) ||
+    /__NEXT_DATA__|__NUXT__|__REACT_DEVTOOLS/i.test(html) ||
+    /vue-app|v-cloak/i.test(html);
+  
+  // Consider it a SPA if:
+  // - Minimal content AND (SPA root OR minimal structure OR SPA markers)
+  return hasMinimalContent && (hasSPARoot || hasMinimalStructure || hasSPAMarkers);
+}
+
+// Smart fetch: dual-mode (static + optionally rendered)
+async function fetchPageSmart(
+  url: string, 
+  env: Env, 
+  pageIndex: number,
+  renderCount: { current: number },
+  isHomepage: boolean = false
+): Promise<{ 
+  staticHtml: string | null; 
+  renderedHtml: string | null; 
+  renderGapRatio: number | null;
+  isSPA: boolean;
+}> {
+  // Always fetch static first (fast, reliable)
+  const staticHtml = await fetchPageWithTimeout(url, STATIC_TIMEOUT_MS, env);
+  let renderedHtml: string | null = null;
+  let isSPA = false;
+  
+  if (!staticHtml) {
+    return { staticHtml: null, renderedHtml: null, renderGapRatio: null, isSPA: false };
+  }
+  
+  // Detect if this is a SPA
+  isSPA = isLikelySPA(staticHtml);
+  
+  // Only render if:
+  // 1. We're in dual/rendered mode
+  // 2. Haven't hit render limit
+  // 3. This is a top page (first 10) OR homepage
+  // 4. SPA is detected (to save quota)
+  const shouldRender = RENDER_MODE !== 'static' && 
+                      renderCount.current < MAX_RENDER_PAGES && 
+                      (pageIndex < MAX_RENDER_PAGES || isHomepage) &&
+                      isSPA; // Only render if SPA detected
+  
+  if (shouldRender) {
+    console.log(`[SPA DETECTED] ${url} - rendering...`);
+    renderedHtml = await browserRender(url, env);
+    if (renderedHtml) {
+      renderCount.current++;
+      console.log(`[RENDER] ${url} (${renderCount.current}/${MAX_RENDER_PAGES})`);
+    }
+  } else if (isSPA && renderCount.current >= MAX_RENDER_PAGES) {
+    console.log(`[SPA DETECTED] ${url} - skipping (quota: ${renderCount.current}/${MAX_RENDER_PAGES})`);
+  }
+  
+  // Compute gap ratio if we have both
+  const renderGapRatio = computeRenderGap(staticHtml, renderedHtml);
+  
+  return { staticHtml, renderedHtml, renderGapRatio, isSPA };
 }
 
 function hostKey(u: URL): string {
@@ -817,9 +964,14 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
   }
   
   let analyzed = 0;
+  const renderCount = { current: 0 }; // Track renders across parallel operations
+  
+  // Get audit root URL to detect homepage
+  const rootUrl = audit.root_url || '';
+  const rootUrlNormalized = rootUrl.replace(/\/$/, ''); // Remove trailing slash
   
   // 3) Process in parallel with time budget
-  await pMap(queue, async (url) => {
+  await pMap(queue, async (url, index) => {
     if (Date.now() - started > PER_REQUEST_BUDGET_MS) return; // stay < 30s
     
     // Check robots.txt
@@ -835,15 +987,60 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
       return;
     }
     
-    // Fetch with timeout (no rendering)
-    const html = await fetchPageWithTimeout(url, PER_PAGE_TIMEOUT_MS, env);
-    if (!html) return;
+    // Detect if this is the homepage (exact match or with trailing slash)
+    const urlNormalized = url.replace(/\/$/, '');
+    const isHomepage = urlNormalized === rootUrlNormalized || 
+                      url === rootUrl || 
+                      urlNormalized === rootUrl.replace(/\/$/, '');
+    
+    // Smart fetch: static + optionally rendered (prioritize homepage)
+    const { staticHtml, renderedHtml, renderGapRatio, isSPA } = await fetchPageSmart(
+      url, 
+      env, 
+      index, 
+      renderCount, 
+      isHomepage
+    );
+    
+    // Use rendered HTML if available, fallback to static
+    const htmlToAnalyze = renderedHtml || staticHtml;
+    if (!htmlToAnalyze) return;
     
     // Extract and score
     try {
-      const extract = await extractAll(html, url);
+      const extract = await extractAll(htmlToAnalyze, url);
       const weights = await loadWeights(env.RULES);
       const scores = scorePage(extract, weights);
+      
+      // Add A11 check for render visibility (SPA risk)
+      let a11Score = 3; // Default: full visibility
+      let a11Weight = weights.aeo.A11 || 10;
+      let a11Evidence = { found: true, details: 'Full content visibility' };
+      
+      if (renderGapRatio !== null) {
+        if (renderGapRatio < 0.3) {
+          a11Score = 0; // Poor: <30% visible
+          a11Evidence = { found: false, details: `SPA risk: Only ${Math.round(renderGapRatio * 100)}% of content visible without JavaScript. GPTBot may not see this content.` };
+        } else if (renderGapRatio < 0.5) {
+          a11Score = 1; // Weak: <50% visible
+          a11Evidence = { found: false, details: `Partial visibility: ${Math.round(renderGapRatio * 100)}% of content in static HTML. Some AI crawlers may miss content.` };
+        } else if (renderGapRatio < 0.7) {
+          a11Score = 2; // Moderate: <70% visible
+          a11Evidence = { found: true, details: `Good visibility: ${Math.round(renderGapRatio * 100)}% of content available in static HTML.` };
+        } else {
+          a11Score = 3; // Strong: ≥70% visible
+          a11Evidence = { found: true, details: `Excellent visibility: ${Math.round(renderGapRatio * 100)}% of content in static HTML.` };
+        }
+      }
+      
+      // Add A11 to checks array
+      const checksWithA11 = [
+        ...scores.items,
+        { id: 'A11', score: a11Score, weight: a11Weight, evidence: a11Evidence }
+      ];
+      
+      // Recalculate AEO score with A11
+      const aeoWithA11 = (scores.aeo * 3 + (a11Score * a11Weight)) / 3; // Weighted average
       
       // Get page_id
       const pageRow: any = await env.DB.prepare(
@@ -855,7 +1052,7 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
         return;
       }
       
-      // Update audit_pages with fetch metadata
+      // Update audit_pages with fetch metadata (both static and rendered HTML)
       await env.DB.prepare(
         `UPDATE audit_pages 
          SET status_code = ?, 
@@ -865,15 +1062,15 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
       ).bind(
         200, // We only process successful fetches
         'text/html',
-        html.slice(0, 200000), // Truncate to 200k chars
+        (staticHtml || htmlToAnalyze).slice(0, 200000), // Store static HTML, truncate to 200k chars
         pageRow.id
       ).run();
       
-      // Save analysis
+      // Save analysis with rendered HTML, gap ratio, and A11 check
       await env.DB.prepare(
         `INSERT INTO audit_page_analysis 
-         (id, page_id, title, h1, canonical, schema_types, jsonld, checks_json, aeo_score, geo_score, analyzed_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+         (id, page_id, title, h1, canonical, schema_types, jsonld, checks_json, aeo_score, geo_score, rendered_html, render_gap_ratio, analyzed_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       ).bind(
         crypto.randomUUID(),
         pageRow.id,
@@ -882,9 +1079,11 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
         extract.canonical || '',
         JSON.stringify(extract.schemaTypes || []),
         JSON.stringify(extract.jsonldRaw || []),
-        JSON.stringify(scores.items || []),
-        scores.aeo,
-        scores.geo
+        JSON.stringify(checksWithA11 || []),
+        Math.round(aeoWithA11 * 100) / 100,
+        scores.geo,
+        renderedHtml ? renderedHtml.slice(0, 200000) : null, // Store rendered HTML if available
+        renderGapRatio // Store gap ratio for SPA detection
       ).run();
       
       analyzed++;
@@ -937,6 +1136,18 @@ async function getAuditStats(env: Env, auditId: string): Promise<{ pages_analyze
 }
 
 // Helper to finalize audit with scores
+// Helper: Get average render gap ratio for an audit
+async function getAverageRenderGap(env: Env, auditId: string): Promise<number | null> {
+  const result: any = await env.DB.prepare(
+    `SELECT AVG(render_gap_ratio) as avg_gap 
+     FROM audit_page_analysis apa
+     JOIN audit_pages ap ON apa.page_id = ap.id
+     WHERE ap.audit_id = ? AND render_gap_ratio IS NOT NULL`
+  ).bind(auditId).first();
+  
+  return result?.avg_gap ?? null;
+}
+
 async function finalizeAudit(env: Env, auditId: string, reason: string): Promise<void> {
   // Compute site scores from analyzed pages
   const scores: any = await env.DB.prepare(
@@ -946,8 +1157,25 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
      WHERE ap.audit_id = ?`
   ).bind(auditId).first();
   
-  const aeo = Math.round((scores?.aeo || 0) * 100) / 100;
-  const geo = Math.round((scores?.geo || 0) * 100) / 100;
+  let baseAeo = scores?.aeo || 0;
+  let baseGeo = scores?.geo || 0;
+  
+  // Apply render gap penalty (SPA visibility risk)
+  const avgRenderGap = await getAverageRenderGap(env, auditId);
+  let spaPenalty = 0;
+  
+  if (avgRenderGap !== null) {
+    if (avgRenderGap < 0.3) {
+      spaPenalty = 10; // Severe: <30% content in static HTML
+      console.log(`[SPA PENALTY] ${auditId}: -10 points (gap: ${Math.round(avgRenderGap * 100)}%)`);
+    } else if (avgRenderGap < 0.5) {
+      spaPenalty = 5; // Moderate: <50% content in static HTML
+      console.log(`[SPA PENALTY] ${auditId}: -5 points (gap: ${Math.round(avgRenderGap * 100)}%)`);
+    }
+  }
+  
+  const aeo = Math.max(0, Math.round((baseAeo - spaPenalty) * 100) / 100);
+  const geo = Math.round(baseGeo * 100) / 100;
   
   await env.DB.prepare(
     `UPDATE audits 
@@ -958,7 +1186,7 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
      WHERE id = ?`
   ).bind(aeo, geo, auditId).run();
   
-  console.log(`[FINALIZED] ${auditId}: ${reason} (AEO: ${aeo}, GEO: ${geo})`);
+  console.log(`[FINALIZED] ${auditId}: ${reason} (AEO: ${aeo}, GEO: ${geo}, Gap: ${avgRenderGap ? Math.round(avgRenderGap * 100) + '%' : 'N/A'})`);
 }
 
 // API Route Handlers
@@ -1866,7 +2094,7 @@ async function loadWeights(rules: KVNamespace): Promise<ScoringRules> {
   if (!rulesStr) {
     // Return defaults if not seeded
     return {
-      aeo: { A1:15, A2:15, A3:15, A4:12, A5:10, A6:10, A7:8, A8:6, A9:5, A10:4 },
+      aeo: { A1:15, A2:15, A3:15, A4:12, A5:10, A6:10, A7:8, A8:6, A9:5, A10:4, A11:10 },
       geo: { G1:15, G2:15, G3:12, G4:12, G5:10, G6:8, G7:8, G8:6, G9:7, G10:7 },
       patterns: {
         facts_headings: ["key facts","at-a-glance","highlights","summary"],
@@ -2439,10 +2667,29 @@ async function getInsights(params: URLSearchParams, env: Env) {
       last_run: citationsSummary.bySource[0]?.last_run || null
     };
 
+    // Check for SPA visibility risk
+    const spaInsights: any[] = [];
+    if (audit_id) {
+      const avgRenderGap = await getAverageRenderGap(env, audit_id);
+      
+      if (avgRenderGap !== null && avgRenderGap < 0.5) {
+        spaInsights.push({
+          code: "SPA_RISK",
+          message: avgRenderGap < 0.3
+            ? "Severe SPA visibility risk — most content requires JavaScript rendering"
+            : "Moderate SPA risk — some content requires JavaScript rendering",
+          impact: avgRenderGap < 0.3 ? "high" : "medium",
+          recommendation: "Use server-side rendering (SSR) or pre-render static content to ensure GPTBot and ClaudeBot can see it. Test with 'curl' or 'View Source' to verify content visibility.",
+          render_gap: Math.round(avgRenderGap * 100) + '%'
+        });
+      }
+    }
+
     return {
       top_issues: topIssues,
       quick_wins: quickWins,
-      visibility_summary: visibilitySummary
+      visibility_summary: visibilitySummary,
+      spa_insights: spaInsights
     };
 
   } catch (error) {
@@ -2468,6 +2715,7 @@ function getIssueDescription(code: string, score: number): string {
     'A8': 'Missing or outdated sitemaps',
     'A9': 'Content freshness issues',
     'A10': 'Not ready for AI Overviews',
+    'A11': 'SPA risk — content hidden behind JavaScript',
     'G1': 'No citable facts block',
     'G2': 'Missing provenance schema',
     'G3': 'Insufficient evidence density',
@@ -2486,6 +2734,7 @@ function getQuickWinAction(code: string): string {
   const actions: Record<string, string> = {
     'A1': 'Add answer block with jump links to key sections',
     'A3': 'Add Organization & Person JSON-LD site-wide',
+    'A11': 'Enable server-side rendering or pre-render key content',
     'G2': 'Add citation/isBasedOn/license to JSON-LD',
     'G4': 'Fix robots.txt and ensure SPA parity',
     'G1': 'Create facts block with 3-7 atomic facts',

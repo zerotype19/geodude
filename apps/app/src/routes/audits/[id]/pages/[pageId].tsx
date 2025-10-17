@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import CheckPill from '/src/components/CheckPill';
 
 interface PageDetails {
   id: string;
@@ -348,8 +349,12 @@ export default function PageDetail() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {aeoChecks.map((check) => (
                           <tr key={check.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {check.id}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <CheckPill 
+                                code={check.id} 
+                                weight={check.weight} 
+                                score={check.score}
+                              />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCheckScoreColor(check.score)}`}>
@@ -389,8 +394,12 @@ export default function PageDetail() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {geoChecks.map((check) => (
                           <tr key={check.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {check.id}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <CheckPill 
+                                code={check.id} 
+                                weight={check.weight} 
+                                score={check.score}
+                              />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCheckScoreColor(check.score)}`}>

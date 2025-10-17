@@ -19,7 +19,7 @@
 
 ## AEO (Answer Engine Optimization)
 
-### A1 — Answer-first design (weight 15)
+### A1 — Answer-first design (weight 15) {#a1-answer-first-design}
 
 **What we check:** A concise answer in the first ~600–800 chars, jump links/ToC, a scannable list/table near the top.
 **Why it matters:** Reduces pogo-sticking; aligns with engagement-re-ranking and snippet eligibility.
@@ -30,117 +30,147 @@
 **Checklist:** answer block, ToC, H2 steps, short paragraphs.
 **Tooltip:** *"Put the answer at the top with jump links and a scannable list/table."*
 
-### A2 — Topical cluster integrity (15)
+### A2 — Topical cluster integrity (15) {#a2-topical-cluster-integrity}
 
 **Checks:** Page links to/from a pillar; breadcrumb present; cluster-internal links use descriptive anchors.
 **Win:** Create a pillar ("/topic/") and 6–15 focused subpages; interlink them; add breadcrumbs.
 **Tooltip:** *"Belongs to a tight cluster with pillar links and breadcrumb."*
 
-### A3 — Host / site-level authority (15)
+### A3 — Host / site-level authority (15) {#a3-host-site-level-authority}
 
 **Checks:** Valid `Organization` + `Person` JSON-LD, About/Contact, author pages.
 **Win:** Add **Organization** schema site-wide; author bios with credentials; visible editorial standards.
 **Tooltip:** *"Clear Organization & Author identity with valid schema."*
 
-### A4 — Originality & effort (12)
+### A4 — Originality & effort (12) {#a4-originality-effort}
 
 **Checks:** Unique assets: data tables, tools, diagrams, code; references/method notes.
 **Win:** Publish a downloadable asset (CSV/JSON, calculator, diagram) and explain your method.
 **Tooltip:** *"Unique assets & method—hard to copy."*
 
-### A5 — Schema accuracy & breadth (10)
+### A5 — Schema accuracy & breadth (10) {#a5-schema-accuracy-breadth}
 
 **Checks:** Valid JSON-LD types (`Article`, `HowTo`, `FAQPage`, `QAPage`, `Product`, `BreadcrumbList`)—no errors.
 **Win:** Use server-rendered JSON-LD; minimum viable properties per type; validate.
 **Tooltip:** *"Correct JSON-LD for the page intent; no errors."*
 
-### A6 — Crawlability & canonicals (10)
+### A6 — Crawlability & canonicals (10) {#a6-crawlability-canonicals}
 
 **Checks:** Self-canonical; unique title/H1; not `noindex`; no duplicate canonicals in cluster.
 **Win:** One canonical per URL; dedupe similar pages; stable titles/H1s.
 **Tooltip:** *"Self-canonical, unique title/H1; crawlable."*
 
-### A7 — UX & performance proxies (8)
+### A7 — UX & performance proxies (8) {#a7-ux-performance-proxies}
 
 **Checks:** No big CLS above the fold; images have width/height; proper viewport; lazy-load below fold.
 **Win:** Reserve image space; avoid layout shifts near the answer block.
 **Tooltip:** *"Stable above-the-fold; no jumpy layout."*
 
-### A8 — Sitemaps & discoverability (6)
+### A8 — Sitemaps & discoverability (6) {#a8-sitemaps-discoverability}
 
 **Checks:** `/sitemap.xml` exists; fresh `lastmod`; child sitemaps valid.
 **Win:** Generate per-section sitemaps; keep `lastmod` accurate.
 **Tooltip:** *"Sitemap present & fresh."*
 
-### A9 — Freshness & stability (5)
+### A9 — Freshness & stability (5) {#a9-freshness-stability}
 
 **Checks:** `dateModified` present and increasing; internal links not 404; URL stable.
 **Win:** Update cadence by topic; keep URLs stable; maintain link health.
 **Tooltip:** *"Shows updates; links work; URLs stay put."*
 
-### A10 — AI Overviews readiness (4)
+### A10 — AI Overviews readiness (4) {#a10-ai-overviews-readiness}
 
 **Checks:** Clear task framing, steps/pros-cons/safety notes, at least one credible external citation.
 **Win:** Add a "Summary" + "Steps" + "Considerations/Safety" + "Sources" section.
 **Tooltip:** *"Complete, safe, and well-cited answer for AIO."*
 
+### A11 — Render Visibility (SPA Risk) (10) {#a11-render-visibility-spa-risk}
+
+**What we check:** How much of your page's main content is visible in the raw HTML versus only after JavaScript execution.
+
+**Scoring Rubric:**
+
+| Score | Condition | Interpretation |
+|-------|-----------|----------------|
+| **3 (Strong)** | ≥70% of content visible in static HTML | Excellent — GPTBot and ClaudeBot will see your content easily |
+| **2 (Moderate)** | 50–70% visible in static HTML | Mostly visible — minor SPA usage acceptable |
+| **1 (Weak)** | 30–50% visible in static HTML | Partial visibility; some AI crawlers may miss content |
+| **0 (Poor)** | <30% visible in static HTML | Severe SPA risk — most AI crawlers won't capture this content |
+
+**Why it matters:** AI crawlers like GPTBot, ClaudeBot, and Perplexity typically don't execute JavaScript. If your content only appears after React/Vue/Angular hydration, these crawlers see an empty page. This directly impacts your ability to be cited in ChatGPT, Claude, and Perplexity answers.
+
+**How to win:**
+* Use **server-side rendering (SSR)** or **static site generation (SSG)** where possible
+* Ensure key content, metadata, and structured data are **present in HTML at response time**
+* Test your URLs with `curl` or browser "View Source" — if you can't see your content there, AI crawlers can't either
+* Avoid loading all content through client-side hydration or post-load JavaScript
+* Consider Next.js (SSR/SSG), Nuxt, SvelteKit, or Astro for better crawler visibility
+
+**Example:**
+* **Good:** `/about` page includes `<h1>About Us</h1>` and full content in HTML response
+* **Bad:** `/about` page loads empty `<div id="root"></div>` until JavaScript executes
+
+**Site-level penalty:** If your average render visibility falls below 50%, your AEO score receives a **-5 to -10 point penalty** to reflect the reduced crawler visibility.
+
+**Tooltip:** *"Content visible in raw HTML vs only after JavaScript renders."*
+
 ## GEO (Generative Engine Optimization)
 
-### G1 — Citable "Key Facts" block (15)
+### G1 — Citable "Key Facts" block (15) {#g1-citable-key-facts-block}
 
 **Checks:** "Key facts / At-a-glance" near top; 3–7 atomic bullets; optional anchors per fact.
 **Win:** Add a facts box with **stable IDs** (`#fact-eligibility-2025`).
 **Tooltip:** *"3–7 atomic facts near the top (anchored)."*
 
-### G2 — Provenance schema (15)
+### G2 — Provenance schema (15) {#g2-provenance-schema}
 
 **Checks:** `Article/CreativeWork` with `author`, `publisher`, `datePublished`, `dateModified`, `citation`, `isBasedOn`, `license`.
 **Win:** Include sources in JSON-LD, not just on page.
 **Tooltip:** *"Author, publisher, dates + citation/isBasedOn/license in JSON-LD."*
 
-### G3 — Evidence density (12)
+### G3 — Evidence density (12) {#g3-evidence-density}
 
 **Checks:** References section; outbound links to high-trust domains; tables/footnotes present.
 **Win:** Add **References** with primary sources and in-page tables (not images).
 **Tooltip:** *"Good references & real data tables."*
 
-### G4 — AI crawler access & parity (12)
+### G4 — AI crawler access & parity (12) {#g4-ai-crawler-access-parity}
 
 **Checks:** robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks.
 **Win:** Set your desired allow/deny; ensure server HTML contains key content/schema.
 **Tooltip:** *"Bots allowed/denied intentionally; content matches rendered."*
 
-### G5 — Chunkability & structure (10)
+### G5 — Chunkability & structure (10) {#g5-chunkability-structure}
 
 **Checks:** Short paragraphs; semantic headings; glossary; TL;DR summary.
 **Win:** Add TL;DR, Glossary, and keep sections small and well-labeled.
 **Tooltip:** *"Chunked content with summary & glossary."*
 
-### G6 — Canonical fact URLs (8)
+### G6 — Canonical fact URLs (8) {#g6-canonical-fact-urls}
 
 **Checks:** One URL per fact topic; stable anchor names.
 **Win:** Split omnibus pages; add stable anchors for linkable facts.
 **Tooltip:** *"Stable URLs/anchors for individual facts."*
 
-### G7 — Dataset availability (8)
+### G7 — Dataset availability (8) {#g7-dataset-availability}
 
 **Checks:** Downloadable CSV/JSON with version notes.
 **Win:** Host a `/datasets/` file per table; link it from the page.
 **Tooltip:** *"Provide CSV/JSON with versions."*
 
-### G8 — Policy transparency (6)
+### G8 — Policy transparency (6) {#g8-policy-transparency}
 
 **Checks:** Visible content license/AI reuse stance in UI + JSON-LD `license`.
 **Win:** Add a site-wide policy page and link it; include `license` in schema.
 **Tooltip:** *"Clear license/AI policy shown & in schema."*
 
-### G9 — Update hygiene (7)
+### G9 — Update hygiene (7) {#g9-update-hygiene}
 
 **Checks:** Visible changelog/"What changed" and `dateModified` aligned.
 **Win:** Add a small changelog block or `<details>` with edits and dates.
 **Tooltip:** *"Changelog + dateModified kept in sync."*
 
-### G10 — Cluster ↔ evidence linking (7)
+### G10 — Cluster ↔ evidence linking (7) {#g10-cluster-evidence-linking}
 
 **Checks:** Pillars link to a `/sources` hub; hub links back.
 **Win:** Build a central **Sources/Research** page; link both ways.

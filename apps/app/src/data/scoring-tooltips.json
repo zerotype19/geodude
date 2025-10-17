@@ -69,6 +69,13 @@
     "description": "Clear task framing, steps/pros-cons/safety notes, at least one credible external citation.",
     "howToWin": "Add a 'Summary' + 'Steps' + 'Considerations/Safety' + 'Sources' section."
   },
+  "A11": {
+    "title": "Render Visibility (SPA Risk)",
+    "weight": 10,
+    "tooltip": "Content visible in raw HTML vs only after JavaScript renders.",
+    "description": "Checks how much of your site's content is visible in raw HTML versus after JavaScript rendering. A low score means GPTBot and ClaudeBot may not see your main content.",
+    "howToWin": "Use server-side rendering (SSR) or pre-render key content. Make sure important text and schema appear in the initial HTML response. Test with 'View Source' - if it's blank, AI crawlers can't see it."
+  },
   "G1": {
     "title": "Citable 'Key Facts' block",
     "weight": 15,
