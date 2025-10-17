@@ -9,8 +9,10 @@ export interface Env {
   BROWSER: Browser;
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
+  CLAUDE_API_KEY?: string;
   PERPLEXITY_API_KEY?: string;
   BRAVE_API_KEY?: string;
+  BRAVE_SEARCH?: string;
 }
 
 export interface AuditRequest {

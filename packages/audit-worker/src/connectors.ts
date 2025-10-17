@@ -13,8 +13,10 @@ export interface ConnectorResult {
 export interface ConnectorEnv {
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
+  CLAUDE_API_KEY?: string;
   PERPLEXITY_API_KEY?: string;
   BRAVE_API_KEY?: string;
+  BRAVE_SEARCH?: string;
 }
 
 // Retry helper function
@@ -206,7 +208,8 @@ export async function queryChatGPT(query: string, env: ConnectorEnv): Promise<Co
 
 // Claude Connector
 export async function queryClaude(query: string, env: ConnectorEnv): Promise<ConnectorResult> {
-  if (!env.ANTHROPIC_API_KEY) {
+  const apiKey = env.ANTHROPIC_API_KEY || env.CLAUDE_API_KEY;
+  if (!apiKey) {
     return { source: 'claude', query, answer_text: '', cited_urls: [], confidence: 0, error: 'API key not configured' };
   }
 
@@ -214,7 +217,7 @@ export async function queryClaude(query: string, env: ConnectorEnv): Promise<Con
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': env.ANTHROPIC_API_KEY,
+        'x-api-key': apiKey,
         'Content-Type': 'application/json',
         'anthropic-version': '2023-06-01'
       },
@@ -266,14 +269,15 @@ export async function queryClaude(query: string, env: ConnectorEnv): Promise<Con
 
 // Brave Search Connector (for AEO coverage)
 export async function queryBrave(query: string, env: ConnectorEnv): Promise<ConnectorResult> {
-  if (!env.BRAVE_API_KEY) {
+  const apiKey = env.BRAVE_API_KEY || env.BRAVE_SEARCH;
+  if (!apiKey) {
     return { source: 'brave', query, answer_text: '', cited_urls: [], confidence: 0, error: 'API key not configured' };
   }
 
   try {
     const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`, {
       headers: {
-        'X-Subscription-Token': env.BRAVE_API_KEY,
+        'X-Subscription-Token': apiKey,
         'Accept': 'application/json'
       }
     });
