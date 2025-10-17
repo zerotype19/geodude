@@ -1,4 +1,5 @@
 import { getCheckMeta } from "../content/checks";
+import { ID_TO_SLUG } from "../content/score-guide/checks";
 
 type Props = {
   code: string;
@@ -7,6 +8,8 @@ type Props = {
   compact?: boolean;
   showGuideLink?: boolean;
   alwaysShowLabel?: boolean; // Force label to show even on mobile
+  auditId?: string; // For deep-linking context
+  pageId?: string; // For deep-linking context
 };
 
 export default function CheckPill({ 
@@ -15,7 +18,9 @@ export default function CheckPill({
   score, 
   compact = false,
   showGuideLink = true,
-  alwaysShowLabel = false 
+  alwaysShowLabel = false,
+  auditId,
+  pageId
 }: Props) {
   const meta = getCheckMeta(code);
   
@@ -30,7 +35,18 @@ export default function CheckPill({
   const handleClick = (e: React.MouseEvent) => {
     if (showGuideLink) {
       e.preventDefault();
-      window.open(`/score-guide${meta.guideAnchor}`, '_blank');
+      // Build deep-link with audit context
+      const slug = ID_TO_SLUG[code];
+      if (slug) {
+        let url = `/score-guide/${slug}#examples`;
+        if (auditId && pageId) {
+          url += `?from=audits&check=${code}&auditId=${auditId}&pageId=${pageId}`;
+        }
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        // Fallback to old anchor system if slug not found
+        window.open(`/score-guide${meta.guideAnchor}`, '_blank', 'noopener,noreferrer');
+      }
     }
   };
 
