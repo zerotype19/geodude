@@ -14,6 +14,8 @@ interface Audit {
   pages_analyzed: number;
   avg_aeo_score: number;
   avg_geo_score: number;
+  fail_reason?: string;
+  fail_at?: string;
 }
 
 interface CheckResult {
@@ -316,6 +318,51 @@ export default function AuditDetail() {
             </button>
           </nav>
         </div>
+
+        {/* Failure Banner */}
+        {audit.status === 'failed' && (
+          <div className="mb-8 bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-sm font-medium text-red-800">
+                  Audit Failed
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>
+                    {audit.fail_reason === 'non_content_platform' && 
+                      'This platform requires login or is a web application (not a content site). Try a different domain.'}
+                    {audit.fail_reason === 'timeout_no_pages_discovered' && 
+                      'No pages discovered after 2 minutes. The site may be blocking our crawler or have no accessible content.'}
+                    {audit.fail_reason === 'no_crawlable_pages_found' && 
+                      'No crawlable pages found. Check if you entered the correct domain or if the site blocks crawlers.'}
+                    {audit.fail_reason === 'domain_error_or_empty_page' && 
+                      'Domain returned an error page or is not configured. Please check the URL and try again.'}
+                    {audit.fail_reason?.startsWith('precheck_failed') && 
+                      `Domain validation failed: ${audit.fail_reason.replace('precheck_failed_', '').replace(/_/g, ' ')}`}
+                    {(!audit.fail_reason || (
+                      audit.fail_reason !== 'non_content_platform' && 
+                      audit.fail_reason !== 'timeout_no_pages_discovered' &&
+                      audit.fail_reason !== 'no_crawlable_pages_found' &&
+                      audit.fail_reason !== 'domain_error_or_empty_page' &&
+                      !audit.fail_reason.startsWith('precheck_failed')
+                    )) && 
+                      `Reason: ${audit.fail_reason || 'Unknown error'}`}
+                  </p>
+                </div>
+                {audit.fail_at && (
+                  <p className="mt-2 text-xs text-red-600">
+                    Failed at: {new Date(audit.fail_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tab Content */}
         {activeTab === 'citations' ? (

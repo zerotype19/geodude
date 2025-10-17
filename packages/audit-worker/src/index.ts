@@ -3,6 +3,28 @@ import { queryAI, processCitations, generateDefaultQueries } from './connectors'
 // Bot Identity Configuration
 const BOT_UA = "OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)";
 
+// Failure Handling Configuration
+const MAX_RUN_MS = 2 * 60 * 1000; // 2 minutes max runtime
+const PROGRESS_CHECK_INTERVAL = 15_000; // Check every 15 seconds
+
+// Non-crawlable platforms (require login or are web apps, not content sites)
+const BLOCKED_HOSTS = [
+  "github.com",
+  "app.figma.com", 
+  "figma.com",
+  "canva.com",
+  "notion.so",
+  "app.notion.so",
+  "miro.com",
+  "app.miro.com"
+];
+
+// Known redirects (optional - can move to KV later)
+const AUTO_REDIRECTS: Record<string, string> = {
+  "omnicom.com": "https://www.omnicomgroup.com",
+  "ford.com": "https://corporate.ford.com"
+};
+
 export interface Env {
   DB: D1Database;
   RULES: KVNamespace;
@@ -302,6 +324,22 @@ export default {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           });
         }
+
+        if (path === `/api/audits/${auditId}/fail`) {
+          if (req.method !== 'POST') {
+            return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
+              status: 405, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
+          }
+          const body = await req.json() as { reason?: string };
+          const reason = body.reason || 'manual_failure';
+          await markAuditFailed(env, auditId, reason);
+          return new Response(JSON.stringify({ status: 'failed', reason }), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
       }
 
       if (req.method === 'POST' && path === '/api/admin/seed-rules') {
@@ -467,20 +505,210 @@ Crawl-delay: 5</pre>
   }
 } satisfies ExportedHandler<Env>;
 
+// Failure Handling Helpers
+
+async function markAuditFailed(env: Env, auditId: string, reason: string) {
+  console.error(`[AUDIT FAILED] ${auditId}: ${reason}`);
+  await env.DB.prepare(`
+    UPDATE audits 
+    SET status = 'failed', 
+        fail_reason = ?, 
+        fail_at = datetime('now'),
+        finished_at = datetime('now')
+    WHERE id = ?
+  `).bind(reason, auditId).run();
+}
+
+function isEmptyOrErrorPage(html: string): boolean {
+  const len = html.length;
+  if (len < 500) return true; // Very short page
+  
+  const lower = html.toLowerCase();
+  const badPhrases = [
+    "unsupported service",
+    "not configured for this service",
+    "domain parked",
+    "coming soon",
+    "page cannot be displayed",
+    "this domain is for sale",
+    "under construction",
+    "site not found",
+    "error 404",
+    "access denied"
+  ];
+  
+  return badPhrases.some(phrase => lower.includes(phrase));
+}
+
+function isBlockedHost(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return BLOCKED_HOSTS.some(blocked => 
+      hostname === blocked || hostname.endsWith('.' + blocked)
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function precheckDomain(url: string, env: Env): Promise<{
+  ok: boolean;
+  finalUrl?: string;
+  reason?: string;
+}> {
+  try {
+    // Check if blocked host
+    if (isBlockedHost(url)) {
+      return {
+        ok: false,
+        reason: 'non_content_platform'
+      };
+    }
+    
+    // Check known redirects
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (AUTO_REDIRECTS[hostname]) {
+      return {
+        ok: true,
+        finalUrl: AUTO_REDIRECTS[hostname]
+      };
+    }
+    
+    // Fetch with manual redirect to detect redirect chains
+    const res = await fetchWithIdentity(url, { redirect: 'manual' }, env);
+    
+    // Handle redirects
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (location) {
+        const finalUrl = new URL(location, url).href;
+        return {
+          ok: true,
+          finalUrl
+        };
+      }
+    }
+    
+    // Check for errors
+    if (res.status >= 400) {
+      return {
+        ok: false,
+        reason: `precheck_failed_http_${res.status}`
+      };
+    }
+    
+    // Check if page is empty or error page
+    const html = await res.text();
+    if (isEmptyOrErrorPage(html)) {
+      return {
+        ok: false,
+        reason: 'domain_error_or_empty_page'
+      };
+    }
+    
+    return { ok: true };
+  } catch (error: any) {
+    return {
+      ok: false,
+      reason: `precheck_error: ${error.message || 'unknown'}`
+    };
+  }
+}
+
+async function monitorProgress(env: Env, auditId: string) {
+  const started = Date.now();
+  let lastPageCount = 0;
+  let checkCount = 0;
+  const maxChecks = Math.ceil(MAX_RUN_MS / PROGRESS_CHECK_INTERVAL);
+  
+  const check = async () => {
+    checkCount++;
+    
+    // Get current audit status
+    const audit = await env.DB.prepare(
+      'SELECT status FROM audits WHERE id = ? AND status NOT IN (?, ?)'
+    ).bind(auditId, 'complete', 'failed').first();
+    
+    if (!audit) {
+      // Audit completed or failed, stop monitoring
+      return;
+    }
+    
+    // Get page count
+    const result = await env.DB.prepare(
+      'SELECT COUNT(*) as count FROM audit_pages WHERE audit_id = ?'
+    ).bind(auditId).first();
+    
+    const currentCount = (result?.count as number) || 0;
+    
+    // Update last seen count
+    if (currentCount > lastPageCount) {
+      lastPageCount = currentCount;
+    }
+    
+    // Check for timeout
+    const elapsed = Date.now() - started;
+    if (elapsed > MAX_RUN_MS && lastPageCount === 0) {
+      await markAuditFailed(env, auditId, 'timeout_no_pages_discovered');
+      console.warn(`[TIMEOUT] Audit ${auditId} failed: no pages after ${Math.floor(elapsed / 1000)}s`);
+      return;
+    }
+    
+    // Continue monitoring if not at max checks
+    if (checkCount < maxChecks) {
+      setTimeout(() => check(), PROGRESS_CHECK_INTERVAL);
+    }
+  };
+  
+  // Start monitoring after initial delay
+  setTimeout(() => check(), PROGRESS_CHECK_INTERVAL);
+}
+
 // API Route Handlers
 
 async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   const body: AuditRequest = await req.json();
-  const { project_id, root_url, site_description, max_pages = 200, config = {} } = body;
+  let { project_id, root_url, site_description, max_pages = 200, config = {} } = body;
   
   const id = crypto.randomUUID();
   
+  // Pre-check domain validation
+  console.log(`[PRECHECK] Starting validation for: ${root_url}`);
+  const precheck = await precheckDomain(root_url, env);
+  
+  if (!precheck.ok) {
+    // Domain failed validation - create audit as failed immediately
+    await env.DB.prepare(
+      "INSERT INTO audits (id, project_id, root_url, site_description, started_at, finished_at, status, fail_reason, fail_at, config_json) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), 'failed', ?, datetime('now'), ?)"
+    ).bind(id, project_id, root_url, site_description || null, precheck.reason, JSON.stringify(config)).run();
+    
+    console.log(`[PRECHECK FAILED] ${id}: ${precheck.reason}`);
+    return { audit_id: id, status: 'failed', reason: precheck.reason };
+  }
+  
+  // If domain redirects, update root_url
+  if (precheck.finalUrl && precheck.finalUrl !== root_url) {
+    console.log(`[PRECHECK] Redirect detected: ${root_url} → ${precheck.finalUrl}`);
+    root_url = precheck.finalUrl;
+  }
+  
+  // Create audit
   await env.DB.prepare(
     "INSERT INTO audits (id, project_id, root_url, site_description, started_at, status, config_json) VALUES (?, ?, ?, ?, datetime('now'), 'running', ?)"
   ).bind(id, project_id, root_url, site_description || null, JSON.stringify(config)).run();
 
-  // Start crawl in background
-  ctx.waitUntil(runCrawl({ audit_id: id, root_url, site_description, max_pages }, env));
+  // Start progress monitoring
+  ctx.waitUntil(monitorProgress(env, id));
+  
+  // Start crawl in background with error handling
+  ctx.waitUntil((async () => {
+    try {
+      await runCrawl({ audit_id: id, root_url, site_description, max_pages }, env);
+    } catch (error: any) {
+      console.error(`[CRAWL ERROR] ${id}:`, error);
+      await markAuditFailed(env, id, `crawl_error: ${error.message || 'unknown'}`);
+    }
+  })());
 
   return { audit_id: id, status: 'running' };
 }
@@ -704,6 +932,20 @@ async function runCrawl({ audit_id, root_url, site_description, max_pages }: any
       }
     }
 
+    // Check if any pages were analyzed
+    const pageCountResult = await env.DB.prepare(
+      'SELECT COUNT(*) as count FROM audit_pages WHERE audit_id = ?'
+    ).bind(audit_id).first();
+    
+    const pagesAnalyzed = (pageCountResult?.count as number) || 0;
+    
+    if (pagesAnalyzed === 0) {
+      // No pages were successfully crawled - mark as failed
+      await markAuditFailed(env, audit_id, 'no_crawlable_pages_found');
+      console.warn(`[NO PAGES] Audit ${audit_id} failed: 0 pages analyzed`);
+      return;
+    }
+
     // Finalize site scores
     const { aeo, geo } = await computeSiteScores(env.DB, audit_id);
     await env.DB.prepare("UPDATE audits SET finished_at=datetime('now'), status='complete', aeo_score=?, geo_score=? WHERE id=?")
@@ -713,7 +955,7 @@ async function runCrawl({ audit_id, root_url, site_description, max_pages }: any
 
   } catch (error) {
     console.error(`Crawl failed for audit ${audit_id}:`, error);
-    await env.DB.prepare("UPDATE audits SET status='failed' WHERE id=?").bind(audit_id).run();
+    await markAuditFailed(env, audit_id, `crawl_exception: ${(error as Error).message || 'unknown'}`);
   }
 }
 
