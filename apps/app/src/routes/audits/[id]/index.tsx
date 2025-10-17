@@ -43,6 +43,7 @@ export default function AuditDetail() {
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rescoreLoading, setRescoreLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -76,6 +77,39 @@ export default function AuditDetail() {
       console.error('Failed to fetch pages:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRescore = async () => {
+    if (!id) return;
+    
+    setRescoreLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/audits/${id}/recompute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to rescore audit');
+      }
+      
+      const result = await response.json();
+      console.log('Rescore result:', result);
+      
+      // Refresh the audit and pages data
+      await fetchAudit();
+      await fetchPages();
+      
+      // Show success message (you could add a toast notification here)
+      alert('Audit rescored successfully!');
+    } catch (error) {
+      console.error('Failed to rescore audit:', error);
+      alert('Failed to rescore audit. Please try again.');
+    } finally {
+      setRescoreLoading(false);
     }
   };
 
@@ -223,7 +257,31 @@ export default function AuditDetail() {
                 {audit.project_id} • {audit.root_url}
               </p>
             </div>
-            <div className="text-right">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleRescore}
+                disabled={rescoreLoading || audit.status !== 'complete'}
+                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  rescoreLoading || audit.status !== 'complete'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+                title={audit.status !== 'complete' ? 'Only available for completed audits' : 'Rescore existing data with current rules'}
+              >
+                {rescoreLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Rescoring...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Rescore
+                  </>
+                )}
+              </button>
               <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(audit.status)}`}>
                 {audit.status.toUpperCase()}
               </span>
