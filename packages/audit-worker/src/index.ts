@@ -172,17 +172,22 @@ async function getRobots(env: Env, u: URL): Promise<RobotsRules | null> {
 function isAllowedByRobots(rules: RobotsRules | null, path: string): boolean {
   if (!rules) return true; // no robots; treat as allowed
   
-  // Simple longest-match wins: if a Disallow prefix matches, block unless an Allow has a longer match
-  const matches = (pats: string[]) => pats.filter(p => p && path.startsWith(p));
-  const dis = matches(rules.disallow);
-  const alw = matches(rules.allow);
+  // Find all matching disallow rules
+  const disallowMatches = rules.disallow.filter(rule => rule && path.startsWith(rule));
   
-  if (dis.length === 0) return true;
+  // If no disallow rule matches, allow the path
+  if (disallowMatches.length === 0) return true;
   
-  const longestDis = dis.reduce((a, b) => b.length > a.length ? b : a, "");
-  const longestAlw = alw.reduce((a, b) => b.length > a.length ? b : a, "");
+  // Find the longest disallow rule that matches
+  const longestDisallow = disallowMatches.reduce((longest, current) => 
+    current.length > longest.length ? current : longest, "");
   
-  return longestAlw.length > longestDis.length;
+  // Find all matching allow rules that are longer than the longest disallow rule
+  const allowMatches = rules.allow.filter(rule => 
+    rule && path.startsWith(rule) && rule.length > longestDisallow.length);
+  
+  // If we have an allow rule that's longer than the longest disallow rule, allow the path
+  return allowMatches.length > 0;
 }
 
 export interface ScoringResult {
