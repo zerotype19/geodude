@@ -861,39 +861,69 @@ async function discoverSitemaps(finalOrigin: URL, env: Env): Promise<string[]> {
 
   // Expand index files into child sitemaps
   const out: string[] = [];
+  const MAX_SITEMAPS = 50; // Cap to prevent timeout on sites with 100s of sitemaps
+  
   for (const siteUrl of discovered) {
+    if (out.length >= MAX_SITEMAPS) {
+      console.log(`[CRAWL] Sitemap limit reached (${MAX_SITEMAPS}), stopping discovery`);
+      break;
+    }
+    
     const xml = await fetchTextMaybeGzip(siteUrl, env);
     if (!xml) continue;
     if (/<sitemapindex/i.test(xml)) {
       const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
-      let m; while ((m = re.exec(xml))) out.push(m[1]);
+      let m; 
+      while ((m = re.exec(xml))) {
+        out.push(m[1]);
+        if (out.length >= MAX_SITEMAPS) break;
+      }
     } else {
       out.push(siteUrl);
     }
   }
 
-  // Dedup
-  return [...new Set(out)];
+  // Dedup and limit
+  const unique = [...new Set(out)];
+  if (unique.length > MAX_SITEMAPS) {
+    console.log(`[CRAWL] Trimming ${unique.length} sitemaps to ${MAX_SITEMAPS}`);
+    return unique.slice(0, MAX_SITEMAPS);
+  }
+  return unique;
 }
 
 async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL)=>boolean, env: Env): Promise<string[]> {
   const urls: string[] = [];
+  const MAX_URLS_FROM_SITEMAPS = 5000; // Cap to prevent memory/timeout issues
+  
   for (const sm of sitemapUrls) {
+    if (urls.length >= MAX_URLS_FROM_SITEMAPS) {
+      console.log(`[CRAWL] URL extraction limit reached (${MAX_URLS_FROM_SITEMAPS}), stopping`);
+      break;
+    }
+    
     const xml = await fetchTextMaybeGzip(sm, env);
     if (!xml) continue;
     if (/<urlset/i.test(xml)) {
       const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
-      let m; while ((m = re.exec(xml))) {
+      let m; 
+      while ((m = re.exec(xml))) {
         try {
           const u = new URL(m[1]);
-          if (hostAllow(u)) urls.push(u.toString());
+          if (hostAllow(u)) {
+            urls.push(u.toString());
+            if (urls.length >= MAX_URLS_FROM_SITEMAPS) break;
+          }
         } catch { /* ignore bad */ }
       }
     } else if (/<sitemapindex/i.test(xml)) {
       // already expanded above; safe to ignore
     }
   }
-  return [...new Set(urls)];
+  
+  const unique = [...new Set(urls)];
+  console.log(`[CRAWL] Extracted ${unique.length} unique URLs from ${sitemapUrls.length} sitemaps`);
+  return unique;
 }
 
 async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env): Promise<string[]> {
