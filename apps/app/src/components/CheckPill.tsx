@@ -64,6 +64,22 @@ export default function CheckPill({
           {weight && <div>Weight: {weight}</div>}
           {typeof score === "number" && <div>Score: {score}/3</div>}
         </div>
+        
+        {/* G4: Add Google-Extended note */}
+        {code === 'G4' && (
+          <div className="mt-3 pt-3 border-t border-gray-700">
+            <div className="font-medium mb-1">Google-Extended (Training Access)</div>
+            <div className="opacity-80 text-[11px] mb-2">
+              Controls whether Google may use your content for AI model training (separate from normal Googlebot crawling). 
+              Blocking Google-Extended does NOT affect Google Search indexing or AI Overviews visibility.
+            </div>
+            <pre className="rounded bg-gray-800 p-2 text-[10px] overflow-x-auto text-green-300">
+{`User-agent: Google-Extended
+Disallow: /`}
+            </pre>
+          </div>
+        )}
+        
         {showGuideLink && (
           <div className="mt-2 pt-2 border-t border-gray-700">
             <span className="text-blue-300 text-[11px]">Click to open scoring guide →</span>

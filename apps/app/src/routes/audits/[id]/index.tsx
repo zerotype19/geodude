@@ -6,6 +6,7 @@ import ScoreBadge from '/src/components/ScoreBadge';
 import ScoreLegend from '/src/components/ScoreLegend';
 import CheckCategories from '/src/components/CheckCategories';
 import PagesTab from '/src/components/PagesTab';
+import RenderParityPanel from '/src/components/RenderParityPanel';
 
 interface Audit {
   id: string;
@@ -21,6 +22,7 @@ interface Audit {
   avg_geo_score: number;
   fail_reason?: string;
   fail_at?: string;
+  render_gap_ratio?: number; // Average render visibility across all pages (0-1)
 }
 
 interface CheckResult {
@@ -602,6 +604,18 @@ export default function AuditDetail() {
         <div className="mb-8">
           <CheckCategories scores={getAllCheckScores()} />
         </div>
+
+        {/* Render Parity Panel (if data available) */}
+        {typeof audit.render_gap_ratio === 'number' && (
+          <div className="mb-8 bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">HTML vs Rendered DOM Analysis</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              This metric shows how much of your site's content is visible in the raw HTML (server response) 
+              versus content that only appears after JavaScript execution.
+            </p>
+            <RenderParityPanel ratio={audit.render_gap_ratio} />
+          </div>
+        )}
 
         {/* Pages List */}
         <div className="bg-white shadow rounded-lg">

@@ -13,7 +13,7 @@ export const CHECKS: Record<string, CheckMeta> = {
     code: "A1", 
     label: "Answer-first design", 
     category: "Answerability",
-    description: "Concise answer summary at the top with jump links.",
+    description: "Concise answer at the top; add anchors and list/table when helpful (TOC is optional).",
     weightKey: "aeo", 
     guideAnchor: "#a1-answer-first-design" 
   },
@@ -45,7 +45,7 @@ export const CHECKS: Record<string, CheckMeta> = {
     code: "A5", 
     label: "Schema accuracy", 
     category: "Governance",
-    description: "Valid JSON-LD types with no errors.",
+    description: "Valid JSON-LD for page intent. Note: FAQPage/HowTo rich results limited since 2023—use only when truly relevant.",
     weightKey: "aeo", 
     guideAnchor: "#a5-schema-accuracy-breadth" 
   },
@@ -85,7 +85,7 @@ export const CHECKS: Record<string, CheckMeta> = {
     code: "A10", 
     label: "AI Overviews readiness", 
     category: "Answerability",
-    description: "Complete, safe, well-cited answer for AIO.",
+    description: "Complete, safe, well-cited answer. Note: AIO behavior evolves; monitor impressions and traffic over time.",
     weightKey: "aeo", 
     guideAnchor: "#a10-ai-overviews-readiness" 
   },
@@ -93,7 +93,7 @@ export const CHECKS: Record<string, CheckMeta> = {
     code: "A11", 
     label: "Render visibility (SPA risk)", 
     category: "Rendering",
-    description: "How much content is visible without JavaScript.",
+    description: "Keep key content and JSON-LD in HTML. AEO: small site penalty only if <30%. GEO: stricter—bots often don't run JS.",
     weightKey: "aeo", 
     guideAnchor: "#a11-render-visibility-spa-risk" 
   },
@@ -127,7 +127,7 @@ export const CHECKS: Record<string, CheckMeta> = {
     code: "G4", 
     label: "AI crawler access", 
     category: "Access",
-    description: "Robots policy for GPTBot/Claude-Web/Perplexity.",
+    description: "Be explicit with AI bots and ensure HTML≈rendered content. Note: real-world tests show occasional non-compliance; verify via access logs.",
     weightKey: "geo", 
     guideAnchor: "#g4-ai-crawler-access-parity" 
   },
