@@ -433,10 +433,6 @@ export default function AuditDetail() {
             label="AEO Score"
             icon="A"
             iconColor="bg-blue-500"
-            penalty={audit.aeo_score && audit.avg_aeo_score ? Math.round(audit.avg_aeo_score - audit.aeo_score) : undefined}
-            penaltyReason={audit.aeo_score && audit.avg_aeo_score && audit.avg_aeo_score - audit.aeo_score > 0 
-              ? "SPA visibility penalty applied (-5 to -10 points for low render gap)" 
-              : undefined}
           />
 
           <ScoreBadge
