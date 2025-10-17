@@ -44,7 +44,6 @@ export default function CheckPill({
       <span 
         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs border cursor-pointer transition-all hover:shadow-sm ${color}`}
         onClick={handleClick}
-        title={meta.description}
       >
         <span className="font-semibold">{code}</span>
         {!compact && <span className={labelClass}>{meta.label}</span>}
