@@ -1,5 +1,8 @@
 import { queryAI, processCitations, generateDefaultQueries } from './connectors';
 
+// Bot Identity Configuration
+const BOT_UA = "OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)";
+
 export interface Env {
   DB: D1Database;
   RULES: KVNamespace;
@@ -72,6 +75,114 @@ export interface CheckResult {
     details: string;
     snippets?: string[];
   };
+}
+
+// Bot Identity and Robots.txt Support
+type RobotsRules = {
+  fetchedAt: string;
+  group: "bot" | "star";
+  allow: string[];
+  disallow: string[];
+  crawlDelay?: number;
+};
+
+async function fetchWithIdentity(url: string, init: RequestInit = {}, env: Env) {
+  const headers = new Headers(init.headers || {});
+  if (!headers.has("user-agent")) headers.set("user-agent", BOT_UA);
+  headers.set("X-Optiview-Bot", "audit");
+  return fetch(url, { ...init, headers, cf: { cacheTtl: 0 } });
+}
+
+function hostKey(u: URL): string {
+  return `robots:${u.protocol}//${u.host}`;
+}
+
+async function getRobots(env: Env, u: URL): Promise<RobotsRules | null> {
+  const key = hostKey(u);
+  const cached = await env.RULES.get(key);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch (e) {
+      // Invalid cached data, continue to fetch fresh
+    }
+  }
+
+  const robotsUrl = new URL("/robots.txt", `${u.protocol}//${u.host}`).toString();
+  const res = await fetchWithIdentity(robotsUrl, {}, env);
+  if (!res.ok) {
+    return null;
+  }
+  const text = await res.text();
+
+  // Parse robots.txt
+  const lines = text.split(/\r?\n/);
+  let current = "*";
+  const blocks: Record<string, { allow: string[]; disallow: string[]; crawlDelay?: number }> = {};
+  const ensure = (k: string) => (blocks[k] ||= { allow: [], disallow: [] });
+
+  for (const line of lines) {
+    const l = line.trim();
+    if (!l || l.startsWith("#")) continue;
+    
+    const mUA = l.match(/^User-agent:\s*(.+)$/i);
+    if (mUA) {
+      current = mUA[1].trim().toLowerCase();
+      ensure(current);
+      continue;
+    }
+    
+    const mAllow = l.match(/^Allow:\s*(.+)$/i);
+    if (mAllow) {
+      ensure(current).allow.push(mAllow[1].trim());
+      continue;
+    }
+    
+    const mDis = l.match(/^Disallow:\s*(.+)$/i);
+    if (mDis) {
+      ensure(current).disallow.push(mDis[1].trim());
+      continue;
+    }
+    
+    const mDelay = l.match(/^Crawl-delay:\s*(\d+)/i);
+    if (mDelay) {
+      ensure(current).crawlDelay = Number(mDelay[1]);
+      continue;
+    }
+  }
+
+  const botName = "optiviewauditbot"; // lowercase for matching
+  const botGroup = blocks[botName] ? "bot" : "star";
+  const group = botGroup === "bot" ? blocks[botName]! : (blocks["*"] || { allow: [], disallow: [] });
+
+  const rules: RobotsRules = {
+    fetchedAt: new Date().toISOString(),
+    group: botGroup,
+    allow: group.allow,
+    disallow: group.disallow,
+    crawlDelay: group.crawlDelay
+  };
+  
+  // Cache for 24 hours
+  await env.RULES.put(key, JSON.stringify(rules), { expirationTtl: 86400 });
+  return rules;
+}
+
+// Path test: returns true if allowed
+function isAllowedByRobots(rules: RobotsRules | null, path: string): boolean {
+  if (!rules) return true; // no robots; treat as allowed
+  
+  // Simple longest-match wins: if a Disallow prefix matches, block unless an Allow has a longer match
+  const matches = (pats: string[]) => pats.filter(p => p && path.startsWith(p));
+  const dis = matches(rules.disallow);
+  const alw = matches(rules.allow);
+  
+  if (dis.length === 0) return true;
+  
+  const longestDis = dis.reduce((a, b) => b.length > a.length ? b : a, "");
+  const longestAlw = alw.reduce((a, b) => b.length > a.length ? b : a, "");
+  
+  return longestAlw.length > longestDis.length;
 }
 
 export interface ScoringResult {
@@ -215,6 +326,109 @@ export default {
         return new Response(JSON.stringify(result), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Bot documentation endpoints
+      if (req.method === 'GET' && path === '/bot') {
+        const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OptiviewAuditBot</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
+    code { background: #f5f5f5; padding: 0.2em 0.4em; border-radius: 3px; }
+    pre { background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto; }
+    h1, h2 { color: #333; }
+    a { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <h1>OptiviewAuditBot</h1>
+  
+  <p>We are a responsible web crawler that runs site audits you initiate in Optiview. We respect robots.txt directives and follow best practices for web crawling.</p>
+  
+  <h2>Our Identity</h2>
+  <p><strong>User-Agent:</strong> <code>OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)</code></p>
+  <p><strong>Identifying Header:</strong> <code>X-Optiview-Bot: audit</code></p>
+  
+  <h2>What We Respect</h2>
+  <ul>
+    <li><strong>robots.txt</strong> - We check for <code>User-agent: OptiviewAuditBot</code> rules, falling back to <code>*</code></li>
+    <li><strong>Allow/Disallow</strong> - We respect path-based allow/disallow rules</li>
+    <li><strong>Crawl-delay</strong> - We honor crawl delay directives</li>
+    <li><strong>Meta tags</strong> - We respect <code>noindex</code>, <code>nofollow</code>, and <code>noai</code> meta tags</li>
+  </ul>
+  
+  <h2>How to Allow/Block Us</h2>
+  
+  <h3>Allow the bot:</h3>
+  <pre>User-agent: OptiviewAuditBot
+Allow: /</pre>
+  
+  <h3>Block the bot:</h3>
+  <pre>User-agent: OptiviewAuditBot
+Disallow: /</pre>
+  
+  <h3>Block specific paths:</h3>
+  <pre>User-agent: OptiviewAuditBot
+Disallow: /admin/
+Disallow: /private/</pre>
+  
+  <h3>Set crawl delay:</h3>
+  <pre>User-agent: OptiviewAuditBot
+Crawl-delay: 5</pre>
+  
+  <h2>About Our Crawling</h2>
+  <p>We only crawl sites when you explicitly request an audit through Optiview. We:</p>
+  <ul>
+    <li>Fetch pages to analyze AEO/GEO optimization</li>
+    <li>Extract structured data and content signals</li>
+    <li>Respect all robots.txt directives</li>
+    <li>Use reasonable crawl delays</li>
+    <li>Identify ourselves clearly in requests</li>
+  </ul>
+  
+  <h2>Contact</h2>
+  <p>Questions or concerns? Contact us at <a href="mailto:admin@optiview.ai">admin@optiview.ai</a></p>
+  
+  <h2>Machine-Readable Info</h2>
+  <p>For automated systems: <a href="/.well-known/optiview-bot.json">/.well-known/optiview-bot.json</a></p>
+</body>
+</html>`;
+        return new Response(html, {
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'text/html; charset=utf-8'
+          }
+        });
+      }
+
+      if (req.method === 'GET' && path === '/.well-known/optiview-bot.json') {
+        const body = {
+          name: "OptiviewAuditBot",
+          version: "1.0",
+          user_agent: BOT_UA,
+          website: "https://api.optiview.ai/bot",
+          contact: "admin@optiview.ai",
+          respect_robots_txt: true,
+          honors_crawl_delay: true,
+          ip_policy: "Cloudflare egress (AS13335); fixed IPs not guaranteed.",
+          opt_out: {
+            via_robots: [
+              {"group": "User-agent: OptiviewAuditBot", "rule": "Disallow: /"},
+              {"group": "User-agent: *", "rule": "Disallow: /"}
+            ],
+            via_meta: ["noindex", "nofollow", "noai"]
+          }
+        };
+        return new Response(JSON.stringify(body, null, 2), {
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
         });
       }
 
@@ -377,7 +591,7 @@ async function seedRules(env: Env) {
 async function runCrawl({ audit_id, root_url, max_pages }: any, env: Env) {
   try {
     // Discover URLs
-    const discovered = await discoverUrls(root_url);
+    const discovered = await discoverUrls(root_url, env);
     const queue = [...discovered].slice(0, max_pages);
 
     console.log(`Starting crawl for ${queue.length} URLs`);
@@ -385,7 +599,7 @@ async function runCrawl({ audit_id, root_url, max_pages }: any, env: Env) {
     // Process each URL
     for (const url of queue) {
       try {
-        const page = await fetchPage(url);
+        const page = await fetchPage(url, env);
         if (!page.html) continue;
 
         const rendered = await maybeRender(url, page.html, env.BROWSER);
@@ -506,9 +720,9 @@ function parseHTML(html: string) {
 }
 
 // Helper functions for redirect-aware crawling
-async function resolveFinalUrl(input: string): Promise<URL> {
+async function resolveFinalUrl(input: string, env: Env): Promise<URL> {
   // Default fetch in Workers follows redirects. We rely on res.url for the final URL.
-  const res = await fetch(input, { cf: { cacheTtl: 0 } });
+  const res = await fetchWithIdentity(input, {}, env);
   // If host is blocking HTML, still trust res.url for canonical origin.
   const finalUrl = new URL(res.url || input);
   return finalUrl;
@@ -535,8 +749,8 @@ function sameSite(base: URL, candidate: URL): boolean {
   return etld1(base.hostname) === etld1(candidate.hostname) && base.protocol === candidate.protocol;
 }
 
-async function fetchTextMaybeGzip(url: string): Promise<string|null> {
-  const res = await fetch(url, { cf:{ cacheTtl: 0 } });
+async function fetchTextMaybeGzip(url: string, env: Env): Promise<string|null> {
+  const res = await fetchWithIdentity(url, {}, env);
   if (!res.ok) return null;
   const ct = res.headers.get("content-type") || "";
   // Most gz sitemaps set application/x-gzip or octet-stream
@@ -549,7 +763,7 @@ async function fetchTextMaybeGzip(url: string): Promise<string|null> {
   return await res.text();
 }
 
-async function discoverSitemaps(finalOrigin: URL): Promise<string[]> {
+async function discoverSitemaps(finalOrigin: URL, env: Env): Promise<string[]> {
   const candidates: string[] = [];
   const tryUrls = new Set<string>();
 
@@ -566,7 +780,7 @@ async function discoverSitemaps(finalOrigin: URL): Promise<string[]> {
 
   const discovered: string[] = [];
   for (const url of tryUrls) {
-    const text = await fetchTextMaybeGzip(url);
+    const text = await fetchTextMaybeGzip(url, env);
     if (!text) continue;
 
     if (url.endsWith("/robots.txt")) {
@@ -585,7 +799,7 @@ async function discoverSitemaps(finalOrigin: URL): Promise<string[]> {
   // Expand index files into child sitemaps
   const out: string[] = [];
   for (const siteUrl of discovered) {
-    const xml = await fetchTextMaybeGzip(siteUrl);
+    const xml = await fetchTextMaybeGzip(siteUrl, env);
     if (!xml) continue;
     if (/<sitemapindex/i.test(xml)) {
       const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
@@ -599,10 +813,10 @@ async function discoverSitemaps(finalOrigin: URL): Promise<string[]> {
   return [...new Set(out)];
 }
 
-async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL)=>boolean): Promise<string[]> {
+async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL)=>boolean, env: Env): Promise<string[]> {
   const urls: string[] = [];
   for (const sm of sitemapUrls) {
-    const xml = await fetchTextMaybeGzip(sm);
+    const xml = await fetchTextMaybeGzip(sm, env);
     if (!xml) continue;
     if (/<urlset/i.test(xml)) {
       const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
@@ -619,7 +833,7 @@ async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL
   return [...new Set(urls)];
 }
 
-async function bfsCrawl(finalOrigin: URL, maxPages: number): Promise<string[]> {
+async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env): Promise<string[]> {
   const visited = new Set<string>();
   const queue: string[] = [finalOrigin.toString()];
   const pages: string[] = [];
@@ -629,7 +843,21 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number): Promise<string[]> {
     if (visited.has(next)) continue;
     visited.add(next);
 
-    const res = await fetch(next, { cf: { cacheTtl: 0 } });
+    // Check robots.txt before fetching
+    const urlObj = new URL(next);
+    const robotsRules = await getRobots(env, urlObj);
+    
+    if (!isAllowedByRobots(robotsRules, urlObj.pathname)) {
+      console.log(`[BFS] Skipping ${next} - disallowed by robots.txt`);
+      continue;
+    }
+    
+    // Respect crawl delay if specified
+    if (robotsRules?.crawlDelay) {
+      await new Promise(resolve => setTimeout(resolve, robotsRules.crawlDelay * 1000));
+    }
+
+    const res = await fetchWithIdentity(next, {}, env);
     // Canonicalize to final URL after redirect
     const finalUrl = new URL(res.url || next);
     const html = (await res.text()) || "";
@@ -651,15 +879,15 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number): Promise<string[]> {
   return pages;
 }
 
-async function discoverUrls(rootUrl: string): Promise<string[]> {
+async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   console.log(`[CRAWL] Starting URL discovery for: ${rootUrl}`);
   
   // Step 1: Resolve final URL after redirects
-  const finalOrigin = await resolveFinalUrl(rootUrl);
+  const finalOrigin = await resolveFinalUrl(rootUrl, env);
   console.log(`[CRAWL] Final origin after redirects: ${finalOrigin.toString()}`);
   
   // Step 2: Try sitemap discovery
-  const sitemaps = await discoverSitemaps(finalOrigin);
+  const sitemaps = await discoverSitemaps(finalOrigin, env);
   console.log(`[CRAWL] Found ${sitemaps.length} sitemaps`);
   
   let urls: string[] = [];
@@ -667,14 +895,14 @@ async function discoverUrls(rootUrl: string): Promise<string[]> {
   if (sitemaps.length > 0) {
     // Step 3: Extract URLs from sitemaps
     const hostAllow = (u: URL) => sameSite(finalOrigin, u);
-    urls = await extractUrlsFromSitemaps(sitemaps, hostAllow);
+    urls = await extractUrlsFromSitemaps(sitemaps, hostAllow, env);
     console.log(`[CRAWL] Extracted ${urls.length} URLs from sitemaps`);
   }
   
   // Step 4: Fallback to BFS if no sitemap URLs found
   if (urls.length === 0) {
     console.log(`[CRAWL] No sitemap URLs found, falling back to BFS`);
-    urls = await bfsCrawl(finalOrigin, 1000);
+    urls = await bfsCrawl(finalOrigin, 1000, env);
     console.log(`[CRAWL] BFS discovered ${urls.length} URLs`);
   }
   
@@ -688,15 +916,27 @@ async function discoverUrls(rootUrl: string): Promise<string[]> {
   return urls;
 }
 
-async function fetchPage(url: string) {
+async function fetchPage(url: string, env: Env) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
   
   try {
-    const res = await fetch(url, { 
-      cf: { cacheTtl: 0 },
+    // Check robots.txt before fetching
+    const urlObj = new URL(url);
+    const robotsRules = await getRobots(env, urlObj);
+    
+    if (!isAllowedByRobots(robotsRules, urlObj.pathname)) {
+      throw new Error(`URL disallowed by robots.txt: ${url}`);
+    }
+    
+    // Respect crawl delay if specified
+    if (robotsRules?.crawlDelay) {
+      await new Promise(resolve => setTimeout(resolve, robotsRules.crawlDelay * 1000));
+    }
+    
+    const res = await fetchWithIdentity(url, { 
       signal: controller.signal 
-    });
+    }, env);
     
     clearTimeout(timeoutId);
     
