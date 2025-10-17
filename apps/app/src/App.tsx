@@ -7,6 +7,10 @@ import AuditPages from './routes/audits/[id]/pages/index.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
 import ScoreGuide from './routes/ScoreGuide.tsx'
 import CitationsGuide from './routes/help/citations.tsx'
+import Terms from './routes/Terms.tsx'
+import Privacy from './routes/Privacy.tsx'
+import Methodology from './routes/Methodology.tsx'
+import FooterLegal from './components/FooterLegal.tsx'
 
 function Navigation() {
   const location = useLocation()
@@ -106,9 +110,9 @@ function Navigation() {
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <Navigation />
-        <main>
+        <main className="flex-grow">
           <Routes>
             <Route path="/" element={<AuditsIndex />} />
             <Route path="/audits" element={<AuditsIndex />} />
@@ -117,8 +121,12 @@ function App() {
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
             <Route path="/score-guide" element={<ScoreGuide />} />
             <Route path="/help/citations" element={<CitationsGuide />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/methodology" element={<Methodology />} />
           </Routes>
         </main>
+        <FooterLegal />
       </div>
     </BrowserRouter>
   )
