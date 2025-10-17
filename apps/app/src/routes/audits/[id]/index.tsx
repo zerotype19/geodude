@@ -152,9 +152,16 @@ export default function AuditDetail() {
       const result = await response.json();
       console.log('New audit started:', result);
       
+      // API returns audit_id, not id
+      const newAuditId = result.audit_id || result.id;
+      
+      if (!newAuditId) {
+        throw new Error('No audit ID returned from API');
+      }
+      
       // Redirect to the new audit
       alert(`New audit started! Redirecting to new audit page...`);
-      window.location.href = `/audits/${result.id}`;
+      window.location.href = `/audits/${newAuditId}`;
     } catch (error) {
       console.error('Failed to re-run audit:', error);
       alert('Failed to start new audit. Please try again.');
