@@ -5,9 +5,10 @@
 * **Two rollups:**
   * **AEO** (Answer Engine Optimization): how well your pages win Google/Bing answer-like surfaces (featured snippets, AI Overviews eligibility, rich results).
   * **GEO** (Generative Engine Optimization): how well your content is cited/used by LLMs and answer engines (ChatGPT/Claude/Perplexity).
-* **Per-page checks:** 20 items (A1–A10, G1–G10). Each scores **0–3**:
+* **Per-page checks:** 21 items (A1–A11 for AEO, G1–G10 for GEO). Each scores **0–3**:
   * **0** Missing, **1** Partial, **2** Meets, **3** Exceeds.
-* **Weights:** Each check has a weight. Your page score = Σ(weight × score/3). Site score = average of page scores.
+* **Weights:** Each check has a weight (ranging from 4 to 15). Your page score = Σ(weight × score/3). Site score = average of page scores.
+* **Site-level penalties:** AEO scores may be reduced by 5-10 points if average render visibility is below 50% (SPA risk).
 * **Top Blockers:** highest-impact low scores. **Quick Wins:** easiest high-impact fixes.
 * **Evidence:** In page details, expand a check to see *why* it scored (detected schema, facts count, links, etc.).
 
