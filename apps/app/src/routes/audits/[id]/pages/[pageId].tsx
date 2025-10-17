@@ -335,7 +335,7 @@ export default function PageDetail() {
                 {/* AEO Checks */}
                 <div className="mb-8">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">AEO (Answer Engine Optimization)</h3>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-visible">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
@@ -380,7 +380,7 @@ export default function PageDetail() {
                 {/* GEO Checks */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">GEO (Generative Engine Optimization)</h3>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-visible">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
