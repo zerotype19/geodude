@@ -18,6 +18,7 @@ export interface Env {
 export interface AuditRequest {
   project_id: string;
   root_url: string;
+  site_description?: string;
   max_pages?: number;
   config?: any;
 }
@@ -470,16 +471,16 @@ Crawl-delay: 5</pre>
 
 async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   const body: AuditRequest = await req.json();
-  const { project_id, root_url, max_pages = 200, config = {} } = body;
+  const { project_id, root_url, site_description, max_pages = 200, config = {} } = body;
   
   const id = crypto.randomUUID();
   
   await env.DB.prepare(
-    "INSERT INTO audits (id, project_id, root_url, started_at, status, config_json) VALUES (?, ?, ?, datetime('now'), 'running', ?)"
-  ).bind(id, project_id, root_url, JSON.stringify(config)).run();
+    "INSERT INTO audits (id, project_id, root_url, site_description, started_at, status, config_json) VALUES (?, ?, ?, ?, datetime('now'), 'running', ?)"
+  ).bind(id, project_id, root_url, site_description || null, JSON.stringify(config)).run();
 
   // Start crawl in background
-  ctx.waitUntil(runCrawl({ audit_id: id, root_url, max_pages }, env));
+  ctx.waitUntil(runCrawl({ audit_id: id, root_url, site_description, max_pages }, env));
 
   return { audit_id: id, status: 'running' };
 }
@@ -647,7 +648,7 @@ async function seedRules(env: Env) {
 
 // Core Crawl Logic
 
-async function runCrawl({ audit_id, root_url, max_pages }: any, env: Env) {
+async function runCrawl({ audit_id, root_url, site_description, max_pages }: any, env: Env) {
   try {
     // Discover URLs
     const discovered = await discoverUrls(root_url, env);
@@ -1378,23 +1379,49 @@ async function runCitations(req: Request, env: Env) {
     let finalQueries = queries;
     if (!finalQueries || finalQueries.length === 0) {
       console.log('[CITATIONS] Generating default queries');
-      // Get page titles from recent audit for this domain (path depth ≤ 2, title length 12-60)
-      const audit = await env.DB.prepare(`
-        SELECT apa.title, ap.url FROM audit_page_analysis apa
-        JOIN audit_pages ap ON apa.page_id = ap.id
-        JOIN audits a ON ap.audit_id = a.id
-        WHERE a.project_id = ? AND ap.url LIKE ?
-        AND apa.title IS NOT NULL 
-        AND LENGTH(apa.title) BETWEEN 12 AND 60
-        AND (
-          LENGTH(ap.url) - LENGTH(REPLACE(ap.url, '/', '')) <= 3
-        )
-        ORDER BY ap.fetched_at DESC
-        LIMIT 10
-      `).bind(project_id, `%${domain}%`).all();
       
-      const pageTitles = audit.results.map((r: any) => r.title).filter(Boolean);
-      finalQueries = generateDefaultQueries(domain, brand, pageTitles);
+      // Get site description and homepage metadata from recent audit
+      const auditData = await env.DB.prepare(`
+        SELECT 
+          a.site_description,
+          apa.title as homepage_title,
+          ap.html_static
+        FROM audits a
+        LEFT JOIN audit_pages ap ON ap.audit_id = a.id AND (
+          ap.url LIKE CONCAT('%', ?, '%/') OR 
+          ap.url LIKE CONCAT('%', ?, '/%')
+        )
+        LEFT JOIN audit_page_analysis apa ON apa.page_id = ap.id
+        WHERE a.project_id = ? AND (a.root_url LIKE ? OR ap.url LIKE ?)
+        ORDER BY a.started_at DESC
+        LIMIT 1
+      `).bind(domain, domain, project_id, `%${domain}%`, `%${domain}%`).first();
+      
+      let siteDescription = auditData?.site_description || null;
+      let homePageTitle = auditData?.homepage_title || null;
+      let homePageMetaDescription = null;
+      
+      // Extract meta description from homepage HTML if available
+      if (auditData?.html_static) {
+        const metaMatch = auditData.html_static.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
+        if (metaMatch) {
+          homePageMetaDescription = metaMatch[1];
+        }
+      }
+      
+      console.log('[CITATIONS] Metadata:', { 
+        hasSiteDescription: !!siteDescription, 
+        hasTitle: !!homePageTitle, 
+        hasMetaDesc: !!homePageMetaDescription 
+      });
+      
+      finalQueries = generateDefaultQueries(
+        domain, 
+        brand, 
+        siteDescription, 
+        homePageTitle, 
+        homePageMetaDescription
+      );
       console.log('[CITATIONS] Generated queries:', finalQueries.length);
     }
     

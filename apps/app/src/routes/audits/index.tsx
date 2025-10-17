@@ -24,6 +24,7 @@ export default function AuditsIndex() {
   const [createForm, setCreateForm] = useState({
     project_id: '',
     root_url: '',
+    site_description: '',
     max_pages: 200
   });
 
@@ -66,7 +67,7 @@ export default function AuditsIndex() {
       console.log('Audit created:', result);
       
       // Reset form and close
-      setCreateForm({ project_id: '', root_url: '', max_pages: 200 });
+      setCreateForm({ project_id: '', root_url: '', site_description: '', max_pages: 200 });
       setShowCreateForm(false);
       
       // Refresh audits list
@@ -156,6 +157,23 @@ export default function AuditsIndex() {
                     placeholder="https://example.com"
                     required
                   />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Site Description
+                  </label>
+                  <textarea
+                    value={createForm.site_description}
+                    onChange={(e) => setCreateForm({ ...createForm, site_description: e.target.value })}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Describe what this site is about, what it offers, and what makes it unique..."
+                    rows={4}
+                    required
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    This description will be used to generate relevant citation queries across AI sources.
+                  </p>
                 </div>
 
                 <div className="mb-6">

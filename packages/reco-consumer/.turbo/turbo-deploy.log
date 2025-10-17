@@ -3,6 +3,8 @@
 > wrangler deploy
 
 
+Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md
+
  ⛅️ wrangler 3.114.15 (update available 4.43.0)
 -----------------------------------------------
 
@@ -21,12 +23,12 @@
 
 
 Total Upload: 21.62 KiB / gzip: 5.12 KiB
-Worker Startup Time: 12 ms
+Worker Startup Time: 17 ms
 Your worker has access to the following bindings:
 - Vars:
   - OPENAI_API_BASE: "https://api.openai.com/v1"
   - OPENAI_MODEL: "gpt-4.5-turbo"
-Uploaded geodude-reco-consumer (8.35 sec)
-Deployed geodude-reco-consumer triggers (1.37 sec)
+Uploaded geodude-reco-consumer (5.43 sec)
+Deployed geodude-reco-consumer triggers (0.82 sec)
   https://geodude-reco-consumer.kevin-mcgovern.workers.dev
-Current Version ID: 9a620d00-51be-46b6-ae76-7a8d6e1680e9
+Current Version ID: 1e49cf0a-0237-4a4f-8e35-6cb5184b8d21

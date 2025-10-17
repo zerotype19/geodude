@@ -362,37 +362,66 @@ export function processCitations(
 export function generateDefaultQueries(
   domain: string,
   brand?: string,
-  pageTitles?: string[]
+  siteDescription?: string,
+  homePageTitle?: string,
+  homePageMetaDescription?: string
 ): string[] {
   const queries: string[] = [];
   const domainName = domain.replace(/^www\./, '');
   const brandName = brand || domainName.split('.')[0];
   
-  // Core seed queries
-  queries.push(`what is ${brandName}`);
-  queries.push(`what is ${domainName}`);
-  queries.push(`site:${domainName} best pages`);
-  queries.push(`${brandName} glossary`);
-  queries.push(`${brandName} definition`);
-  queries.push(`${brandName} key facts`);
-  
-  // Add top page titles (filtered for pillar-like content)
-  if (pageTitles) {
-    const pillarTitles = pageTitles
-      .filter(title => {
-        // Filter for pillar-like content: length 12-60, not too generic
-        if (title.length < 12 || title.length > 60) return false;
-        // Skip generic titles
-        const genericWords = ['home', 'about', 'contact', 'privacy', 'terms', 'login', 'signup'];
-        const lowerTitle = title.toLowerCase();
-        if (genericWords.some(word => lowerTitle.includes(word))) return false;
-        return true;
-      })
-      .map(title => title.trim()) // Remove whitespace
-      .filter((title, index, arr) => arr.indexOf(title) === index) // Remove exact duplicates
-      .slice(0, 7); // Take top 7
+  // If we have site description, use it to generate relevant queries
+  if (siteDescription && siteDescription.length > 10) {
+    // Extract key topics from description
+    // Add primary query about the site's purpose
+    queries.push(`what is ${brandName}`);
     
-    queries.push(...pillarTitles);
+    // Generate queries based on description keywords
+    const descWords = siteDescription.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 4 && !['about', 'website', 'offers', 'provides'].includes(w));
+    
+    // Take first 3 significant keywords for topic queries
+    const topKeywords = [...new Set(descWords)].slice(0, 3);
+    topKeywords.forEach(keyword => {
+      queries.push(`${keyword} ${brandName}`);
+      queries.push(`${brandName} ${keyword}`);
+    });
+    
+    // Add query combining brand with description concept
+    if (descWords.length > 0) {
+      const firstFewWords = siteDescription.split(/\s+/).slice(0, 8).join(' ');
+      if (firstFewWords.length > 15) {
+        queries.push(firstFewWords);
+      }
+    }
+  }
+  
+  // Use homepage title if available
+  if (homePageTitle && homePageTitle.length > 5) {
+    // Clean up title (remove domain, separator characters)
+    const cleanTitle = homePageTitle
+      .replace(new RegExp(domainName, 'gi'), '')
+      .replace(/[\|\/\-\–]/g, ' ')
+      .trim();
+    
+    if (cleanTitle.length > 5 && cleanTitle.length < 100) {
+      queries.push(cleanTitle);
+    }
+  }
+  
+  // Use meta description if available
+  if (homePageMetaDescription && homePageMetaDescription.length > 20) {
+    const cleanMeta = homePageMetaDescription.slice(0, 150).trim();
+    queries.push(cleanMeta);
+  }
+  
+  // Add brand-specific queries if no description provided
+  if (!siteDescription || queries.length < 3) {
+    queries.push(`what is ${domainName}`);
+    queries.push(`${brandName} overview`);
+    queries.push(`${brandName} information`);
   }
   
   // Case-insensitive deduplication and cleanup
@@ -402,6 +431,8 @@ export function generateDefaultQueries(
     .filter(q => {
       const lower = q.toLowerCase();
       if (seen.has(lower)) return false;
+      if (q.length < 10) return false; // Skip very short queries
+      if (q.length > 200) return false; // Skip very long queries
       seen.add(lower);
       return q.length > 0;
     });

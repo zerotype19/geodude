@@ -16,9 +16,9 @@ Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more
 
 
 Total Upload: 21.61 KiB / gzip: 5.12 KiB
-Worker Startup Time: 15 ms
+Worker Startup Time: 12 ms
 No bindings found.
-Uploaded geodude-api (8.25 sec)
-Deployed geodude-api triggers (1.60 sec)
+Uploaded geodude-api (5.19 sec)
+Deployed geodude-api triggers (0.75 sec)
   https://geodude-api.kevin-mcgovern.workers.dev
-Current Version ID: bdfc1d18-b544-4dab-9a24-02f9c62940d6
+Current Version ID: 49e472c5-87d2-4bd8-bcd1-9a961594a761
