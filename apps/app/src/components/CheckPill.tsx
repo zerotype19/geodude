@@ -55,8 +55,8 @@ export default function CheckPill({
         )}
       </span>
       
-      {/* Hover tooltip */}
-      <div className="absolute left-0 top-full mt-2 z-50 hidden group-hover:block w-72 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 pointer-events-none">
+      {/* Hover tooltip - positioned above to avoid card clipping */}
+      <div className="absolute left-1/2 bottom-full mb-2 -translate-x-1/2 z-[9999] hidden group-hover:block w-72 bg-gray-900 text-white text-xs rounded-lg shadow-xl p-3 pointer-events-none">
         <div className="font-semibold mb-1">{meta.label} ({code})</div>
         <div className="opacity-90 mb-2">{meta.description}</div>
         <div className="opacity-70 text-[11px] space-y-0.5">
@@ -71,7 +71,7 @@ export default function CheckPill({
         )}
         
         {/* Arrow pointer */}
-        <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 bg-gray-900 transform rotate-45"></div>
       </div>
     </div>
   );

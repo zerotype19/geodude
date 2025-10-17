@@ -149,7 +149,7 @@ export default function PagesTab({ auditId }: PagesTabProps) {
           const checkChips = getCheckChips(page.checks_json);
           
           return (
-            <div key={page.id} className="bg-white shadow rounded-lg overflow-hidden">
+            <div key={page.id} className="bg-white shadow rounded-lg">
               <div className="p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">

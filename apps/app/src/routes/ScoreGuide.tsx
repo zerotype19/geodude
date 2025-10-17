@@ -52,12 +52,15 @@ const ScoreGuide: React.FC = () => {
                   </h3>
                 );
               },
-              // Style lists
+              // Style lists with proper indentation
               ul: ({ node, ...props }) => (
-                <ul className="list-disc list-inside space-y-2 text-gray-700 my-4" {...props} />
+                <ul className="list-disc ml-6 space-y-2 text-gray-700 my-4 [&_ul]:ml-6 [&_ul]:mt-2" {...props} />
               ),
               ol: ({ node, ...props }) => (
-                <ol className="list-decimal list-inside space-y-2 text-gray-700 my-4" {...props} />
+                <ol className="list-decimal ml-6 space-y-2 text-gray-700 my-4 [&_ol]:ml-6 [&_ol]:mt-2" {...props} />
+              ),
+              li: ({ node, ...props }) => (
+                <li className="leading-relaxed" {...props} />
               ),
               // Style paragraphs
               p: ({ node, ...props }) => (
@@ -66,7 +69,7 @@ const ScoreGuide: React.FC = () => {
               // Style code blocks
               code: ({ node, inline, ...props }) => 
                 inline ? (
-                  <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800" {...props} />
+                  <code className="bg-gray-800 text-green-400 px-2 py-0.5 rounded text-sm font-mono whitespace-nowrap" {...props} />
                 ) : (
                   <code className="block bg-gray-800 text-green-400 p-4 rounded text-sm overflow-x-auto my-4" {...props} />
                 ),
