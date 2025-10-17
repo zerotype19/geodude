@@ -29,7 +29,7 @@
 * Optionally include a short **"Jump to"** table of contents with in-page anchors if the topic benefits from it.
 * Use a **step list** or **table** if procedural/comparative.
 **Checklist:** answer block, optional ToC, H2 steps, short paragraphs.
-**Tooltip:** *"Put the answer at the top with jump links and a scannable list/table."*
+**Tooltip:** *"Put the answer at the top; add anchors and a list/table when helpful (TOC is optional)."*
 
 ### A2 — Topical cluster integrity (15) {#a2-topical-cluster-integrity}
 
@@ -113,7 +113,7 @@
 * **Good:** `/about` page includes `<h1>About Us</h1>` and full content in HTML response
 * **Bad:** `/about` page loads empty `<div id="root"></div>` until JavaScript executes
 
-**Site-level penalty:** If your average render visibility falls below 50%, your AEO score receives a **-5 to -10 point penalty** to reflect the reduced crawler visibility.
+**Site-level penalty:** For **AEO**, a small penalty (up to **−5**) may apply **only when average render visibility falls below 30%** and key schema/copy are JS-only. For **GEO**, a stricter penalty (**−5 to −10**) may apply when average render visibility is **below 50%**.
 
 **Tooltip:** *"Content visible in raw HTML vs only after JavaScript renders."*
 
@@ -140,7 +140,7 @@
 ### G4 — AI crawler access & parity (12) {#g4-ai-crawler-access-parity}
 
 **Checks:** robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks.
-**Why it matters:** Ensures AI systems can access and properly parse your content for citation and training purposes.
+**Why it matters:** Most AI crawlers don't execute JS; keeping essentials in server HTML improves capture and citation. Real-world behavior can vary, so verify parity and check access logs.
 **Win:** Set your desired allow/deny; ensure server HTML contains key content/schema.
 **Tooltip:** *"Bots allowed/denied intentionally; content matches rendered."*
 
@@ -290,3 +290,9 @@ Disallow:
 * **A4/G7:** At least one downloadable dataset or tool is linked.
 * **G4:** Robots stance explicit for GPTBot/Claude-Web/Perplexity; parity pass.
 * **G9:** Visible changelog + `dateModified` updated.
+
+---
+
+**Document version:** 2.0  
+**Last revised:** January 17, 2025 at 18:45 UTC  
+**Changes:** Updated AEO/GEO render visibility penalty thresholds (AEO: <30%, GEO: <50%), added FAQPage/HowTo deprecation note, clarified Google-Extended training access, documented real-world crawler non-compliance, made ToC optional for A1, updated A10 citation language to "Sources section", added evolving AIO behavior note.
