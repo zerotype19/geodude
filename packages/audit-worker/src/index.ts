@@ -140,16 +140,27 @@ export default {
           });
         }
 
-        if (path === `/api/audits/${auditId}/recompute`) {
-          const result = await recomputeAudit(auditId, env);
+        if (path === `/api/audits/${auditId}/recrawl`) {
+          const result = await recrawlAudit(auditId, env, ctx);
           return new Response(JSON.stringify(result), { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           });
         }
+      }
 
-        if (path === `/api/audits/${auditId}/recrawl`) {
-          const result = await recrawlAudit(auditId, env, ctx);
+      // POST endpoints for audit actions
+      if (req.method === 'POST' && path.startsWith('/api/audits/')) {
+        const auditId = path.split('/')[3];
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'Audit ID required' }), { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        if (path === `/api/audits/${auditId}/recompute`) {
+          const result = await recomputeAudit(auditId, env);
           return new Response(JSON.stringify(result), { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
