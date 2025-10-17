@@ -1144,7 +1144,7 @@ async function extractAll(html: string, ctx: { url: string, robots: any, rendere
 
   // Outbound links
   const outboundLinks = [...doc.querySelectorAll('a[href^="http"]')]
-    .filter(a => !a.href.includes(new URL(ctx.url).hostname)).length;
+    .filter(a => a.href && !a.href.includes(new URL(ctx.url).hostname)).length;
 
   // Extract entities
   const { org, author } = pullEntities(jsonldRaw);
@@ -1161,7 +1161,7 @@ async function extractAll(html: string, ctx: { url: string, robots: any, rendere
   const clsRisk = false; // Would need actual CLS measurement
   const sitemapsOk = true; // Checked during discovery
   const internalCluster = [...doc.querySelectorAll('a[href]')]
-    .filter(a => a.href.includes(new URL(ctx.url).hostname)).length >= 3;
+    .filter(a => a.href && a.href.includes(new URL(ctx.url).hostname)).length >= 3;
 
   // Parity check (simplified)
   const parityPass = true; // Would compare static vs rendered
