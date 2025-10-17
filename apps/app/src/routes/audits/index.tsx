@@ -149,14 +149,22 @@ export default function AuditsIndex() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Root URL
                   </label>
-                  <input
-                    type="url"
-                    value={createForm.root_url}
-                    onChange={(e) => setCreateForm({ ...createForm, root_url: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://example.com"
-                    required
-                  />
+                  <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500">
+                    <span className="px-3 py-2 bg-gray-50 text-gray-500 border-r border-gray-300 select-none">
+                      https://
+                    </span>
+                    <input
+                      type="text"
+                      value={createForm.root_url.replace(/^https?:\/\//, '')}
+                      onChange={(e) => {
+                        const cleanValue = e.target.value.replace(/^https?:\/\//, '');
+                        setCreateForm({ ...createForm, root_url: `https://${cleanValue}` });
+                      }}
+                      className="flex-1 px-3 py-2 focus:outline-none rounded-r-md"
+                      placeholder="example.com"
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div className="mb-4">
