@@ -1762,7 +1762,7 @@ async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL
   return unique;
 }
 
-async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: string): Promise<string[]> {
+async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: string, rootPath?: string): Promise<string[]> {
   const visited = new Set<string>();
   const queue: string[] = [finalOrigin.toString()];
   const pages: string[] = [];
@@ -1772,8 +1772,8 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: 
     if (visited.has(next)) continue;
     visited.add(next);
 
-    // Apply crawl policy filter
-    if (!shouldCrawlUrl(next, rootHost)) {
+    // Apply crawl policy filter with locale awareness
+    if (!shouldCrawlUrl(next, rootHost, rootPath)) {
       console.log(`[BFS] Skipping ${next} - filtered by crawl policy`);
       continue;
     }
@@ -1806,7 +1806,7 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: 
       try {
         const u = new URL(href, finalUrl);       // resolve relative URLs
         if (!sameSite(finalOrigin, u)) continue; // stay on same site
-        if (!shouldCrawlUrl(u.toString(), rootHost)) continue; // apply crawl policy
+        if (!shouldCrawlUrl(u.toString(), rootHost, rootPath)) continue; // apply crawl policy with locale
         const abs = u.toString().split("#")[0];
         if (!visited.has(abs)) queue.push(abs);
       } catch { /* ignore bad URLs */ }
@@ -1890,31 +1890,83 @@ function prioritizeUrls(urls: string[], rootOrigin: URL, maxUrls: number): strin
  * - English/US content only (excludes language folders)
  * - Same host only
  */
-function shouldCrawlUrl(url: string, rootHost: string): boolean {
+/**
+ * Strict locale-aware URL filter
+ * - Stays within origin + pathPrefix (e.g., /en-us)
+ * - Only allows top-level pages (depth 1) + FAQ/help
+ * - Blocks all foreign locale patterns (xx-yy)
+ */
+function shouldCrawlUrl(url: string, rootHost: string, rootPath?: string): boolean {
   try {
     const u = new URL(url);
 
-    // ✅ Stay on same host (normalized without www)
+    // ✅ 1. Stay on same host (normalized without www)
     const urlHost = u.hostname.replace(/^www\./, '');
-    if (urlHost !== rootHost) return false;
+    if (urlHost !== rootHost) {
+      console.log(`[FILTER:OFF_ORIGIN] ${url}`);
+      return false;
+    }
 
-    // ✅ Only crawl English / US (skip non-English folders)
-    if (/\/(es|fr|de|it|pt|nl|jp|cn|kr|zh|br|mx|sa|ae|ru|pl|tr|in|ar)\b/i.test(u.pathname)) return false;
-    if (/\b(lang|locale|country)=/i.test(u.search)) return false;
+    const lowerPath = u.pathname.toLowerCase();
+    const normalizedRootPath = rootPath && rootPath !== '/' ? rootPath.toLowerCase().replace(/\/$/, '') : '';
 
-    // ✅ Allow only top-level paths (no nested routes)
-    const pathParts = u.pathname.split('/').filter(Boolean);
+    // ✅ 2. If root has a locale path (e.g., /en-us), STRICTLY enforce it
+    if (normalizedRootPath) {
+      if (!lowerPath.startsWith(normalizedRootPath + '/') && lowerPath !== normalizedRootPath && lowerPath !== normalizedRootPath + '/') {
+        console.log(`[FILTER:OUT_OF_PREFIX] ${url} - not under ${normalizedRootPath}`);
+        return false;
+      }
+    }
+
+    // ✅ 3. Block ALL foreign locale patterns at start of path
+    // Pattern: /xx-yy/ or /xx_yy/ at path start (not our prefix)
+    const foreignLocalePattern = /^\/[a-z]{2}[-_][a-z]{2}\//;
+    if (foreignLocalePattern.test(lowerPath)) {
+      // Allow only if it matches our root path exactly
+      if (!normalizedRootPath || !lowerPath.startsWith(normalizedRootPath + '/')) {
+        console.log(`[FILTER:FOREIGN_LOCALE] ${url}`);
+        return false;
+      }
+    }
+
+    // ✅ 4. Block query params indicating locale switching
+    if (/\b(lang|locale|country|region)=/i.test(u.search)) {
+      console.log(`[FILTER:LOCALE_PARAM] ${url}`);
+      return false;
+    }
+
+    // ✅ 5. Calculate depth from root path
+    let pathAfterRoot = u.pathname;
+    if (normalizedRootPath) {
+      pathAfterRoot = u.pathname.substring(normalizedRootPath.length) || '/';
+    }
     
-    // ✅ Always allow root
-    if (pathParts.length === 0 || u.pathname === '/' || u.pathname === '') return true;
+    // Remove leading/trailing slashes for accurate segment count
+    const pathSegments = pathAfterRoot.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+    
+    // ✅ 6. Always allow the root path itself
+    if (pathSegments.length === 0 || lowerPath === normalizedRootPath || lowerPath === normalizedRootPath + '/') {
+      return true;
+    }
 
-    // ✅ Whitelist keywords (FAQ, about, contact, products, pricing)
-    const whitelist = ['faq', 'faqs', 'about', 'contact', 'pricing', 'products', 'services', 'support', 'help'];
-    if (whitelist.some(w => u.pathname.toLowerCase().includes(w))) return true;
+    // ✅ 7. Allow FAQ/help/support pages at any depth (but still within prefix)
+    const priorityKeywords = ['faq', 'faqs', 'help', 'support', 'contact', 'about'];
+    if (priorityKeywords.some(kw => pathAfterRoot.toLowerCase().includes(`/${kw}`))) {
+      console.log(`[FILTER:ALLOW_PRIORITY] ${url} - contains priority keyword`);
+      return true;
+    }
 
-    // ✅ Otherwise allow only top-level pages (domain.com/page)
-    return pathParts.length === 1;
-  } catch {
+    // ✅ 8. Only allow top-level pages (1 segment after root path)
+    if (pathSegments.length > 1) {
+      console.log(`[FILTER:TOO_DEEP] ${url} - depth=${pathSegments.length} (max=1)`);
+      return false;
+    }
+
+    // ✅ 9. Allow this top-level page
+    console.log(`[FILTER:ALLOW] ${url} - top-level page`);
+    return true;
+  } catch (err) {
+    console.error(`[FILTER:ERROR] ${url} - ${err}`);
     return false;
   }
 }
@@ -1940,8 +1992,10 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   const finalOrigin = await resolveFinalUrl(rootUrl, env);
   console.log(`[CRAWL] Final origin after redirects: ${finalOrigin.toString()}`);
   
-  // Extract root host for filtering
+  // Extract root host and path for locale-aware filtering
   const rootHost = finalOrigin.hostname.replace(/^www\./, '');
+  const rootPath = finalOrigin.pathname === '/' ? '/' : finalOrigin.pathname.replace(/\/$/, '');
+  console.log(`[CRAWL] Root host: ${rootHost}, Root path: ${rootPath}`);
   
   // Step 2: Try sitemap discovery
   const sitemaps = await discoverSitemaps(finalOrigin, env);
@@ -1950,8 +2004,8 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   let urls: string[] = [];
   
   if (sitemaps.length > 0) {
-    // Step 3: Extract URLs from sitemaps with crawl policy
-    const hostAllow = (u: URL) => sameSite(finalOrigin, u) && shouldCrawlUrl(u.toString(), rootHost);
+    // Step 3: Extract URLs from sitemaps with crawl policy (locale-aware)
+    const hostAllow = (u: URL) => sameSite(finalOrigin, u) && shouldCrawlUrl(u.toString(), rootHost, rootPath);
     urls = await extractUrlsFromSitemaps(sitemaps, hostAllow, env);
     console.log(`[CRAWL] Extracted ${urls.length} URLs from sitemaps (after filtering)`);
   }
@@ -1959,7 +2013,7 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   // Step 4: Fallback to BFS if no sitemap URLs found
   if (urls.length === 0) {
     console.log(`[CRAWL] No sitemap URLs found, falling back to BFS`);
-    urls = await bfsCrawl(finalOrigin, 50, env, rootHost); // Reduced from 1000 to 50
+    urls = await bfsCrawl(finalOrigin, 50, env, rootHost, rootPath); // Pass rootPath
     console.log(`[CRAWL] BFS discovered ${urls.length} URLs`);
   }
   
