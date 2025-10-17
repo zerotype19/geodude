@@ -52,6 +52,7 @@ export default function AuditDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rescoreLoading, setRescoreLoading] = useState(false);
+  const [rerunLoading, setRerunLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'citations'>('overview');
 
   useEffect(() => {
@@ -119,6 +120,46 @@ export default function AuditDetail() {
       alert('Failed to rescore audit. Please try again.');
     } finally {
       setRescoreLoading(false);
+    }
+  };
+
+  const handleRerun = async () => {
+    if (!id || !audit) return;
+    
+    if (!confirm('This will re-crawl the entire site and may take several minutes. Continue?')) {
+      return;
+    }
+    
+    setRerunLoading(true);
+    try {
+      // Trigger a new audit with the same parameters
+      const response = await fetch(`${API_BASE}/api/audits`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: audit.project_id,
+          root_url: audit.root_url,
+          max_pages: 100, // Default limit
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to start new audit');
+      }
+      
+      const result = await response.json();
+      console.log('New audit started:', result);
+      
+      // Redirect to the new audit
+      alert(`New audit started! Redirecting to new audit page...`);
+      window.location.href = `/audits/${result.id}`;
+    } catch (error) {
+      console.error('Failed to re-run audit:', error);
+      alert('Failed to start new audit. Please try again.');
+    } finally {
+      setRerunLoading(false);
     }
   };
 
@@ -304,6 +345,30 @@ export default function AuditDetail() {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleRerun}
+                disabled={rerunLoading}
+                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  rerunLoading
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
+                title="Re-crawl the site and generate fresh analysis"
+              >
+                {rerunLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Re-run
+                  </>
+                )}
+              </button>
               <button
                 onClick={handleRescore}
                 disabled={rescoreLoading || audit.status !== 'complete'}
