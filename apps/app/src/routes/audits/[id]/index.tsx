@@ -5,6 +5,7 @@ import CheckPill from '/src/components/CheckPill';
 import ScoreBadge from '/src/components/ScoreBadge';
 import ScoreLegend from '/src/components/ScoreLegend';
 import CheckCategories from '/src/components/CheckCategories';
+import PagesTab from '/src/components/PagesTab';
 
 interface Audit {
   id: string;
@@ -51,7 +52,7 @@ export default function AuditDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rescoreLoading, setRescoreLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'citations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'citations'>('overview');
 
   useEffect(() => {
     if (id) {
@@ -336,7 +337,7 @@ export default function AuditDetail() {
 
         {/* Tab Navigation */}
         <div className="mb-8">
-          <nav className="flex space-x-8">
+          <nav className="flex space-x-8 border-b border-gray-200">
             <button
               onClick={() => setActiveTab('overview')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -346,6 +347,16 @@ export default function AuditDetail() {
               }`}
             >
               Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('pages')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'pages'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Pages
             </button>
             <button
               onClick={() => setActiveTab('citations')}
@@ -411,6 +422,8 @@ export default function AuditDetail() {
             projectId={audit.project_id} 
             domain={new URL(audit.root_url).hostname} 
           />
+        ) : activeTab === 'pages' ? (
+          <PagesTab auditId={id!} />
         ) : (
           <>
             {/* Score Cards */}
@@ -478,6 +491,7 @@ export default function AuditDetail() {
                         code={blocker.id} 
                         weight={blocker.weight} 
                         score={Math.round(blocker.score)}
+                        alwaysShowLabel={true}
                       />
                       <div className="text-xs text-gray-500">
                         Impact: {Math.round(blocker.impact)}
@@ -506,6 +520,7 @@ export default function AuditDetail() {
                         code={win.id} 
                         weight={win.weight} 
                         score={0}
+                        alwaysShowLabel={true}
                       />
                     </div>
                   ))}

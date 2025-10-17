@@ -6,6 +6,7 @@ type Props = {
   score?: number; // 0..3
   compact?: boolean;
   showGuideLink?: boolean;
+  alwaysShowLabel?: boolean; // Force label to show even on mobile
 };
 
 export default function CheckPill({ 
@@ -13,7 +14,8 @@ export default function CheckPill({
   weight, 
   score, 
   compact = false,
-  showGuideLink = true 
+  showGuideLink = true,
+  alwaysShowLabel = false 
 }: Props) {
   const meta = getCheckMeta(code);
   
@@ -32,6 +34,11 @@ export default function CheckPill({
     }
   };
 
+  // Determine label visibility class
+  const labelClass = alwaysShowLabel 
+    ? "truncate max-w-[180px]" // Always show
+    : "hidden sm:inline truncate max-w-[180px]"; // Hide on mobile
+
   return (
     <div className="group relative inline-block">
       <span 
@@ -40,8 +47,7 @@ export default function CheckPill({
         title={meta.description}
       >
         <span className="font-semibold">{code}</span>
-        {/* Hide label on mobile (< 640px) unless compact is explicitly false */}
-        {!compact && <span className="hidden sm:inline truncate max-w-[180px]">{meta.label}</span>}
+        {!compact && <span className={labelClass}>{meta.label}</span>}
         {typeof score === "number" && (
           <span className="opacity-70 ml-0.5">· {score}/3</span>
         )}
