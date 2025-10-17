@@ -359,6 +359,12 @@ export function processCitations(
 }
 
 // Generate default queries from audit data
+/**
+ * Generates focused, brand-safe queries based ONLY on:
+ * - Homepage title & meta description (from crawl)
+ * - User-entered site description
+ * No speculative or creative generation
+ */
 export function generateDefaultQueries(
   domain: string,
   brand?: string,
@@ -366,77 +372,30 @@ export function generateDefaultQueries(
   homePageTitle?: string,
   homePageMetaDescription?: string
 ): string[] {
-  const queries: string[] = [];
   const domainName = domain.replace(/^www\./, '');
   const brandName = brand || domainName.split('.')[0];
   
-  // If we have site description, use it to generate relevant queries
-  if (siteDescription && siteDescription.length > 10) {
-    // Add primary brand query
-    queries.push(`what is ${brandName}`);
-    
-    // Extract meaningful multi-word phrases (2-3 words)
-    const cleanDesc = siteDescription.toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    const words = cleanDesc.split(' ');
-    const stopwords = ['the', 'and', 'for', 'with', 'about', 'from', 'that', 'this', 'your', 'our', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 'will', 'would', 'could', 'should'];
-    
-    // Extract 2-word phrases
-    for (let i = 0; i < words.length - 1; i++) {
-      const phrase = `${words[i]} ${words[i + 1]}`;
-      if (words[i].length > 3 && words[i + 1].length > 3 && 
-          !stopwords.includes(words[i]) && !stopwords.includes(words[i + 1])) {
-        queries.push(phrase);
-        // Also add brand-specific version
-        if (queries.length < 10) {
-          queries.push(`${phrase} ${brandName}`);
-        }
-      }
-    }
-    
-    // Extract 3-word phrases for richer context
-    for (let i = 0; i < Math.min(words.length - 2, 5); i++) {
-      const phrase = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
-      if (phrase.length > 15 && phrase.length < 60) {
-        queries.push(phrase);
-      }
-    }
-    
-    // Add full description as a query if it's a good length
-    if (siteDescription.length > 20 && siteDescription.length < 150) {
-      queries.push(siteDescription.slice(0, 100));
-    }
-  }
+  // Build context from available sources
+  const contextParts = [
+    homePageTitle,
+    homePageMetaDescription,
+    siteDescription
+  ].filter(Boolean);
+
+  const context = contextParts.join(' • ').slice(0, 400);
   
-  // Use homepage title if available
-  if (homePageTitle && homePageTitle.length > 5) {
-    // Clean up title (remove domain, separator characters)
-    const cleanTitle = homePageTitle
-      .replace(new RegExp(domainName, 'gi'), '')
-      .replace(/[\|\/\-\–]/g, ' ')
-      .trim();
-    
-    if (cleanTitle.length > 5 && cleanTitle.length < 100) {
-      queries.push(cleanTitle);
-    }
-  }
+  console.log(`[PROMPT CONTEXT] ${domain}: "${homePageTitle?.slice(0, 50)}..." / "${siteDescription?.slice(0, 100)}..."`);
   
-  // Use meta description if available
-  if (homePageMetaDescription && homePageMetaDescription.length > 20) {
-    const cleanMeta = homePageMetaDescription.slice(0, 150).trim();
-    queries.push(cleanMeta);
-  }
-  
-  // Add brand-specific queries if no description provided
-  if (!siteDescription || queries.length < 3) {
-    queries.push(`what is ${domainName}`);
-    queries.push(`${brandName} overview`);
-    queries.push(`${brandName} information`);
-  }
-  
+  // Build clean, brand-safe, focused query set
+  const queries = [
+    `What is ${domainName}?`,
+    `What products or services does ${domainName} offer?`,
+    `What is ${domainName} known for?`,
+    `Frequently asked questions about ${domainName}`,
+    `How to contact ${domainName}`,
+    `Where is ${domainName} located?`
+  ];
+
   // Case-insensitive deduplication and cleanup
   const seen = new Set<string>();
   const uniqueQueries = queries

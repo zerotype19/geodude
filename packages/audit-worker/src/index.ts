@@ -1703,7 +1703,7 @@ async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL
   return unique;
 }
 
-async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env): Promise<string[]> {
+async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: string): Promise<string[]> {
   const visited = new Set<string>();
   const queue: string[] = [finalOrigin.toString()];
   const pages: string[] = [];
@@ -1712,6 +1712,12 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env): Promise<s
     const next = queue.shift()!;
     if (visited.has(next)) continue;
     visited.add(next);
+
+    // Apply crawl policy filter
+    if (!shouldCrawlUrl(next, rootHost)) {
+      console.log(`[BFS] Skipping ${next} - filtered by crawl policy`);
+      continue;
+    }
 
     // Check robots.txt before fetching
     const urlObj = new URL(next);
@@ -1735,12 +1741,13 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env): Promise<s
 
     // Extract links using regex (faster than parseHTML)
     const links = Array.from(html.matchAll(/<a\s+[^>]*href=['"]([^'"]+)['"]/gi))
-      .map(m => m[1]).slice(0, 500);
+      .map(m => m[1]).slice(0, 100); // Reduced from 500 to 100 for focused crawls
 
     for (const href of links) {
       try {
         const u = new URL(href, finalUrl);       // resolve relative URLs
         if (!sameSite(finalOrigin, u)) continue; // stay on same site
+        if (!shouldCrawlUrl(u.toString(), rootHost)) continue; // apply crawl policy
         const abs = u.toString().split("#")[0];
         if (!visited.has(abs)) queue.push(abs);
       } catch { /* ignore bad URLs */ }
@@ -1817,12 +1824,65 @@ function prioritizeUrls(urls: string[], rootOrigin: URL, maxUrls: number): strin
   return prioritized;
 }
 
+/**
+ * Determines if a URL should be crawled based on crawl policy:
+ * - Homepage + top-level pages only
+ * - FAQ pages prioritized
+ * - English/US content only (excludes language folders)
+ * - Same host only
+ */
+function shouldCrawlUrl(url: string, rootHost: string): boolean {
+  try {
+    const u = new URL(url);
+
+    // ✅ Stay on same host (normalized without www)
+    const urlHost = u.hostname.replace(/^www\./, '');
+    if (urlHost !== rootHost) return false;
+
+    // ✅ Only crawl English / US (skip non-English folders)
+    if (/\/(es|fr|de|it|pt|nl|jp|cn|kr|zh|br|mx|sa|ae|ru|pl|tr|in|ar)\b/i.test(u.pathname)) return false;
+    if (/\b(lang|locale|country)=/i.test(u.search)) return false;
+
+    // ✅ Allow only top-level paths (no nested routes)
+    const pathParts = u.pathname.split('/').filter(Boolean);
+    
+    // ✅ Always allow root
+    if (pathParts.length === 0 || u.pathname === '/' || u.pathname === '') return true;
+
+    // ✅ Whitelist keywords (FAQ, about, contact, products, pricing)
+    const whitelist = ['faq', 'faqs', 'about', 'contact', 'pricing', 'products', 'services', 'support', 'help'];
+    if (whitelist.some(w => u.pathname.toLowerCase().includes(w))) return true;
+
+    // ✅ Otherwise allow only top-level pages (domain.com/page)
+    return pathParts.length === 1;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sorts URLs to prioritize FAQ pages and shorter paths
+ */
+function sortUrlsByPriority(urls: string[]): string[] {
+  return urls.sort((a, b) => {
+    const faqA = /faq/i.test(a);
+    const faqB = /faq/i.test(b);
+    if (faqA && !faqB) return -1;
+    if (faqB && !faqA) return 1;
+    // Shorter paths first
+    return a.length - b.length;
+  });
+}
+
 async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   console.log(`[CRAWL] Starting URL discovery for: ${rootUrl}`);
   
   // Step 1: Resolve final URL after redirects
   const finalOrigin = await resolveFinalUrl(rootUrl, env);
   console.log(`[CRAWL] Final origin after redirects: ${finalOrigin.toString()}`);
+  
+  // Extract root host for filtering
+  const rootHost = finalOrigin.hostname.replace(/^www\./, '');
   
   // Step 2: Try sitemap discovery
   const sitemaps = await discoverSitemaps(finalOrigin, env);
@@ -1831,20 +1891,31 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   let urls: string[] = [];
   
   if (sitemaps.length > 0) {
-    // Step 3: Extract URLs from sitemaps
-    const hostAllow = (u: URL) => sameSite(finalOrigin, u);
+    // Step 3: Extract URLs from sitemaps with crawl policy
+    const hostAllow = (u: URL) => sameSite(finalOrigin, u) && shouldCrawlUrl(u.toString(), rootHost);
     urls = await extractUrlsFromSitemaps(sitemaps, hostAllow, env);
-    console.log(`[CRAWL] Extracted ${urls.length} URLs from sitemaps`);
+    console.log(`[CRAWL] Extracted ${urls.length} URLs from sitemaps (after filtering)`);
   }
   
   // Step 4: Fallback to BFS if no sitemap URLs found
   if (urls.length === 0) {
     console.log(`[CRAWL] No sitemap URLs found, falling back to BFS`);
-    urls = await bfsCrawl(finalOrigin, 1000, env);
+    urls = await bfsCrawl(finalOrigin, 50, env, rootHost); // Reduced from 1000 to 50
     console.log(`[CRAWL] BFS discovered ${urls.length} URLs`);
   }
   
-  // Step 5: Guardrail - mark as failed if still no URLs
+  // Step 5: Apply priority sorting (FAQ first)
+  urls = sortUrlsByPriority(urls);
+  console.log(`[CRAWL] URLs sorted by priority (FAQ first, shorter paths first)`);
+  
+  // Step 6: Cap at reasonable limit for focused audits
+  const MAX_URLS = 50;
+  if (urls.length > MAX_URLS) {
+    console.log(`[CRAWL] Capping URL list from ${urls.length} to ${MAX_URLS}`);
+    urls = urls.slice(0, MAX_URLS);
+  }
+  
+  // Step 7: Guardrail - mark as failed if still no URLs
   if (urls.length === 0) {
     console.error(`[CRAWL] No pages discovered for ${rootUrl} -> ${finalOrigin.toString()}`);
     throw new Error(`No pages discovered. Final origin: ${finalOrigin.toString()}`);
