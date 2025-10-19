@@ -31,10 +31,10 @@ export default function ScoreGuideDetail() {
 
   if (!doc) {
     return (
-      <div className="min-h-screen bg-neutral-950 text-white">
-        <div className="mx-auto max-w-5xl p-6">
-          <p className="text-neutral-300 mb-4">Check not found.</p>
-          <Link className="text-blue-400 hover:text-blue-300 hover:underline transition-colors" to="/score-guide">
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+          <p className="text-gray-700 mb-4">Check not found.</p>
+          <Link className="text-blue-600 hover:text-blue-700 hover:underline transition-colors" to="/score-guide">
             ← Back to Scoring Guide
           </Link>
         </div>
@@ -61,20 +61,20 @@ export default function ScoreGuideDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
-      <div className="mx-auto max-w-5xl p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <nav className="flex items-center gap-4 text-sm">
           <Link 
-            className="text-blue-400 hover:text-blue-300 hover:underline transition-colors" 
+            className="text-blue-600 hover:text-blue-700 hover:underline transition-colors" 
             to="/score-guide"
           >
             ← All checks
           </Link>
           {backAuditUrl && (
             <>
-              <span className="text-neutral-600">·</span>
+              <span className="text-gray-400">·</span>
               <Link 
-                className="text-blue-400 hover:text-blue-300 hover:underline transition-colors" 
+                className="text-blue-600 hover:text-blue-700 hover:underline transition-colors" 
                 to={backAuditUrl}
                 onClick={handleBackClick}
               >
@@ -84,31 +84,31 @@ export default function ScoreGuideDetail() {
           )}
         </nav>
 
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-8">
+        <div className="rounded-lg border border-gray-200 bg-white shadow-sm p-8">
           <ScoreGuideDoc doc={doc} />
         </div>
 
-        <footer className="border-t border-neutral-800 pt-6 space-y-3">
-          <div className="text-sm text-neutral-400">
+        <footer className="border-t border-gray-200 pt-6 space-y-3">
+          <div className="text-sm text-gray-600">
             <strong>Pro tip:</strong> Use the anchors to jump to sections —{" "}
-            <a className="text-blue-400 hover:text-blue-300 hover:underline" href="#why">
+            <a className="text-blue-600 hover:text-blue-700 hover:underline" href="#why">
               #why
             </a>
             {", "}
-            <a className="text-blue-400 hover:text-blue-300 hover:underline" href="#examples">
+            <a className="text-blue-600 hover:text-blue-700 hover:underline" href="#examples">
               #examples
             </a>
             {", "}
-            <a className="text-blue-400 hover:text-blue-300 hover:underline" href="#implementation">
+            <a className="text-blue-600 hover:text-blue-700 hover:underline" href="#implementation">
               #implementation
             </a>
             {", "}
-            <a className="text-blue-400 hover:text-blue-300 hover:underline" href="#qa">
+            <a className="text-blue-600 hover:text-blue-700 hover:underline" href="#qa">
               #qa
             </a>
           </div>
           
-          <div className="text-xs text-neutral-500">
+          <div className="text-xs text-gray-500">
             These examples are meant to be practical starting points. Adapt them to your site's specific needs.
           </div>
         </footer>

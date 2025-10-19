@@ -24,15 +24,15 @@ export default function CodeBlock({ code, language = "json", checkId }: CodeBloc
   };
   
   return (
-    <div className="relative rounded-lg border border-neutral-800 bg-neutral-900">
+    <div className="relative rounded-lg border border-gray-300 bg-gray-50">
       <button
         onClick={handleCopy}
-        className="absolute right-2 top-2 text-xs px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 transition-colors"
+        className="absolute right-2 top-2 text-xs px-2 py-1 rounded bg-white border border-gray-300 hover:bg-gray-100 transition-colors text-gray-700"
         aria-label="Copy code"
       >
         {copied ? "Copied ✓" : "Copy"}
       </button>
-      <pre className="overflow-x-auto p-4 text-sm">
+      <pre className="overflow-x-auto p-4 text-sm text-gray-900">
         <code className={`language-${language}`}>{code}</code>
       </pre>
     </div>

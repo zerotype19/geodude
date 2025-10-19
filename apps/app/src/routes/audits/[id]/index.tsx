@@ -12,11 +12,25 @@ interface Audit {
   id: string;
   project_id: string;
   root_url: string;
+  site_description?: string; // User-provided description of the site
   started_at: string;
   finished_at?: string;
   status: 'running' | 'complete' | 'failed';
   aeo_score?: number;
   geo_score?: number;
+  geo_adjusted?: number; // GEO score adjusted for real-world citations
+  geo_adjustment_details?: {
+    geo_raw: number;
+    geo_adjusted: number;
+    citation_bonus: number;
+    breakdown: {
+      chatgpt_contribution: number;
+      claude_contribution: number;
+      perplexity_contribution: number;
+    };
+    performance_flag?: 'citation_overperformance' | 'structural_advantage' | 'balanced';
+    explanation: string;
+  };
   pages_analyzed: number;
   avg_aeo_score: number;
   avg_geo_score: number;
@@ -134,17 +148,24 @@ export default function AuditDetail() {
     
     setRerunLoading(true);
     try {
-      // Trigger a new audit with the same parameters
+      // Trigger a new audit with the same parameters, including site_description
+      const requestBody: any = {
+        project_id: audit.project_id,
+        root_url: audit.root_url,
+        max_pages: 100, // Default limit
+      };
+      
+      // Include site_description if it exists
+      if (audit.site_description) {
+        requestBody.site_description = audit.site_description;
+      }
+      
       const response = await fetch(`${API_BASE}/api/audits`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          project_id: audit.project_id,
-          root_url: audit.root_url,
-          max_pages: 100, // Default limit
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
@@ -493,8 +514,7 @@ export default function AuditDetail() {
         {/* Tab Content */}
         {activeTab === 'citations' ? (
           <CitationsTab 
-            projectId={audit.project_id} 
-            domain={new URL(audit.root_url).hostname} 
+            auditId={id!} 
           />
         ) : activeTab === 'pages' ? (
           <PagesTab auditId={id!} />
@@ -510,10 +530,12 @@ export default function AuditDetail() {
           />
 
           <ScoreBadge
-            score={audit.geo_score}
-            label="GEO Score"
+            score={audit.geo_adjusted !== null && audit.geo_adjusted !== undefined ? audit.geo_adjusted : audit.geo_score}
+            label={audit.geo_adjusted !== null && audit.geo_adjusted !== undefined ? "GEO Adjusted" : "GEO Score"}
+            subtitle={audit.geo_adjustment_details ? `Raw: ${Math.round(audit.geo_adjustment_details.geo_raw)} (+${audit.geo_adjustment_details.citation_bonus} from citations)` : undefined}
             icon="G"
             iconColor="bg-green-500"
+            tooltip={audit.geo_adjustment_details?.explanation}
           />
 
           <div className="bg-white overflow-hidden shadow rounded-lg">

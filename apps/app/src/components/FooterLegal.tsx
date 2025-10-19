@@ -20,6 +20,9 @@ export default function FooterLegal() {
           <Link to="/score-guide" className="hover:text-gray-900 transition-colors">
             Scoring Guide
           </Link>
+          <a href="https://api.optiview.ai/bot" target="_blank" rel="noopener noreferrer" className="hover:text-gray-900 transition-colors">
+            Bot Documentation
+          </a>
         </div>
 
         {/* Copyright & Disclaimer */}

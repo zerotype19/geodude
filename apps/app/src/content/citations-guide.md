@@ -20,18 +20,48 @@ The Citations system tracks how frequently your domain is referenced across majo
 
 ### How Citations Are Calculated
 
-1. **Query Generation**: We create 8-12 targeted queries based on:
-   - Your domain and brand name
-   - Top page titles from recent audits
-   - Industry-relevant search terms
+Our citation system uses **context-aware AI prompts** to generate queries that mirror real user behavior:
 
-2. **AI Querying**: Each query is sent to all configured AI sources
+1. **Intelligent Query Generation**: We generate 28-30 queries per domain using:
+   - **Brand Analysis**: Official brand name, common nicknames, and industry context
+   - **Audience Personas**: Consumer, merchant, developer, and investor perspectives
+   - **Intent Coverage**: 8 categories (trust, cost, features, comparison, acceptance, support, eligibility, rewards)
+   - **Industry Intelligence**: Specialized quotas for finance (networks vs banks), retail, software, insurance, automotive
+   - **Real-Time Context**: Homepage metadata, navigation structure, and site purpose
 
-3. **Citation Detection**: We extract and normalize URLs from AI responses
+2. **Natural Language AI**: Queries are crafted to sound human, not robotic:
+   - Varied verbs and question structures
+   - 6-12 word queries (typical user length)
+   - Mixed branded (40%) and non-branded (60%) searches
+   - Persona-appropriate phrasing (e.g., merchants ask about integration, consumers about security)
 
-4. **Domain Matching**: URLs are matched against your domain (including www/non-www variants)
+3. **Multi-Source Querying**: Each query is sent to all configured AI sources:
+   - **ChatGPT** (GPT-4): General knowledge and recommendations
+   - **Claude**: In-depth analysis and comparisons
+   - **Perplexity**: Real-time web search citations
+   - **Brave Search**: Traditional search visibility
 
-5. **Scoring**: Cited percentage = (queries that cited you) / (total queries) × 100
+4. **Citation Detection**: We extract and normalize URLs from AI responses
+
+5. **Domain Matching**: URLs are matched against your domain (including www/non-www variants)
+
+6. **Scoring**: Cited percentage = (queries that cited you) / (total queries) × 100
+
+### Why Our Queries Are More Realistic
+
+Traditional citation tools use generic templates like "best [brand]" or "[brand] vs competitor". Our system learns from your actual site:
+
+- **Adaptive Context**: We analyze your homepage, navigation, and industry to understand your business model
+- **Persona Detection**: Automatically detects whether to ask consumer, merchant, developer, or investor questions
+- **Cold-Start Ready**: Even for brand new domains, we fetch your homepage live to build context
+- **Confidence-Aware**: When classification confidence is low, queries shift to safer, more generic intents
+- **Self-Improving**: As you run audits, our system learns more about your domain and generates better queries
+
+**Example Evolution:**
+- **Generic approach**: "american express reviews", "american express customer service"
+- **Our approach**: "Is Amex widely accepted by ecommerce sites?", "Amex Platinum vs Chase Sapphire Reserve for airport lounge access", "What credit score do I need for Amex Gold?"
+
+This means your citation results reflect **real-world visibility**, not artificial test queries.
 
 ### Improving Your Citations
 

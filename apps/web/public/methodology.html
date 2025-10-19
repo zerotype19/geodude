@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Optiview AEO + GEO Methodology</title>
+  <meta name="description" content="Our research methodology, scoring weights, and audit system architecture for Answer Engine Optimization (AEO) and Generative Engine Optimization (GEO).">
+  <link rel="canonical" href="https://optiview.ai/methodology" />
+
+  <!-- Article JSON-LD with Person author -->
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"Article",
+    "@id":"https://optiview.ai/methodology/#article",
+    "headline":"Optiview AEO + GEO Methodology",
+    "url":"https://optiview.ai/methodology/",
+    "datePublished":"2025-03-01",
+    "dateModified":"2025-03-01",
+    "author":{"@id":"https://optiview.ai/authors/kevin-mcgovern/#person"},
+    "publisher":{"@id":"https://optiview.ai/#org"},
+    "citation":[
+      {"@type":"WebPage","name":"Public guidance on AI Overviews","url":"https://support.google.com/websearch/answer/13376098"},
+      {"@type":"ScholarlyArticle","name":"Generative Engines and the Web","url":"https://arxiv.org/abs/2404.16366"},
+      {"@type":"WebPage","name":"GPTBot user-agent documentation","url":"https://platform.openai.com/docs/gptbot"}
+    ],
+    "isBasedOn":[
+      {"@type":"Dataset","name":"Optiview AEO/GEO Test Corpus v1.0","url":"https://optiview.ai/datasets/aeo-geo-test-v1.csv"}
+    ],
+    "license":"https://optiview.ai/content-license"
+  }
+  </script>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root { --mx:auto; --w:clamp(320px, 92vw, 980px); --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height:1.7; color:#111; margin:0; background:#fafafa; }
+    main { width:var(--w); margin:0 auto; padding:2rem 1.25rem; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem; width:var(--w); margin:0 auto; }
+    .logo { font-size:1.4rem; font-weight:700; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    nav a { margin-left:1rem; text-decoration:none; color:#333; font-weight:500; }
+    nav a:hover { color:#667eea; }
+    h1 { font-size:2.5rem; margin-bottom:0.5rem; line-height:1.2; }
+    h2 { font-size:1.8rem; margin-top:2.5rem; margin-bottom:1rem; border-bottom:2px solid #667eea; padding-bottom:0.5rem; }
+    h3 { font-size:1.4rem; margin-top:2rem; margin-bottom:0.75rem; }
+    .author { font-size:0.95rem; color:#666; margin-bottom:2rem; }
+    .author a { color:#667eea; text-decoration:none; }
+    .author a:hover { text-decoration:underline; }
+    code { background:#f5f5f5; padding:0.2em 0.4em; border-radius:3px; font-size:0.9em; }
+    table { border-collapse:collapse; width:100%; margin:1.5rem 0; }
+    th, td { padding:0.75rem; text-align:left; border:1px solid #ddd; }
+    th { background:#f5f5f5; font-weight:600; }
+    footer { text-align:center; padding:2rem 1.25rem; color:#666; font-size:0.9rem; }
+    footer a { color:#667eea; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <header aria-label="Primary">
+    <div class="logo">OPTIVIEW.AI</div>
+    <nav aria-label="Main">
+      <a href="/">Home</a>
+      <a href="https://app.optiview.ai/">Launch App</a>
+      <a href="https://app.optiview.ai/score-guide">Score Guide</a>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <h1>Optiview AEO + GEO Methodology</h1>
+      <p class="author">By <a href="/authors/kevin-mcgovern">Kevin McGovern</a> · Last updated March 1, 2025</p>
+
+      <p><strong>Optiview</strong> audits your web pages for <strong>Answer Engine Optimization (AEO)</strong> and <strong>Generative Engine Optimization (GEO)</strong> using 21 weighted checks derived from public AI crawler documentation, academic research, and real-world testing.</p>
+
+      <h2>Overview</h2>
+      <p>Our scoring system evaluates how well your content is optimized for AI-powered search engines and large language models. We focus on two key areas:</p>
+      <ul>
+        <li><strong>AEO (Answer Engine Optimization)</strong>: Optimizing for answer boxes, featured snippets, and AI Overviews (10 checks + render visibility)</li>
+        <li><strong>GEO (Generative Engine Optimization)</strong>: Optimizing for citation in LLM responses like ChatGPT, Claude, and Perplexity (10 checks)</li>
+      </ul>
+
+      <h2>Scoring Framework</h2>
+      <p>Each check is scored on a 0-3 scale:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Score</th>
+            <th>Meaning</th>
+            <th>Weight Application</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>3</strong></td><td>Strong</td><td>Full weight applied</td></tr>
+          <tr><td><strong>2</strong></td><td>Moderate</td><td>66% of weight</td></tr>
+          <tr><td><strong>1</strong></td><td>Weak</td><td>33% of weight</td></tr>
+          <tr><td><strong>0</strong></td><td>Poor/Missing</td><td>0% of weight</td></tr>
+        </tbody>
+      </table>
+
+      <h2>AEO Checks (11 total)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Weight</th>
+            <th>What We Measure</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>A1: Answer-First Design</td><td>15</td><td>Summary block, jump links, or tables above the fold</td></tr>
+          <tr><td>A2: Topical Cluster</td><td>15</td><td>Internal links to related content</td></tr>
+          <tr><td>A3: Site Authority</td><td>15</td><td>Organization and Author schema</td></tr>
+          <tr><td>A4: Originality & Effort</td><td>12</td><td>Tables, data, or 3+ outbound citations</td></tr>
+          <tr><td>A5: Schema Accuracy</td><td>10</td><td>Structured data (JSON-LD)</td></tr>
+          <tr><td>A6: Crawlability</td><td>10</td><td>Canonical tags, proper URLs</td></tr>
+          <tr><td>A7: UX & Performance</td><td>8</td><td>No CLS risk, fast load</td></tr>
+          <tr><td>A8: Discoverability</td><td>6</td><td>Sitemaps present</td></tr>
+          <tr><td>A9: Freshness</td><td>5</td><td>dateModified present</td></tr>
+          <tr><td>A10: AI Overviews</td><td>4</td><td>Citations block, chunkable structure</td></tr>
+          <tr><td>A11: Render Visibility</td><td>10</td><td>Content visible in static HTML (70%+ for score 3)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>GEO Checks (10 total)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Weight</th>
+            <th>What We Measure</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>G1: Citable Facts</td><td>15</td><td>Fact blocks, statistics, key takeaways</td></tr>
+          <tr><td>G2: Provenance</td><td>15</td><td>Author, publisher, citations, license schema</td></tr>
+          <tr><td>G3: Evidence Density</td><td>12</td><td>Citations block + 3+ outbound references</td></tr>
+          <tr><td>G4: AI Crawler Access</td><td>12</td><td>GPTBot, ClaudeBot, PerplexityBot allowed in robots.txt</td></tr>
+          <tr><td>G5: Chunkability</td><td>10</td><td>Clean HTML structure, semantic markup</td></tr>
+          <tr><td>G6: Stable URLs</td><td>8</td><td>Canonical fact URLs with anchors</td></tr>
+          <tr><td>G7: Dataset Links</td><td>8</td><td>Links to datasets, research, or sources hub</td></tr>
+          <tr><td>G8: Policy Transparency</td><td>6</td><td>License and reuse policy</td></tr>
+          <tr><td>G9: Update Hygiene</td><td>7</td><td>Changelog or version history</td></tr>
+          <tr><td>G10: Cluster Linking</td><td>7</td><td>Links to sources hub or related evidence</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Render Visibility Penalty</h2>
+      <p>Sites with low render visibility (content only visible after JavaScript execution) receive penalties:</p>
+      <ul>
+        <li><strong>AEO:</strong> -5 points if &lt;30% of content in static HTML</li>
+        <li><strong>GEO:</strong> -5 to -10 points if &lt;50% of content in static HTML</li>
+      </ul>
+      <p>This reflects the reality that many AI crawlers (GPTBot, ClaudeBot, PerplexityBot) do not execute JavaScript.</p>
+
+      <h2>Research Foundations</h2>
+      <p>Our methodology is based on:</p>
+      <ol>
+        <li><a href="https://support.google.com/websearch/answer/13376098">Google's public guidance on AI Overviews</a></li>
+        <li><a href="https://arxiv.org/abs/2404.16366">Academic research on Generative Engines</a> (arXiv:2404.16366)</li>
+        <li><a href="https://platform.openai.com/docs/gptbot">GPTBot user-agent documentation</a></li>
+        <li>Real-world testing of 100+ pages against Perplexity, ChatGPT, Claude, and Brave Search</li>
+      </ol>
+
+      <h2>Test Corpus</h2>
+      <p>We maintain a test corpus of reference pages to validate our scoring: <a href="/datasets/aeo-geo-test-v1.csv">aeo-geo-test-v1.csv</a></p>
+
+      <h2>Content License</h2>
+      <p>This methodology and our scoring guide are published under <a href="/content-license">our content license</a> for transparent reuse and citation.</p>
+
+      <h2>Sources</h2>
+      <p>For a complete list of references and citations, see our <a href="/sources">Sources Hub</a>.</p>
+    </article>
+  </main>
+
+  <footer>
+    <p>
+      © <span id="y">2025</span> Optiview.ai · 
+      <a href="/terms">Terms</a> · 
+      <a href="/privacy">Privacy</a> · 
+      <a href="/">Back to Home</a>
+    </p>
+    <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
+  </footer>
+</body>
+</html>
+

@@ -1,20 +1,34 @@
 import React, { useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import './index.css'
+import { useAuth } from './hooks/useAuth'
 import AuditsIndex from './routes/audits/index.tsx'
 import AuditDetail from './routes/audits/[id]/index.tsx'
 import AuditPages from './routes/audits/[id]/pages/index.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
-import ScoreGuide from './routes/ScoreGuide.tsx'
+import ScoreGuideIndex from './routes/score-guide/index.tsx'
+import ScoreGuideDetail from './routes/score-guide/$slug.tsx'
 import CitationsGuide from './routes/help/citations.tsx'
 import Terms from './routes/Terms.tsx'
 import Privacy from './routes/Privacy.tsx'
 import Methodology from './routes/Methodology.tsx'
+import AdminPage from './routes/admin.tsx'
+import ClassifierCompare from './routes/admin/classifier-compare.tsx'
+import HealthDashboard from './routes/admin/health.tsx'
+import PromptsCompare from './routes/admin/prompts-compare.tsx'
+import UsersPage from './routes/admin/users.tsx'
 import FooterLegal from './components/FooterLegal.tsx'
+import CheckEmail from './routes/auth/CheckEmail.tsx'
+import Callback from './routes/auth/Callback.tsx'
+import AuthError from './routes/auth/Error.tsx'
 
 function Navigation() {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { me, isAuthed, logout } = useAuth()
+  
+  // Check if user is authenticated for admin
+  const isAdmin = localStorage.getItem('admin_auth') === 'true'
   
   return (
     <nav className="bg-white shadow-sm border-b">
@@ -57,7 +71,46 @@ function Navigation() {
               >
                 Score Guide
               </Link>
+              <Link
+                to="/help/citations"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                  location.pathname === '/help/citations'
+                    ? 'border-blue-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                Citations Guide
+              </Link>
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                    location.pathname.startsWith('/admin')
+                      ? 'border-blue-500 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  }`}
+                >
+                  Admin
+                </Link>
+              )}
             </div>
+          </div>
+          
+          {/* Auth status & actions */}
+          <div className="hidden sm:flex sm:items-center sm:space-x-4">
+            {isAuthed && me ? (
+              <>
+                <span className="text-sm text-gray-600">
+                  {me.email}
+                </span>
+                <button
+                  onClick={logout}
+                  className="text-sm text-gray-600 hover:text-gray-900 underline"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : null}
           </div>
           
           {/* Mobile menu button */}
@@ -109,6 +162,30 @@ function Navigation() {
             >
               Score Guide
             </Link>
+            <Link
+              to="/help/citations"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                location.pathname === '/help/citations'
+                  ? 'bg-blue-50 border-blue-500 text-blue-700'
+                  : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+              }`}
+            >
+              Citations Guide
+            </Link>
+            {isAdmin && (
+              <Link
+                to="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                  location.pathname.startsWith('/admin')
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                    : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                }`}
+              >
+                Admin
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -128,8 +205,17 @@ function App() {
             <Route path="/audits/:id" element={<AuditDetail />} />
             <Route path="/audits/:id/pages" element={<AuditPages />} />
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
-            <Route path="/score-guide" element={<ScoreGuide />} />
+            <Route path="/score-guide" element={<ScoreGuideIndex />} />
+            <Route path="/score-guide/:slug" element={<ScoreGuideDetail />} />
             <Route path="/help/citations" element={<CitationsGuide />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin/classifier-compare" element={<ClassifierCompare />} />
+            <Route path="/admin/health" element={<HealthDashboard />} />
+            <Route path="/admin/prompts-compare" element={<PromptsCompare />} />
+            <Route path="/admin/users" element={<UsersPage />} />
+            <Route path="/auth/check-email" element={<CheckEmail />} />
+            <Route path="/auth/callback" element={<Callback />} />
+            <Route path="/auth/error" element={<AuthError />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/methodology" element={<Methodology />} />

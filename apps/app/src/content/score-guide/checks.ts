@@ -32,8 +32,8 @@ export const CHECKS: CheckDoc[] = [
     title: 'Answer-first design (A1)',
     category: 'Structure',
     weight: 15,
-    summary: 'Concise answer at the top that directly addresses the user\'s primary intent.',
-    whyItMatters: 'Answer engines extract the first, clearest answer. A strong "lead" improves citation odds and reduces ambiguity.',
+    summary: 'A concise answer in the first ~600–800 chars, jump links/ToC (optional), a scannable list/table near the top.',
+    whyItMatters: 'Reduces pogo-sticking; aligns with engagement-re-ranking and snippet eligibility. Answer engines extract the first, clearest answer. A strong "lead" improves citation odds and reduces ambiguity.',
     detectionNotes: [
       'Looks for a short paragraph (≤ 40–60 words) or bullets near top',
       'Checks headings like H1/H2 that match query intent',
@@ -70,9 +70,10 @@ export const CHECKS: CheckDoc[] = [
       ]
     },
     implementation: [
-      'Add a 40–60 word answer paragraph directly under the H1',
+      'Add a 2–4 sentence answer at the top',
+      'Optionally include a short "Jump to" table of contents with in-page anchors if the topic benefits from it (ToC is optional)',
+      'Use a step list or table if procedural/comparative',
       'Use one H1 that mirrors the page\'s core intent',
-      'If useful, include a 2-4 item bullet list with key benefits/features',
       'Ensure the answer is in static HTML (not lazy-loaded by JS)'
     ],
     qaChecklist: [
@@ -260,11 +261,11 @@ export const CHECKS: CheckDoc[] = [
   {
     id: 'A5',
     slug: 'schema-accuracy',
-    title: 'Schema accuracy (A5)',
+    title: 'Schema accuracy & breadth (A5)',
     category: 'Schema',
     weight: 10,
-    summary: 'Valid JSON-LD for the page type with properties aligned to visible content.',
-    whyItMatters: 'Accurate schema increases extractability and reduces hallucination risk in answer engines.',
+    summary: 'Valid JSON-LD types (Article, HowTo, FAQPage, QAPage, Product, BreadcrumbList)—no errors. Note: FAQPage and HowTo rich results have been deprecated or limited in most search surfaces since 2023. Use these schema types only when genuinely relevant — focus primarily on Article, WebPage, HowTo (instructional), or Product where applicable.',
+    whyItMatters: 'Accurate schema increases extractability and reduces hallucination risk in answer engines. However, relying solely on FAQ or HowTo schema no longer guarantees rich results visibility.',
     detectionNotes: [
       'Parses JSON-LD and checks @type vs. page intent',
       'Validates required fields for target types (FAQPage/Product/HowTo)',
@@ -783,11 +784,11 @@ export const CHECKS: CheckDoc[] = [
   {
     id: 'G4',
     slug: 'crawlability-and-access',
-    title: 'Crawlability and access (G4)',
+    title: 'AI crawler access & parity (G4)',
     category: 'Crawl',
-    weight: 15,
-    summary: 'Allow AI crawlers (GPTBot, Claude-Web, PerplexityBot) while blocking training crawlers if desired.',
-    whyItMatters: 'LLM vendors crawl for training data and real-time answers. Blocking all bots limits visibility.',
+    weight: 12,
+    summary: 'Robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks. Note: While most AI crawlers respect robots.txt, real-world tests show occasional non-compliance — for example, PerplexityBot sometimes disregards disallow rules, and Claude-Web has been observed over-crawling until blocked.',
+    whyItMatters: 'Most AI crawlers don\'t execute JS; keeping essentials in server HTML improves capture and citation. LLM vendors crawl for training data and real-time answers. Blocking all bots limits visibility, but compliance can vary.',
     detectionNotes: [
       'Checks robots.txt for GPTBot, Claude-Web, PerplexityBot',
       'Looks for Google-Extended (training) blocks',
@@ -820,10 +821,11 @@ Disallow: /`
     },
     implementation: [
       'Allow GPTBot, Claude-Web, PerplexityBot in robots.txt',
-      'Block Google-Extended if you don\'t want training data use',
+      'Block Google-Extended if you don\'t want training data use (separate from normal Googlebot crawling)',
+      'Note: Blocking Google-Extended will NOT prevent your site from being indexed or appearing in Google Search or AI Overviews — it only affects training access',
       'Test with robots.txt validator',
       'Ensure Disallow rules don\'t block critical content',
-      'Note: Compliance varies; some crawlers may ignore rules'
+      'Note: Compliance varies; some crawlers may ignore rules — verify access logs'
     ],
     qaChecklist: [
       'Are answer bots (GPTBot, Claude, Perplexity) allowed?',

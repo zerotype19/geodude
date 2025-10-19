@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { apiPost, apiGet } from '../../lib/api';
 
 interface Audit {
   id: string;
@@ -18,9 +20,14 @@ interface Audit {
 const API_BASE = 'https://api.optiview.ai';
 
 export default function AuditsIndex() {
+  const { me, isAuthed, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [audits, setAudits] = useState<Audit[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showMagicLinkForm, setShowMagicLinkForm] = useState(false);
+  const [magicLinkEmail, setMagicLinkEmail] = useState('');
+  const [magicLinkSending, setMagicLinkSending] = useState(false);
   const [createForm, setCreateForm] = useState({
     project_id: '',
     root_url: '',
@@ -29,8 +36,10 @@ export default function AuditsIndex() {
   });
 
   useEffect(() => {
-    fetchAudits();
-  }, []);
+    if (!authLoading) {
+      fetchAudits();
+    }
+  }, [authLoading]);
 
   const fetchAudits = async () => {
     try {
@@ -47,40 +56,37 @@ export default function AuditsIndex() {
     }
   };
 
-  const createAudit = async (e: React.FormEvent) => {
+  const handleStartAuditClick = () => {
+    setShowCreateForm(false);
+    setShowMagicLinkForm(true);
+  };
+
+  const sendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMagicLinkSending(true);
     
     try {
-      const response = await fetch(`${API_BASE}/api/audits`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(createForm),
+      await apiPost('/v1/auth/magic/request', {
+        email: magicLinkEmail,
+        intent: 'start_audit',
+        payload: createForm,
+        redirectPath: '/audits'
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create audit');
-      }
-
-      const result = await response.json();
-      console.log('Audit created:', result);
       
-      // Reset form and close
-      setCreateForm({ project_id: '', root_url: '', site_description: '', max_pages: 200 });
-      setShowCreateForm(false);
-      
-      // Refresh audits list
-      fetchAudits();
+      navigate(`/auth/check-email?email=${encodeURIComponent(magicLinkEmail)}`);
     } catch (error) {
-      console.error('Failed to create audit:', error);
-      alert('Failed to create audit. Please try again.');
+      console.error('Failed to send magic link:', error);
+      alert('Failed to send magic link. Please try again.');
+    } finally {
+      setMagicLinkSending(false);
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'complete': return 'bg-green-100 text-green-800';
+      case 'completed':
+      case 'complete': // Legacy support
+        return 'bg-green-100 text-green-800';
       case 'running': return 'bg-blue-100 text-blue-800';
       case 'failed': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -92,12 +98,12 @@ export default function AuditsIndex() {
     return Math.round(score);
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading audits...</p>
+          <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
     );
@@ -124,13 +130,16 @@ export default function AuditsIndex() {
           </button>
         </div>
 
-        {/* Create Audit Modal */}
+        {/* Create Audit Modal - Step 1: Audit Details */}
         {showCreateForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
               <h2 className="text-xl font-semibold mb-4">Start New Audit</h2>
               
-              <form onSubmit={createAudit}>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleStartAuditClick();
+              }}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Project ID
@@ -184,21 +193,7 @@ export default function AuditsIndex() {
                   </p>
                 </div>
 
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Max Pages
-                  </label>
-                  <input
-                    type="number"
-                    value={createForm.max_pages}
-                    onChange={(e) => setCreateForm({ ...createForm, max_pages: parseInt(e.target.value) })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="1"
-                    max="1000"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-3">
+                <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
                     onClick={() => setShowCreateForm(false)}
@@ -210,7 +205,75 @@ export default function AuditsIndex() {
                     type="submit"
                     className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
                   >
-                    Start Audit
+                    Continue →
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Magic Link Modal - Step 2: Email for Authentication */}
+        {showMagicLinkForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-semibold mb-4">Secure Your Audit</h2>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-blue-900">
+                  🔐 <strong>Magic link authentication</strong>
+                </p>
+                <p className="text-sm text-blue-800 mt-1">
+                  We'll send you a secure link to start this audit. This ensures your audits are private and only accessible by you.
+                </p>
+              </div>
+
+              <form onSubmit={sendMagicLink}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Email
+                  </label>
+                  <input
+                    type="email"
+                    value={magicLinkEmail}
+                    onChange={(e) => setMagicLinkEmail(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="you@company.com"
+                    required
+                    autoComplete="email"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    We'll send you a secure sign-in link (expires in 20 minutes)
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+                  <p className="text-xs text-gray-700 font-medium">Audit Summary:</p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    <strong>URL:</strong> {createForm.root_url || 'Not specified'}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    <strong>Project:</strong> {createForm.project_id || 'Not specified'}
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMagicLinkForm(false);
+                      setShowCreateForm(true);
+                    }}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={magicLinkSending}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors disabled:opacity-60"
+                  >
+                    {magicLinkSending ? 'Sending...' : 'Send Magic Link'}
                   </button>
                 </div>
               </form>

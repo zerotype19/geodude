@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sources & References - Optiview</title>
+  <meta name="description" content="Complete list of research sources, citations, and references for Optiview's AEO and GEO methodology.">
+  <link rel="canonical" href="https://optiview.ai/sources" />
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root { --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    body { font-family: system-ui, sans-serif; line-height:1.7; color:#111; margin:0; background:#fafafa; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem; max-width:980px; margin:0 auto; }
+    .logo { font-size:1.4rem; font-weight:700; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    nav a { margin-left:1rem; text-decoration:none; color:#333; font-weight:500; }
+    nav a:hover { color:#667eea; }
+    main { max-width:980px; margin:0 auto; padding:2rem 1.5rem; }
+    h1 { font-size:2.5rem; margin-bottom:1rem; }
+    h2 { font-size:1.8rem; margin-top:2.5rem; border-bottom:2px solid #667eea; padding-bottom:0.5rem; }
+    .ref { background:#fff; padding:1rem; margin:1rem 0; border-left:3px solid #667eea; border-radius:4px; }
+    .ref strong { display:block; margin-bottom:0.5rem; }
+    code { background:#f5f5f5; padding:0.2em 0.4em; border-radius:3px; }
+    a { color:#667eea; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    footer { text-align:center; padding:2rem; color:#666; font-size:0.9rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">OPTIVIEW.AI</div>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/methodology">Methodology</a>
+      <a href="https://app.optiview.ai/">Launch App</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Sources & References</h1>
+    <p>This page provides a comprehensive list of sources, citations, and references that inform Optiview's AEO and GEO methodology.</p>
+
+    <h2>Official AI Platform Documentation</h2>
+    
+    <div class="ref">
+      <strong>Google AI Overviews and web content</strong>
+      <p><a href="https://support.google.com/websearch/answer/13376098">support.google.com/websearch/answer/13376098</a></p>
+      <p>Official guidance on how Google generates AI Overviews and what content characteristics improve visibility.</p>
+    </div>
+
+    <div class="ref">
+      <strong>GPTBot user-agent documentation</strong>
+      <p><a href="https://platform.openai.com/docs/gptbot">platform.openai.com/docs/gptbot</a></p>
+      <p>OpenAI's specification for their web crawler, including <code>robots.txt</code> directives and crawl behavior.</p>
+    </div>
+
+    <div class="ref">
+      <strong>Google-Extended bot documentation</strong>
+      <p><a href="https://developers.cloudflare.com/fundamentals/reference/bots/google-extended/">developers.cloudflare.com/fundamentals/reference/bots/google-extended/</a></p>
+      <p>Cloudflare's guide to the Google-Extended user-agent for AI training opt-out control.</p>
+    </div>
+
+    <h2>Academic Research</h2>
+
+    <div class="ref">
+      <strong>Generative Engines and the Web</strong>
+      <p><a href="https://arxiv.org/abs/2404.16366">arxiv.org/abs/2404.16366</a></p>
+      <p>Academic research on how generative AI systems interact with and cite web content. Key findings on GEO optimization strategies.</p>
+    </div>
+
+    <h2>Schema.org Specifications</h2>
+
+    <div class="ref">
+      <strong>Schema.org Article specification</strong>
+      <p><a href="https://schema.org/Article">schema.org/Article</a></p>
+      <p>Canonical reference for Article structured data properties including <code>citation</code>, <code>isBasedOn</code>, and <code>license</code>.</p>
+    </div>
+
+    <div class="ref">
+      <strong>Schema.org Organization specification</strong>
+      <p><a href="https://schema.org/Organization">schema.org/Organization</a></p>
+      <p>Specification for Organization entity markup used in authority signals.</p>
+    </div>
+
+    <div class="ref">
+      <strong>Schema.org Person specification</strong>
+      <p><a href="https://schema.org/Person">schema.org/Person</a></p>
+      <p>Specification for author and contributor markup.</p>
+    </div>
+
+    <h2>Testing & Validation</h2>
+
+    <div class="ref">
+      <strong>Optiview AEO/GEO Test Corpus v1.0</strong>
+      <p><a href="/datasets/aeo-geo-test-v1.csv">optiview.ai/datasets/aeo-geo-test-v1.csv</a></p>
+      <p>Our reference dataset of test pages used to validate scoring methodology.</p>
+    </div>
+
+    <h2>Related Resources</h2>
+    <ul>
+      <li><a href="/methodology">Full Methodology</a> - Our complete scoring framework</li>
+      <li><a href="https://app.optiview.ai/score-guide">Score Guide</a> - Detailed explanations of all 21 checks</li>
+      <li><a href="/content-license">Content License</a> - Reuse and citation policy</li>
+    </ul>
+  </main>
+
+  <footer>
+    <p>
+      © <span id="y">2025</span> Optiview.ai · 
+      <a href="/terms">Terms</a> · 
+      <a href="/privacy">Privacy</a> · 
+      <a href="/">Home</a>
+    </p>
+    <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
+  </footer>
+</body>
+</html>
+

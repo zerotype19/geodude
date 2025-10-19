@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import CheckPill from '/src/components/CheckPill';
+import { getCheckMeta } from '/src/content/checks';
 
 interface PageDetails {
   id: string;
@@ -101,29 +102,8 @@ export default function PageDetail() {
   };
 
   const getCheckDescription = (id: string) => {
-    const descriptions: Record<string, string> = {
-      A1: 'Answer-first design with concise summary and navigation',
-      A2: 'Topical cluster integrity with internal linking',
-      A3: 'Site authority with organization and author information',
-      A4: 'Original content with tables, diagrams, or unique assets',
-      A5: 'Valid schema markup for content type',
-      A6: 'Proper canonicals and unique titles/headings',
-      A7: 'Good UX with no performance issues',
-      A8: 'Sitemap presence and freshness',
-      A9: 'Content freshness and URL stability',
-      A10: 'AI Overviews readiness with citations',
-      G1: 'Citable facts block with 3-7 key points',
-      G2: 'Complete provenance schema with author/publisher/dates',
-      G3: 'Evidence density with references and outbound links',
-      G4: 'AI crawler access and content parity',
-      G5: 'Well-structured content with semantic headings',
-      G6: 'Stable canonical URLs and anchors',
-      G7: 'Downloadable datasets (CSV/JSON)',
-      G8: 'Clear content license and AI reuse policy',
-      G9: 'Update tracking with changelog or dateModified',
-      G10: 'Cluster-to-evidence linking via sources hub'
-    };
-    return descriptions[id] || 'Unknown check';
+    const meta = getCheckMeta(id);
+    return meta.description || meta.label || 'Unknown check';
   };
 
   const parseChecks = (): CheckResult[] => {

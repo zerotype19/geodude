@@ -12,8 +12,19 @@ database_id = "17970af4-bbeb-4eea-9684-1464293b137b"
 binding = "RULES"
 id = "ede0baa1d4654ecb86a4d1faf7b5fd46"
 
+[[kv_namespaces]]
+binding = "PROMPT_CACHE"
+id = "7119b238909b43afac31b53e359d0828"
+
+[[kv_namespaces]]
+binding = "AUTH_LOGS"
+id = "12a06cdaa5054deeaec45309b4bd7d01"
+
 [browser]
 binding = "BROWSER"
+
+[ai]
+binding = "AI"
 
 [vars]
 BASE_URL = "https://api.optiview.ai"
@@ -21,5 +32,12 @@ PROXY_FETCH_ENDPOINT = "https://fetch.optiview.ai"
 CITATIONS_MAX_CONCURRENCY = "3"
 CITATIONS_THROTTLE_MS = "400"
 
+# Auth configuration
+APP_BASE_URL = "https://app.optiview.ai"
+COOKIE_NAME = "ov_sess"
+COOKIE_TTL_DAYS = "30"
+MAGIC_TOKEN_TTL_MIN = "20"
+MAGIC_REQUESTS_PER_HOUR = "5"
+
 [triggers]
-crons = ["0 */6 * * *", "0 14 * * 1", "0 * * * *"]
+crons = ["0 */6 * * *", "0 14 * * 1", "0 * * * *", "0 2 * * *"]  # Added nightly warmer at 02:00 UTC

@@ -34,23 +34,30 @@ export default function Methodology() {
             <ul className="space-y-3 text-gray-700">
               <li>
                 <strong>Crawled HTML & metadata</strong> — collected directly from publicly available web pages that you 
-                authorize us to audit.
+                authorize us to audit, including both static HTML and JavaScript-rendered content for visibility analysis.
               </li>
               <li>
                 <strong>Search engine signals</strong> — derived from Google, Bing, and Brave index results (where permitted), 
                 limited to top-level pages for ranking context.
               </li>
               <li>
-                <strong>AI visibility signals</strong> — from monitored LLM sources such as ChatGPT, Claude, and Perplexity 
-                citations, where access is permitted.
+                <strong>AI visibility signals</strong> — from monitored LLM sources such as ChatGPT (OpenAI), Claude (Anthropic), 
+                Perplexity, and Brave Search citations, using context-aware query generation that adapts to each domain's 
+                industry and positioning.
               </li>
               <li>
-                <strong>Technical metrics</strong> — e.g., schema presence, render visibility, canonical correctness, freshness, 
-                and performance scores measured through our crawler.
+                <strong>Technical metrics</strong> — e.g., schema presence, render visibility ratio, canonical correctness, 
+                freshness timestamps, and performance scores measured through our crawler and browser automation.
+              </li>
+              <li>
+                <strong>Industry classification</strong> — hybrid system combining keyword analysis, JSON-LD type detection, 
+                navigation taxonomy, and Workers AI embeddings to classify domains into 18+ industry verticals with confidence 
+                scoring.
               </li>
               <li>
                 <strong>Heuristic weights</strong> — proprietary weighting and scoring frameworks created by Optiview.ai based 
-                on public documentation, experiments, and open-source benchmarks.
+                on public documentation, experiments, and open-source benchmarks, refined through continuous cross-domain 
+                pattern analysis.
               </li>
             </ul>
           </section>
@@ -77,26 +84,81 @@ export default function Methodology() {
               </div>
             </div>
             <div className="mt-4 p-4 bg-gray-50 rounded border border-gray-200">
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-gray-700 mb-2">
                 Each check (A1–A11, G1–G10) is scored 0–3 using static and rendered page data. Weights (4–15) determine the 
                 relative importance of each check. <strong>Scores are heuristic indicators only</strong> — not predictive 
                 models or guarantees.
+              </p>
+              <p className="text-sm text-gray-700">
+                <strong>Site-level penalties:</strong> AEO scores may receive up to a -5 point penalty if average render 
+                visibility (static HTML vs. JavaScript-rendered content) falls below 30%. GEO scores may receive a -5 to -10 
+                point penalty if render visibility is below 50%. This reflects the reality that AI crawlers and search engines 
+                may not execute JavaScript reliably.
               </p>
             </div>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">4. External Data Limitations</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-3">4. Citation Intelligence Methodology</h2>
+            <p className="text-gray-700 leading-relaxed mb-3">
+              Optiview's citation system uses a <strong>self-learning, context-aware approach</strong> to generate 
+              human-realistic queries that mirror actual user search patterns:
+            </p>
+            <div className="space-y-4 text-gray-700">
+              <div>
+                <h3 className="font-semibold text-lg text-gray-900 mb-2">Adaptive Query Generation (V4)</h3>
+                <p className="leading-relaxed">
+                  Rather than static templates, our system analyzes each domain's homepage, meta descriptions, JSON-LD, 
+                  and navigation structure to generate ~28 unique queries (10 branded + 18 non-branded) that:
+                </p>
+                <ul className="list-disc ml-6 space-y-1 mt-2">
+                  <li>Read like authentic user questions (proper grammar, natural phrasing)</li>
+                  <li>Span multiple intent types (discovery, informational, evaluative, commercial)</li>
+                  <li>Adapt to your industry vertical (18+ templates including finance, health, software, retail)</li>
+                  <li>Pass quality gates to ensure zero brand leaks in non-branded queries</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg text-gray-900 mb-2">Continuous Learning Architecture</h3>
+                <p className="leading-relaxed">
+                  After each audit, the system automatically updates a <strong>Prompt Intelligence Index</strong> that stores:
+                </p>
+                <ul className="list-disc ml-6 space-y-1 mt-2">
+                  <li>Brand identity with normalized variants and aliases</li>
+                  <li>Primary entities and semantic phrase extraction</li>
+                  <li>Site classification (e-commerce, corporate, media, software)</li>
+                  <li>Citation performance patterns for future optimization</li>
+                </ul>
+                <p className="leading-relaxed mt-2">
+                  This creates a <strong>flywheel effect</strong> where each audit improves the system's ability to 
+                  generate effective queries for all future domains.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg text-gray-900 mb-2">Three-Tier Caching</h3>
+                <ul className="list-disc ml-6 space-y-1">
+                  <li><strong>Hot cache (KV)</strong>: 5-10ms response, 7-day TTL, serves 90% of requests</li>
+                  <li><strong>Canonical store (D1)</strong>: 50-100ms, durable history with version tracking</li>
+                  <li><strong>Fresh build</strong>: 300-500ms, triggered on cache miss or audit completion</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-3">5. External Data Limitations</h2>
             <ul className="list-disc ml-6 space-y-2 text-gray-700">
               <li>Data from search and AI platforms may be incomplete, cached, or regionally restricted.</li>
               <li>AI citation monitoring depends on public availability and can change without notice.</li>
               <li>Rendered content checks depend on browser automation and may miss dynamic elements.</li>
+              <li>Query generation uses Workers AI (Llama 3.1-8b-instruct) with fallback to industry templates 
+                  if quality gates fail.</li>
               <li>Optiview does not use private, paid, or confidential APIs without user authorization.</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">5. Interpretive Nature</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-3">6. Interpretive Nature</h2>
             <p className="text-gray-700 leading-relaxed">
               All insights, rankings, and "Quick Win" recommendations represent <strong>interpretations of observed 
               patterns</strong>, not official documentation or endorsements by any external entity. Use these results to guide 
@@ -105,7 +167,7 @@ export default function Methodology() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">6. Methodology Updates</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-3">7. Methodology Updates</h2>
             <p className="text-gray-700 leading-relaxed">
               We refine our scoring logic periodically to reflect emerging best practices and changes in the digital ecosystem. 
               Updates may alter prior scores or interpretations. Changelogs are published on the{' '}

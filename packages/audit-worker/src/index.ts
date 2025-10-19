@@ -1,7 +1,81 @@
 import { queryAI, processCitations, generateDefaultQueries } from './connectors';
+import { handleGetLLMPrompts } from './routes/llm-prompts';
+import { 
+  CRAWL_DELAY_MS, 
+  PRECHECK_MAX_RETRIES, 
+  PRECHECK_RETRY_BASE_MS, 
+  PRECHECK_RETRY_MAX_MS,
+  CITATIONS_BATCH_SIZE,
+  CITATIONS_TIMEOUT_MS,
+  CITATIONS_PERPLEXITY_TIMEOUT_MS,
+  CITATIONS_CHATGPT_TIMEOUT_MS,
+  CITATIONS_CLAUDE_TIMEOUT_MS,
+  CITATIONS_BRAVE_TIMEOUT_MS,
+  DISABLE_BRAVE_TEMP
+} from './config';
 
 // Bot Identity Configuration
 const BOT_UA = "OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)";
+
+// Helper: Sleep for polite crawling
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper: Calculate exponential backoff delay
+function getBackoffDelay(attempt: number): number {
+  const delay = PRECHECK_RETRY_BASE_MS * Math.pow(2, attempt);
+  return Math.min(delay, PRECHECK_RETRY_MAX_MS);
+}
+
+// Helper: Parse Retry-After header (supports both seconds and HTTP date)
+function parseRetryAfter(retryAfter: string | null): number {
+  if (!retryAfter) return 0;
+  
+  // Try parsing as seconds
+  const seconds = parseInt(retryAfter, 10);
+  if (!isNaN(seconds)) {
+    return seconds * 1000; // Convert to milliseconds
+  }
+  
+  // Try parsing as HTTP date
+  try {
+    const date = new Date(retryAfter);
+    const delay = date.getTime() - Date.now();
+    return Math.max(0, delay);
+  } catch {
+    return 0;
+  }
+}
+
+// Helper: Timeout wrapper for promises
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMsg: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error(errorMsg)), timeoutMs)
+    )
+  ]);
+}
+
+// Helper: Run items in batches with concurrency control
+async function runInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = [];
+  
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.allSettled(
+      batch.map(item => fn(item))
+    );
+    results.push(...batchResults);
+  }
+  
+  return results;
+}
 
 // Crawl/scoring budget for one run
 const HARD_TIME_MS = 120_000;          // 2 minutes total budget per audit
@@ -42,10 +116,45 @@ const AUTO_REDIRECTS: Record<string, string> = {
   "ford.com": "https://corporate.ford.com"
 };
 
+/**
+ * Normalize a URL for deduplication:
+ * - Remove query strings (except for essential params like page IDs)
+ * - Remove fragments (#)
+ * - Normalize trailing slashes
+ * - Lowercase hostname
+ */
+function normalizeUrl(urlString: string): string {
+  try {
+    const url = new URL(urlString);
+    
+    // Lowercase the hostname
+    url.hostname = url.hostname.toLowerCase();
+    
+    // Remove hash/fragment
+    url.hash = '';
+    
+    // Remove all query parameters (can be made smarter later to keep certain params)
+    url.search = '';
+    
+    // Normalize trailing slash: always remove except for root path
+    if (url.pathname !== '/' && url.pathname.endsWith('/')) {
+      url.pathname = url.pathname.slice(0, -1);
+    }
+    
+    return url.toString();
+  } catch (e) {
+    // If URL parsing fails, return original
+    return urlString;
+  }
+}
+
 export interface Env {
   DB: D1Database;
   RULES: KVNamespace;
+  PROMPT_CACHE: KVNamespace;
+  AUTH_LOGS: KVNamespace;
   BROWSER: Browser;
+  AI: any;
   BASE_URL?: string; // For self-chaining batch requests
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
@@ -53,6 +162,12 @@ export interface Env {
   PERPLEXITY_API_KEY?: string;
   BRAVE_API_KEY?: string;
   BRAVE_SEARCH?: string;
+  SMTP2GO_API_KEY?: string;
+  APP_BASE_URL?: string;
+  COOKIE_NAME?: string;
+  COOKIE_TTL_DAYS?: string;
+  MAGIC_TOKEN_TTL_MIN?: string;
+  MAGIC_REQUESTS_PER_HOUR?: string;
 }
 
 export interface AuditRequest {
@@ -64,6 +179,7 @@ export interface AuditRequest {
 }
 
 export interface CitationsRequest {
+  audit_id: string;           // Required: ties citations to specific audit
   project_id: string;
   domain: string;
   brand?: string;
@@ -133,6 +249,13 @@ async function fetchWithIdentity(url: string, init: RequestInit = {}, env: Env) 
   const headers = new Headers(init.headers || {});
   if (!headers.has("user-agent")) headers.set("user-agent", BOT_UA);
   headers.set("X-Optiview-Bot", "audit");
+  
+  // Signal US/English locale preference to prevent geo-redirects
+  // Accept-Language: en-US prioritized, then en, then any
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", "en-US,en;q=0.9,*;q=0.5");
+  }
+  
   return fetch(url, { ...init, headers, cf: { cacheTtl: 0 } });
 }
 
@@ -407,6 +530,7 @@ async function autoFinalizeStuckAudits(env: Env): Promise<void> {
   // Find audits that are stuck in "running" state with enough pages analyzed
   const stuckAudits = await env.DB.prepare(
     `SELECT a.id, 
+            a.started_at,
             (SELECT COUNT(*) FROM audit_page_analysis apa 
              JOIN audit_pages ap ON apa.page_id = ap.id 
              WHERE ap.audit_id = a.id) as pages_analyzed
@@ -420,22 +544,110 @@ async function autoFinalizeStuckAudits(env: Env): Promise<void> {
   let finalized = 0;
   
   for (const audit of (stuckAudits.results || [])) {
-    const auditData = audit as { id: string; pages_analyzed: number };
+    const auditData = audit as { id: string; pages_analyzed: number; started_at: string };
+    const auditAge = Date.now() - new Date(auditData.started_at).getTime();
+    const ageMinutes = Math.round(auditAge / 60000);
     
-    if (auditData.pages_analyzed >= TARGET_MIN_PAGES) {
-      // Has enough pages - finalize it
+    // Finalize if:
+    // 1. Has 20+ pages (usable data) - regardless of age
+    // 2. Has any pages and is >30 minutes old (give up waiting)
+    // 3. Has 0 pages and is >10 minutes old (failed to start)
+    
+    if (auditData.pages_analyzed >= 20) {
+      // Has usable data - finalize it
       await finalizeAudit(env, auditData.id, 'auto_finalize_stuck');
       finalized++;
-      console.log(`[AUTO-FINALIZE] Finalized stuck audit ${auditData.id} (${auditData.pages_analyzed} pages)`);
-    } else if (auditData.pages_analyzed === 0) {
+      console.log(`[AUTO-FINALIZE] Finalized stuck audit ${auditData.id} (${auditData.pages_analyzed} pages, ${ageMinutes}min old)`);
+    } else if (auditData.pages_analyzed > 0 && ageMinutes >= 30) {
+      // Has some pages but stuck for 30+ minutes - finalize what we have
+      await finalizeAudit(env, auditData.id, 'auto_finalize_stuck_partial');
+      finalized++;
+      console.log(`[AUTO-FINALIZE] Finalized partial audit ${auditData.id} (${auditData.pages_analyzed} pages, ${ageMinutes}min old)`);
+    } else if (auditData.pages_analyzed === 0 && ageMinutes >= 10) {
       // No pages analyzed after 10 minutes - mark as failed
       await markAuditFailed(env, auditData.id, 'timeout_no_pages_after_10min');
       finalized++;
-      console.log(`[AUTO-FINALIZE] Failed stuck audit ${auditData.id} (0 pages)`);
+      console.log(`[AUTO-FINALIZE] Failed stuck audit ${auditData.id} (0 pages, ${ageMinutes}min old)`);
+    } else {
+      console.log(`[AUTO-FINALIZE] Skipping audit ${auditData.id} (${auditData.pages_analyzed} pages, ${ageMinutes}min old) - not yet eligible`);
     }
   }
   
   console.log(`[AUTO-FINALIZE] Processed ${finalized} stuck audits`);
+}
+
+/**
+ * Refresh oldest prompt cache entries (rolling refresh strategy)
+ * Runs hourly to keep cache fresh
+ */
+async function refreshPromptCache(env: Env): Promise<void> {
+  console.log('[PROMPT_REFRESH] Starting hourly cache refresh');
+  
+  const { getStalePromptCache, buildAndCachePrompts } = await import('./prompt-cache');
+  const staleDomains = await getStalePromptCache(env, 100);
+  
+  if (staleDomains.length === 0) {
+    console.log('[PROMPT_REFRESH] No stale cache entries found');
+    return;
+  }
+  
+  console.log(`[PROMPT_REFRESH] Refreshing ${staleDomains.length} domains`);
+  let refreshed = 0;
+  
+  for (const domain of staleDomains) {
+    try {
+      await buildAndCachePrompts(env, domain);
+      refreshed++;
+    } catch (err) {
+      console.error(`[PROMPT_REFRESH] Failed to refresh ${domain}:`, err);
+    }
+  }
+  
+  console.log(`[PROMPT_REFRESH] Refreshed ${refreshed}/${staleDomains.length} domains`);
+}
+
+/**
+ * Warm cache for demo domains nightly (for reliable demos)
+ */
+async function warmDemoDomains(env: Env): Promise<void> {
+  console.log('[DEMO_WARMER] Starting nightly demo cache warmer');
+  
+  // Demo domains across all major industries
+  const demoDomains = [
+    // Finance
+    'chase.com', 'visa.com', 'stripe.com', 'americanexpress.com',
+    // Health
+    'cologuard.com', 'mayoclinic.org',
+    // Retail
+    'nike.com', 'etsy.com',
+    // Automotive
+    'lexus.com', 'ford.com',
+    // Travel
+    'hilton.com', 'expedia.com',
+    // Media
+    'nytimes.com', 'wsj.com',
+    // Software
+    'github.com', 'atlassian.com'
+  ];
+  
+  console.log(`[DEMO_WARMER] Warming ${demoDomains.length} demo domains`);
+  let warmed = 0;
+  
+  for (const domain of demoDomains) {
+    try {
+      const { buildLLMQueryPrompts } = await import('./prompts');
+      await buildLLMQueryPrompts(env, domain);
+      warmed++;
+      console.log(`[DEMO_WARMER] ✅ ${domain} warmed (${warmed}/${demoDomains.length})`);
+    } catch (err) {
+      console.error(`[DEMO_WARMER] ❌ Failed to warm ${domain}:`, err);
+    }
+    
+    // Small delay to avoid rate limits
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  
+  console.log(`[DEMO_WARMER] Warmed ${warmed}/${demoDomains.length} domains`);
 }
 
 export default {
@@ -450,6 +662,14 @@ export default {
     if (event.cron === '0 * * * *') {
       // Hourly: Auto-finalize stuck audits
       await autoFinalizeStuckAudits(env);
+      
+      // Hourly: Refresh oldest 100 prompt cache entries
+      await refreshPromptCache(env);
+    }
+    
+    if (event.cron === '0 2 * * *') {
+      // Nightly: Warm demo domain cache (02:00 UTC)
+      await warmDemoDomains(env);
     }
   },
 
@@ -469,6 +689,42 @@ export default {
         return new Response(null, { status: 204, headers: corsHeaders });
       }
 
+      // Auth routes
+      if (path.startsWith('/v1/auth/')) {
+        const { 
+          handleMagicLinkRequest, 
+          handleMagicLinkVerify, 
+          handleAuthMe, 
+          handleAuthLogout,
+          handleGetUsers,
+          handleGetAuthStats
+        } = await import('./auth/routes');
+
+        if (req.method === 'POST' && path === '/v1/auth/magic/request') {
+          return handleMagicLinkRequest(req, env);
+        }
+
+        if (req.method === 'GET' && path === '/v1/auth/magic/verify') {
+          return handleMagicLinkVerify(req, env);
+        }
+
+        if (req.method === 'GET' && path === '/v1/auth/me') {
+          return handleAuthMe(req, env);
+        }
+
+        if (req.method === 'POST' && path === '/v1/auth/logout') {
+          return handleAuthLogout(req, env);
+        }
+
+        if (req.method === 'GET' && path === '/v1/auth/users') {
+          return handleGetUsers(req, env);
+        }
+
+        if (req.method === 'GET' && path === '/v1/auth/stats') {
+          return handleGetAuthStats(req, env);
+        }
+      }
+
       // Route handlers
       if (req.method === 'POST' && path === '/api/audits') {
         const result = await createAudit(req, env, ctx);
@@ -479,7 +735,29 @@ export default {
       }
 
       if (req.method === 'GET' && path === '/api/audits') {
-        const result = await getAuditsList(url.searchParams, env);
+        // Extract user_id from session cookie (if present)
+        let userId: string | undefined;
+        const cookieName = env.COOKIE_NAME || 'ov_sess';
+        const cookieHeader = req.headers.get('Cookie');
+        if (cookieHeader) {
+          const cookies = cookieHeader.split(';');
+          for (const cookie of cookies) {
+            const [key, value] = cookie.trim().split('=');
+            if (key === cookieName) {
+              const sessionId = value;
+              // Fetch session from DB
+              const session = await env.DB.prepare(
+                'SELECT user_id FROM sessions WHERE id = ? AND datetime(expires_at) > datetime(\'now\')'
+              ).bind(sessionId).first() as any;
+              if (session) {
+                userId = session.user_id;
+              }
+              break;
+            }
+          }
+        }
+        
+        const result = await getAuditsList(url.searchParams, env, userId);
         return new Response(JSON.stringify(result), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -588,6 +866,187 @@ export default {
         });
       }
 
+      // Admin classifier comparison endpoint
+      if (req.method === 'GET' && path === '/api/admin/classifier-compare') {
+        const host = url.searchParams.get('host');
+        if (!host) {
+          return new Response(JSON.stringify({ error: 'host parameter required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const result = await compareClassifiers(host, env);
+          
+          // Log telemetry
+          console.log(JSON.stringify({
+            type: 'admin_classifier_compare_viewed',
+            host,
+            has_legacy: !!result.legacy,
+            has_v2: !!result.v2
+          }));
+
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // Admin system status endpoint
+      if (req.method === 'GET' && path === '/api/admin/system-status') {
+        const { handleSystemStatus } = await import('./routes/system-status');
+        return handleSystemStatus(env);
+      }
+
+      // Admin classifier health endpoint
+      if (req.method === 'GET' && path === '/api/admin/classifier-health') {
+        try {
+          const { computeHealthMetrics, checkHealth } = await import('./lib/health');
+          
+          const metrics = await computeHealthMetrics(env, 24);
+          const alerts = checkHealth(metrics);
+
+          return new Response(JSON.stringify({ metrics, alerts }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // Admin circuit breaker reset endpoint
+      if (req.method === 'POST' && path === '/api/admin/circuit-breaker/reset') {
+        try {
+          const { CircuitBreaker } = await import('./lib/circuitBreaker');
+          const breaker = new CircuitBreaker(env.RULES);
+          await breaker.reset();
+
+          return new Response(JSON.stringify({ ok: true, message: 'Circuit breaker reset to half-open' }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // Manual finalize endpoint for specific audit
+      if (req.method === 'POST' && path.match(/^\/api\/audits\/[^\/]+\/finalize$/)) {
+        const auditId = path.split('/')[3];
+        try {
+          await finalizeAudit(env, auditId, 'manual_finalize');
+          return new Response(JSON.stringify({ ok: true, message: 'Audit finalized', auditId }), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({ ok: false, error: error.message }), { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+      }
+
+      // Admin delete audit endpoint
+      if (req.method === 'DELETE' && path.match(/^\/api\/admin\/audits\/[^\/]+$/)) {
+        const auditId = path.split('/')[4];
+        try {
+          // Get audit info before deletion for logging
+          const auditInfo = await env.DB.prepare(`
+            SELECT root_url, status, pages_analyzed FROM audits WHERE id = ?
+          `).bind(auditId).first();
+
+          if (!auditInfo) {
+            return new Response(JSON.stringify({ error: 'Audit not found' }), { 
+              status: 404, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
+          }
+
+          // Delete from dependent tables first (foreign key order)
+          await env.DB.prepare(`
+            DELETE FROM audit_page_analysis WHERE page_id IN (
+              SELECT id FROM audit_pages WHERE audit_id = ?
+            )
+          `).bind(auditId).run();
+
+          await env.DB.prepare(`
+            DELETE FROM audit_pages WHERE audit_id = ?
+          `).bind(auditId).run();
+
+          // Delete citations associated with this audit
+          await env.DB.prepare(`
+            DELETE FROM ai_citations WHERE audit_id = ?
+          `).bind(auditId).run();
+
+          await env.DB.prepare(`
+            DELETE FROM ai_referrals WHERE audit_id = ?
+          `).bind(auditId).run();
+
+          await env.DB.prepare(`
+            DELETE FROM citations_runs WHERE audit_id = ?
+          `).bind(auditId).run();
+
+          // Delete the audit itself
+          await env.DB.prepare(`
+            DELETE FROM audits WHERE id = ?
+          `).bind(auditId).run();
+
+          // Log the admin action
+          const logId = crypto.randomUUID();
+          const ipAddress = req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || 'unknown';
+          const userAgent = req.headers.get('user-agent') || 'unknown';
+          
+          await env.DB.prepare(`
+            INSERT INTO admin_logs (id, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          `).bind(
+            logId,
+            'DELETE',
+            'audit',
+            auditId,
+            JSON.stringify({ 
+              root_url: auditInfo.root_url, 
+              status: auditInfo.status, 
+              pages_analyzed: auditInfo.pages_analyzed 
+            }),
+            ipAddress,
+            userAgent
+          ).run();
+
+          console.log(`[ADMIN] Audit deleted: ${auditId} (${auditInfo.root_url}) by ${ipAddress}`);
+
+          return new Response(JSON.stringify({ 
+            ok: true, 
+            message: 'Audit and all associated data deleted', 
+            auditId 
+          }), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        } catch (error: any) {
+          console.error('[DELETE AUDIT] Error:', error);
+          return new Response(JSON.stringify({ error: error.message }), { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+      }
+
       // Citations endpoints
       if (req.method === 'POST' && path === '/api/citations/run') {
         const result = await runCitations(req, env);
@@ -613,6 +1072,30 @@ export default {
         });
       }
 
+      // LLM Prompts endpoints
+      if (req.method === 'GET' && path === '/api/llm/prompts') {
+        const { handleGetLLMPrompts } = await import('./routes/llm-prompts');
+        const result = await handleGetLLMPrompts(env, req);
+        return result;
+      }
+      
+      if (req.method === 'GET' && path === '/api/llm/prompts/health') {
+        const { handlePromptsHealth } = await import('./routes/prompts-health');
+        return await handlePromptsHealth(env);
+      }
+      
+      if (req.method === 'GET' && path === '/api/prompts/related') {
+        const { handleGetRelatedPrompts } = await import('./routes/prompts-related');
+        const result = await handleGetRelatedPrompts(env, req);
+        return result;
+      }
+      
+      if (req.method === 'GET' && path === '/api/llm/prompts/export') {
+        const { handlePromptsExport } = await import('./routes/prompts-export');
+        const result = await handlePromptsExport(req, env);
+        return result;
+      }
+
       if (req.method === 'GET' && path.startsWith('/api/insights')) {
         const result = await getInsights(url.searchParams, env);
         return new Response(JSON.stringify(result), {
@@ -628,66 +1111,144 @@ export default {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OptiviewAuditBot</title>
+  <title>OptiviewAuditBot - Optiview</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
-    code { background: #f5f5f5; padding: 0.2em 0.4em; border-radius: 3px; }
-    pre { background: #f5f5f5; padding: 1rem; border-radius: 5px; overflow-x: auto; }
-    h1, h2 { color: #333; }
-    a { color: #0066cc; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #1f2937; }
+    
+    /* Header */
+    header { background: white; border-bottom: 1px solid #e5e7eb; padding: 1rem 0; }
+    .header-content { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-size: 1.25rem; font-weight: 700; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-decoration: none; }
+    nav { display: flex; gap: 2rem; }
+    nav a { color: #6b7280; text-decoration: none; font-size: 0.875rem; transition: color 0.2s; }
+    nav a:hover { color: #3b82f6; }
+    
+    /* Main Content */
+    main { max-width: 800px; margin: 0 auto; padding: 3rem 1.5rem; }
+    h1 { font-size: 2.5rem; font-weight: 700; color: #111827; margin-bottom: 1rem; }
+    h2 { font-size: 1.75rem; font-weight: 600; color: #111827; margin: 2.5rem 0 1rem; padding-top: 1rem; border-top: 2px solid #e5e7eb; }
+    h3 { font-size: 1.25rem; font-weight: 600; color: #374151; margin: 1.5rem 0 0.75rem; }
+    p { margin: 0.75rem 0; color: #4b5563; }
+    ul, ol { margin: 0.75rem 0; padding-left: 2rem; color: #4b5563; }
+    li { margin: 0.5rem 0; }
+    code { background: #f3f4f6; padding: 0.2em 0.5em; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9em; color: #1f2937; }
+    pre { background: #1f2937; color: #f9fafb; padding: 1.25rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; line-height: 1.5; }
+    pre code { background: transparent; color: #f9fafb; padding: 0; }
+    a { color: #3b82f6; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { font-weight: 600; color: #111827; }
+    
+    /* Footer */
+    footer { background: #f9fafb; border-top: 1px solid #e5e7eb; margin-top: 4rem; }
+    .footer-content { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .footer-links { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem; }
+    .footer-links a { color: #6b7280; font-size: 0.875rem; text-decoration: none; }
+    .footer-links a:hover { color: #3b82f6; }
+    .footer-copy { text-align: center; color: #9ca3af; font-size: 0.875rem; }
   </style>
 </head>
 <body>
-  <h1>OptiviewAuditBot</h1>
+  <!-- Header -->
+  <header>
+    <div class="header-content">
+      <a href="https://optiview.ai" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Dashboard</a>
+        <a href="https://app.optiview.ai/score-guide">Scoring Guide</a>
+        <a href="https://app.optiview.ai/methodology">Methodology</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <h1>OptiviewAuditBot</h1>
+    
+    <p>We are a responsible web crawler that runs site audits you initiate in Optiview. We respect robots.txt directives and follow best practices for web crawling.</p>
+    
+    <h2>Our Identity</h2>
+    <p><strong>User-Agent:</strong> <code>OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)</code></p>
+    <p><strong>Identifying Header:</strong> <code>X-Optiview-Bot: audit</code></p>
+    
+    <h2>What We Respect</h2>
+    <ul>
+      <li><strong>robots.txt</strong> - We check for <code>User-agent: OptiviewAuditBot</code> rules, falling back to <code>*</code></li>
+      <li><strong>Allow/Disallow</strong> - We respect path-based allow/disallow rules (longest match wins)</li>
+      <li><strong>Crawl-delay</strong> - We honor crawl delay directives (default: 1.5s between requests to same domain)</li>
+      <li><strong>Retry-After header</strong> - We parse and respect the <code>Retry-After</code> header for rate-limited responses (429)</li>
+      <li><strong>Exponential backoff</strong> - We implement exponential backoff for transient errors (429, 521) with up to 3 retries</li>
+      <li><strong>Meta tags</strong> - We respect <code>noindex</code>, <code>nofollow</code>, and <code>noai</code> meta tags</li>
+    </ul>
+    
+    <h2>How to Allow/Block Us</h2>
+    
+    <h3>Allow the bot:</h3>
+    <pre><code>User-agent: OptiviewAuditBot
+Allow: /</code></pre>
+    
+    <h3>Block the bot:</h3>
+    <pre><code>User-agent: OptiviewAuditBot
+Disallow: /</code></pre>
   
-  <p>We are a responsible web crawler that runs site audits you initiate in Optiview. We respect robots.txt directives and follow best practices for web crawling.</p>
-  
-  <h2>Our Identity</h2>
-  <p><strong>User-Agent:</strong> <code>OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)</code></p>
-  <p><strong>Identifying Header:</strong> <code>X-Optiview-Bot: audit</code></p>
-  
-  <h2>What We Respect</h2>
-  <ul>
-    <li><strong>robots.txt</strong> - We check for <code>User-agent: OptiviewAuditBot</code> rules, falling back to <code>*</code></li>
-    <li><strong>Allow/Disallow</strong> - We respect path-based allow/disallow rules</li>
-    <li><strong>Crawl-delay</strong> - We honor crawl delay directives</li>
-    <li><strong>Meta tags</strong> - We respect <code>noindex</code>, <code>nofollow</code>, and <code>noai</code> meta tags</li>
-  </ul>
-  
-  <h2>How to Allow/Block Us</h2>
-  
-  <h3>Allow the bot:</h3>
-  <pre>User-agent: OptiviewAuditBot
-Allow: /</pre>
-  
-  <h3>Block the bot:</h3>
-  <pre>User-agent: OptiviewAuditBot
-Disallow: /</pre>
-  
-  <h3>Block specific paths:</h3>
-  <pre>User-agent: OptiviewAuditBot
+    
+    <h3>Block specific paths:</h3>
+    <pre><code>User-agent: OptiviewAuditBot
 Disallow: /admin/
-Disallow: /private/</pre>
-  
-  <h3>Set crawl delay:</h3>
-  <pre>User-agent: OptiviewAuditBot
-Crawl-delay: 5</pre>
-  
-  <h2>About Our Crawling</h2>
-  <p>We only crawl sites when you explicitly request an audit through Optiview. We:</p>
-  <ul>
-    <li>Fetch pages to analyze AEO/GEO optimization</li>
-    <li>Extract structured data and content signals</li>
-    <li>Respect all robots.txt directives</li>
-    <li>Use reasonable crawl delays</li>
-    <li>Identify ourselves clearly in requests</li>
-  </ul>
-  
-  <h2>Contact</h2>
-  <p>Questions or concerns? Contact us at <a href="mailto:admin@optiview.ai">admin@optiview.ai</a></p>
-  
-  <h2>Machine-Readable Info</h2>
-  <p>For automated systems: <a href="/.well-known/optiview-bot.json">/.well-known/optiview-bot.json</a></p>
+Disallow: /private/</code></pre>
+    
+    <h3>Set crawl delay:</h3>
+    <pre><code>User-agent: OptiviewAuditBot
+Crawl-delay: 5</code></pre>
+    
+    <h2>About Our Crawling</h2>
+    <p>We only crawl sites when you explicitly request an audit through Optiview. Our crawler is designed to be polite, efficient, and respectful of your server resources:</p>
+    <ul>
+      <li><strong>Targeted crawling</strong> - We fetch pages to analyze AEO/GEO optimization (typically 40-50 pages per audit)</li>
+      <li><strong>Structured data extraction</strong> - We extract JSON-LD, meta tags, headings, and content signals for analysis</li>
+      <li><strong>Dual-mode rendering</strong> - We fetch both static HTML and JavaScript-rendered content to detect visibility gaps</li>
+      <li><strong>Strict robots.txt compliance</strong> - We respect all robots.txt directives with longest-match path rules</li>
+      <li><strong>Configurable delays</strong> - Default 1.5s delay between requests, configurable via <code>Crawl-delay</code> directive</li>
+      <li><strong>Rate limit handling</strong> - We automatically back off when receiving 429 responses and respect <code>Retry-After</code> headers</li>
+      <li><strong>Retry logic</strong> - Up to 3 retries with exponential backoff for transient errors (429, 521)</li>
+      <li><strong>Clear identification</strong> - We identify ourselves with User-Agent and custom header on every request</li>
+      <li><strong>KV caching</strong> - We cache robots.txt rules for 24 hours to reduce redundant requests</li>
+    </ul>
+    
+    <h2>Crawling Limits & Scope</h2>
+    <p>To minimize server impact while providing comprehensive analysis:</p>
+    <ul>
+      <li><strong>Page limit</strong> - Maximum 50 pages per audit (prioritizes homepage and top-level navigation)</li>
+      <li><strong>Sitemap-first</strong> - We prioritize sitemap-listed URLs with 3s timeout for sitemap discovery</li>
+      <li><strong>Depth limits</strong> - We typically crawl homepage + 1-2 levels deep</li>
+      <li><strong>Language filtering</strong> - We focus on English (US) content, filtering non-English paths by default</li>
+      <li><strong>Per-request timeout</strong> - 25 seconds per batch request to prevent hung connections</li>
+      <li><strong>Total audit timeout</strong> - 2 minutes maximum runtime with automatic completion</li>
+    </ul>
+    
+    <h2>Contact</h2>
+    <p>Questions or concerns? Contact us at <a href="mailto:admin@optiview.ai">admin@optiview.ai</a></p>
+    
+    <h2>Machine-Readable Info</h2>
+    <p>For automated systems: <a href="/.well-known/optiview-bot.json">/.well-known/optiview-bot.json</a></p>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-content">
+      <div class="footer-links">
+        <a href="https://app.optiview.ai/score-guide">Scoring Guide</a>
+        <a href="https://app.optiview.ai/help/citations">Citations Guide</a>
+        <a href="https://app.optiview.ai/methodology">Methodology</a>
+        <a href="https://app.optiview.ai/terms">Terms of Use</a>
+        <a href="https://app.optiview.ai/privacy">Privacy Policy</a>
+        <a href="https://api.optiview.ai/bot">Bot Documentation</a>
+      </div>
+      <div class="footer-copy">
+        © 2025 Optiview.ai. All rights reserved.
+      </div>
+    </div>
+  </footer>
 </body>
 </html>`;
         return new Response(html, {
@@ -707,7 +1268,28 @@ Crawl-delay: 5</pre>
           contact: "admin@optiview.ai",
           respect_robots_txt: true,
           honors_crawl_delay: true,
+          honors_retry_after: true,
+          exponential_backoff: {
+            enabled: true,
+            max_retries: 3,
+            base_delay_ms: 2000,
+            max_delay_ms: 30000
+          },
+          default_crawl_delay_ms: 1500,
+          robots_cache_ttl_hours: 24,
           ip_policy: "Cloudflare egress (AS13335); fixed IPs not guaranteed.",
+          crawl_scope: {
+            max_pages_per_audit: 50,
+            typical_pages: "40-50",
+            depth_limit: "homepage + 1-2 levels",
+            sitemap_timeout_ms: 3000,
+            language_filter: "en-US preferred"
+          },
+          rendering: {
+            mode: "dual",
+            static_and_rendered: true,
+            render_visibility_analysis: true
+          },
           opt_out: {
             via_robots: [
               {"group": "User-agent: OptiviewAuditBot", "rule": "Disallow: /"},
@@ -861,40 +1443,132 @@ async function precheckDomain(url: string, env: Env): Promise<{
       };
     }
     
-    // Fetch with automatic redirect following (up to 20 redirects by default)
-    // This handles: 301/302 redirects, Cloudflare Waiting Room, and challenge pages
-    const res = await fetchWithIdentity(url, { redirect: 'follow' }, env);
-    
-    // Check for errors
-    if (res.status >= 400) {
-      return {
-        ok: false,
-        reason: `precheck_failed_http_${res.status}`
-      };
+    // Retry logic for transient errors (429 rate limit, 521 server down)
+    let lastError: any = null;
+    for (let attempt = 0; attempt <= PRECHECK_MAX_RETRIES; attempt++) {
+      try {
+        // Add delay for retries (except first attempt)
+        if (attempt > 0) {
+          const delay = getBackoffDelay(attempt - 1);
+          console.log(`[PRECHECK RETRY] Attempt ${attempt}/${PRECHECK_MAX_RETRIES} for ${url}, waiting ${delay}ms`);
+          await sleep(delay);
+        }
+        
+        // Fetch with automatic redirect following (up to 20 redirects by default)
+        // This handles: 301/302 redirects, Cloudflare Waiting Room, and challenge pages
+        const res = await fetchWithIdentity(url, { redirect: 'follow' }, env);
+        
+        // Handle rate limiting (429) - respect Retry-After if provided
+        if (res.status === 429) {
+          const retryAfter = res.headers.get('Retry-After');
+          const retryDelay = parseRetryAfter(retryAfter) || getBackoffDelay(attempt);
+          
+          console.log(`[PRECHECK 429] Rate limited at ${url}, retry after ${retryDelay}ms`);
+          
+          if (attempt < PRECHECK_MAX_RETRIES) {
+            await sleep(retryDelay);
+            continue; // Retry
+          } else {
+            // Final attempt failed
+            return {
+              ok: false,
+              reason: `precheck_failed_http_429`
+            };
+          }
+        }
+        
+        // Handle server down (521) - retry with backoff
+        if (res.status === 521) {
+          console.log(`[PRECHECK 521] Server down at ${url}, attempt ${attempt}/${PRECHECK_MAX_RETRIES}`);
+          
+          if (attempt < PRECHECK_MAX_RETRIES) {
+            continue; // Retry with exponential backoff
+          } else {
+            // Final attempt failed
+            return {
+              ok: false,
+              reason: `precheck_failed_http_521`
+            };
+          }
+        }
+        
+        // Check for other errors (non-retryable)
+        if (res.status >= 400) {
+          return {
+            ok: false,
+            reason: `precheck_failed_http_${res.status}`
+          };
+        }
+        
+        // Get the final URL after redirects
+        const finalUrl = res.url;
+        
+        // Check if page is empty or error page
+        const html = await res.text();
+        console.log(`[PRECHECK] ${url} -> status=${res.status}, size=${html.length}, finalUrl=${finalUrl}`);
+        console.log(`[PRECHECK HTML] First 300 chars: ${html.slice(0, 300).replace(/\s+/g, ' ')}`);
+        
+        if (isEmptyOrErrorPage(html)) {
+          console.log(`[PRECHECK EMPTY] ${url} failed: HTML too short (${html.length} bytes) or contains error phrases`);
+          return {
+            ok: false,
+            reason: 'domain_error_or_empty_page'
+          };
+        }
+        
+        // Check if redirected to non-US/non-English locale
+        // Common patterns: /en-gb/, /en-ca/, /en-au/, /fr/, /de/, /es/, /ja/, /zh/, etc.
+        const nonUSLocalePattern = /\/(en-(?!us)[a-z]{2}|[a-z]{2}-[a-z]{2}|[a-z]{2})(?:\/|$)/i;
+        if (finalUrl !== url && nonUSLocalePattern.test(finalUrl)) {
+          const localeMatch = finalUrl.match(nonUSLocalePattern);
+          console.log(`[PRECHECK LOCALE] Redirected to non-US locale: ${localeMatch?.[0]} in ${finalUrl}`);
+          
+          // Try to construct US/English version
+          // Replace /en-gb/ with /en-us/, or remove locale prefix entirely
+          let usUrl = finalUrl.replace(/\/(en-[a-z]{2}|[a-z]{2}-[a-z]{2}|[a-z]{2})\//i, '/en-us/');
+          
+          // If that didn't change anything, try without locale prefix
+          if (usUrl === finalUrl) {
+            usUrl = finalUrl.replace(/\/(en-[a-z]{2}|[a-z]{2}-[a-z]{2}|[a-z]{2})\//i, '/');
+          }
+          
+          // If still no change, try the original domain without path
+          if (usUrl === finalUrl) {
+            const originalHostname = new URL(url).hostname;
+            usUrl = `https://${originalHostname}/`;
+          }
+          
+          console.log(`[PRECHECK LOCALE] Attempting US version: ${usUrl}`);
+          
+          return {
+            ok: true,
+            finalUrl: usUrl
+          };
+        }
+        
+        // Success!
+        return {
+          ok: true,
+          finalUrl: finalUrl !== url ? finalUrl : undefined
+        };
+        
+      } catch (error: any) {
+        lastError = error;
+        console.log(`[PRECHECK ERROR] Attempt ${attempt}/${PRECHECK_MAX_RETRIES} failed: ${error.message}`);
+        
+        // Retry on network errors
+        if (attempt < PRECHECK_MAX_RETRIES) {
+          continue;
+        }
+      }
     }
     
-    // Get the final URL after redirects
-    const finalUrl = res.url;
-    
-    // Check if page is empty or error page
-    const html = await res.text();
-    const htmlPreview = html.slice(0, 300).replace(/\s+/g, ' ');
-    console.log(`[PRECHECK] ${url} -> status=${res.status}, size=${html.length}, finalUrl=${finalUrl}`);
-    console.log(`[PRECHECK HTML] First 300 chars: ${htmlPreview}`);
-    
-    if (isEmptyOrErrorPage(html)) {
-      console.log(`[PRECHECK EMPTY] ${url} failed: HTML too short (${html.length} bytes) or contains error phrases`);
-      return {
-        ok: false,
-        reason: 'domain_error_or_empty_page'
-      };
-    }
-    
-    // Return success with final URL if it changed
+    // All retries exhausted
     return {
-      ok: true,
-      finalUrl: finalUrl !== url ? finalUrl : undefined
+      ok: false,
+      reason: `precheck_error: ${lastError?.message || 'unknown'}`
     };
+    
   } catch (error: any) {
     return {
       ok: false,
@@ -1016,13 +1690,25 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
   let analyzed = 0;
   const renderCount = { current: 0 }; // Track renders across parallel operations
   
-  // Get audit root URL to detect homepage
+  // Get audit root URL and extract locale prefix for filtering
   const rootUrl = audit.root_url || '';
   const rootUrlNormalized = rootUrl.replace(/\/$/, ''); // Remove trailing slash
+  
+  // Extract locale prefix from root URL (same logic as discoverUrls)
+  const rootUrlObj = new URL(rootUrl);
+  const rootHost = rootUrlObj.hostname.replace(/^www\./, '');
+  const localeMatch = rootUrlObj.pathname.match(/^\/[a-z]{2}(?:[-_][a-z]{2})?/);
+  const rootLocalePrefix = localeMatch ? localeMatch[0] : '/';
   
   // 3) Process in parallel with time budget
   await pMap(queue, async (url, index) => {
     if (Date.now() - started > PER_REQUEST_BUDGET_MS) return; // stay < 30s
+    
+    // Polite crawl delay - stagger requests slightly to avoid overwhelming servers
+    // With CONCURRENCY=8, effective rate is ~5-6 requests/second
+    if (index > 0) {
+      await sleep(Math.min(CRAWL_DELAY_MS / CONCURRENCY, 200)); // Small stagger per parallel worker
+    }
     
     // Check robots.txt
     try {
@@ -1102,42 +1788,96 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
         return;
       }
       
-      // Update audit_pages with fetch metadata (both static and rendered HTML)
-      await env.DB.prepare(
-        `UPDATE audit_pages 
-         SET status_code = ?, 
-             content_type = ?, 
-             html_static = ?
-         WHERE id = ?`
-      ).bind(
-        200, // We only process successful fetches
-        'text/html',
-        (staticHtml || htmlToAnalyze).slice(0, 200000), // Store static HTML, truncate to 200k chars
-        pageRow.id
-      ).run();
+      // Use batch operation to ensure both UPDATE and INSERT complete atomically
+      const analysisId = crypto.randomUUID();
       
-      // Save analysis with rendered HTML, gap ratio, and A11 check
-      await env.DB.prepare(
-        `INSERT INTO audit_page_analysis 
-         (id, page_id, title, h1, canonical, schema_types, jsonld, checks_json, aeo_score, geo_score, rendered_html, render_gap_ratio, analyzed_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
-      ).bind(
-        crypto.randomUUID(),
-        pageRow.id,
-        extract.title || '',
-        extract.h1 || '',
-        extract.canonical || '',
-        JSON.stringify(extract.schemaTypes || []),
-        JSON.stringify(extract.jsonldRaw || []),
-        JSON.stringify(checksWithA11 || []),
-        Math.round(aeoWithA11 * 100) / 100,
-        scores.geo,
-        renderedHtml ? renderedHtml.slice(0, 200000) : null, // Store rendered HTML if available
-        renderGapRatio // Store gap ratio for SPA detection
-      ).run();
-      
-      analyzed++;
-      console.log(`Processed: ${url} (AEO: ${scores.aeo}, GEO: ${scores.geo})`);
+      try {
+        await env.DB.batch([
+          // Update audit_pages with fetch metadata
+          env.DB.prepare(
+            `UPDATE audit_pages 
+             SET status_code = ?, 
+                 content_type = ?, 
+                 html_static = ?
+             WHERE id = ?`
+          ).bind(
+            200, // We only process successful fetches
+            'text/html',
+            (staticHtml || htmlToAnalyze).slice(0, 200000), // Store static HTML, truncate to 200k chars
+            pageRow.id
+          ),
+          
+          // Save analysis with rendered HTML, gap ratio, and A11 check
+          env.DB.prepare(
+            `INSERT INTO audit_page_analysis 
+             (id, page_id, title, h1, canonical, schema_types, jsonld, checks_json, aeo_score, geo_score, rendered_html, render_gap_ratio, analyzed_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+          ).bind(
+            analysisId,
+            pageRow.id,
+            extract.title || '',
+            extract.h1 || '',
+            extract.canonical || '',
+            JSON.stringify(extract.schemaTypes || []),
+            JSON.stringify(extract.jsonldRaw || []),
+            JSON.stringify(checksWithA11 || []),
+            Math.round(aeoWithA11 * 100) / 100,
+            scores.geo,
+            renderedHtml ? renderedHtml.slice(0, 200000) : null, // Store rendered HTML if available
+            renderGapRatio // Store gap ratio for SPA detection
+          )
+        ]);
+        
+        analyzed++;
+        console.log(`Processed: ${url} (AEO: ${scores.aeo}, GEO: ${scores.geo})`);
+      } catch (dbError: any) {
+        console.error(`[DB ERROR] Failed to save page analysis for ${url}:`, dbError.message);
+        return; // Skip this page if DB operations fail
+      }      
+      // Extract links from this page and queue for future batches (organic discovery)
+      // Continue until we have enough pages analyzed (target is 40-60)
+      if (analyzed < TARGET_MIN_PAGES) {
+        try {
+          const linkMatches = (staticHtml || htmlToAnalyze).matchAll(/<a\s+[^>]*href=['"]([^'"]+)['"]/gi);
+          const newUrls: string[] = [];
+          
+          for (const match of Array.from(linkMatches).slice(0, 50)) { // Max 50 links per page (increased from 20)
+            try {
+              const linkUrl = new URL(match[1], url);
+              const normalizedLinkStr = normalizeUrl(linkUrl.toString()); // Normalize before deduplication
+              
+              // Apply same filtering rules using extracted locale prefix
+              if (sameSite(new URL(rootUrl), linkUrl) && shouldCrawlUrl(normalizedLinkStr, rootHost, rootLocalePrefix)) {
+                newUrls.push(normalizedLinkStr);
+              }
+            } catch { /* ignore bad URLs */ }
+          }
+          
+          // Batch insert new URLs - use INSERT with WHERE NOT EXISTS to prevent duplicates
+          if (newUrls.length > 0) {
+            const uniqueUrls = [...new Set(newUrls)].slice(0, 20); // Dedupe and limit to 20 per page
+            const insertStatements = uniqueUrls.map(newUrl =>
+              env.DB.prepare(
+                `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
+                 SELECT ?, ?, ?, datetime('now')
+                 WHERE NOT EXISTS (SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ?)`
+              ).bind(crypto.randomUUID(), auditId, newUrl, auditId, newUrl)
+            );
+            
+            try {
+              // Batch insert in one go (much faster, fewer API calls)
+              if (insertStatements.length > 0) {
+                await env.DB.batch(insertStatements);
+              }
+            } catch (err) {
+              // Ignore constraint errors (duplicates)
+            }
+            console.log(`[DISCOVER] Found ${newUrls.length} links from ${url}, queued ${uniqueUrls.length}`);
+          }
+        } catch (err) {
+          console.error(`[LINK EXTRACT ERROR] ${url}:`, err);
+        }
+      }
     } catch (error: any) {
       console.error(`[SCORE ERROR] ${url}:`, error.message);
     }
@@ -1150,12 +1890,20 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
   const hitTarget = totals.pages_analyzed >= TARGET_MIN_PAGES;
   const hitHardTime = elapsed >= HARD_TIME_MS;
   const hitMaxPages = totals.pages_analyzed >= TARGET_MAX_PAGES;
-  const queueEmpty = queue.length < TARGET_MAX_PAGES && analyzed === queue.length;
+  
+  // Check if there are more unprocessed pages in the database
+  const unprocessedCount = totals.pages_discovered - totals.pages_analyzed;
+  const queueEmpty = unprocessedCount === 0;
   
   // Log progress
-  console.log(`[BATCH] ${auditId} pages=${totals.pages_analyzed}/${totals.pages_discovered} elapsed=${elapsed}ms`);
+  console.log(`[BATCH] ${auditId} pages=${totals.pages_analyzed}/${totals.pages_discovered} (${unprocessedCount} unprocessed) elapsed=${elapsed}ms`);
   
-  if (hitTarget || hitHardTime || hitMaxPages || queueEmpty) {
+  // Finalization conditions:
+  // 1. Hit target pages (40+) - success
+  // 2. Hit max pages (60) - success
+  // 3. Hit hard time limit (2min) - finalize what we have if >20 pages
+  // 4. Queue empty - finalize if we have any pages
+  if (hitTarget || hitMaxPages || queueEmpty || (hitHardTime && totals.pages_analyzed >= 20)) {
     const reason = hitHardTime ? 'time_budget_reached'
                  : hitMaxPages ? 'max_pages_reached'
                  : hitTarget ? 'target_min_pages_met'
@@ -1163,6 +1911,12 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
     
     await finalizeAudit(env, auditId, reason);
     return { ok: true, finalized: true, reason, totals };
+  }
+  
+  // If we hit hard time but have <20 pages, mark as failed
+  if (hitHardTime) {
+    await markAuditFailed(env, auditId, `timeout_insufficient_pages_${totals.pages_analyzed}`);
+    return { ok: true, finalized: true, reason: 'timeout_failed', totals };
   }
   
   // 5) Chain the next batch synchronously (recursive in-process call)
@@ -1238,7 +1992,7 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
   
   await env.DB.prepare(
     `UPDATE audits 
-     SET status = 'complete', 
+     SET status = 'completed', 
          aeo_score = ?, 
          geo_score = ?, 
          finished_at = datetime('now')
@@ -1246,6 +2000,25 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
   ).bind(aeo, geo, auditId).run();
   
   console.log(`[FINALIZED] ${auditId}: ${reason} (AEO: ${aeo}, GEO: ${geo}, Gap: ${avgRenderGap ? Math.round(avgRenderGap * 100) + '%' : 'N/A'})`);
+  
+  // Async: Build and cache LLM prompts for this domain (non-blocking)
+  // This runs after finalization so citation runs can use cached prompts
+  (async () => {
+    try {
+      const audit: any = await env.DB.prepare(
+        'SELECT root_url, project_id FROM audits WHERE id = ?'
+      ).bind(auditId).first();
+      
+      if (audit) {
+        const domain = new URL(audit.root_url).hostname.replace(/^www\./, '');
+        const { buildAndCachePrompts } = await import('./prompt-cache');
+        await buildAndCachePrompts(env, domain, audit.project_id);
+        console.log(`[PROMPT_CACHE] Built cache for ${domain} after audit completion`);
+      }
+    } catch (err) {
+      console.error(`[PROMPT_CACHE] Failed to build cache after audit:`, err);
+    }
+  })();
 }
 
 // API Route Handlers
@@ -1281,25 +2054,65 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     "INSERT INTO audits (id, project_id, root_url, site_description, started_at, status, config_json) VALUES (?, ?, ?, ?, datetime('now'), 'running', ?)"
   ).bind(id, project_id, root_url, site_description || null, JSON.stringify(config)).run();
 
-  // Discover URLs and populate audit_pages (do this in background but ensure it starts)
+  // Hybrid discovery: Try sitemap first (fast timeout), then fill with organic discovery
   ctx.waitUntil((async () => {
     try {
-      console.log(`[DISCOVER] Starting URL discovery for: ${root_url}`);
-      const urls = await discoverUrls(root_url, env, Math.min(max_pages, MAX_DISCOVER));
+      console.log(`[HYBRID-DISCOVER] Starting discovery for: ${root_url}`);
       
-      // Insert discovered URLs into audit_pages
-      for (const url of urls) {
-        await env.DB.prepare(
-          "INSERT INTO audit_pages (id, audit_id, url, fetched_at) VALUES (?, ?, ?, datetime('now'))"
-        ).bind(crypto.randomUUID(), id, url).run();
+      const discoveredUrls = new Set<string>();
+      discoveredUrls.add(normalizeUrl(root_url)); // Always include homepage (normalized)
+      
+      // 1. Try sitemap discovery (with 10s timeout)
+      try {
+        const sitemapPromise = discoverUrls(root_url, env);
+        const sitemapUrls = await Promise.race([
+          sitemapPromise,
+          new Promise<string[]>((_, reject) => setTimeout(() => reject('timeout'), 10000))
+        ]);
+        
+        // Normalize and sort by depth (closest to root first) and take top 50
+        const normalizedUrls = sitemapUrls.map(u => normalizeUrl(u));
+        const sortedUrls = normalizedUrls.sort((a, b) => {
+          const depthA = new URL(a).pathname.split('/').filter(Boolean).length;
+          const depthB = new URL(b).pathname.split('/').filter(Boolean).length;
+          return depthA - depthB;
+        }).slice(0, 50);
+        
+        sortedUrls.forEach(u => discoveredUrls.add(u));
+        console.log(`[HYBRID-DISCOVER] Found ${sortedUrls.length} normalized URLs from sitemap`);
+      } catch (sitemapError: any) {
+        console.log(`[HYBRID-DISCOVER] Sitemap discovery failed/timeout, will use organic discovery: ${sitemapError}`);
       }
       
-      console.log(`[DISCOVER] Inserted ${urls.length} URLs for audit ${id}`);
+      // 2. Insert discovered URLs (batch insert for speed)
+      // URL normalization already handled above, discoveredUrls Set ensures uniqueness
+      const uniqueUrls = Array.from(discoveredUrls);
+      console.log(`[HYBRID-DISCOVER] Inserting ${uniqueUrls.length} unique normalized URLs`);
       
-      // Directly call continueAuditBatch instead of fetching
+      // Use deterministic UUIDs based on audit_id + url to prevent duplicate inserts
+      const statements = uniqueUrls.map(url => {
+        const urlHash = `${id}:${url}`;
+        const deterministicId = crypto.randomUUID(); // Still use random, but INSERT OR IGNORE based on unique constraint
+        return env.DB.prepare(
+          `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
+           SELECT ?, ?, ?, datetime('now')
+           WHERE NOT EXISTS (SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ?)`
+        ).bind(deterministicId, id, url, id, url);
+      });
+      
+      // Batch insert (100 at a time)
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+        const chunk = statements.slice(i, i + BATCH_SIZE);
+        await env.DB.batch(chunk);
+      }
+      
+      console.log(`[HYBRID-DISCOVER] Starting batch processing with ${uniqueUrls.length} initial URLs`);
+      
+      // 3. Start batch processing (will extract more links organically)
       await continueAuditBatch(id, env);
     } catch (error: any) {
-      console.error(`[DISCOVER ERROR] ${id}:`, error);
+      console.error(`[HYBRID-DISCOVER ERROR] ${id}:`, error);
       await markAuditFailed(env, id, `discover_error: ${error.message || 'unknown'}`);
     }
   })());
@@ -1307,11 +2120,12 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   return { audit_id: id, status: 'running' };
 }
 
-async function getAuditsList(searchParams: URLSearchParams, env: Env) {
+async function getAuditsList(searchParams: URLSearchParams, env: Env, userId?: string) {
   const limit = parseInt(searchParams.get('limit') || '50');
   const offset = parseInt(searchParams.get('offset') || '0');
   
-  const results = await env.DB.prepare(`
+  // Build query with optional user_id filter
+  let query = `
     SELECT 
       id,
       project_id,
@@ -1321,11 +2135,22 @@ async function getAuditsList(searchParams: URLSearchParams, env: Env) {
       status,
       aeo_score,
       geo_score,
-      config_json
+      config_json,
+      user_id
     FROM audits 
-    ORDER BY started_at DESC
-    LIMIT ? OFFSET ?
-  `).bind(limit, offset).all();
+  `;
+  
+  const bindings: any[] = [];
+  
+  if (userId) {
+    query += ` WHERE user_id = ? `;
+    bindings.push(userId);
+  }
+  
+  query += ` ORDER BY started_at DESC LIMIT ? OFFSET ? `;
+  bindings.push(limit, offset);
+  
+  const results = await env.DB.prepare(query).bind(...bindings).all();
 
   // Get page stats for each audit
   const auditsWithStats = await Promise.all(
@@ -1365,11 +2190,50 @@ async function getAudit(auditId: string, env: Env) {
     "SELECT COUNT(*) as total, AVG(aeo_score) as avg_aeo, AVG(geo_score) as avg_geo FROM audit_page_analysis apa JOIN audit_pages ap ON apa.page_id = ap.id WHERE ap.audit_id = ?"
   ).bind(auditId).first();
 
+  // Calculate GEO Adjusted score from citations (if available)
+  let geoAdjusted = null;
+  let geoAdjustmentDetails = null;
+  
+  try {
+    const { calculateGeoAdjusted, extractCitationRates, getPerformanceExplanation } = await import('./lib/geoAdjustment');
+    
+    // Fetch citation summary
+    const citationsSummary = await env.DB.prepare(`
+      SELECT 
+        ai_source as source,
+        COUNT(*) as total_queries,
+        SUM(CASE WHEN cited_match_count > 0 THEN 1 ELSE 0 END) as cited_queries
+      FROM ai_citations
+      WHERE audit_id = ?
+      GROUP BY ai_source
+    `).bind(auditId).all();
+    
+    if (citationsSummary.results && citationsSummary.results.length > 0) {
+      const citationRates = extractCitationRates({ by_source: citationsSummary.results });
+      const geoRaw = audit.geo_score || 0;
+      const result = calculateGeoAdjusted(geoRaw, citationRates);
+      
+      geoAdjusted = result.geo_adjusted;
+      geoAdjustmentDetails = {
+        geo_raw: result.geo_raw,
+        geo_adjusted: result.geo_adjusted,
+        citation_bonus: result.citation_bonus,
+        breakdown: result.breakdown,
+        performance_flag: result.performance_flag,
+        explanation: getPerformanceExplanation(result)
+      };
+    }
+  } catch (err) {
+    console.warn('[GEO_ADJUSTED] Failed to calculate:', err);
+  }
+
   return {
     ...audit,
     pages_analyzed: pageStats?.total || 0,
     avg_aeo_score: pageStats?.avg_aeo || 0,
-    avg_geo_score: pageStats?.avg_geo || 0
+    avg_geo_score: pageStats?.avg_geo || 0,
+    geo_adjusted: geoAdjusted,
+    geo_adjustment_details: geoAdjustmentDetails
   };
 }
 
@@ -1377,10 +2241,12 @@ async function getAuditPages(auditId: string, searchParams: URLSearchParams, env
   const limit = parseInt(searchParams.get('limit') || '50');
   const offset = parseInt(searchParams.get('offset') || '0');
 
+  // Use INNER JOIN to only return pages that have been analyzed
+  // This excludes discovered URLs that were never processed
   const pages = await env.DB.prepare(`
     SELECT ap.*, apa.aeo_score, apa.geo_score, apa.checks_json
     FROM audit_pages ap
-    LEFT JOIN audit_page_analysis apa ON ap.id = apa.page_id
+    INNER JOIN audit_page_analysis apa ON ap.id = apa.page_id
     WHERE ap.audit_id = ?
     ORDER BY ap.fetched_at DESC
     LIMIT ? OFFSET ?
@@ -1494,6 +2360,71 @@ async function runCrawl({ audit_id, root_url, site_description, max_pages }: any
         const weights = await loadWeights(env.RULES);
         const checks = scorePage(analysis, weights);
         
+        // Phase 1: Run classifier v2 in shadow mode
+        let classificationV2 = null;
+        try {
+          const { classifyV2 } = await import('./prompts/classifierV2');
+          const hostname = new URL(url).hostname;
+          const hostKey = `optiview:classify:v1:${hostname}`;
+          
+          // Try KV cache first
+          const cachedRaw = await env.RULES.get(hostKey);
+          if (cachedRaw) {
+            classificationV2 = JSON.parse(cachedRaw);
+            console.log(`[CLASSIFY_V2] Cache hit for ${hostname}`);
+          } else {
+            // Compute v2 classification
+            const renderGapRatio = rendered ? (analysis.parityPass ? 0.8 : 0.5) : 1.0;
+            classificationV2 = await classifyV2({
+              html,
+              url,
+              hostname,
+              title: analysis.title,
+              metaDescription: analysis.h1, // Use H1 as proxy for meta description
+              renderVisibilityPct: renderGapRatio
+            });
+            
+            // Cache for 24h (fire-and-forget, don't await)
+            env.RULES.put(hostKey, JSON.stringify(classificationV2), { expirationTtl: 86400 }).catch(() => {});
+            console.log(`[CLASSIFY_V2] Computed for ${hostname}: ${classificationV2.site_type.value}/${classificationV2.industry.value}`);
+            
+            // Log telemetry for health dashboard
+            try {
+              const { logClassificationV2 } = await import('./lib/telemetry');
+              const { classifySite, inferIndustryFromContext } = await import('./prompts');
+              const contextBlob = `${analysis.title || ''} ${analysis.h1 || ''} ${html.substring(0, 2000)}`;
+              const legacySiteType = classifySite(contextBlob);
+              const legacyIndustry = inferIndustryFromContext(contextBlob);
+              
+              logClassificationV2({
+                host: hostname,
+                classification: classificationV2,
+                legacySiteType,
+                legacyIndustry
+              });
+            } catch (e) {
+              console.warn('[CLASSIFY_V2] Telemetry logging failed:', e);
+            }
+          }
+        } catch (error) {
+          console.error(`[CLASSIFY_V2] Error:`, error);
+          // Fallback classification on error
+          classificationV2 = {
+            site_type: { value: null, confidence: null },
+            industry: { value: null, confidence: null },
+            site_mode: null,
+            brand_kind: null,
+            purpose: "inform",
+            lang: null,
+            region: null,
+            jsonld_types: [],
+            nav_terms: [],
+            category_terms: [],
+            signals: { url: 0, schema: 0, nav: 0, commerce: 0, media: 0 },
+            notes: ["classifier_v2_error"]
+          };
+        }
+        
         const ids = { page_id: crypto.randomUUID(), analysis_id: crypto.randomUUID() };
 
         await env.DB.batch([
@@ -1504,8 +2435,8 @@ async function runCrawl({ audit_id, root_url, site_description, max_pages }: any
           
           env.DB.prepare(`INSERT INTO audit_page_analysis
             (id, page_id, title, h1, canonical, schema_types, jsonld, has_answer_box, has_jump_links, facts_block, references_block,
-             tables_count, outbound_links, author_json, org_json, robots_ai_policy, parity_pass, aeo_score, geo_score, checks_json, analyzed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
+             tables_count, outbound_links, author_json, org_json, robots_ai_policy, parity_pass, aeo_score, geo_score, checks_json, metadata, analyzed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`)
             .bind(
               ids.analysis_id, ids.page_id,
               analysis.title, analysis.h1, analysis.canonical,
@@ -1515,7 +2446,8 @@ async function runCrawl({ audit_id, root_url, site_description, max_pages }: any
               analysis.tablesCount, analysis.outboundLinks,
               JSON.stringify(analysis.author||null), JSON.stringify(analysis.org||null),
               JSON.stringify(analysis.robots||{}), analysis.parityPass ? 1 : 0,
-              checks.aeo, checks.geo, JSON.stringify(checks.items)
+              checks.aeo, checks.geo, JSON.stringify(checks.items),
+              JSON.stringify({ classification_v2: classificationV2 })
             )
         ]);
 
@@ -1663,74 +2595,50 @@ async function fetchTextMaybeGzip(url: string, env: Env): Promise<string|null> {
 }
 
 async function discoverSitemaps(finalOrigin: URL, env: Env): Promise<string[]> {
-  const candidates: string[] = [];
-  const tryUrls = new Set<string>();
-
-  // robots.txt
-  for (const u of flipWww(finalOrigin)) {
-    tryUrls.add(new URL("/robots.txt", u.origin).toString());
-  }
-
-  // standard locations
-  for (const u of flipWww(finalOrigin)) {
-    tryUrls.add(new URL("/sitemap.xml", u.origin).toString());
-    tryUrls.add(new URL("/sitemap_index.xml", u.origin).toString());
-  }
-
-  const discovered: string[] = [];
-  for (const url of tryUrls) {
-    const text = await fetchTextMaybeGzip(url, env);
-    if (!text) continue;
-
-    if (url.endsWith("/robots.txt")) {
-      // Parse "Sitemap: <url>" lines
-      const lines = text.split(/\r?\n/);
-      for (const line of lines) {
-        const m = line.match(/^\s*Sitemap:\s*(\S+)\s*$/i);
-        if (m) discovered.push(m[1]);
-      }
-    } else {
-      // Direct sitemap location
-      discovered.push(url);
-    }
-  }
-
-  // Expand index files into child sitemaps
-  const out: string[] = [];
-  const MAX_SITEMAPS = 50; // Cap to prevent timeout on sites with 100s of sitemaps
+  // Fast sitemap discovery: try common patterns only, no robots.txt parsing
+  const tryUrls: string[] = [];
   
-  for (const siteUrl of discovered) {
-    if (out.length >= MAX_SITEMAPS) {
-      console.log(`[CRAWL] Sitemap limit reached (${MAX_SITEMAPS}), stopping discovery`);
-      break;
-    }
+  // Extract locale from path (e.g., /en-us -> en-us)
+  const pathParts = finalOrigin.pathname.split('/').filter(Boolean);
+  const locale = pathParts.length > 0 ? pathParts[0] : '';
+  
+  // Try direct sitemap URLs (most common patterns)
+  const origin = finalOrigin.origin;
+  tryUrls.push(`${origin}/sitemap.xml`);
+  
+  if (locale && /^[a-z]{2}(-[a-z]{2})?$/i.test(locale)) {
+    // Locale-specific sitemaps
+    tryUrls.push(`${origin}/sitemap-${locale}.xml`);
+    tryUrls.push(`${origin}/${locale}/sitemap.xml`);
+  }
+  
+  tryUrls.push(`${origin}/sitemap_index.xml`);
+  
+  console.log(`[CRAWL] Trying ${tryUrls.length} sitemap URLs`);
+  
+  const found: string[] = [];
+  
+  for (const url of tryUrls) {
+    if (found.length >= 5) break; // Take up to 5 working sitemaps
     
-    const xml = await fetchTextMaybeGzip(siteUrl, env);
-    if (!xml) continue;
-    if (/<sitemapindex/i.test(xml)) {
-      const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
-      let m; 
-      while ((m = re.exec(xml))) {
-        out.push(m[1]);
-        if (out.length >= MAX_SITEMAPS) break;
-      }
-    } else {
-      out.push(siteUrl);
+    const xml = await fetchTextMaybeGzip(url, env);
+    if (!xml || xml.length < 100) continue;
+    
+    // Check if it's a valid sitemap
+    if (/<urlset/i.test(xml) || /<sitemapindex/i.test(xml)) {
+      console.log(`[CRAWL] Found sitemap: ${url}`);
+      found.push(url);
     }
   }
-
-  // Dedup and limit
-  const unique = [...new Set(out)];
-  if (unique.length > MAX_SITEMAPS) {
-    console.log(`[CRAWL] Trimming ${unique.length} sitemaps to ${MAX_SITEMAPS}`);
-    return unique.slice(0, MAX_SITEMAPS);
-  }
-  return unique;
+  
+  console.log(`[CRAWL] Discovered ${found.length} sitemaps`);
+  return found;
 }
 
 async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL)=>boolean, env: Env): Promise<string[]> {
   const urls: string[] = [];
-  const MAX_URLS_FROM_SITEMAPS = 5000; // Cap to prevent memory/timeout issues
+  const MAX_URLS_FROM_SITEMAPS = 200; // Cap at 200 URLs (will be sorted by depth later)
+  const childSitemaps: string[] = [];
   
   for (const sm of sitemapUrls) {
     if (urls.length >= MAX_URLS_FROM_SITEMAPS) {
@@ -1740,6 +2648,22 @@ async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL
     
     const xml = await fetchTextMaybeGzip(sm, env);
     if (!xml) continue;
+    
+    // If it's a sitemap index, extract first 3 child sitemaps
+    if (/<sitemapindex/i.test(xml)) {
+      console.log(`[CRAWL] Found sitemap index, extracting child sitemaps`);
+      const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+      let m;
+      let count = 0;
+      while ((m = re.exec(xml)) && count < 3) {
+        childSitemaps.push(m[1]);
+        count++;
+      }
+      console.log(`[CRAWL] Extracted ${count} child sitemaps from index`);
+      continue;
+    }
+    
+    // Extract URLs from urlset
     if (/<urlset/i.test(xml)) {
       const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
       let m; 
@@ -1752,8 +2676,29 @@ async function extractUrlsFromSitemaps(sitemapUrls: string[], hostAllow: (u: URL
           }
         } catch { /* ignore bad */ }
       }
-    } else if (/<sitemapindex/i.test(xml)) {
-      // already expanded above; safe to ignore
+    }
+  }
+  
+  // Process child sitemaps if we found any
+  if (childSitemaps.length > 0 && urls.length < MAX_URLS_FROM_SITEMAPS) {
+    console.log(`[CRAWL] Processing ${childSitemaps.length} child sitemaps`);
+    for (const childSm of childSitemaps) {
+      if (urls.length >= MAX_URLS_FROM_SITEMAPS) break;
+      
+      const xml = await fetchTextMaybeGzip(childSm, env);
+      if (!xml || !/<urlset/i.test(xml)) continue;
+      
+      const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+      let m;
+      while ((m = re.exec(xml))) {
+        try {
+          const u = new URL(m[1]);
+          if (hostAllow(u)) {
+            urls.push(u.toString());
+            if (urls.length >= MAX_URLS_FROM_SITEMAPS) break;
+          }
+        } catch { /* ignore bad */ }
+      }
     }
   }
   
@@ -1774,8 +2719,7 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: 
 
     // Apply crawl policy filter with locale awareness
     if (!shouldCrawlUrl(next, rootHost, rootPath)) {
-      console.log(`[BFS] Skipping ${next} - filtered by crawl policy`);
-      continue;
+      continue; // Filtered by policy
     }
 
     // Check robots.txt before fetching
@@ -1783,8 +2727,7 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: 
     const robotsRules = await getRobots(env, urlObj);
     
     if (!isAllowedByRobots(robotsRules, urlObj.pathname)) {
-      console.log(`[BFS] Skipping ${next} - disallowed by robots.txt`);
-      continue;
+      continue; // Disallowed by robots.txt
     }
     
     // Respect crawl delay if specified
@@ -1903,8 +2846,7 @@ function shouldCrawlUrl(url: string, rootHost: string, rootPath?: string): boole
     // ✅ 1. Stay on same host (normalized without www)
     const urlHost = u.hostname.replace(/^www\./, '');
     if (urlHost !== rootHost) {
-      console.log(`[FILTER:OFF_ORIGIN] ${url}`);
-      return false;
+      return false; // Off-origin
     }
 
     const lowerPath = u.pathname.toLowerCase();
@@ -1913,8 +2855,7 @@ function shouldCrawlUrl(url: string, rootHost: string, rootPath?: string): boole
     // ✅ 2. If root has a locale path (e.g., /en-us), STRICTLY enforce it
     if (normalizedRootPath) {
       if (!lowerPath.startsWith(normalizedRootPath + '/') && lowerPath !== normalizedRootPath && lowerPath !== normalizedRootPath + '/') {
-        console.log(`[FILTER:OUT_OF_PREFIX] ${url} - not under ${normalizedRootPath}`);
-        return false;
+        return false; // Out of prefix
       }
     }
 
@@ -1924,15 +2865,13 @@ function shouldCrawlUrl(url: string, rootHost: string, rootPath?: string): boole
     if (foreignLocalePattern.test(lowerPath)) {
       // Allow only if it matches our root path exactly
       if (!normalizedRootPath || !lowerPath.startsWith(normalizedRootPath + '/')) {
-        console.log(`[FILTER:FOREIGN_LOCALE] ${url}`);
-        return false;
+        return false; // Foreign locale
       }
     }
 
     // ✅ 4. Block query params indicating locale switching
     if (/\b(lang|locale|country|region)=/i.test(u.search)) {
-      console.log(`[FILTER:LOCALE_PARAM] ${url}`);
-      return false;
+      return false; // Locale param
     }
 
     // ✅ 5. Calculate depth from root path
@@ -1952,18 +2891,16 @@ function shouldCrawlUrl(url: string, rootHost: string, rootPath?: string): boole
     // ✅ 7. Allow FAQ/help/support pages at any depth (but still within prefix)
     const priorityKeywords = ['faq', 'faqs', 'help', 'support', 'contact', 'about'];
     if (priorityKeywords.some(kw => pathAfterRoot.toLowerCase().includes(`/${kw}`))) {
-      console.log(`[FILTER:ALLOW_PRIORITY] ${url} - contains priority keyword`);
-      return true;
+      return true; // Priority keywords allowed
     }
 
-    // ✅ 8. Only allow top-level pages (1 segment after root path)
-    if (pathSegments.length > 1) {
-      console.log(`[FILTER:TOO_DEEP] ${url} - depth=${pathSegments.length} (max=1)`);
-      return false;
+    // ✅ 8. Only allow shallow pages (up to 2 segments after root path for e-commerce)
+    // Examples: /en-us/themes ✅ /en-us/themes/starwars ✅ /en-us/themes/starwars/sets ❌
+    if (pathSegments.length > 2) {
+      return false; // Too deep
     }
 
-    // ✅ 9. Allow this top-level page
-    console.log(`[FILTER:ALLOW] ${url} - top-level page`);
+    // ✅ 9. Allow this page
     return true;
   } catch (err) {
     console.error(`[FILTER:ERROR] ${url} - ${err}`);
@@ -1992,10 +2929,15 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   const finalOrigin = await resolveFinalUrl(rootUrl, env);
   console.log(`[CRAWL] Final origin after redirects: ${finalOrigin.toString()}`);
   
-  // Extract root host and path for locale-aware filtering
+  // Extract root host and locale prefix (not full path) for locale-aware filtering
   const rootHost = finalOrigin.hostname.replace(/^www\./, '');
-  const rootPath = finalOrigin.pathname === '/' ? '/' : finalOrigin.pathname.replace(/\/$/, '');
-  console.log(`[CRAWL] Root host: ${rootHost}, Root path: ${rootPath}`);
+  
+  // Only extract locale prefix (e.g., /us, /en-us), not deep paths like /us/home
+  // Match pattern: /xx or /xx-yy at the start of the path
+  const localeMatch = finalOrigin.pathname.match(/^\/[a-z]{2}(?:[-_][a-z]{2})?/);
+  const rootPath = localeMatch ? localeMatch[0] : '/';
+  
+  console.log(`[CRAWL] Root host: ${rootHost}, Locale prefix: ${rootPath}`);
   
   // Step 2: Try sitemap discovery
   const sitemaps = await discoverSitemaps(finalOrigin, env);
@@ -2021,8 +2963,8 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   urls = sortUrlsByPriority(urls);
   console.log(`[CRAWL] URLs sorted by priority (FAQ first, shorter paths first)`);
   
-  // Step 6: Cap at reasonable limit for focused audits
-  const MAX_URLS = 50;
+  // Step 6: Cap at reasonable limit for focused audits (tight cap for fast discovery)
+  const MAX_URLS = 30;
   if (urls.length > MAX_URLS) {
     console.log(`[CRAWL] Capping URL list from ${urls.length} to ${MAX_URLS}`);
     urls = urls.slice(0, MAX_URLS);
@@ -2415,76 +3357,114 @@ async function computeSiteScores(db: D1Database, auditId: string): Promise<{ aeo
 
 // Citations API Handlers
 
+/**
+ * Normalize domain for consistent storage and querying
+ * Removes www. prefix and converts to lowercase
+ */
+function normalizeDomain(domain: string): string {
+  return domain.toLowerCase().replace(/^www\./, '');
+}
+
 async function runCitations(req: Request, env: Env) {
   const runId = crypto.randomUUID();
   try {
     console.log('[CITATIONS] Starting citations run:', runId);
     const body: CitationsRequest = await req.json();
-    const { project_id, domain, brand, sources, queries } = body;
+    let { audit_id, project_id, domain, brand, sources, queries } = body;
     
-    console.log('[CITATIONS] Request params:', { project_id, domain, sources: sources.length, queries: queries?.length });
+    if (!audit_id) {
+      throw new Error('audit_id is required');
+    }
     
-    // Log the run start
+    // Fetch audit details FIRST to get project_id and domain
+    const audit: any = await env.DB.prepare(`
+      SELECT 
+        a.id,
+        a.project_id,
+        a.root_url,
+        a.site_description
+      FROM audits a
+      WHERE a.id = ?
+    `).bind(audit_id).first();
+    
+    if (!audit) {
+      throw new Error(`Audit ${audit_id} not found`);
+    }
+    
+    // Extract project_id and domain from audit
+    project_id = audit.project_id;
+    domain = normalizeDomain(new URL(audit.root_url).hostname);
+    
+    console.log('[CITATIONS] Request params:', { audit_id, project_id, domain, sources: sources.length, queries: queries?.length });
+    
+    // Log the run start (now with valid project_id)
     await env.DB.prepare(`
       INSERT INTO citations_runs 
-      (id, project_id, domain, started_at, status, total_queries, by_source)
-      VALUES (?, ?, ?, datetime('now'), 'running', ?, ?)
+      (id, audit_id, project_id, domain, started_at, status, total_queries, by_source)
+      VALUES (?, ?, ?, ?, datetime('now'), 'running', ?, ?)
     `).bind(
-      runId, 
+      runId,
+      audit_id,
       project_id, 
       domain, 
       sources.length * 24, // Max queries per source
       JSON.stringify(sources.reduce((acc, source) => ({ ...acc, [source]: { total: 0, cited: 0 } }), {}))
     ).run();
     
-    // Generate default queries if not provided
+    console.log('[CITATIONS] Resolved audit:', { project_id, domain });
+    
+    // Generate default queries if not provided (v2-contextual engine)
     let finalQueries = queries;
+    let queryTypeMap: Record<string, 'branded' | 'non-branded'> = {};
+    let envelope = '';
+    let promptMeta: any = {};
+    
     if (!finalQueries || finalQueries.length === 0) {
-      console.log('[CITATIONS] Generating default queries');
+      console.log('[CITATIONS] Generating branded + non-branded queries via v2-contextual engine');
       
-      // Get site description and homepage metadata from recent audit
-      const auditData = await env.DB.prepare(`
-        SELECT 
-          a.site_description,
-          apa.title as homepage_title,
-          ap.html_static
-        FROM audits a
-        LEFT JOIN audit_pages ap ON ap.audit_id = a.id AND (
-          ap.url LIKE CONCAT('%', ?, '%/') OR 
-          ap.url LIKE CONCAT('%', ?, '/%')
-        )
-        LEFT JOIN audit_page_analysis apa ON apa.page_id = ap.id
-        WHERE a.project_id = ? AND (a.root_url LIKE ? OR ap.url LIKE ?)
-        ORDER BY a.started_at DESC
-        LIMIT 1
-      `).bind(domain, domain, project_id, `%${domain}%`, `%${domain}%`).first();
+      // Use new sophisticated prompt generation from /api/llm/prompts
+      const { buildLLMQueryPrompts } = await import('./prompts');
+      const prompts = await buildLLMQueryPrompts(env, domain);
       
-      let siteDescription = auditData?.site_description || null;
-      let homePageTitle = auditData?.homepage_title || null;
-      let homePageMetaDescription = null;
+      // Extract metadata and envelope
+      envelope = prompts.envelope || '';
+      promptMeta = prompts.meta || {};
       
-      // Extract meta description from homepage HTML if available
-      if (auditData?.html_static) {
-        const metaMatch = auditData.html_static.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
-        if (metaMatch) {
-          homePageMetaDescription = metaMatch[1];
-        }
-      }
+      // Build query type map
+      prompts.branded.forEach(q => queryTypeMap[q] = 'branded');
+      prompts.nonBranded.forEach(q => queryTypeMap[q] = 'non-branded');
       
-      console.log('[CITATIONS] Metadata:', { 
-        hasSiteDescription: !!siteDescription, 
-        hasTitle: !!homePageTitle, 
-        hasMetaDesc: !!homePageMetaDescription 
+      // Combine branded and non-branded queries
+      finalQueries = [...prompts.branded, ...prompts.nonBranded];
+      
+      console.log('[CITATIONS] Generated queries:', {
+        branded: prompts.branded.length,
+        nonBranded: prompts.nonBranded.length,
+        total: finalQueries.length,
+        brand: promptMeta.brand,
+        site_type: promptMeta.site_type,
+        version: promptMeta.prompt_gen_version
       });
       
-      finalQueries = generateDefaultQueries(
-        domain, 
-        brand, 
-        siteDescription, 
-        homePageTitle, 
-        homePageMetaDescription
-      );
-      console.log('[CITATIONS] Generated queries:', finalQueries.length);
+      // Store prompt run metadata for debugging
+      await env.DB.prepare(`
+        INSERT INTO llm_prompt_runs
+        (id, project_id, domain, brand, site_type, primary_entities, user_intents, 
+         envelope, branded_prompts, nonbranded_prompts, prompt_gen_version, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).bind(
+        crypto.randomUUID(),
+        project_id,
+        domain,
+        promptMeta.brand || null,
+        promptMeta.site_type || null,
+        JSON.stringify(promptMeta.primary_entities || []),
+        JSON.stringify(promptMeta.user_intents || []),
+        envelope,
+        JSON.stringify(prompts.branded),
+        JSON.stringify(prompts.nonBranded),
+        promptMeta.prompt_gen_version || 'v2-contextual'
+      ).run();
     }
     
     const results = [];
@@ -2496,19 +3476,57 @@ async function runCitations(req: Request, env: Env) {
       totalsBySource[source] = { total: 0, cited: 0 };
     }
     
-    // Process each source-query combination with concurrency control
-    for (const source of sources) {
+    // Filter out Brave if temporarily disabled
+    const activeSources = DISABLE_BRAVE_TEMP 
+      ? sources.filter(s => s !== 'brave')
+      : sources;
+    
+    if (DISABLE_BRAVE_TEMP && sources.includes('brave')) {
+      console.log('[CITATIONS] Brave temporarily disabled (DISABLE_BRAVE_TEMP=true)');
+    }
+    
+    // Process each source-query combination with batched concurrency + timeouts
+    for (const source of activeSources) {
       console.log(`[CITATIONS] Processing source: ${source}`);
       // Global cap: max 24 queries per run (configurable)
-      const MAX_QUERIES = 24;
-      for (const query of finalQueries.slice(0, MAX_QUERIES)) {
-        try {
-          // Throttle requests
-          await new Promise(resolve => setTimeout(resolve, 400));
+      const MAX_QUERIES = 27;
+      
+      // Get source-specific timeout
+      const getTimeout = (src: string) => {
+        switch(src) {
+          case 'perplexity': return CITATIONS_PERPLEXITY_TIMEOUT_MS;
+          case 'chatgpt': return CITATIONS_CHATGPT_TIMEOUT_MS;
+          case 'claude': return CITATIONS_CLAUDE_TIMEOUT_MS;
+          case 'brave': return CITATIONS_BRAVE_TIMEOUT_MS;
+          default: return CITATIONS_TIMEOUT_MS;
+        }
+      };
+      
+      const timeoutMs = getTimeout(source);
+      const queryBatch = finalQueries.slice(0, MAX_QUERIES);
+      let timeoutCount = 0;
+      
+      // Process in batches with timeout protection
+      const batchResults = await runInBatches(
+        queryBatch,
+        CITATIONS_BATCH_SIZE,
+        async (query) => {
+          try {
+            // Throttle requests slightly
+            await new Promise(resolve => setTimeout(resolve, 200));
           
-          console.log(`[CITATIONS] Querying ${source}: "${query}"`);
-          const result = await queryAI(source, query, env);
-          console.log(`[CITATIONS] Got result from ${source}:`, { hasAnswer: !!result.answer_text, hasUrls: result.cited_urls.length, error: result.error });
+            // Prepend envelope for context if available (v2-contextual)
+            const fullPrompt = envelope ? `${envelope}Query: ${query}` : query;
+            console.log(`[CITATIONS] Querying ${source}: "${query}"${envelope ? ' (with envelope)' : ''}`);
+            
+            // Wrap in timeout
+            const result = await withTimeout(
+              queryAI(source, fullPrompt, env),
+              timeoutMs,
+              `${source} query timeout after ${timeoutMs}ms`
+            );
+            
+            console.log(`[CITATIONS] Got result from ${source}:`, { hasAnswer: !!result.answer_text, hasUrls: result.cited_urls.length, error: result.error });
           
           const processed = processCitations(result, domain);
         
@@ -2521,33 +3539,39 @@ async function runCitations(req: Request, env: Env) {
           console.log(`[CITATIONS] Storing result for ${source}`);
           // Store in database
           const citationId = crypto.randomUUID();
+          const queryType = queryTypeMap[query] || null; // Get query type from map
+          const intentGroup = queryTypeMap[query] || null; // branded or non-branded
+          const promptGenVersion = promptMeta.prompt_gen_version || 'v1-legacy';
+          
           await env.DB.prepare(`
             INSERT INTO ai_citations 
-            (id, project_id, domain, ai_source, query, answer_hash, answer_excerpt, 
-             cited_urls, cited_match_count, first_match_url, confidence, error, occurred_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            (id, audit_id, project_id, domain, ai_source, query, query_type, answer_hash, answer_excerpt, 
+             cited_urls, cited_match_count, first_match_url, confidence, error, intent_group, prompt_gen_version, occurred_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
           `).bind(
-            citationId, project_id, domain, source, query, answerHash,
-            result.answer_text?.slice(0, 500) || '',
+            citationId, audit_id, project_id, domain, source, query, queryType, answerHash,
+            result.answer_text?.slice(0, 5000) || '', // Store up to 5000 chars for full answer display
             JSON.stringify(processed.cited_urls),
             processed.cited_match_count,
             processed.first_match_url,
             result.confidence || 0,
-            result.error || null
+            result.error || null,
+            intentGroup,
+            promptGenVersion
           ).run();
           
           // Update referrals table
           await env.DB.prepare(`
             INSERT OR REPLACE INTO ai_referrals
-            (id, project_id, domain, ai_source, query, cited, count_urls, first_seen, last_seen)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 
-                    COALESCE((SELECT first_seen FROM ai_referrals WHERE project_id = ? AND domain = ? AND ai_source = ? AND query = ?), datetime('now')),
+            (id, audit_id, project_id, domain, ai_source, query, cited, count_urls, first_seen, last_seen)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 
+                    COALESCE((SELECT first_seen FROM ai_referrals WHERE audit_id = ? AND ai_source = ? AND query = ?), datetime('now')),
                     datetime('now'))
           `).bind(
-            crypto.randomUUID(), project_id, domain, source, query,
+            crypto.randomUUID(), audit_id, project_id, domain, source, query,
             processed.cited_match_count > 0 ? 1 : 0,
             processed.cited_match_count,
-            project_id, domain, source, query
+            audit_id, source, query
           ).run();
           
           // Update totals
@@ -2556,15 +3580,94 @@ async function runCitations(req: Request, env: Env) {
             totalsBySource[source].cited++;
           }
           
-          results.push({
-            source,
-            query,
-            cited: processed.cited_match_count > 0,
-            cited_count: processed.cited_match_count,
-            error: result.error
-          });
+            return { query, result, processed };
+            
+          } catch (error) {
+            if (error instanceof Error && error.message.includes('timeout')) {
+              timeoutCount++;
+            }
+            throw error;
+          }
+        }
+      );
+      
+      // Process batch results
+      for (let i = 0; i < batchResults.length; i++) {
+        const batchResult = batchResults[i];
+        const query = queryBatch[i];
+        
+        if (batchResult.status === 'fulfilled') {
+          const { result, processed } = batchResult.value;
           
-        } catch (error) {
+          try {
+            // Generate hash for deduplication
+            const answerHash = result.answer_text ? 
+              await crypto.subtle.digest('SHA-256', new TextEncoder().encode(result.answer_text))
+                .then(hash => Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')) :
+              null;
+            
+            console.log(`[CITATIONS] Storing result for ${source}`);
+            // Store in database
+            const citationId = crypto.randomUUID();
+            const queryType = queryTypeMap[query] || null;
+            const intentGroup = queryTypeMap[query] || null;
+            const promptGenVersion = promptMeta.prompt_gen_version || 'v1-legacy';
+            
+            await env.DB.prepare(`
+              INSERT INTO ai_citations 
+              (id, audit_id, project_id, domain, ai_source, query, query_type, answer_hash, answer_excerpt, 
+               cited_urls, cited_match_count, first_match_url, confidence, error, intent_group, prompt_gen_version, occurred_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            `).bind(
+              citationId, audit_id, project_id, domain, source, query, queryType, answerHash,
+              result.answer_text?.slice(0, 5000) || '',
+              JSON.stringify(processed.cited_urls),
+              processed.cited_match_count,
+              processed.first_match_url,
+              result.confidence || 0,
+              result.error || null,
+              intentGroup,
+              promptGenVersion
+            ).run();
+            
+            // Update referrals table
+            await env.DB.prepare(`
+              INSERT OR REPLACE INTO ai_referrals
+              (id, audit_id, project_id, domain, ai_source, query, cited, count_urls, first_seen, last_seen)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 
+                      COALESCE((SELECT first_seen FROM ai_referrals WHERE audit_id = ? AND ai_source = ? AND query = ?), datetime('now')),
+                      datetime('now'))
+            `).bind(
+              crypto.randomUUID(), audit_id, project_id, domain, source, query,
+              processed.cited_match_count > 0 ? 1 : 0,
+              processed.cited_match_count,
+              audit_id, source, query
+            ).run();
+            
+            // Update totals
+            totalsBySource[source].total++;
+            if (processed.cited_match_count > 0) {
+              totalsBySource[source].cited++;
+            }
+            
+            results.push({
+              source,
+              query,
+              cited: processed.cited_match_count > 0,
+              cited_count: processed.cited_match_count,
+              error: result.error
+            });
+          } catch (dbError) {
+            console.error(`[CITATIONS] DB error for ${source} query "${query}":`, dbError);
+            errors.push({
+              source,
+              query,
+              error: dbError instanceof Error ? dbError.message : 'DB error'
+            });
+          }
+        } else {
+          // Failed query
+          const error = batchResult.reason;
           console.error(`[CITATIONS] Error processing ${source} for query "${query}":`, error);
           errors.push({
             source,
@@ -2583,6 +3686,11 @@ async function runCitations(req: Request, env: Env) {
           });
         }
       }
+      
+      // Log timeout summary for this source
+      if (timeoutCount > 0) {
+        console.warn(`[CITATIONS] ${source} had ${timeoutCount} timeouts`);
+      }
     }
     
     // Calculate percentages
@@ -2598,6 +3706,19 @@ async function runCitations(req: Request, env: Env) {
     const totalQueries = Object.values(totalsBySource).reduce((sum, t) => sum + t.total, 0);
     const totalCitations = Object.values(totalsBySource).reduce((sum, t) => sum + t.cited, 0);
     const overallCitedPct = totalQueries > 0 ? Math.round((totalCitations / totalQueries) * 100) : 0;
+    
+    // Update prompt intelligence index with coverage stats
+    const { updatePromptIndex } = await import('./prompt-cache');
+    await updatePromptIndex(env, {
+      domain,
+      projectId: project_id,
+      brand: promptMeta.brand,
+      siteType: promptMeta.site_type,
+      primaryEntities: promptMeta.primary_entities,
+      avgCoverage: overallCitedPct,
+      totalCitations,
+      totalQueries
+    });
     
     // Update run completion
     await env.DB.prepare(`
@@ -2656,11 +3777,10 @@ async function runCitations(req: Request, env: Env) {
 }
 
 async function getCitationsSummary(searchParams: URLSearchParams, env: Env) {
-  const project_id = searchParams.get('project_id');
-  const domain = searchParams.get('domain');
+  const audit_id = searchParams.get('audit_id');
   
-  if (!project_id || !domain) {
-    throw new Error('project_id and domain are required');
+  if (!audit_id) {
+    throw new Error('audit_id is required');
   }
   
   // Get summary by source
@@ -2672,57 +3792,119 @@ async function getCitationsSummary(searchParams: URLSearchParams, env: Env) {
       ROUND(AVG(CASE WHEN cited_match_count > 0 THEN 1.0 ELSE 0.0 END) * 100, 1) as cited_percentage,
       MAX(occurred_at) as last_run
     FROM ai_citations
-    WHERE project_id = ? AND domain = ?
+    WHERE audit_id = ?
     GROUP BY ai_source
     ORDER BY last_run DESC
-  `).bind(project_id, domain).all();
+  `).bind(audit_id).all();
   
-  // Get top cited URLs
+  // Get breakdown by query type (branded vs non-branded)
+  const typeBreakdown = await env.DB.prepare(`
+    SELECT 
+      query_type,
+      COUNT(*) as total_queries,
+      SUM(CASE WHEN cited_match_count > 0 THEN 1 ELSE 0 END) as cited_queries,
+      ROUND(AVG(CASE WHEN cited_match_count > 0 THEN 1.0 ELSE 0.0 END) * 100, 1) as cited_percentage,
+      SUM(cited_match_count) as total_citations
+    FROM ai_citations
+    WHERE audit_id = ? AND query_type IS NOT NULL
+    GROUP BY query_type
+  `).bind(audit_id).all();
+  
+  // Get top cited URLs (clean trailing punctuation from URLs)
   const topUrls = await env.DB.prepare(`
     SELECT 
-      first_match_url,
+      RTRIM(first_match_url, '),;.!?') as first_match_url,
       COUNT(*) as citation_count,
       MAX(occurred_at) as last_seen
     FROM ai_citations
-    WHERE project_id = ? AND domain = ? AND cited_match_count > 0 AND first_match_url IS NOT NULL
-    GROUP BY first_match_url
+    WHERE audit_id = ? AND cited_match_count > 0 AND first_match_url IS NOT NULL
+    GROUP BY RTRIM(first_match_url, '),;.!?')
     ORDER BY citation_count DESC, last_seen DESC
     LIMIT 10
-  `).bind(project_id, domain).all();
+  `).bind(audit_id).all();
   
-  // Get top citing queries
+  // Get top citing queries with all sources grouped (unique sources only)
   const topQueries = await env.DB.prepare(`
     SELECT 
       query,
-      ai_source,
-      cited_match_count,
-      occurred_at
+      GROUP_CONCAT(DISTINCT ai_source) as ai_sources,
+      SUM(cited_match_count) as total_citations,
+      MAX(occurred_at) as last_occurred,
+      MAX(answer_excerpt) as sample_answer
     FROM ai_citations
-    WHERE project_id = ? AND domain = ? AND cited_match_count > 0
-    ORDER BY occurred_at DESC
+    WHERE audit_id = ? AND cited_match_count > 0
+    GROUP BY query
+    ORDER BY total_citations DESC, last_occurred DESC
     LIMIT 10
-  `).bind(project_id, domain).all();
+  `).bind(audit_id).all();
+  
+  // Enrich with per-source answers
+  const enrichedQueries = await Promise.all((topQueries.results || []).map(async (query: any) => {
+    const sourceAnswers = await env.DB.prepare(`
+      SELECT ai_source, answer_excerpt, cited_urls, cited_match_count
+      FROM ai_citations
+      WHERE audit_id = ? AND query = ?
+      ORDER BY ai_source
+    `).bind(audit_id, query.query).all();
+    
+    return {
+      ...query,
+      source_answers: sourceAnswers.results || []
+    };
+  }));
+  
+  // Get queries that DID NOT cite the domain (missing opportunities)
+  const missingQueries = await env.DB.prepare(`
+    SELECT 
+      query,
+      query_type,
+      GROUP_CONCAT(DISTINCT ai_source) as ai_sources,
+      COUNT(DISTINCT ai_source) as source_count,
+      MAX(occurred_at) as last_occurred,
+      MAX(answer_excerpt) as sample_answer
+    FROM ai_citations
+    WHERE audit_id = ? AND cited_match_count = 0
+    GROUP BY query
+    ORDER BY source_count DESC, last_occurred DESC
+    LIMIT 20
+  `).bind(audit_id).all();
+  
+  // Enrich missing queries with per-source answers
+  const enrichedMissing = await Promise.all((missingQueries.results || []).map(async (query: any) => {
+    const sourceAnswers = await env.DB.prepare(`
+      SELECT ai_source, answer_excerpt, cited_urls
+      FROM ai_citations
+      WHERE audit_id = ? AND query = ? AND cited_match_count = 0
+      ORDER BY ai_source
+    `).bind(audit_id, query.query).all();
+    
+    return {
+      ...query,
+      source_answers: sourceAnswers.results || []
+    };
+  }));
   
   return {
-    bySource: summary.results,
-    topCitedUrls: topUrls.results,
-    topCitingQueries: topQueries.results
+    bySource: summary.results || [],
+    byType: typeBreakdown.results || [],
+    topCitedUrls: topUrls.results || [],
+    topCitingQueries: enrichedQueries,
+    missingQueries: enrichedMissing
   };
 }
 
 async function getCitationsList(searchParams: URLSearchParams, env: Env) {
-  const project_id = searchParams.get('project_id');
-  const domain = searchParams.get('domain');
+  const audit_id = searchParams.get('audit_id');
   const source = searchParams.get('source');
   const limit = parseInt(searchParams.get('limit') || '50');
   const offset = parseInt(searchParams.get('offset') || '0');
   
-  if (!project_id || !domain) {
-    throw new Error('project_id and domain are required');
+  if (!audit_id) {
+    throw new Error('audit_id is required');
   }
   
-  let whereClause = 'WHERE project_id = ? AND domain = ?';
-  const params = [project_id, domain];
+  let whereClause = 'WHERE audit_id = ?';
+  const params = [audit_id];
   
   if (source) {
     whereClause += ' AND ai_source = ?';
@@ -2732,7 +3914,8 @@ async function getCitationsList(searchParams: URLSearchParams, env: Env) {
   const citations = await env.DB.prepare(`
     SELECT 
       id, ai_source, query, answer_excerpt,
-      cited_urls, cited_match_count, first_match_url,
+      cited_urls, cited_match_count, 
+      RTRIM(first_match_url, '),;.!?') as first_match_url,
       confidence, error, occurred_at
     FROM ai_citations
     ${whereClause}
@@ -2740,16 +3923,76 @@ async function getCitationsList(searchParams: URLSearchParams, env: Env) {
     LIMIT ? OFFSET ?
   `).bind(...params, limit, offset).all();
   
-  // Parse cited_urls JSON and limit to top 5 for response
-  const processedCitations = citations.results.map((citation: any) => ({
-    ...citation,
-    cited_urls: JSON.parse(citation.cited_urls || '[]').slice(0, 5)
-  }));
+  // Parse cited_urls JSON, clean trailing punctuation, and limit to top 5 for response
+  const processedCitations = citations.results.map((citation: any) => {
+    const urls = JSON.parse(citation.cited_urls || '[]');
+    const cleanedUrls = urls.map((url: string) => url.replace(/[),;.!?]+$/, '')).slice(0, 5);
+    return {
+      ...citation,
+      cited_urls: cleanedUrls
+    };
+  });
   
   return {
     citations: processedCitations,
     hasMore: processedCitations.length === limit
   };
+}
+
+/**
+ * Compare legacy classifier vs v2 for admin review
+ */
+async function compareClassifiers(host: string, env: Env): Promise<any> {
+  try {
+    // Fetch most recent audit for this host
+    const audit: any = await env.DB.prepare(`
+      SELECT id, root_url FROM audits 
+      WHERE LOWER(root_url) LIKE '%' || ? || '%'
+      ORDER BY started_at DESC
+      LIMIT 1
+    `).bind(host.toLowerCase()).first();
+
+    if (!audit) {
+      return { error: 'No audit found for this host' };
+    }
+
+    // Fetch analysis with legacy classification (if stored separately) and v2
+    const analysis: any = await env.DB.prepare(`
+      SELECT 
+        pa.title, pa.h1, pa.schema_types, pa.jsonld, pa.metadata,
+        p.url, p.html_static
+      FROM audit_page_analysis pa
+      JOIN audit_pages p ON p.id = pa.page_id
+      WHERE p.audit_id = ? AND p.url = ?
+      LIMIT 1
+    `).bind(audit.id, audit.root_url).first();
+
+    if (!analysis) {
+      return { error: 'No homepage analysis found' };
+    }
+
+    const metadata = analysis.metadata ? JSON.parse(analysis.metadata) : {};
+    const v2 = metadata.classification_v2;
+
+    // Generate legacy classification from current prompts.ts
+    const { classifySite, inferIndustryFromContext } = await import('./prompts');
+    const contextBlob = `${analysis.title || ''} ${analysis.h1 || ''} ${analysis.html_static?.substring(0, 2000) || ''}`;
+    const legacyClassification = classifySite(contextBlob);
+    const legacyIndustry = inferIndustryFromContext(contextBlob, []);
+
+    return {
+      host,
+      path: '/',
+      legacy: {
+        site_type: legacyClassification.site_type,
+        industry: legacyIndustry
+      },
+      v2: v2 || { error: 'v2 classification not available' }
+    };
+  } catch (error: any) {
+    console.error('[CLASSIFIER_COMPARE] Error:', error);
+    throw error;
+  }
 }
 
 async function getInsights(params: URLSearchParams, env: Env) {
@@ -2944,7 +4187,7 @@ async function runWeeklyCitations(env: Env) {
         MAX(started_at) as last_audit
       FROM audits 
       WHERE started_at > datetime('now', '-30 days')
-        AND status = 'complete'
+        AND status = 'completed'
         AND pages_analyzed > 0
       GROUP BY project_id, root_url
       ORDER BY last_audit DESC

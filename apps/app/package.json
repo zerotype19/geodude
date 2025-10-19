@@ -9,6 +9,7 @@
     "deploy": "wrangler pages deploy dist --project-name=geodude-app"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",

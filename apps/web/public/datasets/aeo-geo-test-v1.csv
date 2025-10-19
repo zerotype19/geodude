@@ -1,0 +1,7 @@
+url,aeo_score,geo_score,test_category,notes
+https://optiview.ai/,95,85,homepage,Full AEO/GEO optimization reference
+https://support.google.com/websearch/answer/13376098,90,90,official_docs,Google AI Overviews guidance
+https://arxiv.org/abs/2404.16366,85,95,academic,GEO research paper
+https://platform.openai.com/docs/gptbot,88,92,api_docs,GPTBot documentation
+https://schema.org/Article,82,88,specification,Schema.org reference
+

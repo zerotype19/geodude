@@ -53,7 +53,10 @@ async function withRetry<T>(
 // Helper function to normalize URLs and match domain
 function normalizeUrl(url: string): string {
   try {
-    const urlObj = new URL(url);
+    // Strip common trailing punctuation that shouldn't be part of URLs
+    // This handles markdown links like [text](https://example.com) or sentences ending with URLs.
+    let cleanUrl = url.replace(/[),;.!?]+$/, '');
+    const urlObj = new URL(cleanUrl);
     return urlObj.href;
   } catch {
     return url;
@@ -77,7 +80,9 @@ function matchDomain(url: string, targetDomain: string): boolean {
 
 // Extract URLs from text using regex
 function extractUrls(text: string): string[] {
-  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+  // Match URLs but stop at common markdown/punctuation delimiters
+  // This prevents capturing trailing ), ], etc. from markdown links
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]()]+/gi;
   const matches = text.match(urlRegex) || [];
   return [...new Set(matches.map(normalizeUrl))];
 }
@@ -287,9 +292,26 @@ export async function queryBrave(query: string, env: ConnectorEnv): Promise<Conn
     }
 
     const data = await response.json();
-    const results = data.web?.results || [];
     
-    const cited_urls = results.map((result: any) => result.url).filter(Boolean);
+    // Debug: Log first Brave response to diagnose 0 URLs issue
+    if (Math.random() < 0.1) { // 10% sampling
+      console.log('[BRAVE_DEBUG] Raw response structure:', JSON.stringify({
+        hasWeb: !!data.web,
+        hasResults: !!data.results,
+        webResultsCount: data.web?.results?.length ?? 0,
+        resultsCount: data.results?.length ?? 0,
+        topLevelKeys: Object.keys(data)
+      }));
+    }
+    
+    // Fallback parser: try multiple possible locations for results
+    const urls = [
+      ...(data?.web?.results ?? []),
+      ...(data?.results ?? []),
+    ].map((r: any) => r?.url).filter(Boolean);
+    
+    const results = data.web?.results || data.results || [];
+    const cited_urls = urls;
     const answer_text = `Search results for: ${query}\n\n` + 
       results.slice(0, 3).map((result: any, i: number) => 
         `${i + 1}. ${result.title}\n   ${result.url}\n   ${result.description || ''}`
