@@ -111,7 +111,14 @@ function Navigation() {
                   Sign out
                 </button>
               </>
-            ) : null}
+            ) : (
+              <Link
+                to="/"
+                className="text-sm text-gray-600 hover:text-gray-900 underline"
+              >
+                Sign In
+              </Link>
+            )}
           </div>
           
           {/* Mobile menu button */}
@@ -185,6 +192,33 @@ function Navigation() {
                 }`}
               >
                 Admin
+              </Link>
+            )}
+          </div>
+          {/* Mobile auth section */}
+          <div className="pt-4 pb-3 border-t border-gray-200">
+            {isAuthed && me ? (
+              <div className="space-y-1">
+                <div className="px-4 text-sm text-gray-600">
+                  {me.email}
+                </div>
+                <button
+                  onClick={() => {
+                    logout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+              >
+                Sign In
               </Link>
             )}
           </div>
