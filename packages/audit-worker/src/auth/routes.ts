@@ -260,11 +260,22 @@ export async function handleMagicLinkVerify(request: Request, env: Env): Promise
 
     const fullRedirectUrl = `${env.APP_BASE_URL || 'https://app.optiview.ai'}${redirectUrl}`;
 
-    return new Response(null, {
-      status: 302,
+    // Return JSON response with cookie and redirect info (for CORS compatibility)
+    const origin = request.headers.get('Origin') || 'https://app.optiview.ai';
+    return new Response(JSON.stringify({
+      ok: true,
+      redirectTo: redirectUrl,
+      user: {
+        email: result.user!.email,
+        userId: result.user!.id
+      }
+    }), {
+      status: 200,
       headers: {
-        'Location': fullRedirectUrl,
-        'Set-Cookie': setCookie
+        'Content-Type': 'application/json',
+        'Set-Cookie': setCookie,
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
       }
     });
 
