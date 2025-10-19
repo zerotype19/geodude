@@ -36,3 +36,24 @@ export async function getUserIdFromRequest(request: Request, env: Env): Promise<
   }
 }
 
+/**
+ * Verify that the authenticated user owns the specified audit
+ * Returns true if user owns audit, false otherwise
+ */
+export async function verifyAuditOwnership(db: D1Database, auditId: string, userId: string): Promise<boolean> {
+  try {
+    const audit = await db.prepare(
+      'SELECT user_id FROM audits WHERE id = ?'
+    ).bind(auditId).first() as any;
+
+    if (!audit) {
+      return false;
+    }
+
+    return audit.user_id === userId;
+  } catch (error) {
+    console.error('[AUTH] Error verifying audit ownership:', error);
+    return false;
+  }
+}
+

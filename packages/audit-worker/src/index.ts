@@ -1,6 +1,6 @@
 import { queryAI, processCitations, generateDefaultQueries } from './connectors';
 import { handleGetLLMPrompts } from './routes/llm-prompts';
-import { getUserIdFromRequest } from './auth/helpers';
+import { getUserIdFromRequest, verifyAuditOwnership } from './auth/helpers';
 import { 
   CRAWL_DELAY_MS, 
   PRECHECK_MAX_RETRIES, 
@@ -738,26 +738,14 @@ export default {
       }
 
       if (req.method === 'GET' && path === '/api/audits') {
-        // Extract user_id from session cookie (if present)
-        let userId: string | undefined;
-        const cookieName = env.COOKIE_NAME || 'ov_sess';
-        const cookieHeader = req.headers.get('Cookie');
-        if (cookieHeader) {
-          const cookies = cookieHeader.split(';');
-          for (const cookie of cookies) {
-            const [key, value] = cookie.trim().split('=');
-            if (key === cookieName) {
-              const sessionId = value;
-              // Fetch session from DB
-              const session = await env.DB.prepare(
-                'SELECT user_id FROM sessions WHERE id = ? AND datetime(expires_at) > datetime(\'now\')'
-              ).bind(sessionId).first() as any;
-              if (session) {
-                userId = session.user_id;
-              }
-              break;
-            }
-          }
+        // Extract user_id from session cookie - REQUIRED for security
+        const userId = await getUserIdFromRequest(req, env);
+        
+        if (!userId) {
+          return new Response(JSON.stringify({ error: 'Authentication required' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
         }
         
         const result = await getAuditsList(url.searchParams, env, userId);
@@ -773,6 +761,23 @@ export default {
           return new Response(JSON.stringify({ error: 'Audit ID required' }), { 
             status: 400, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        // SECURITY: Verify user is authenticated and owns this audit
+        const userId = await getUserIdFromRequest(req, env);
+        if (!userId) {
+          return new Response(JSON.stringify({ error: 'Authentication required' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const hasAccess = await verifyAuditOwnership(env.DB, auditId, userId);
+        if (!hasAccess) {
+          return new Response(JSON.stringify({ error: 'Access denied' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
 
@@ -817,6 +822,23 @@ export default {
           return new Response(JSON.stringify({ error: 'Audit ID required' }), { 
             status: 400, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        // SECURITY: Verify user is authenticated and owns this audit
+        const userId = await getUserIdFromRequest(req, env);
+        if (!userId) {
+          return new Response(JSON.stringify({ error: 'Authentication required' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const hasAccess = await verifyAuditOwnership(env.DB, auditId, userId);
+        if (!hasAccess) {
+          return new Response(JSON.stringify({ error: 'Access denied' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
 
@@ -2127,12 +2149,12 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   return { audit_id: id, status: 'running' };
 }
 
-async function getAuditsList(searchParams: URLSearchParams, env: Env, userId?: string) {
+async function getAuditsList(searchParams: URLSearchParams, env: Env, userId: string) {
   const limit = parseInt(searchParams.get('limit') || '50');
   const offset = parseInt(searchParams.get('offset') || '0');
   
-  // Build query with optional user_id filter
-  let query = `
+  // SECURITY: Always filter by user_id - users can only see their own audits
+  const query = `
     SELECT 
       id,
       project_id,
@@ -2145,17 +2167,12 @@ async function getAuditsList(searchParams: URLSearchParams, env: Env, userId?: s
       config_json,
       user_id
     FROM audits 
+    WHERE user_id = ?
+    ORDER BY started_at DESC 
+    LIMIT ? OFFSET ?
   `;
   
-  const bindings: any[] = [];
-  
-  if (userId) {
-    query += ` WHERE user_id = ? `;
-    bindings.push(userId);
-  }
-  
-  query += ` ORDER BY started_at DESC LIMIT ? OFFSET ? `;
-  bindings.push(limit, offset);
+  const bindings = [userId, limit, offset];
   
   const results = await env.DB.prepare(query).bind(...bindings).all();
 
