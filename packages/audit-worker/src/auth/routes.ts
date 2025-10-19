@@ -172,7 +172,7 @@ export async function handleMagicLinkRequest(request: Request, env: Env): Promis
  * GET /v1/auth/magic/verify?token=...
  * Verify magic link token and create session
  */
-export async function handleMagicLinkVerify(request: Request, env: Env): Promise<Response> {
+export async function handleMagicLinkVerify(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
   try {
     const url = new URL(request.url);
     const rawToken = url.searchParams.get('token');
@@ -240,11 +240,38 @@ export async function handleMagicLinkVerify(request: Request, env: Env): Promise
         ).run();
         
         console.log(`[AUTH] Audit ${auditId} created for user ${result.user!.id}`);
+        
+        // Insert homepage as the initial page to analyze
+        const homepageId = crypto.randomUUID();
+        await env.DB.prepare(
+          `INSERT INTO audit_pages (id, audit_id, url, fetched_at) VALUES (?, ?, ?, datetime('now'))`
+        ).bind(homepageId, auditId, audit.root_url).run();
+        
         redirectUrl = `/audits/${auditId}`;
         
-        // TODO: Trigger audit processing in the background (via fetch or waitUntil)
-        // For now, the audit is created in 'running' status
-        // The actual processing would need to be triggered separately
+        // Trigger audit processing in the background
+        if (ctx) {
+          ctx.waitUntil((async () => {
+            try {
+              console.log(`[AUTH] Triggering audit processing for ${auditId}`);
+              // Self-fetch to trigger the audit continue endpoint which will start batch processing
+              const response = await fetch(`${env.BASE_URL || 'https://api.optiview.ai'}/api/audits/${auditId}/continue`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              if (!response.ok) {
+                const text = await response.text();
+                console.error(`[AUTH] Failed to trigger audit: ${response.status} - ${text}`);
+              } else {
+                console.log(`[AUTH] Audit processing triggered successfully for ${auditId}`);
+              }
+            } catch (error: any) {
+              console.error(`[AUTH] Failed to trigger audit: ${error.message}`);
+            }
+          })());
+        } else {
+          console.warn(`[AUTH] No ExecutionContext - audit ${auditId} will need manual start`);
+        }
       } catch (error) {
         console.error('[AUTH] Failed to create audit:', error);
         return Response.redirect(`${env.APP_BASE_URL || 'https://app.optiview.ai'}/auth/error?reason=internal_error`, 302);

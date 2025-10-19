@@ -707,7 +707,7 @@ export default {
         }
 
         if (req.method === 'GET' && path === '/v1/auth/magic/verify') {
-          return handleMagicLinkVerify(req, env);
+          return handleMagicLinkVerify(req, env, ctx);
         }
 
         if (req.method === 'GET' && path === '/v1/auth/me') {
