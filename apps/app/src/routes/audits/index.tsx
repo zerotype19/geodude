@@ -43,11 +43,7 @@ export default function AuditsIndex() {
 
   const fetchAudits = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/audits`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch audits');
-      }
-      const data = await response.json();
+      const data = await apiGet<{ audits: Audit[] }>('/api/audits');
       setAudits(data.audits || []);
     } catch (error) {
       console.error('Failed to fetch audits:', error);
