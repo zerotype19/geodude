@@ -160,17 +160,11 @@ export async function handleMagicLinkRequest(request: Request, env: Env): Promis
     }, request);
 
     // Always return 200 to prevent email enumeration
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ ok: true }, 200, request);
 
   } catch (error) {
     console.error('[AUTH] Error in handleMagicLinkRequest:', error);
-    return new Response(JSON.stringify({ ok: false, error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ ok: false, error: 'Internal server error' }, 500, request);
   }
 }
 
