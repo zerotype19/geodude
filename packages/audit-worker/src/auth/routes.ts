@@ -353,20 +353,20 @@ export async function handleAuthLogout(request: Request, env: Env): Promise<Resp
     }
 
     const clearCookie = clearSessionCookie(cookieName);
+    const origin = request.headers.get('Origin') || 'https://app.optiview.ai';
 
     return new Response(null, {
       status: 204,
       headers: {
-        'Set-Cookie': clearCookie
+        'Set-Cookie': clearCookie,
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true',
       }
     });
 
   } catch (error) {
     console.error('[AUTH] Error in handleAuthLogout:', error);
-    return new Response(JSON.stringify({ ok: false, error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ ok: false, error: 'Internal server error' }, 500, request);
   }
 }
 
