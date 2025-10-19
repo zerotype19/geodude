@@ -679,10 +679,12 @@ export default {
 
     try {
       // CORS headers
+      const origin = req.headers.get('Origin') || 'https://app.optiview.ai';
       const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Credentials': 'true',
       };
 
       if (req.method === 'OPTIONS') {
