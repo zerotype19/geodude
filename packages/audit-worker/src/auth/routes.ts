@@ -21,6 +21,21 @@ import {
 } from './cookies';
 import { logAuthEvent, getAuthStats } from './telemetry';
 
+/**
+ * Helper to create JSON responses with CORS headers
+ */
+function jsonResponse(data: any, status: number, request: Request): Response {
+  const origin = request.headers.get('Origin') || 'https://app.optiview.ai';
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
+    }
+  });
+}
+
 export interface Env {
   DB: D1Database;
   AUTH_LOGS: KVNamespace;
@@ -275,19 +290,13 @@ export async function handleAuthMe(request: Request, env: Env): Promise<Response
     const sessionId = readCookie(request, cookieName);
 
     if (!sessionId) {
-      return new Response(JSON.stringify({ ok: false, error: 'Not authenticated' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ ok: false, error: 'Not authenticated' }, 401, request);
     }
 
     const session = await getSession(env.DB, sessionId);
 
     if (!session) {
-      return new Response(JSON.stringify({ ok: false, error: 'Session expired' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonResponse({ ok: false, error: 'Session expired' }, 401, request);
     }
 
     // Touch session (update last_seen_at)
@@ -301,7 +310,7 @@ export async function handleAuthMe(request: Request, env: Env): Promise<Response
       sessionId
     }, request);
 
-    return new Response(JSON.stringify({
+    return jsonResponse({
       ok: true,
       email: session.email,
       userId: session.user_id,
@@ -310,17 +319,11 @@ export async function handleAuthMe(request: Request, env: Env): Promise<Response
         lastSeenAt: session.last_seen_at,
         authAgeAt: session.auth_age_at
       }
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    }, 200, request);
 
   } catch (error) {
     console.error('[AUTH] Error in handleAuthMe:', error);
-    return new Response(JSON.stringify({ ok: false, error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return jsonResponse({ ok: false, error: 'Internal server error' }, 500, request);
   }
 }
 
