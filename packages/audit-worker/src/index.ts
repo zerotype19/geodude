@@ -1,6 +1,6 @@
 import { queryAI, processCitations, generateDefaultQueries } from './connectors';
 import { handleGetLLMPrompts } from './routes/llm-prompts';
-import { getUserIdFromRequest, verifyAuditOwnership } from './auth/helpers';
+import { getUserIdFromRequest, verifyAuditOwnership, verifyIsAdmin } from './auth/helpers';
 import { 
   CRAWL_DELAY_MS, 
   PRECHECK_MAX_RETRIES, 
@@ -875,24 +875,43 @@ export default {
         }
       }
 
-      if (req.method === 'POST' && path === '/api/admin/seed-rules') {
-        const result = await seedRules(env);
-        return new Response(JSON.stringify(result), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
-      }
+      // Admin routes - require admin authentication
+      if (path.startsWith('/api/admin/')) {
+        // SECURITY: Verify user is authenticated and is an admin
+        const userId = await getUserIdFromRequest(req, env);
+        if (!userId) {
+          return new Response(JSON.stringify({ error: 'Authentication required' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
 
-      if (req.method === 'POST' && path === '/api/admin/finalize-stuck') {
-        await autoFinalizeStuckAudits(env);
-        return new Response(JSON.stringify({ ok: true, message: 'Auto-finalize completed' }), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
-      }
+        const isAdmin = await verifyIsAdmin(env.DB, userId);
+        if (!isAdmin) {
+          return new Response(JSON.stringify({ error: 'Admin access required' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
 
-      // Admin classifier comparison endpoint
-      if (req.method === 'GET' && path === '/api/admin/classifier-compare') {
+        if (req.method === 'POST' && path === '/api/admin/seed-rules') {
+          const result = await seedRules(env);
+          return new Response(JSON.stringify(result), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        if (req.method === 'POST' && path === '/api/admin/finalize-stuck') {
+          await autoFinalizeStuckAudits(env);
+          return new Response(JSON.stringify({ ok: true, message: 'Auto-finalize completed' }), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        // Admin classifier comparison endpoint
+        if (req.method === 'GET' && path === '/api/admin/classifier-compare') {
         const host = url.searchParams.get('host');
         if (!host) {
           return new Response(JSON.stringify({ error: 'host parameter required' }), {
@@ -1070,6 +1089,7 @@ export default {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           });
         }
+      }
       }
 
       // Citations endpoints

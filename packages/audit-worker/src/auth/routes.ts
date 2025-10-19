@@ -312,6 +312,7 @@ export async function handleAuthMe(request: Request, env: Env): Promise<Response
       ok: true,
       email: session.email,
       userId: session.user_id,
+      isAdmin: Boolean(session.is_admin),
       session: {
         createdAt: session.created_at,
         lastSeenAt: session.last_seen_at,

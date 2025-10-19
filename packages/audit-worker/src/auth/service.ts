@@ -176,7 +176,7 @@ export async function verifyMagicToken(
  */
 export async function getSession(db: D1Database, sessionId: string) {
   const session = await db.prepare(`
-    SELECT s.*, u.email
+    SELECT s.*, u.email, u.is_admin
     FROM sessions s
     JOIN users u ON s.user_id = u.id
     WHERE s.id = ? 

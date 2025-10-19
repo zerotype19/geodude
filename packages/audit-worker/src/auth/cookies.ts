@@ -4,6 +4,7 @@
 
 /**
  * Create a session cookie header value
+ * Sets Domain=.optiview.ai to share cookie across app.optiview.ai and api.optiview.ai
  */
 export function makeSessionCookie(
   cookieName: string,
@@ -11,14 +12,14 @@ export function makeSessionCookie(
   ttlDays: number
 ): string {
   const expires = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000).toUTCString();
-  return `${cookieName}=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${expires}`;
+  return `${cookieName}=${sessionId}; Domain=.optiview.ai; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${expires}`;
 }
 
 /**
  * Create a cookie deletion header value
  */
 export function clearSessionCookie(cookieName: string): string {
-  return `${cookieName}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+  return `${cookieName}=; Domain=.optiview.ai; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
 /**

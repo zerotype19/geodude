@@ -28,8 +28,8 @@ function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { me, isAuthed, logout } = useAuth()
   
-  // Check if user is authenticated for admin
-  const isAdmin = localStorage.getItem('admin_auth') === 'true'
+  // Check if user is an admin (from backend session)
+  const isAdmin = me?.isAdmin === true
   
   return (
     <nav className="bg-white shadow-sm border-b">

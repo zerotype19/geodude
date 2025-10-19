@@ -9,6 +9,7 @@ export type AuthSession = {
   ok: true;
   email: string;
   userId: string;
+  isAdmin: boolean;
   session: {
     createdAt: string;
     lastSeenAt: string;

@@ -57,3 +57,24 @@ export async function verifyAuditOwnership(db: D1Database, auditId: string, user
   }
 }
 
+/**
+ * Verify that the authenticated user is an admin
+ * Returns true if user is admin, false otherwise
+ */
+export async function verifyIsAdmin(db: D1Database, userId: string): Promise<boolean> {
+  try {
+    const user = await db.prepare(
+      'SELECT is_admin FROM users WHERE id = ?'
+    ).bind(userId).first() as any;
+
+    if (!user) {
+      return false;
+    }
+
+    return Boolean(user.is_admin);
+  } catch (error) {
+    console.error('[AUTH] Error verifying admin status:', error);
+    return false;
+  }
+}
+
