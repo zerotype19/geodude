@@ -1,5 +1,6 @@
 import { queryAI, processCitations, generateDefaultQueries } from './connectors';
 import { handleGetLLMPrompts } from './routes/llm-prompts';
+import { getUserIdFromRequest } from './auth/helpers';
 import { 
   CRAWL_DELAY_MS, 
   PRECHECK_MAX_RETRIES, 
@@ -2031,6 +2032,10 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   
   const id = crypto.randomUUID();
   
+  // Extract user_id from session cookie
+  const userId = await getUserIdFromRequest(req, env);
+  console.log(`[CREATE AUDIT] User ID from session: ${userId || 'none'}`);
+  
   // Pre-check domain validation
   console.log(`[PRECHECK] Starting validation for: ${root_url}`);
   const precheck = await precheckDomain(root_url, env);
@@ -2038,8 +2043,8 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   if (!precheck.ok) {
     // Domain failed validation - create audit as failed immediately
     await env.DB.prepare(
-      "INSERT INTO audits (id, project_id, root_url, site_description, started_at, finished_at, status, fail_reason, fail_at, config_json) VALUES (?, ?, ?, ?, datetime('now'), datetime('now'), 'failed', ?, datetime('now'), ?)"
-    ).bind(id, project_id, root_url, site_description || null, precheck.reason, JSON.stringify(config)).run();
+      "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, finished_at, status, fail_reason, fail_at, config_json) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 'failed', ?, datetime('now'), ?)"
+    ).bind(id, project_id, root_url, site_description || null, userId, precheck.reason, JSON.stringify(config)).run();
     
     console.log(`[PRECHECK FAILED] ${id}: ${precheck.reason}`);
     return { audit_id: id, status: 'failed', reason: precheck.reason };
@@ -2053,8 +2058,8 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   
   // Create audit
   await env.DB.prepare(
-    "INSERT INTO audits (id, project_id, root_url, site_description, started_at, status, config_json) VALUES (?, ?, ?, ?, datetime('now'), 'running', ?)"
-  ).bind(id, project_id, root_url, site_description || null, JSON.stringify(config)).run();
+    "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, status, config_json) VALUES (?, ?, ?, ?, ?, datetime('now'), 'running', ?)"
+  ).bind(id, project_id, root_url, site_description || null, userId, JSON.stringify(config)).run();
 
   // Hybrid discovery: Try sitemap first (fast timeout), then fill with organic discovery
   ctx.waitUntil((async () => {

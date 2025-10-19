@@ -222,41 +222,24 @@ export async function handleMagicLinkVerify(request: Request, env: Env): Promise
     let redirectUrl = result.redirectPath || '/';
 
     if (result.intent === 'start_audit' && result.payload) {
-      // Call the existing POST /api/audits endpoint to create and start the audit
+      // Redirect to the audits page with the audit details in the URL
+      // The frontend will then call POST /api/audits to create and start the audit
       try {
         const audit = result.payload as any;
+        console.log(`[AUTH] User verified for audit: ${audit.root_url}`);
         
-        console.log(`[AUTH] Starting audit for user ${result.user!.id}: ${audit.root_url}`);
-        
-        // Call the worker's own POST /api/audits endpoint
-        const createUrl = `${env.BASE_URL || 'https://api.optiview.ai'}/api/audits`;
-        const createResponse = await fetch(createUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            project_id: audit.project_id || 'default',
-            root_url: audit.root_url,
-            site_description: audit.site_description || null,
-            max_pages: audit.max_pages || 50,
-            user_id: result.user!.id  // Pass user_id to tie audit to user
-          })
+        // Store audit details in URL params for the frontend to use
+        const auditParams = new URLSearchParams({
+          project_id: audit.project_id || 'default',
+          root_url: audit.root_url,
+          site_description: audit.site_description || '',
+          max_pages: String(audit.max_pages || 50)
         });
         
-        if (!createResponse.ok) {
-          const errorText = await createResponse.text();
-          console.error(`[AUTH] Failed to create audit: ${createResponse.status} - ${errorText}`);
-          return Response.redirect(`${env.APP_BASE_URL || 'https://app.optiview.ai'}/auth/error?reason=audit_failed`, 302);
-        }
-        
-        const createResult = await createResponse.json() as any;
-        const auditId = createResult.audit_id;
-        
-        console.log(`[AUTH] Audit ${auditId} created and started for user ${result.user!.id}`);
-        
-        redirectUrl = `/audits/${auditId}`;
+        redirectUrl = `/audits/new?${auditParams.toString()}`;
         
       } catch (error) {
-        console.error('[AUTH] Failed to create audit:', error);
+        console.error('[AUTH] Failed to prepare audit:', error);
         return Response.redirect(`${env.APP_BASE_URL || 'https://app.optiview.ai'}/auth/error?reason=internal_error`, 302);
       }
     } else if (result.intent === 'open_audit' && result.auditId) {

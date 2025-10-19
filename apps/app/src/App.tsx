@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import './index.css'
 import { useAuth } from './hooks/useAuth'
 import AuditsIndex from './routes/audits/index.tsx'
+import NewAudit from './routes/audits/new.tsx'
 import AuditDetail from './routes/audits/[id]/index.tsx'
 import AuditPages from './routes/audits/[id]/pages/index.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
@@ -202,6 +203,7 @@ function App() {
           <Routes>
             <Route path="/" element={<AuditsIndex />} />
             <Route path="/audits" element={<AuditsIndex />} />
+            <Route path="/audits/new" element={<NewAudit />} />
             <Route path="/audits/:id" element={<AuditDetail />} />
             <Route path="/audits/:id/pages" element={<AuditPages />} />
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
