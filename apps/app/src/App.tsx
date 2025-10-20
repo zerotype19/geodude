@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import './index.css'
 import { useAuth } from './hooks/useAuth'
+import SignInModal from './components/SignInModal.tsx'
 import AuditsIndex from './routes/audits/index.tsx'
 import NewAudit from './routes/audits/new.tsx'
 import AuditDetail from './routes/audits/[id]/index.tsx'
@@ -26,6 +27,7 @@ import AuthError from './routes/auth/Error.tsx'
 function Navigation() {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [signInModalOpen, setSignInModalOpen] = useState(false)
   const { me, isAuthed, logout } = useAuth()
   
   // Check if user is an admin (from backend session)
@@ -112,12 +114,12 @@ function Navigation() {
                 </button>
               </>
             ) : (
-              <Link
-                to="/"
+              <button
+                onClick={() => setSignInModalOpen(true)}
                 className="text-sm text-gray-600 hover:text-gray-900 underline"
               >
                 Sign In
-              </Link>
+              </button>
             )}
           </div>
           
@@ -213,17 +215,22 @@ function Navigation() {
                 </button>
               </div>
             ) : (
-              <Link
-                to="/"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setSignInModalOpen(true);
+                }}
+                className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
               >
                 Sign In
-              </Link>
+              </button>
             )}
           </div>
         </div>
       )}
+      
+      {/* Sign In Modal */}
+      <SignInModal isOpen={signInModalOpen} onClose={() => setSignInModalOpen(false)} />
     </nav>
   )
 }
