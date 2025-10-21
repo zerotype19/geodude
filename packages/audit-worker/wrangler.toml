@@ -42,5 +42,18 @@ MAGIC_REQUESTS_PER_HOUR = "5"
 # Scorecard V2
 SCORECARD_V2_ENABLED = "true"
 
+# Phase Next - Production Configuration
+PHASE_NEXT_ENABLED = "true"
+PHASE_NEXT_SCORING = "true"
+MVA_ENABLED = "true"
+LEARNING_LOOP_ENABLED = "true"
+VECTORIZE_ENABLED = "true"
+
 [triggers]
-crons = ["0 */6 * * *", "0 14 * * 1", "0 * * * *", "0 2 * * *"]  # Added nightly warmer at 02:00 UTC
+crons = [
+  "0 */6 * * *",  # Citations runs (every 6 hours)
+  "0 14 * * 1",   # Weekly classifier benchmark
+  "0 * * * *",    # Hourly health check
+  "0 2 * * *",    # Daily MVA computation
+  "0 3 * * *"     # Nightly recommendations (Learning Loop)
+]
