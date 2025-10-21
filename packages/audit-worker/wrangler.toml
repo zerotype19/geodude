@@ -20,6 +20,10 @@ id = "7119b238909b43afac31b53e359d0828"
 binding = "AUTH_LOGS"
 id = "12a06cdaa5054deeaec45309b4bd7d01"
 
+[[kv_namespaces]]
+binding = "DOMAIN_RULES_KV"
+id = "0247b816db7b4540ada69dd9f842f543"
+
 [browser]
 binding = "BROWSER"
 
@@ -48,6 +52,11 @@ PHASE_NEXT_SCORING = "true"
 MVA_ENABLED = "true"
 LEARNING_LOOP_ENABLED = "true"
 VECTORIZE_ENABLED = "true"
+
+# Industry Lock System
+FEATURE_INDUSTRY_LOCK = "1"
+FEATURE_INTENT_GUARDS = "1"
+FEATURE_SOURCE_CIRCUIT = "1"
 
 [triggers]
 crons = [

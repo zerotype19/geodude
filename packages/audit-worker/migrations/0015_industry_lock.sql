@@ -1,17 +1,18 @@
 -- Industry Lock Migration
 -- Add fields to lock industry at audit level
 
--- Add industry fields to audits table (if not already present from Phase Next)
-ALTER TABLE audits ADD COLUMN IF NOT EXISTS industry TEXT;
-ALTER TABLE audits ADD COLUMN IF NOT EXISTS industry_source TEXT; 
+-- Add industry column to store the locked industry value
+ALTER TABLE audits ADD COLUMN industry TEXT;
+
+-- Add industry_source to track how industry was determined
 -- Values: 'override' | 'domain_rules' | 'heuristics' | 'default'
-ALTER TABLE audits ADD COLUMN IF NOT EXISTS industry_locked INTEGER DEFAULT 1;
+ALTER TABLE audits ADD COLUMN industry_source TEXT;
 
-CREATE INDEX IF NOT EXISTS idx_audits_industry ON audits(industry);
+-- Add industry_locked flag (always 1 for locked)
+ALTER TABLE audits ADD COLUMN industry_locked INTEGER DEFAULT 1;
 
--- Add industry override to projects table (optional)
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS industry_override TEXT;
+-- Create index for fast industry lookups
+CREATE INDEX idx_audits_industry ON audits(industry);
 
--- Migration complete
-SELECT 'Industry lock migration complete - columns added to audits and projects' as status;
-
+-- Verification query
+SELECT 'Industry lock migration complete - 3 columns added to audits table' as status;
