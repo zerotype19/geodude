@@ -889,26 +889,8 @@ export async function generateQueriesV4(
 }> {
   const model = PROMPTS_LLM_USE_HIGH_QUALITY ? PROMPTS_LLM_MODEL_HIGH : PROMPTS_LLM_MODEL;
   
-  // HOT PATCH: If industry missing/unknown, ask MSS V2 to detect it (uses HTML + embeddings)
-  if (!input.industry || input.industry === "default") {
-    try {
-      const { buildMinimalSafeSetV2 } = await import('./v2/minimalSafe');
-      const aliases = brandAliases(input.brand);
-      const m = await buildMinimalSafeSetV2(env, env.RULES, {
-        brand: input.brand,
-        domain: input.domain,
-        aliases,
-        categoryTerms: input.categoryTerms,
-        siteType: input.siteType
-      });
-      if (m?.industry && m.industry !== "default") {
-        input.industry = m.industry;
-        console.log(`[V4_HOT_PATCH] MSS V2 detected industry: ${m.industry} (source: ${m.source})`);
-      }
-    } catch (error) {
-      console.warn('[V4_HOT_PATCH] MSS V2 industry detection failed:', error);
-    }
-  }
+  // Note: Legacy MSS V2 hot patch removed - industry now comes from audit lock system
+  // If industry is missing/default, that's intentional (use generic queries)
   
   try {
     const { sys, user } = buildPrompt(input);

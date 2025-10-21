@@ -41,7 +41,7 @@ export async function getHomepageContext(env: Env, domain: string): Promise<Home
   const normDomain = domain.toLowerCase().replace(/^www\./, '').replace(/\/$/, '');
   
   const sql = `
-    SELECT ? as domain, a.site_description,
+    SELECT ? as domain, a.site_description, a.industry, a.industry_source,
            pa.title, NULL as meta_description, pa.h1, NULL as body_text,
            NULL as og_site_name,
            NULL as org_name
@@ -596,38 +596,12 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
   
   const classification = classifySite(contextBlob);
   const schemaTypes: string[] = []; // Future: pass actual schema types from crawl
-  let industry = inferIndustryFromContext(contextBlob);
   const ents = normalizeEntities(classification.primary_entities || []);
   
-  // HORIZON 1: Always use inferIndustryV2 for better classification (rules + embeddings)
-  // This replaces the old heuristic-based classification with hybrid ML approach
-  try {
-    // Import cold-start helpers for better classification
-    const { extractJsonLd, extractNavTerms } = await import('./prompts/v2/lib/coldStartSignals');
-    
-    // Extract signals from context blob (which includes title, h1, description, body text)
-    const jsonld = extractJsonLd(contextBlob);
-    const nav = extractNavTerms(contextBlob);
-    
-    const inferredV2 = await inferIndustryV2(env, env.RULES, {
-      domain,
-      htmlText: contextBlob.slice(0, 2000), // First 2000 chars for embeddings
-      jsonld,
-      nav,
-      fallback: "default"
-    });
-    industry = inferredV2.industry;
-    console.log(`[PROMPTS] IndustryV2 detected: ${industry} (source: ${inferredV2.source}, confidence: ${inferredV2.confidence?.toFixed(3)})`);
-  } catch (error) {
-    console.warn(`[PROMPTS] IndustryV2 failed, using fallback:`, error);
-    industry = "default";
-  }
-  
-  // Fallback: if industry is still ambiguous (software/generic) but entities suggest finance, reclassify
-  if ((!industry || industry === 'software') && ents.some(e => /trading|investment|stock|broker|brokerage|crypto|portfolio|market|invest|securities|financial/i.test(e))) {
-    industry = 'finance';
-    console.log(`[PROMPTS] Entity-based reclassification: software -> finance (entities: ${ents.join(', ')})`);
-  }
+  // Get industry from audit record (locked during audit creation)
+  // Legacy industry detection removed - now using audit lock system
+  let industry = row.industry || "default";
+  console.log(`[PROMPTS] Using locked industry from audit: ${industry} (source: audit.industry_source)`);
   
   const categoryTerms = buildCategoryTerms(industry, ents, classification.site_type || 'corporate');
   
