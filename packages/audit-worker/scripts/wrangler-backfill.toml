@@ -1,0 +1,13 @@
+name = "industry-backfill"
+main = "./backfill-industry.ts"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "optiview"
+database_id = "17970af4-bbeb-4eea-9684-1464293b137b"
+
+[[kv_namespaces]]
+binding = "DOMAIN_RULES_KV"
+id = "0247b816db7b4540ada69dd9f842f543"
+
