@@ -24,7 +24,15 @@
       "clevelandclinic.org": "healthcare_provider",
       "delta.com": "travel_air",
       "united.com": "travel_air",
-      "marriott.com": "travel_hotels"
+      "marriott.com": "travel_hotels",
+      "vikingcruises.com": "travel_cruise",
+      "vikingrivercruises.com": "travel_cruise",
+      "carnival.com": "travel_cruise",
+      "princess.com": "travel_cruise",
+      "royalcaribbean.com": "travel_cruise",
+      "norwegiancruiseline.com": "travel_cruise",
+      "msccruises.com": "travel_cruise",
+      "celebritycruises.com": "travel_cruise"
     }
   },
   "packs": {

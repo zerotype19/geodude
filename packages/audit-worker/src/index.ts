@@ -734,6 +734,12 @@ export default {
         }
       }
 
+      // Industry classification endpoint
+      if (req.method === 'POST' && path === '/industry/classify') {
+        const { handleIndustryClassify } = await import('./routes/industry-classify');
+        return handleIndustryClassify(req, env);
+      }
+
       // Route handlers
       if (req.method === 'POST' && path === '/api/audits') {
         const result = await createAudit(req, env, ctx);
@@ -2091,7 +2097,7 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   // Resolve industry early (before any INSERT)
   const domain = new URL(root_url).hostname.toLowerCase().replace(/^www\./, '');
   
-  const industryLock = resolveIndustry({
+  let industryLock = resolveIndustry({
     override: config.industry as IndustryKey | undefined,
     project: undefined, // Could read from project table if needed
     signals: {
@@ -2104,6 +2110,49 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
       navTerms: undefined,
     }
   });
+  
+  // If resolved to default, try AI classifier
+  if (industryLock.source === 'default' && env.FEATURE_INDUSTRY_AI_CLASSIFY !== '0') {
+    try {
+      console.log(`[INDUSTRY_AI] Calling AI classifier for ${domain}...`);
+      const { classifyIndustry } = await import('./lib/industry-classifier');
+      const classifyResult = await Promise.race([
+        classifyIndustry({
+          domain,
+          root_url,
+          site_description: site_description || '',
+          project_id,
+          crawl_budget: { homepage: true, timeout_ms: 3000 },
+        }),
+        new Promise<null>((_, reject) => setTimeout(() => reject('timeout'), 3000)),
+      ]);
+      
+      if (classifyResult && classifyResult.primary.confidence >= 0.80) {
+        // High confidence - use AI result
+        industryLock = {
+          value: classifyResult.primary.industry_key,
+          source: 'ai_worker',
+          locked: true,
+        };
+        console.log(`[INDUSTRY_AI] ✅ ${domain} → ${classifyResult.primary.industry_key} (conf: ${classifyResult.primary.confidence.toFixed(3)})`);
+        
+        // Update KV mapping for next time
+        try {
+          const doc = await env.DOMAIN_RULES_KV.get('industry_packs_json', 'json') as any || { industry_rules: { domains: {} }, packs: {} };
+          doc.industry_rules = doc.industry_rules || {};
+          doc.industry_rules.domains = doc.industry_rules.domains || {};
+          doc.industry_rules.domains[domain] = classifyResult.primary.industry_key;
+          await env.DOMAIN_RULES_KV.put('industry_packs_json', JSON.stringify(doc));
+        } catch (kvErr) {
+          console.error('[INDUSTRY_AI KV ERROR]', kvErr);
+        }
+      } else if (classifyResult) {
+        console.log(`[INDUSTRY_AI] ⚠️  ${domain} → ${classifyResult.primary.industry_key} (conf: ${classifyResult.primary.confidence.toFixed(3)}) - LOW CONFIDENCE, using default`);
+      }
+    } catch (aiErr: any) {
+      console.log(`[INDUSTRY_AI] Failed for ${domain}: ${aiErr.message || aiErr}, using default`);
+    }
+  }
   
   console.log(`[INDUSTRY] resolved: ${industryLock.value} (source=${industryLock.source}) domain=${domain} locked`);
   
