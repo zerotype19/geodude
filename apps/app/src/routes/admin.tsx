@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiGet, apiPost, apiDelete } from '../lib/api';
 
 interface Audit {
   id: string;
@@ -38,8 +39,7 @@ export default function AdminPage() {
   const fetchAudits = async () => {
     try {
       setLoading(true);
-      const response = await fetch('https://api.optiview.ai/api/audits');
-      const data = await response.json();
+      const data = await apiGet<{ audits: Audit[] }>('/api/audits');
       setAudits(data.audits || []);
     } catch (error) {
       console.error('Failed to fetch audits:', error);
@@ -118,17 +118,9 @@ export default function AdminPage() {
 
     setDeletingIds(prev => new Set(prev).add(auditId));
     try {
-      const response = await fetch(`https://api.optiview.ai/api/admin/audits/${auditId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showMessage('success', 'Audit deleted successfully');
-        fetchAudits();
-      } else {
-        const data = await response.json();
-        showMessage('error', data.error || 'Failed to delete audit');
-      }
+      await apiDelete(`/api/admin/audits/${auditId}`);
+      showMessage('success', 'Audit deleted successfully');
+      fetchAudits();
     } catch (error) {
       console.error('Failed to delete audit:', error);
       showMessage('error', 'Failed to delete audit');
@@ -144,8 +136,7 @@ export default function AdminPage() {
   const regeneratePrompts = async (domain: string) => {
     try {
       showMessage('success', `Regenerating prompts for ${domain}...`);
-      const response = await fetch(`https://api.optiview.ai/api/llm/prompts?domain=${domain}&refresh=true`);
-      const data = await response.json();
+      const data = await apiGet<any>(`/api/llm/prompts?domain=${domain}&refresh=true`);
       
       if (data.meta) {
         showMessage('success', `✅ ${domain}: ${data.meta.industry || 'unknown'} industry, ${data.branded.length} branded + ${data.nonBranded.length} non-branded queries`);
@@ -190,12 +181,7 @@ export default function AdminPage() {
 
     for (const audit of failedAudits) {
       try {
-        const response = await fetch(`https://api.optiview.ai/api/admin/audits/${audit.id}`, {
-          method: 'DELETE',
-        });
-        if (!response.ok) {
-          console.error(`Failed to delete ${audit.id}`);
-        }
+        await apiDelete(`/api/admin/audits/${audit.id}`);
       } catch (error) {
         console.error(`Error deleting ${audit.id}:`, error);
       }

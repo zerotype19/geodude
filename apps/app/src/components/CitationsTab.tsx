@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiGet, apiPost } from '../lib/api';
 
 interface CitationSummary {
   bySource: Array<{
@@ -75,11 +76,8 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
 
   const fetchSummary = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/citations/summary?audit_id=${auditId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSummary(data);
-      }
+      const data = await apiGet<CitationSummary>(`/api/citations/summary?audit_id=${auditId}`);
+      setSummary(data);
     } catch (error) {
       console.error('Failed to fetch citations summary:', error);
     } finally {
@@ -90,25 +88,16 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
   const runCitations = async () => {
     setRunning(true);
     try {
-      const response = await fetch(`${API_BASE}/api/citations/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          audit_id: auditId,
-          project_id: 'default', // Legacy field, can be removed later
-          domain: 'placeholder', // Legacy field, can be removed later
-          sources: ['perplexity', 'chatgpt', 'claude', 'brave']
-        })
+      const result = await apiPost<CitationRun>(`/api/citations/run`, {
+        audit_id: auditId,
+        project_id: 'default', // Legacy field, can be removed later
+        domain: 'placeholder', // Legacy field, can be removed later
+        sources: ['perplexity', 'chatgpt', 'claude', 'brave']
       });
-
-      if (response.ok) {
-        const result: CitationRun = await response.json();
-        console.log('Citations run result:', result);
-        // Refresh summary after run
-        await fetchSummary();
-      }
+      
+      console.log('Citations run result:', result);
+      // Refresh summary after run
+      await fetchSummary();
     } catch (error) {
       console.error('Failed to run citations:', error);
     } finally {
@@ -149,6 +138,7 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
           </p>
         </div>
         <button
+          data-tour="run-citations-button"
           onClick={runCitations}
           disabled={running}
           className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${

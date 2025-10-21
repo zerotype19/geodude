@@ -12,6 +12,7 @@ interface Audit {
   status: 'running' | 'complete' | 'failed';
   aeo_score?: number;
   geo_score?: number;
+  geo_adjusted?: number; // GEO score adjusted for real-world citations
   pages_analyzed: number;
   avg_aeo_score: number;
   avg_geo_score: number;
@@ -317,7 +318,14 @@ export default function AuditsIndex() {
                       AEO Score
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      GEO Score
+                      <span className="inline-flex items-center">
+                        GEO Score
+                        <span className="ml-1 text-gray-400" title="Adjusted for real-world LLM citations">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </span>
+                      </span>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Pages
@@ -350,7 +358,14 @@ export default function AuditsIndex() {
                         {formatScore(audit.aeo_score)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatScore(audit.geo_score)}
+                        <span className="inline-flex items-center">
+                          {formatScore(audit.geo_adjusted !== undefined && audit.geo_adjusted !== null ? audit.geo_adjusted : audit.geo_score)}
+                          {audit.geo_adjusted !== undefined && audit.geo_adjusted !== null && audit.geo_adjusted !== audit.geo_score && (
+                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800" title={`Adjusted from ${formatScore(audit.geo_score)} based on citation performance`}>
+                              +
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {audit.pages_analyzed}

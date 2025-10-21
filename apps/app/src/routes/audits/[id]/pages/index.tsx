@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiGet } from '../../../../lib/api';
 import { useParams, Link } from 'react-router-dom';
 
 interface Page {
@@ -29,11 +30,7 @@ export default function AuditPages() {
 
   const fetchPages = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/audits/${id}/pages?limit=500`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch pages');
-      }
-      const data = await response.json();
+      const data = await apiGet<{ pages: Page[] }>(`/api/audits/${id}/pages?limit=500`);
       setPages(data.pages || []);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');

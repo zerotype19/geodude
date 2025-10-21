@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Is Your Site Invisible to AI Search? | Free Optiview Audit</title>
-  <meta name="description" content="Find out in 2 minutes if ChatGPT, Claude, Perplexity, and Google AI Overviews can find your site. Get a free 21-point AEO + GEO audit with live citation testing and prioritized fixes.">
+  <title>AEO + GEO Readiness Audit | Optiview</title>
+  <meta name="description" content="Get a complete 21-point AEO + GEO audit showing how training bots and live LLMs see your site today. Test real citations across ChatGPT, Claude, Perplexity, and Brave with actionable implementation guides.">
   <link rel="canonical" href="https://optiview.ai/" />
   
   <!-- WebPage JSON-LD with Organization and WebSite SearchAction -->
@@ -16,8 +16,8 @@
         "@type":"WebPage",
         "@id":"https://optiview.ai/#page",
         "url":"https://optiview.ai/",
-        "name":"Is Your Site Invisible to AI Search? | Free Optiview Audit",
-        "description":"Find out in 2 minutes if ChatGPT, Claude, Perplexity, and Google AI Overviews can find your site. Get a free 21-point AEO + GEO audit with live citation testing and prioritized fixes.",
+        "name":"AEO + GEO Readiness Audit | Optiview",
+        "description":"Get a complete 21-point AEO + GEO audit showing how training bots and live LLMs see your site today. Test real citations across ChatGPT, Claude, Perplexity, and Brave with actionable implementation guides.",
         "isPartOf":{"@id":"https://optiview.ai/#site"},
         "about":{"@id":"https://optiview.ai/#org"},
         "primaryImageOfPage":{"@type":"ImageObject","url":"https://optiview.ai/logo.png"},
@@ -112,6 +112,9 @@
       transition: color 0.2s;
     }
     nav a:hover { color: var(--purple); }
+    nav a.btn {
+      color: #fff !important;
+    }
     .btn {
       display: inline-block;
       padding: 0.75rem 1.5rem;
@@ -152,65 +155,150 @@
       margin: 0 auto;
       padding: 3rem 1.5rem;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 2rem;
     }
     .feature {
       background: #fff;
-      padding: 2rem;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      transition: transform 0.2s, box-shadow 0.2s;
+      padding: 2.5rem;
+      border-radius: 16px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      position: relative;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+    .feature::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 16px;
+      padding: 2px;
+      background: var(--gradient);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
     .feature:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      transform: translateY(-6px);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15);
+    }
+    .feature:hover::before {
+      opacity: 1;
+    }
+    .feature-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: block;
     }
     .feature h3 {
-      font-size: 1.5rem;
-      margin-bottom: 0.75rem;
-      color: var(--purple);
+      font-size: 1.375rem;
+      line-height: 1.4;
+      margin-bottom: 1rem;
+      color: var(--dark);
+      font-weight: 700;
+      white-space: nowrap;
     }
     .feature p {
-      color: var(--gray);
-      line-height: 1.6;
+      color: #4b5563;
+      line-height: 1.75;
+      font-size: 0.9375rem;
+    }
+    .feature strong {
+      color: var(--dark);
+      font-weight: 600;
     }
     .stats-section {
       max-width: var(--max-w);
       margin: 4rem auto;
-      padding: 3rem 1.5rem;
-      background: #fff;
-      border-radius: 12px;
-      border: 1px solid var(--border);
+      padding: 4rem 2rem;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-radius: 24px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      position: relative;
+      overflow: hidden;
+    }
+    .stats-section::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 24px;
+      padding: 2px;
+      background: var(--gradient);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0.3;
+    }
+    .stats-section::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(102, 126, 234, 0.15) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
     }
     .stats-section h2 {
       text-align: center;
-      font-size: 2rem;
-      margin-bottom: 2rem;
+      font-size: 2.25rem;
+      margin-bottom: 3rem;
       color: var(--dark);
+      font-weight: 700;
+      position: relative;
+      z-index: 1;
     }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 2rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 2.5rem;
       text-align: center;
+      position: relative;
+      z-index: 1;
     }
     .stat {
-      padding: 1rem;
+      padding: 2rem 1.5rem;
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.1);
+      transition: all 0.3s ease;
+    }
+    .stat:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+      background: rgba(255, 255, 255, 0.95);
     }
     .stat-number {
-      font-size: 3rem;
-      font-weight: 700;
+      font-size: 3.5rem;
+      font-weight: 800;
       background: var(--gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       display: block;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.75rem;
+      line-height: 1;
     }
     .stat-label {
-      color: var(--gray);
-      font-size: 0.95rem;
+      color: #4b5563;
+      font-size: 0.9375rem;
+      line-height: 1.6;
+      font-weight: 500;
     }
     .cta-section {
       background: var(--gradient);
@@ -277,85 +365,87 @@
       <nav>
         <a href="/methodology">Methodology</a>
         <a href="https://app.optiview.ai/score-guide">Score Guide</a>
-        <a href="https://app.optiview.ai/" class="btn">Launch App</a>
       </nav>
     </div>
   </header>
 
   <main>
     <section class="hero">
-      <h1>Is Your Site Invisible to AI Search?</h1>
+      <h1>Is Your Site AEO + GEO Ready?</h1>
       <p class="subtitle">
-        <strong>50% of searches now use AI.</strong> Find out in 2 minutes if ChatGPT, Claude, 
-        Perplexity, and Google AI Overviews can find and cite your content—or if you're losing 
-        traffic to competitors who show up.
+        Get actionable insights on how training bots and live LLMs see your site today. 
+        Test real citations, check structural readiness, and get prioritized fixes 
+        with implementation guides—in 2 minutes.
       </p>
       <a href="https://app.optiview.ai/" class="btn">Run Free Audit Now →</a>
     </section>
 
     <section class="features">
       <div class="feature">
-        <h3>🎯 Know Exactly What's Broken</h3>
+        <span class="feature-icon">🤖</span>
+        <h3>Test Training Bot Access</h3>
         <p>
-          Get a <strong>21-point technical audit</strong> (11 AEO + 10 GEO checks) showing exactly 
-          what's blocking your site from AI visibility. See missing schema, render visibility gaps, 
-          provenance issues, and crawl policy errors—ranked by impact.
+          See how GPTBot, Claude-Web, and other training crawlers view your site. Get a 
+          <strong>21-point structural audit</strong> showing schema completeness, render visibility, 
+          provenance signals, and crawl policies—ranked by impact.
         </p>
       </div>
       
       <div class="feature">
-        <h3>🔍 Test Real AI Citations</h3>
+        <span class="feature-icon">🔍</span>
+        <h3>Test Live LLM Citations</h3>
         <p>
-          Run <strong>live queries against ChatGPT, Claude, Perplexity, and Brave</strong> to see if 
-          your brand actually appears. Get citation rates (branded + non-branded), competitor gaps, 
-          and a <strong>GEO Adjusted Score</strong> that rewards real-world visibility.
+          Run <strong>real queries</strong> against ChatGPT, Claude, Perplexity, and Brave to see 
+          if your brand appears today. Get citation rates, competitive positioning, and a 
+          <strong>GEO Adjusted Score</strong> that combines structural readiness with real-world visibility.
         </p>
       </div>
       
       <div class="feature">
-        <h3>⚡ Fix What Matters First</h3>
+        <span class="feature-icon">⚡</span>
+        <h3>Get Actionable Guidance</h3>
         <p>
-          Skip the guesswork. Get <strong>"Top Blockers"</strong> (highest-impact issues) and 
-          <strong>"Quick Wins"</strong> (fast improvements) prioritized by weight. Each check links 
-          to examples, implementation guides, and QA checklists.
+          No guesswork. See <strong>"Top Blockers"</strong> (highest-impact issues) and 
+          <strong>"Quick Wins"</strong> (fast improvements) prioritized by weight. Every check 
+          includes examples, implementation guides, and QA checklists.
         </p>
       </div>
     </section>
 
     <section class="stats-section">
-      <h2>Why Optiview Now?</h2>
+      <h2>Complete AEO + GEO Assessment</h2>
       <div class="stats-grid">
         <div class="stat">
-          <span class="stat-number">50%</span>
-          <span class="stat-label">of searches now use AI (Google, ChatGPT, Claude)</span>
-        </div>
-        <div class="stat">
           <span class="stat-number">21</span>
-          <span class="stat-label">AEO + GEO checks across structure, schema, and visibility</span>
+          <span class="stat-label">structural checks (schema, rendering, provenance, crawl policies)</span>
         </div>
         <div class="stat">
           <span class="stat-number">4</span>
-          <span class="stat-label">AI sources tested live (ChatGPT, Claude, Perplexity, Brave)</span>
+          <span class="stat-label">live LLM sources tested (ChatGPT, Claude, Perplexity, Brave)</span>
         </div>
         <div class="stat">
           <span class="stat-number">2 min</span>
-          <span class="stat-label">to get actionable results with Top Blockers + Quick Wins</span>
+          <span class="stat-label">to get prioritized fixes with implementation guides</span>
+        </div>
+        <div class="stat">
+          <span class="stat-number">100%</span>
+          <span class="stat-label">actionable—every finding includes examples & QA steps</span>
         </div>
       </div>
     </section>
 
     <section class="cta-section">
-      <h2>Don't Wait Until Your Traffic Drops</h2>
+      <h2>See How LLMs View Your Site Today</h2>
       <p>
-        AI search is eating traditional SEO traffic. Sites that aren't optimized for answer engines 
-        are losing visibility <em>right now</em>. Get your audit before your competitors do.
+        Get a complete picture of your AEO + GEO readiness—from training bot access to live 
+        citation performance. Start with a free audit and get actionable recommendations.
       </p>
       <a href="https://app.optiview.ai/" class="btn-white">Start Free Audit — 2 Minutes →</a>
     </section>
   </main>
 
   <footer>
-    <p>&copy; 2025 Optiview. Built for the age of answer engines.</p>
+    <p>&copy; 2025 Optiview. AEO + GEO auditing for modern search.</p>
     <nav>
       <a href="/methodology">Methodology</a>
       <a href="/sources">Data Sources</a>

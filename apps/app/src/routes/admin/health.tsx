@@ -41,7 +41,14 @@ export default function HealthDashboard() {
 
   const fetchHealth = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/admin/classifier-health`);
+      const response = await fetch(`${API_BASE}/api/admin/classifier-health`, {
+        credentials: 'include' // Send session cookie
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
       
       setMetrics(data.metrics);

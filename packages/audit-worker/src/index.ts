@@ -943,50 +943,50 @@ export default {
         }
       }
 
-      // Admin system status endpoint
-      if (req.method === 'GET' && path === '/api/admin/system-status') {
-        const { handleSystemStatus } = await import('./routes/system-status');
-        return handleSystemStatus(env);
-      }
-
-      // Admin classifier health endpoint
-      if (req.method === 'GET' && path === '/api/admin/classifier-health') {
-        try {
-          const { computeHealthMetrics, checkHealth } = await import('./lib/health');
-          
-          const metrics = await computeHealthMetrics(env, 24);
-          const alerts = checkHealth(metrics);
-
-          return new Response(JSON.stringify({ metrics, alerts }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        } catch (error: any) {
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
+        // Admin system status endpoint
+        if (req.method === 'GET' && path === '/api/admin/system-status') {
+          const { handleSystemStatus } = await import('./routes/system-status');
+          return handleSystemStatus(env);
         }
-      }
 
-      // Admin circuit breaker reset endpoint
-      if (req.method === 'POST' && path === '/api/admin/circuit-breaker/reset') {
-        try {
-          const { CircuitBreaker } = await import('./lib/circuitBreaker');
-          const breaker = new CircuitBreaker(env.RULES);
-          await breaker.reset();
+        // Admin classifier health endpoint
+        if (req.method === 'GET' && path === '/api/admin/classifier-health') {
+          try {
+            const { computeHealthMetrics, checkHealth } = await import('./lib/health');
+            
+            const metrics = await computeHealthMetrics(env, 24);
+            const alerts = checkHealth(metrics);
 
-          return new Response(JSON.stringify({ ok: true, message: 'Circuit breaker reset to half-open' }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        } catch (error: any) {
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
+            return new Response(JSON.stringify({ metrics, alerts }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (error: any) {
+            return new Response(JSON.stringify({ error: error.message }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
         }
-      }
+
+        // Admin circuit breaker reset endpoint
+        if (req.method === 'POST' && path === '/api/admin/circuit-breaker/reset') {
+          try {
+            const { CircuitBreaker } = await import('./lib/circuitBreaker');
+            const breaker = new CircuitBreaker(env.RULES);
+            await breaker.reset();
+
+            return new Response(JSON.stringify({ ok: true, message: 'Circuit breaker reset to half-open' }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (error: any) {
+            return new Response(JSON.stringify({ error: error.message }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
 
       // Manual finalize endpoint for specific audit
       if (req.method === 'POST' && path.match(/^\/api\/audits\/[^\/]+\/finalize$/)) {
@@ -1005,91 +1005,91 @@ export default {
         }
       }
 
-      // Admin delete audit endpoint
-      if (req.method === 'DELETE' && path.match(/^\/api\/admin\/audits\/[^\/]+$/)) {
-        const auditId = path.split('/')[4];
-        try {
-          // Get audit info before deletion for logging
-          const auditInfo = await env.DB.prepare(`
-            SELECT root_url, status, pages_analyzed FROM audits WHERE id = ?
-          `).bind(auditId).first();
+        // Admin delete audit endpoint
+        if (req.method === 'DELETE' && path.match(/^\/api\/admin\/audits\/[^\/]+$/)) {
+          const auditId = path.split('/')[4];
+          try {
+            // Get audit info before deletion for logging
+            const auditInfo = await env.DB.prepare(`
+              SELECT root_url, status, pages_analyzed FROM audits WHERE id = ?
+            `).bind(auditId).first();
 
-          if (!auditInfo) {
-            return new Response(JSON.stringify({ error: 'Audit not found' }), { 
-              status: 404, 
+            if (!auditInfo) {
+              return new Response(JSON.stringify({ error: 'Audit not found' }), { 
+                status: 404, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+              });
+            }
+
+            // Delete from dependent tables first (foreign key order)
+            await env.DB.prepare(`
+              DELETE FROM audit_page_analysis WHERE page_id IN (
+                SELECT id FROM audit_pages WHERE audit_id = ?
+              )
+            `).bind(auditId).run();
+
+            await env.DB.prepare(`
+              DELETE FROM audit_pages WHERE audit_id = ?
+            `).bind(auditId).run();
+
+            // Delete citations associated with this audit
+            await env.DB.prepare(`
+              DELETE FROM ai_citations WHERE audit_id = ?
+            `).bind(auditId).run();
+
+            await env.DB.prepare(`
+              DELETE FROM ai_referrals WHERE audit_id = ?
+            `).bind(auditId).run();
+
+            await env.DB.prepare(`
+              DELETE FROM citations_runs WHERE audit_id = ?
+            `).bind(auditId).run();
+
+            // Delete the audit itself
+            await env.DB.prepare(`
+              DELETE FROM audits WHERE id = ?
+            `).bind(auditId).run();
+
+            // Log the admin action
+            const logId = crypto.randomUUID();
+            const ipAddress = req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || 'unknown';
+            const userAgent = req.headers.get('user-agent') || 'unknown';
+            
+            await env.DB.prepare(`
+              INSERT INTO admin_logs (id, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            `).bind(
+              logId,
+              'DELETE',
+              'audit',
+              auditId,
+              JSON.stringify({ 
+                root_url: auditInfo.root_url, 
+                status: auditInfo.status, 
+                pages_analyzed: auditInfo.pages_analyzed 
+              }),
+              ipAddress,
+              userAgent
+            ).run();
+
+            console.log(`[ADMIN] Audit deleted: ${auditId} (${auditInfo.root_url}) by ${ipAddress}`);
+
+            return new Response(JSON.stringify({ 
+              ok: true, 
+              message: 'Audit and all associated data deleted', 
+              auditId 
+            }), { 
+              status: 200, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
+          } catch (error: any) {
+            console.error('[DELETE AUDIT] Error:', error);
+            return new Response(JSON.stringify({ error: error.message }), { 
+              status: 500, 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
             });
           }
-
-          // Delete from dependent tables first (foreign key order)
-          await env.DB.prepare(`
-            DELETE FROM audit_page_analysis WHERE page_id IN (
-              SELECT id FROM audit_pages WHERE audit_id = ?
-            )
-          `).bind(auditId).run();
-
-          await env.DB.prepare(`
-            DELETE FROM audit_pages WHERE audit_id = ?
-          `).bind(auditId).run();
-
-          // Delete citations associated with this audit
-          await env.DB.prepare(`
-            DELETE FROM ai_citations WHERE audit_id = ?
-          `).bind(auditId).run();
-
-          await env.DB.prepare(`
-            DELETE FROM ai_referrals WHERE audit_id = ?
-          `).bind(auditId).run();
-
-          await env.DB.prepare(`
-            DELETE FROM citations_runs WHERE audit_id = ?
-          `).bind(auditId).run();
-
-          // Delete the audit itself
-          await env.DB.prepare(`
-            DELETE FROM audits WHERE id = ?
-          `).bind(auditId).run();
-
-          // Log the admin action
-          const logId = crypto.randomUUID();
-          const ipAddress = req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || 'unknown';
-          const userAgent = req.headers.get('user-agent') || 'unknown';
-          
-          await env.DB.prepare(`
-            INSERT INTO admin_logs (id, action, resource_type, resource_id, details, ip_address, user_agent, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-          `).bind(
-            logId,
-            'DELETE',
-            'audit',
-            auditId,
-            JSON.stringify({ 
-              root_url: auditInfo.root_url, 
-              status: auditInfo.status, 
-              pages_analyzed: auditInfo.pages_analyzed 
-            }),
-            ipAddress,
-            userAgent
-          ).run();
-
-          console.log(`[ADMIN] Audit deleted: ${auditId} (${auditInfo.root_url}) by ${ipAddress}`);
-
-          return new Response(JSON.stringify({ 
-            ok: true, 
-            message: 'Audit and all associated data deleted', 
-            auditId 
-          }), { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          });
-        } catch (error: any) {
-          console.error('[DELETE AUDIT] Error:', error);
-          return new Response(JSON.stringify({ error: error.message }), { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          });
         }
-      }
       }
 
       // Citations endpoints
@@ -2271,13 +2271,72 @@ async function getAudit(auditId: string, env: Env) {
     console.warn('[GEO_ADJUSTED] Failed to calculate:', err);
   }
 
+  // Scorecard V2: Add enriched criteria, category scores, and fix_first
+  let enrichedChecks: any[] | null = null;
+  let categoryScores: any[] | null = null;
+  let fixFirst: any[] | null = null;
+  let scorecardV2 = false;
+
+  try {
+    const scorecardEnabled = env.SCORECARD_V2_ENABLED === 'true';
+    
+    if (scorecardEnabled) {
+      const { CHECKS_METADATA } = await import('./lib/checksMetadata');
+      const { computeCategoryScores, computeTopFixes } = await import('./lib/categoryScoring');
+      
+      // Get a representative page's checks (use homepage or first page)
+      const samplePage = await env.DB.prepare(`
+        SELECT apa.checks_json
+        FROM audit_page_analysis apa
+        JOIN audit_pages ap ON apa.page_id = ap.id
+        WHERE ap.audit_id = ?
+        ORDER BY ap.url ASC
+        LIMIT 1
+      `).bind(auditId).first();
+
+      if (samplePage && samplePage.checks_json) {
+        const checks = JSON.parse(samplePage.checks_json as string);
+        
+        // Enrich checks with V2 metadata
+        enrichedChecks = checks.map((check: any) => {
+          const meta = CHECKS_METADATA[check.id];
+          return {
+            ...check,
+            category: meta?.category || 'Uncategorized',
+            impact_level: meta?.impact_level || 'Medium',
+            why_it_matters: meta?.why_it_matters,
+            refs: meta?.refs,
+            name: meta?.label || check.id,
+            weight: meta?.weight || 10
+          };
+        });
+
+        // Compute category roll-ups
+        categoryScores = computeCategoryScores(enrichedChecks);
+
+        // Compute top fixes
+        fixFirst = computeTopFixes(enrichedChecks, 5);
+        
+        scorecardV2 = true;
+      }
+    }
+  } catch (err) {
+    console.warn('[SCORECARD_V2] Failed to compute:', err);
+  }
+
   return {
     ...audit,
     pages_analyzed: pageStats?.total || 0,
     avg_aeo_score: pageStats?.avg_aeo || 0,
     avg_geo_score: pageStats?.avg_geo || 0,
     geo_adjusted: geoAdjusted,
-    geo_adjustment_details: geoAdjustmentDetails
+    geo_adjustment_details: geoAdjustmentDetails,
+    ...(scorecardV2 && {
+      checks: enrichedChecks,
+      category_scores: categoryScores,
+      fix_first: fixFirst,
+      scorecard_v2: true
+    })
   };
 }
 

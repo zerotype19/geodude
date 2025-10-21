@@ -7,6 +7,8 @@ import ScoreLegend from '/src/components/ScoreLegend';
 import CheckCategories from '/src/components/CheckCategories';
 import PagesTab from '/src/components/PagesTab';
 import RenderParityPanel from '/src/components/RenderParityPanel';
+import AuditTour from '/src/components/AuditTour';
+import { apiGet, apiPost } from '/src/lib/api';
 
 interface Audit {
   id: string;
@@ -80,11 +82,7 @@ export default function AuditDetail() {
 
   const fetchAudit = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/audits/${id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch audit');
-      }
-      const data = await response.json();
+      const data = await apiGet<Audit>(`/api/audits/${id}`);
       setAudit(data);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
@@ -93,11 +91,7 @@ export default function AuditDetail() {
 
   const fetchPages = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/audits/${id}/pages?limit=100`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch pages');
-      }
-      const data = await response.json();
+      const data = await apiGet<{ pages: Page[] }>(`/api/audits/${id}/pages?limit=100`);
       setPages(data.pages || []);
     } catch (error) {
       console.error('Failed to fetch pages:', error);
@@ -111,18 +105,7 @@ export default function AuditDetail() {
     
     setRescoreLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/audits/${id}/recompute`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to rescore audit');
-      }
-      
-      const result = await response.json();
+      const result = await apiPost(`/api/audits/${id}/recompute`);
       console.log('Rescore result:', result);
       
       // Refresh the audit and pages data
@@ -160,19 +143,7 @@ export default function AuditDetail() {
         requestBody.site_description = audit.site_description;
       }
       
-      const response = await fetch(`${API_BASE}/api/audits`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to start new audit');
-      }
-      
-      const result = await response.json();
+      const result = await apiPost<any>(`/api/audits`, requestBody);
       console.log('New audit started:', result);
       
       // API returns audit_id, not id
@@ -361,6 +332,7 @@ export default function AuditDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <AuditTour />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -434,6 +406,7 @@ export default function AuditDetail() {
         <div className="mb-8">
           <nav className="flex space-x-8 border-b border-gray-200">
             <button
+              data-tour="overview-tab"
               onClick={() => setActiveTab('overview')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'overview'
@@ -444,6 +417,7 @@ export default function AuditDetail() {
               Overview
             </button>
             <button
+              data-tour="pages-tab"
               onClick={() => setActiveTab('pages')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'pages'
@@ -454,6 +428,7 @@ export default function AuditDetail() {
               Pages
             </button>
             <button
+              data-tour="citations-tab"
               onClick={() => setActiveTab('citations')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'citations'

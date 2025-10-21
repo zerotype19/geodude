@@ -39,5 +39,8 @@ COOKIE_TTL_DAYS = "30"
 MAGIC_TOKEN_TTL_MIN = "20"
 MAGIC_REQUESTS_PER_HOUR = "5"
 
+# Scorecard V2
+SCORECARD_V2_ENABLED = "true"
+
 [triggers]
 crons = ["0 */6 * * *", "0 14 * * 1", "0 * * * *", "0 2 * * *"]  # Added nightly warmer at 02:00 UTC

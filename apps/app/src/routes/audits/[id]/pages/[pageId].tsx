@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiGet } from '../../../../lib/api';
 import { useParams, Link } from 'react-router-dom';
 import CheckPill from '/src/components/CheckPill';
 import { getCheckMeta } from '/src/content/checks';
@@ -61,11 +62,7 @@ export default function PageDetail() {
 
   const fetchPage = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/audits/${id}/pages/${pageId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch page details');
-      }
-      const data = await response.json();
+      const data = await apiGet<PageDetails>(`/api/audits/${id}/pages/${pageId}`);
       setPage(data);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');
