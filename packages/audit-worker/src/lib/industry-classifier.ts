@@ -60,6 +60,7 @@ const HEURISTICS: Record<IndustryKey, RegExp[]> = {
     /\b(msrp|vin|dealer|build\s*(&|and)\s*price|configure|inventory|test\s*drive)\b/i,
     /\b(iihs|nhtsa|safety\s*rating|crash\s*test|warranty|towing|payload)\b/i,
     /\b(sedan|suv|truck|pickup|crossover|hybrid|electric\s*vehicle|ev)\b/i,
+    /\b(car\s*manufacturer|auto\s*manufacturer|automotive|vehicle|automobile)\b/i,
   ],
   travel_cruise: [
     /\b(cruise|cruises|river\s*cruise|ocean\s*cruise|expedition|sailing|itinerary|itineraries)\b/i,
