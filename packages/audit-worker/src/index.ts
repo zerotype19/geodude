@@ -2,6 +2,7 @@ import { queryAI, processCitations, generateDefaultQueries } from './connectors'
 import { handleGetLLMPrompts } from './routes/llm-prompts';
 import { getUserIdFromRequest, verifyAuditOwnership, verifyIsAdmin } from './auth/helpers';
 import { loadIndustryConfig } from './config/loader';
+import { resolveIndustry } from './lib/industry';
 import { 
   CRAWL_DELAY_MS, 
   PRECHECK_MAX_RETRIES, 
@@ -2086,11 +2087,20 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   console.log(`[PRECHECK] Starting validation for: ${root_url}`);
   const precheck = await precheckDomain(root_url, env);
   
+  // Resolve industry early (before any INSERT)
+  const industryLock = await resolveIndustry(root_url, env, {
+    projectOverride: undefined, // Could read from project table if needed
+    auditOverride: config.industry as string | undefined,
+    siteDescription: site_description,
+  });
+  
+  console.log(`[INDUSTRY] resolved: ${industryLock.industry} (source=${industryLock.source}) domain=${new URL(root_url).hostname} locked`);
+  
   if (!precheck.ok) {
     // Domain failed validation - create audit as failed immediately
     await env.DB.prepare(
-      "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, finished_at, status, fail_reason, fail_at, config_json) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 'failed', ?, datetime('now'), ?)"
-    ).bind(id, project_id, root_url, site_description || null, userId, precheck.reason, JSON.stringify(config)).run();
+      "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, finished_at, status, fail_reason, fail_at, config_json, industry, industry_source, industry_locked) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 'failed', ?, datetime('now'), ?, ?, ?, ?)"
+    ).bind(id, project_id, root_url, site_description || null, userId, precheck.reason, JSON.stringify(config), industryLock.industry, industryLock.source, 1).run();
     
     console.log(`[PRECHECK FAILED] ${id}: ${precheck.reason}`);
     return { audit_id: id, status: 'failed', reason: precheck.reason };
@@ -2104,8 +2114,8 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   
   // Create audit
   await env.DB.prepare(
-    "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, status, config_json) VALUES (?, ?, ?, ?, ?, datetime('now'), 'running', ?)"
-  ).bind(id, project_id, root_url, site_description || null, userId, JSON.stringify(config)).run();
+    "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, status, config_json, industry, industry_source, industry_locked) VALUES (?, ?, ?, ?, ?, datetime('now'), 'running', ?, ?, ?, ?)"
+  ).bind(id, project_id, root_url, site_description || null, userId, JSON.stringify(config), industryLock.industry, industryLock.source, 1).run();
 
   // Hybrid discovery: Try sitemap first (fast timeout), then fill with organic discovery
   ctx.waitUntil((async () => {
