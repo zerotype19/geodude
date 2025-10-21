@@ -1,6 +1,7 @@
 import { queryAI, processCitations, generateDefaultQueries } from './connectors';
 import { handleGetLLMPrompts } from './routes/llm-prompts';
 import { getUserIdFromRequest, verifyAuditOwnership, verifyIsAdmin } from './auth/helpers';
+import { loadIndustryConfig } from './config/loader';
 import { 
   CRAWL_DELAY_MS, 
   PRECHECK_MAX_RETRIES, 
@@ -675,6 +676,9 @@ export default {
   },
 
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Load industry configuration from KV on first request
+    await loadIndustryConfig(env);
+    
     const url = new URL(req.url);
     const path = url.pathname;
 
