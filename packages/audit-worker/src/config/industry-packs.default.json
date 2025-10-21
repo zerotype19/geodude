@@ -1,0 +1,256 @@
+{
+  "industry_rules": {
+    "default_industry": "generic_consumer",
+    "domains": {
+      "toyota.com": "automotive_oem",
+      "ford.com": "automotive_oem",
+      "gm.com": "automotive_oem",
+      "honda.com": "automotive_oem",
+      "nissan-usa.com": "automotive_oem",
+      "hyundai.com": "automotive_oem",
+      "kia.com": "automotive_oem",
+      "bmw.com": "automotive_oem",
+      "mercedes-benz.com": "automotive_oem",
+      "tesla.com": "automotive_oem",
+      "bestbuy.com": "retail",
+      "target.com": "retail",
+      "walmart.com": "retail",
+      "amazon.com": "retail",
+      "chase.com": "financial_services",
+      "wellsfargo.com": "financial_services",
+      "usaa.com": "financial_services",
+      "mayoclinic.org": "healthcare_provider",
+      "clevelandclinic.org": "healthcare_provider",
+      "delta.com": "travel_air",
+      "united.com": "travel_air",
+      "marriott.com": "travel_hotels"
+    }
+  },
+  "packs": {
+    "generic_consumer": {
+      "allow_tags": [
+        "pricing",
+        "reviews",
+        "reliability",
+        "warranty",
+        "safety_ratings",
+        "customer_service",
+        "locations",
+        "hours",
+        "contact"
+      ],
+      "description": "Base consumer intent pack - inherited by all industries"
+    },
+    "automotive_oem": {
+      "allow_tags": [
+        "msrp",
+        "build_price",
+        "trim_compare",
+        "dealer_locator",
+        "financing",
+        "lease",
+        "warranty",
+        "maintenance",
+        "reliability",
+        "safety_ratings",
+        "iihs",
+        "nhtsa",
+        "towing",
+        "cargo",
+        "range",
+        "mpg",
+        "cpo",
+        "certified_preowned",
+        "owners_manual",
+        "recalls",
+        "trade_in",
+        "test_drive",
+        "inventory",
+        "delivery"
+      ],
+      "deny_phrases": [
+        "return policy",
+        "free returns",
+        "promo code",
+        "store credit",
+        "shipping",
+        "exchange policy",
+        "gift card",
+        "in stock online",
+        "add to cart",
+        "checkout"
+      ],
+      "inherits": ["generic_consumer"],
+      "description": "Automotive OEM (Toyota, Ford, GM, etc.)"
+    },
+    "retail": {
+      "allow_tags": [
+        "price",
+        "discounts",
+        "sales",
+        "store_locator",
+        "shipping",
+        "returns",
+        "availability",
+        "in_stock",
+        "delivery",
+        "pickup",
+        "gift_cards",
+        "loyalty_program"
+      ],
+      "deny_phrases": [
+        "iihs",
+        "nhtsa",
+        "towing capacity",
+        "mpg",
+        "trim levels",
+        "dealer",
+        "test drive"
+      ],
+      "inherits": ["generic_consumer"],
+      "description": "Retail stores (Best Buy, Target, etc.)"
+    },
+    "financial_services": {
+      "allow_tags": [
+        "rates",
+        "apr",
+        "eligibility",
+        "prequalify",
+        "coverage",
+        "claims",
+        "fees",
+        "branch_locator",
+        "atm_locator",
+        "account_types",
+        "credit_score",
+        "mortgage",
+        "investment",
+        "insurance"
+      ],
+      "deny_phrases": [
+        "shipping",
+        "return policy",
+        "in stock",
+        "towing capacity"
+      ],
+      "inherits": ["generic_consumer"],
+      "description": "Banks, credit unions, insurance (Chase, USAA, etc.)"
+    },
+    "healthcare_provider": {
+      "allow_tags": [
+        "appointments",
+        "insurance_accepted",
+        "specialties",
+        "doctors",
+        "locations",
+        "emergency",
+        "patient_portal",
+        "medical_records",
+        "billing",
+        "conditions_treated"
+      ],
+      "deny_phrases": [
+        "shipping",
+        "return policy",
+        "promo code",
+        "gift card"
+      ],
+      "inherits": ["generic_consumer"],
+      "description": "Hospitals, clinics, medical practices"
+    },
+    "travel_air": {
+      "allow_tags": [
+        "baggage",
+        "fare_classes",
+        "loyalty_miles",
+        "status_benefits",
+        "change_policy",
+        "cancellation",
+        "on_time",
+        "route_map",
+        "fleet",
+        "check_in",
+        "seat_selection"
+      ],
+      "deny_phrases": [
+        "return policy",
+        "shipping",
+        "towing capacity",
+        "mpg"
+      ],
+      "inherits": ["generic_consumer"],
+      "description": "Airlines (Delta, United, etc.)"
+    },
+    "travel_hotels": {
+      "allow_tags": [
+        "room_types",
+        "amenities",
+        "loyalty_program",
+        "cancellation_policy",
+        "check_in",
+        "parking",
+        "dining",
+        "spa",
+        "meeting_rooms"
+      ],
+      "deny_phrases": [
+        "towing capacity",
+        "mpg",
+        "trim levels"
+      ],
+      "inherits": ["generic_consumer"],
+      "description": "Hotels and resorts (Marriott, Hilton, etc.)"
+    },
+    "saas_b2b": {
+      "allow_tags": [
+        "pricing",
+        "plans",
+        "enterprise",
+        "api",
+        "integrations",
+        "security",
+        "compliance",
+        "support",
+        "sla",
+        "documentation",
+        "trial"
+      ],
+      "deny_phrases": [
+        "shipping",
+        "return policy",
+        "in stock"
+      ],
+      "inherits": ["generic_consumer"],
+      "description": "B2B Software (Salesforce, Slack, etc.)"
+    },
+    "ecommerce_fashion": {
+      "allow_tags": [
+        "sizing",
+        "fit_guide",
+        "materials",
+        "care_instructions",
+        "shipping",
+        "returns",
+        "exchange",
+        "availability",
+        "new_arrivals",
+        "sales"
+      ],
+      "deny_phrases": [
+        "towing capacity",
+        "mpg",
+        "dealer",
+        "test drive"
+      ],
+      "inherits": ["retail"],
+      "description": "Fashion e-commerce"
+    },
+    "unknown": {
+      "allow_tags": [],
+      "deny_phrases": [],
+      "inherits": ["generic_consumer"],
+      "description": "Fallback for unclassified sites"
+    }
+  }
+}
+
