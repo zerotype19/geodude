@@ -117,7 +117,9 @@ const BLOCKED_HOSTS = [
 // Known redirects (optional - can move to KV later)
 const AUTO_REDIRECTS: Record<string, string> = {
   "omnicom.com": "https://www.omnicomgroup.com",
-  "ford.com": "https://corporate.ford.com"
+  "ford.com": "https://corporate.ford.com",
+  "princess.com": "https://www.princess.com/en-us/",
+  "www.princess.com": "https://www.princess.com/en-us/"
 };
 
 /**

@@ -15,4 +15,4 @@ dist/assets/index-DJlyeJtN.js   757.01 kB │ gzip: 222.69 kB
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 1.09s
+✓ built in 1.07s
