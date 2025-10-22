@@ -19,6 +19,20 @@ export interface ScoringCriterion {
   check_type: 'html_dom' | 'llm' | 'aggregation' | 'manual';
   enabled: boolean;
   preview: boolean;
+  
+  // Enhanced fields matching live score guide
+  points_possible: number;
+  importance_rank: number; // 1=Critical, 2=High, 3=Medium
+  scoring_approach: string; // e.g., "Automated HTML analysis"
+  examples: string | null; // Good/bad examples
+  view_in_ui: string | null; // Where to find in UI
+  common_issues: string | null; // Common problems
+  quick_fixes: string | null; // Actionable steps
+  learn_more_links: string | null; // JSON array
+  official_docs: string | null; // JSON array
+  display_order: number | null;
+  
+  // Original fields
   why_it_matters: string | null;
   how_to_fix: string | null;
   references_json: string | null;
