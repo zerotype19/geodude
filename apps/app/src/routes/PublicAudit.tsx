@@ -433,7 +433,7 @@ export default function PublicAudit() {
               color: '#9ca3af',
               display: 'inline-block',
             }}>
-              <span>🤖 Brave AI —</span>
+              <span>🤖 Brave AI -</span>
             </div>
           )}
         </div>

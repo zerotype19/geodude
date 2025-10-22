@@ -40,7 +40,7 @@ export default function Terms() {
             </p>
             <p className="text-gray-700 leading-relaxed mt-3">
               These outputs are generated using automated analysis, machine heuristics, and evolving public information. 
-              They are intended solely to <strong>inform and guide your independent decision-making</strong> — not to prescribe 
+              They are intended solely to <strong>inform and guide your independent decision-making</strong> - not to prescribe 
               specific actions or guarantee any particular outcome.
             </p>
           </section>
@@ -59,7 +59,7 @@ export default function Terms() {
                 or any other search or AI provider</strong>.
               </li>
               <li>
-                Any "weights," "penalties," or "priorities" are subjective heuristics designed for internal consistency — 
+                Any "weights," "penalties," or "priorities" are subjective heuristics designed for internal consistency - 
                 not external validation.
               </li>
               <li>

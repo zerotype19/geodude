@@ -6,7 +6,7 @@ import rehypeRaw from 'rehype-raw';
 
 const citationsGuideContent = `## How We Measure AI Visibility
 
-The Citations system reveals how frequently your domain is referenced across major AI platforms—using **human-realistic query patterns** that mirror what real users actually ask. Unlike generic testing tools, Optiview's citation engine uses **self-learning context extraction** to generate queries that evolve with your content.
+The Citations system reveals how frequently your domain is referenced across major AI platforms-using **human-realistic query patterns** that mirror what real users actually ask. Unlike generic testing tools, Optiview's citation engine uses **self-learning context extraction** to generate queries that evolve with your content.
 
 ### What We Track
 
@@ -30,7 +30,7 @@ Optiview doesn't use fixed templates. Instead, we've built a **context-aware pro
 
 **What Makes Our Queries Unique:**
 
-✨ **Human-realistic patterns**: Our query engine analyzes your homepage, meta descriptions, and site structure to generate questions that match natural language patterns—no awkward grammar, no "cruises cruises" repetition, no generic templates.
+✨ **Human-realistic patterns**: Our query engine analyzes your homepage, meta descriptions, and site structure to generate questions that match natural language patterns-no awkward grammar, no "cruises cruises" repetition, no generic templates.
 
 🧠 **Self-learning context extraction**: After every audit, the system automatically:
 - Extracts your brand identity with intelligent camelCase and compound-word splitting
@@ -39,7 +39,7 @@ Optiview doesn't use fixed templates. Instead, we've built a **context-aware pro
 - Maps competitive positioning and category relationships
 - Updates a **Prompt Intelligence Index** that improves with each audit
 
-🎯 **Intent diversity**: Queries span multiple user journeys—comparison, informational, evaluative, commercial, and navigational—ensuring comprehensive coverage of how real users discover and evaluate your content.
+🎯 **Intent diversity**: Queries span multiple user journeys-comparison, informational, evaluative, commercial, and navigational-ensuring comprehensive coverage of how real users discover and evaluate your content.
 
 🔄 **Dynamic adaptation**: The system continuously refines its understanding of your domain, detecting brand aliases, filtering meta-noise, and ensuring query realism through multi-layer quality gates.
 
@@ -117,7 +117,7 @@ The **Prompt Intelligence Index** powers entity-based search, allowing you to di
 - Which entities drive the highest AI visibility
 - Emerging topic trends across your industry
 
-This creates a **flywheel effect**: Each audit makes the next one smarter. The system learns which query patterns yield genuine citations, which brand formulations AI platforms recognize, and which content structures maximize visibility—then applies those insights across all future audits.
+This creates a **flywheel effect**: Each audit makes the next one smarter. The system learns which query patterns yield genuine citations, which brand formulations AI platforms recognize, and which content structures maximize visibility-then applies those insights across all future audits.
 
 ---
 
@@ -192,20 +192,20 @@ Results are aggregated by:
 ### Understanding Your Results
 
 **Citation Percentage by Source:**
-- **0-10%**: Low visibility across that AI platform — focus on G1 (Citable Facts), G2 (Provenance), and G4 (Crawler Access)
-- **10-25%**: Moderate visibility — optimize G5 (Chunkability) and A10 (Citations & Sources)
-- **25-50%**: Strong visibility — expand content depth and maintain quality
-- **50%+**: Excellent visibility — you're a trusted source for this AI platform
+- **0-10%**: Low visibility across that AI platform - focus on G1 (Citable Facts), G2 (Provenance), and G4 (Crawler Access)
+- **10-25%**: Moderate visibility - optimize G5 (Chunkability) and A10 (Citations & Sources)
+- **25-50%**: Strong visibility - expand content depth and maintain quality
+- **50%+**: Excellent visibility - you're a trusted source for this AI platform
 
 **Query Type Performance (Branded vs Non-Branded):**
 
 This breakdown shows how well you're cited when your brand is mentioned vs when users search for topics/categories:
 
-- **🏷️ Branded Queries**: Tests brand awareness — "What is [YourBrand]?", "How do I contact [YourBrand]?"
+- **🏷️ Branded Queries**: Tests brand awareness - "What is [YourBrand]?", "How do I contact [YourBrand]?"
   - High citation rate (>80%) = Strong brand recognition
   - Low citation rate (<50%) = AI systems don't have good information about your brand
   
-- **🌐 Non-Branded Queries**: Tests category authority — "Best ways to [your service]", "How does [your technology] work?"
+- **🌐 Non-Branded Queries**: Tests category authority - "Best ways to [your service]", "How does [your technology] work?"
   - High citation rate (>50%) = You're a trusted authority in your category
   - Low citation rate (<30%) = Opportunity to create more educational/topic-focused content
 
@@ -385,13 +385,13 @@ This ensures ongoing visibility monitoring without manual intervention.
 
 ## Why Optiview's Citation System Is Different
 
-**Traditional citation tools** use static templates and fixed queries that feel robotic—AI platforms recognize them as synthetic and may respond differently than they would to genuine user queries.
+**Traditional citation tools** use static templates and fixed queries that feel robotic-AI platforms recognize them as synthetic and may respond differently than they would to genuine user queries.
 
 **Optiview's approach** is fundamentally different:
 
 **✨ Learns from your actual content**
 
-No two domains get the same queries—each audit produces unique, contextually grounded questions based on *your* homepage, *your* brand, and *your* positioning.
+No two domains get the same queries-each audit produces unique, contextually grounded questions based on *your* homepage, *your* brand, and *your* positioning.
 
 **🧠 Self-improving intelligence**
 
@@ -399,7 +399,7 @@ The system gets smarter with every audit, learning which query patterns, entity 
 
 **🎯 Human-realistic at scale**
 
-Our multi-layer quality filtering ensures queries read like authentic user questions—proper grammar, natural phrasing, intent-appropriate language—so AI platforms treat them as real searches.
+Our multi-layer quality filtering ensures queries read like authentic user questions-proper grammar, natural phrasing, intent-appropriate language-so AI platforms treat them as real searches.
 
 **🔄 Cross-domain learning**
 
@@ -407,9 +407,9 @@ Insights from thousands of audits feed back into the prompt generation engine, c
 
 **📊 Actionable intelligence**
 
-Beyond citation counts, you get entity-level insights, competitive benchmarking, and trend analysis—powered by the same intelligence index that generates your queries.
+Beyond citation counts, you get entity-level insights, competitive benchmarking, and trend analysis-powered by the same intelligence index that generates your queries.
 
-**The result?** Citation metrics you can trust, based on queries that mirror what real users actually ask—giving you genuine insight into how AI platforms will surface your content when it matters most.
+**The result?** Citation metrics you can trust, based on queries that mirror what real users actually ask-giving you genuine insight into how AI platforms will surface your content when it matters most.
 
 ---
 

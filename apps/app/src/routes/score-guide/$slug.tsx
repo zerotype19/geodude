@@ -90,7 +90,7 @@ export default function ScoreGuideDetail() {
 
         <footer className="border-t border-gray-200 pt-6 space-y-3">
           <div className="text-sm text-gray-600">
-            <strong>Pro tip:</strong> Use the anchors to jump to sections —{" "}
+            <strong>Pro tip:</strong> Use the anchors to jump to sections -{" "}
             <a className="text-blue-600 hover:text-blue-700 hover:underline" href="#why">
               #why
             </a>

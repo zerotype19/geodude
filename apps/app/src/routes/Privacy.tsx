@@ -25,7 +25,7 @@ export default function Privacy() {
               collect, use, and protect personal information when you use our website and services (the "Service").
             </p>
             <p className="text-gray-700 leading-relaxed mt-3">
-              Optiview is designed primarily as a business analytics tool. We do not sell, rent, or trade your data — ever.
+              Optiview is designed primarily as a business analytics tool. We do not sell, rent, or trade your data - ever.
             </p>
           </section>
 
@@ -67,7 +67,7 @@ export default function Privacy() {
               <li>Ensure system integrity and prevent abuse.</li>
             </ul>
             <p className="text-gray-700 leading-relaxed mt-3">
-              We may use aggregated, anonymized data for statistical insights — but never in a way that identifies you or 
+              We may use aggregated, anonymized data for statistical insights - but never in a way that identifies you or 
               your company.
             </p>
           </section>

@@ -33,29 +33,29 @@ export default function Methodology() {
             <p className="text-gray-700 leading-relaxed mb-3">Optiview combines multiple input types:</p>
             <ul className="space-y-3 text-gray-700">
               <li>
-                <strong>Crawled HTML & metadata</strong> — collected directly from publicly available web pages that you 
+                <strong>Crawled HTML & metadata</strong> - collected directly from publicly available web pages that you 
                 authorize us to audit, including both static HTML and JavaScript-rendered content for visibility analysis.
               </li>
               <li>
-                <strong>Search engine signals</strong> — derived from Google, Bing, and Brave index results (where permitted), 
+                <strong>Search engine signals</strong> - derived from Google, Bing, and Brave index results (where permitted), 
                 limited to top-level pages for ranking context.
               </li>
               <li>
-                <strong>AI visibility signals</strong> — from monitored LLM sources such as ChatGPT (OpenAI), Claude (Anthropic), 
+                <strong>AI visibility signals</strong> - from monitored LLM sources such as ChatGPT (OpenAI), Claude (Anthropic), 
                 Perplexity, and Brave Search citations, using context-aware query generation that adapts to each domain's 
                 industry and positioning.
               </li>
               <li>
-                <strong>Technical metrics</strong> — e.g., schema presence, render visibility ratio, canonical correctness, 
+                <strong>Technical metrics</strong> - e.g., schema presence, render visibility ratio, canonical correctness, 
                 freshness timestamps, and performance scores measured through our crawler and browser automation.
               </li>
               <li>
-                <strong>Industry classification</strong> — hybrid system combining keyword analysis, JSON-LD type detection, 
+                <strong>Industry classification</strong> - hybrid system combining keyword analysis, JSON-LD type detection, 
                 navigation taxonomy, and Workers AI embeddings to classify domains into 18+ industry verticals with confidence 
                 scoring.
               </li>
               <li>
-                <strong>Heuristic weights</strong> — proprietary weighting and scoring frameworks created by Optiview.ai based 
+                <strong>Heuristic weights</strong> - proprietary weighting and scoring frameworks created by Optiview.ai based 
                 on public documentation, experiments, and open-source benchmarks, refined through continuous cross-domain 
                 pattern analysis.
               </li>
@@ -86,7 +86,7 @@ export default function Methodology() {
             <div className="mt-4 p-4 bg-gray-50 rounded border border-gray-200">
               <p className="text-sm text-gray-700 mb-2">
                 Each check (A1–A11, G1–G10) is scored 0–3 using static and rendered page data. Weights (4–15) determine the 
-                relative importance of each check. <strong>Scores are heuristic indicators only</strong> — not predictive 
+                relative importance of each check. <strong>Scores are heuristic indicators only</strong> - not predictive 
                 models or guarantees.
               </p>
               <p className="text-sm text-gray-700">

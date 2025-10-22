@@ -45,7 +45,7 @@ export const CHECKS: Record<string, CheckMeta> = {
     code: "A5", 
     label: "Schema accuracy", 
     category: "Governance",
-    description: "Valid JSON-LD for page intent. Note: FAQPage/HowTo rich results limited since 2023—use only when truly relevant.",
+    description: "Valid JSON-LD for page intent. Note: FAQPage/HowTo rich results limited since 2023-use only when truly relevant.",
     weightKey: "aeo", 
     guideAnchor: "#a5-schema-accuracy-breadth" 
   },
@@ -93,7 +93,7 @@ export const CHECKS: Record<string, CheckMeta> = {
     code: "A11", 
     label: "Render visibility (SPA risk)", 
     category: "Rendering",
-    description: "Keep key content and JSON-LD in HTML. AEO: small site penalty only if <30%. GEO: stricter—bots often don't run JS.",
+    description: "Keep key content and JSON-LD in HTML. AEO: small site penalty only if <30%. GEO: stricter-bots often don't run JS.",
     weightKey: "aeo", 
     guideAnchor: "#a11-render-visibility-spa-risk" 
   },

@@ -561,7 +561,7 @@ export default function AdminPage() {
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {audit.aeo_score !== null && audit.geo_score !== null
                           ? `${Math.round(audit.aeo_score)} / ${Math.round(audit.geo_score)}`
-                          : '—'}
+                          : '-'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {new Date(audit.started_at + 'Z').toLocaleString()}

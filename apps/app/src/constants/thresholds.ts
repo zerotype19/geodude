@@ -33,14 +33,14 @@ export function renderParityLabel(ratio: number): {
     return { 
       emoji: '⚠️', 
       label: 'Partial parity', 
-      hint: '50–90% present — consider server-rendering key blocks',
+      hint: '50–90% present - consider server-rendering key blocks',
       severity: 'warning'
     };
   }
   return { 
     emoji: '❌', 
     label: 'Low parity', 
-    hint: '<50% present — LLM crawlers likely miss key content',
+    hint: '<50% present - LLM crawlers likely miss key content',
     severity: 'error'
   };
 }

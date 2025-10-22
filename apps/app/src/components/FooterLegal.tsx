@@ -31,7 +31,7 @@ export default function FooterLegal() {
         {/* Copyright & Disclaimer */}
         <div className="text-xs text-gray-500 space-y-1">
           <div>
-            © {currentYear} Optiview.ai — All rights reserved.
+            © {currentYear} Optiview.ai - All rights reserved.
           </div>
           <div className="md:text-right">
             Scores and recommendations are heuristic indicators only; no warranties or guarantees implied.

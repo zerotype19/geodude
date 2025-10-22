@@ -264,7 +264,7 @@ export const CHECKS: CheckDoc[] = [
     title: 'Schema accuracy & breadth (A5)',
     category: 'Schema',
     weight: 10,
-    summary: 'Valid JSON-LD types (Article, HowTo, FAQPage, QAPage, Product, BreadcrumbList)—no errors. Note: FAQPage and HowTo rich results have been deprecated or limited in most search surfaces since 2023. Use these schema types only when genuinely relevant — focus primarily on Article, WebPage, HowTo (instructional), or Product where applicable.',
+    summary: 'Valid JSON-LD types (Article, HowTo, FAQPage, QAPage, Product, BreadcrumbList)-no errors. Note: FAQPage and HowTo rich results have been deprecated or limited in most search surfaces since 2023. Use these schema types only when genuinely relevant - focus primarily on Article, WebPage, HowTo (instructional), or Product where applicable.',
     whyItMatters: 'Accurate schema increases extractability and reduces hallucination risk in answer engines. However, relying solely on FAQ or HowTo schema no longer guarantees rich results visibility.',
     detectionNotes: [
       'Parses JSON-LD and checks @type vs. page intent',
@@ -787,7 +787,7 @@ export const CHECKS: CheckDoc[] = [
     title: 'AI crawler access & parity (G4)',
     category: 'Crawl',
     weight: 12,
-    summary: 'Robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks. Note: While most AI crawlers respect robots.txt, real-world tests show occasional non-compliance — for example, PerplexityBot sometimes disregards disallow rules, and Claude-Web has been observed over-crawling until blocked.',
+    summary: 'Robots policy for GPTBot/Claude-Web/Perplexity; HTML ≈ rendered DOM for key blocks. Note: While most AI crawlers respect robots.txt, real-world tests show occasional non-compliance - for example, PerplexityBot sometimes disregards disallow rules, and Claude-Web has been observed over-crawling until blocked.',
     whyItMatters: 'Most AI crawlers don\'t execute JS; keeping essentials in server HTML improves capture and citation. LLM vendors crawl for training data and real-time answers. Blocking all bots limits visibility, but compliance can vary.',
     detectionNotes: [
       'Checks robots.txt for GPTBot, Claude-Web, PerplexityBot',
@@ -822,10 +822,10 @@ Disallow: /`
     implementation: [
       'Allow GPTBot, Claude-Web, PerplexityBot in robots.txt',
       'Block Google-Extended if you don\'t want training data use (separate from normal Googlebot crawling)',
-      'Note: Blocking Google-Extended will NOT prevent your site from being indexed or appearing in Google Search or AI Overviews — it only affects training access',
+      'Note: Blocking Google-Extended will NOT prevent your site from being indexed or appearing in Google Search or AI Overviews - it only affects training access',
       'Test with robots.txt validator',
       'Ensure Disallow rules don\'t block critical content',
-      'Note: Compliance varies; some crawlers may ignore rules — verify access logs'
+      'Note: Compliance varies; some crawlers may ignore rules - verify access logs'
     ],
     qaChecklist: [
       'Are answer bots (GPTBot, Claude, Perplexity) allowed?',

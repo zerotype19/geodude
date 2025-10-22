@@ -29,7 +29,7 @@ export default function RenderParityPanel({ ratio }: Props) {
       </div>
       
       <div className="text-sm text-gray-700 mb-3">
-        <strong>{label}</strong> — {hint}
+        <strong>{label}</strong> - {hint}
       </div>
       
       {/* Visual bar */}
@@ -47,7 +47,7 @@ export default function RenderParityPanel({ ratio }: Props) {
       <div className="text-xs text-gray-600 bg-white rounded p-2 border border-gray-200">
         <strong>Tip:</strong> Ensure summary block and JSON-LD are present in server HTML. 
         Avoid deferring them to post-load JavaScript. Test with <code className="bg-gray-100 px-1 rounded">curl</code> or 
-        "View Source" — if it's blank, AI crawlers can't see it.
+        "View Source" - if it's blank, AI crawlers can't see it.
       </div>
       
       {/* Show AEO/GEO penalty info if low */}
