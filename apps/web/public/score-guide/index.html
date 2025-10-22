@@ -4,24 +4,272 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Score Guide - Optiview</title>
-  <meta name="description" content="Complete scoring guide for AEO and GEO optimization with interactive examples.">
+  <meta name="description" content="Complete scoring guide for AEO and GEO optimization - 21 checks for AI visibility and citations.">
   <link rel="canonical" href="https://optiview.ai/score-guide" />
-  <meta http-equiv="refresh" content="0; url=/methodology" />
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+  
   <style>
-    body { font-family: system-ui; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fafafa; }
-    .box { text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; }
-    h1 { color: #111; font-size: 1.5rem; margin-bottom: 1rem; }
-    p { color: #666; line-height: 1.6; margin-bottom: 1.5rem; }
-    a { color: #667eea; text-decoration: none; font-weight: 500; }
-    a:hover { text-decoration: underline; }
+    :root { --mx:auto; --w:clamp(320px, 92vw, 980px); --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height:1.7; color:#111; margin:0; background:#fafafa; }
+    main { width:var(--w); margin:0 auto; padding:2rem 1.25rem; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem; width:var(--w); margin:0 auto; }
+    .logo { font-size:1.4rem; font-weight:700; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; text-decoration:none; }
+    nav a { margin-left:1rem; text-decoration:none; color:#333; font-weight:500; }
+    nav a:hover { color:#667eea; }
+    h1 { font-size:2.5rem; font-weight:700; margin:2rem 0 1rem; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    h2 { font-size:1.8rem; font-weight:600; margin:2rem 0 1rem; color:#111; border-top:2px solid #e5e7eb; padding-top:1.5rem; }
+    h3 { font-size:1.3rem; font-weight:600; margin:1.5rem 0 0.75rem; color:#374151; }
+    p { margin:1rem 0; color:#4b5563; }
+    ul, ol { margin:1rem 0; padding-left:2rem; color:#4b5563; }
+    li { margin:0.5rem 0; }
+    a { color:#667eea; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .intro { background:#fff; padding:2rem; border-radius:12px; margin:2rem 0; box-shadow:0 2px 8px rgba(0,0,0,0.05); border-left:4px solid #667eea; }
+    .cta { background:var(--gradient); color:#fff; padding:1rem 2rem; border-radius:8px; display:inline-block; font-weight:600; margin:1rem 0; text-decoration:none; }
+    .cta:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(102, 126, 234, 0.3); text-decoration:none; }
+    table { width:100%; border-collapse:collapse; margin:1.5rem 0; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+    th { background:#667eea; color:#fff; padding:1rem; text-align:left; font-weight:600; }
+    td { padding:0.875rem 1rem; border-bottom:1px solid #e5e7eb; }
+    tr:last-child td { border-bottom:none; }
+    .score-scale { background:#f9fafb; padding:1.5rem; border-radius:8px; margin:1.5rem 0; }
+    footer { text-align:center; padding:2rem 1.25rem; color:#666; font-size:0.9rem; border-top:1px solid #e5e7eb; margin-top:3rem; }
+    footer a { color:#667eea; }
   </style>
 </head>
 <body>
-  <div class="box">
-    <h1>Score Guide</h1>
-    <p>Our detailed score guide is being moved here. For now, please see our Methodology page.</p>
-    <p><a href="/methodology">View Methodology →</a></p>
-    <p><a href="https://app.optiview.ai">Go to Dashboard →</a></p>
-  </div>
+  <header aria-label="Primary">
+    <a href="/" class="logo">OPTIVIEW.AI</a>
+    <nav aria-label="Main">
+      <a href="https://app.optiview.ai">Audits</a>
+      <a href="/score-guide">Score Guide</a>
+      <a href="/docs/citations.html">Citations Guide</a>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <h1>Optiview Score Guide</h1>
+      
+      <div class="intro">
+        <p><strong>Optiview uses 21 weighted checks</strong> to evaluate how well your site is optimized for AI search engines and LLM citations. Each check is scored 0-3 and contributes to your overall AEO (Answer Engine Optimization) and GEO (Generative Engine Optimization) scores.</p>
+        <p>This guide explains what we measure, why it matters, and how to improve your scores.</p>
+        <a href="https://app.optiview.ai" class="cta">Run Free Audit Now →</a>
+      </div>
+
+      <h2>How We Score</h2>
+      
+      <div class="score-scale">
+        <h3>Score Scale (0-3)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Score</th>
+              <th>Meaning</th>
+              <th>Weight Applied</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>3</strong></td>
+              <td>Strong - Fully optimized</td>
+              <td>100% of weight</td>
+            </tr>
+            <tr>
+              <td><strong>2</strong></td>
+              <td>Moderate - Partially optimized</td>
+              <td>66% of weight</td>
+            </tr>
+            <tr>
+              <td><strong>1</strong></td>
+              <td>Weak - Minimal optimization</td>
+              <td>33% of weight</td>
+            </tr>
+            <tr>
+              <td><strong>0</strong></td>
+              <td>Poor/Missing - Not optimized</td>
+              <td>0% of weight</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>AEO Checks (11 checks)</h2>
+      <p>Answer Engine Optimization checks focus on how well your content is structured for featured snippets, AI Overviews, and answer boxes.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Weight</th>
+            <th>What We Measure</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>A1: Answer-First Design</strong></td>
+            <td>15</td>
+            <td>Summary block, jump links, or tables above the fold</td>
+          </tr>
+          <tr>
+            <td><strong>A2: Topical Cluster</strong></td>
+            <td>15</td>
+            <td>Internal links to related content</td>
+          </tr>
+          <tr>
+            <td><strong>A3: Site Authority</strong></td>
+            <td>15</td>
+            <td>Organization and Author schema</td>
+          </tr>
+          <tr>
+            <td><strong>A4: Originality & Effort</strong></td>
+            <td>12</td>
+            <td>Tables, data, or 3+ outbound citations</td>
+          </tr>
+          <tr>
+            <td><strong>A5: Schema Accuracy</strong></td>
+            <td>10</td>
+            <td>Structured data (JSON-LD) present and valid</td>
+          </tr>
+          <tr>
+            <td><strong>A6: Crawlability</strong></td>
+            <td>10</td>
+            <td>Canonical tags, proper URLs, no duplicate content</td>
+          </tr>
+          <tr>
+            <td><strong>A7: UX & Performance</strong></td>
+            <td>8</td>
+            <td>No layout shift risk, fast page load</td>
+          </tr>
+          <tr>
+            <td><strong>A8: Discoverability</strong></td>
+            <td>6</td>
+            <td>Sitemaps present and accessible</td>
+          </tr>
+          <tr>
+            <td><strong>A9: Freshness</strong></td>
+            <td>5</td>
+            <td>dateModified present in schema</td>
+          </tr>
+          <tr>
+            <td><strong>A10: AI Overviews</strong></td>
+            <td>4</td>
+            <td>Citations block, chunkable structure for AI summaries</td>
+          </tr>
+          <tr>
+            <td><strong>A11: Render Visibility</strong></td>
+            <td>10</td>
+            <td>Content visible in static HTML (70%+ for score 3)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>GEO Checks (10 checks)</h2>
+      <p>Generative Engine Optimization checks focus on making your content citeable and discoverable by LLMs like ChatGPT, Claude, and Perplexity.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Weight</th>
+            <th>What We Measure</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>G1: Citable Facts</strong></td>
+            <td>15</td>
+            <td>Fact blocks, statistics, key takeaways clearly marked</td>
+          </tr>
+          <tr>
+            <td><strong>G2: Provenance</strong></td>
+            <td>15</td>
+            <td>Author, publisher, citations, license schema present</td>
+          </tr>
+          <tr>
+            <td><strong>G3: Evidence Density</strong></td>
+            <td>12</td>
+            <td>Citations block + 3+ outbound references to sources</td>
+          </tr>
+          <tr>
+            <td><strong>G4: AI Crawler Access</strong></td>
+            <td>12</td>
+            <td>GPTBot, ClaudeBot, PerplexityBot allowed in robots.txt</td>
+          </tr>
+          <tr>
+            <td><strong>G5: Chunkability</strong></td>
+            <td>10</td>
+            <td>Clean HTML structure, semantic markup for easy parsing</td>
+          </tr>
+          <tr>
+            <td><strong>G6: Stable URLs</strong></td>
+            <td>8</td>
+            <td>Canonical fact URLs with anchors for deep linking</td>
+          </tr>
+          <tr>
+            <td><strong>G7: Dataset Links</strong></td>
+            <td>8</td>
+            <td>Links to datasets, research, or sources hub</td>
+          </tr>
+          <tr>
+            <td><strong>G8: Policy Transparency</strong></td>
+            <td>6</td>
+            <td>License and reuse policy clearly stated</td>
+          </tr>
+          <tr>
+            <td><strong>G9: Update Hygiene</strong></td>
+            <td>7</td>
+            <td>Changelog or version history maintained</td>
+          </tr>
+          <tr>
+            <td><strong>G10: Cluster Linking</strong></td>
+            <td>7</td>
+            <td>Links to sources hub or related evidence pages</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Live Citation Testing</h2>
+      <p>Beyond structural checks, we test whether your brand actually appears in live LLM responses by running real queries against:</p>
+      <ul>
+        <li><strong>ChatGPT (OpenAI)</strong> - GPT-4 with web browsing</li>
+        <li><strong>Claude (Anthropic)</strong> - Claude 3 with web search</li>
+        <li><strong>Perplexity</strong> - Real-time web search and citation</li>
+        <li><strong>Brave Search</strong> - AI-powered search results</li>
+      </ul>
+      <p>Your <strong>GEO Adjusted Score</strong> combines structural readiness (70% weight) with real-world citation performance (30% weight).</p>
+
+      <h2>Get Your Score</h2>
+      <p>Ready to see how your site scores? Run a free audit to get your complete AEO and GEO assessment with actionable recommendations.</p>
+      <a href="https://app.optiview.ai" class="cta">Run Free Audit Now →</a>
+
+      <h2>Learn More</h2>
+      <ul>
+        <li><a href="/methodology">Full Methodology</a> - Complete technical documentation</li>
+        <li><a href="/docs/citations.html">Citations Guide</a> - How we test live LLM citations</li>
+        <li><a href="/bot">Bot Documentation</a> - How our crawler works</li>
+      </ul>
+    </article>
+  </main>
+
+  <footer>
+    <p>
+      <a href="https://app.optiview.ai">Audits</a> · 
+      <a href="/score-guide">Scoring Guide</a> · 
+      <a href="/docs/citations.html">Citations Guide</a> · 
+      <a href="/methodology">Methodology</a> · 
+      <a href="/terms">Terms</a> · 
+      <a href="/privacy">Privacy</a> · 
+      <a href="/bot">Bot Info</a>
+    </p>
+    <p>© 2025 Optiview.ai · AEO + GEO auditing for modern search.</p>
+  </footer>
 </body>
 </html>
