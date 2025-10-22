@@ -96,12 +96,12 @@ export default function AuditDetail() {
   const [error, setError] = useState<string | null>(null);
   const [rescoreLoading, setRescoreLoading] = useState(false);
   const [rerunLoading, setRerunLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'citations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'citations' | 'actions'>('overview');
 
   // Handle tab from URL query parameter
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'citations' || tabParam === 'pages' || tabParam === 'overview') {
+    if (tabParam === 'citations' || tabParam === 'pages' || tabParam === 'overview' || tabParam === 'actions') {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -471,6 +471,16 @@ export default function AuditDetail() {
             >
               Citations
             </button>
+            <button
+              onClick={() => setActiveTab('actions')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'actions'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Actions
+            </button>
           </nav>
         </div>
 
@@ -526,9 +536,22 @@ export default function AuditDetail() {
           />
         ) : activeTab === 'pages' ? (
           <PagesTab auditId={id!} />
+        ) : activeTab === 'actions' ? (
+          <>
+            {/* Actions Tab - Fix First Priority Queue */}
+            {audit.scorecard_v2 && audit.fix_first && audit.fix_first.length > 0 ? (
+              <div className="mb-8">
+                <FixFirst fixes={audit.fix_first} />
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                <p className="text-gray-600">No priority actions identified yet. Complete the audit to see recommendations.</p>
+              </div>
+            )}
+          </>
         ) : (
           <>
-            {/* Score Cards */}
+            {/* Overview Tab - Score Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <ScoreBadge
             score={audit.aeo_score}
@@ -567,11 +590,6 @@ export default function AuditDetail() {
           </div>
         </div>
 
-        {/* Score Legend */}
-        <div className="mb-8">
-          <ScoreLegend />
-        </div>
-
         {/* Category Scores (Scorecard V2) */}
         {audit.scorecard_v2 && audit.category_scores && audit.category_scores.length > 0 && (
           <div className="mb-8">
@@ -592,165 +610,9 @@ export default function AuditDetail() {
           </div>
         )}
 
-        {/* Fix First (Scorecard V2) */}
-        {audit.scorecard_v2 && audit.fix_first && (
-          <div className="mb-8">
-            <FixFirst fixes={audit.fix_first} />
-          </div>
-        )}
-
         {/* Citation Summary */}
         <div className="mb-8">
           <CitationSummaryCard auditId={id!} />
-        </div>
-
-        {/* Top Blockers & Quick Wins */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Top Blockers */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Top Blockers</h2>
-              <p className="text-sm text-gray-600">Highest impact issues to fix first</p>
-            </div>
-            <div className="p-6">
-              {topBlockers.length === 0 ? (
-                <p className="text-gray-500 text-sm">No blockers identified</p>
-              ) : (
-                <div className="space-y-3">
-                  {topBlockers.map((blocker, index) => (
-                    <div key={blocker.id} className="flex items-center justify-between">
-                      <CheckPill 
-                        code={blocker.id} 
-                        weight={blocker.weight} 
-                        score={Math.round(blocker.score)}
-                        alwaysShowLabel={true}
-                      />
-                      <div className="text-xs text-gray-500">
-                        Impact: {Math.round(blocker.impact)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Wins */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Quick Wins</h2>
-              <p className="text-sm text-gray-600">High-impact improvements you can make</p>
-            </div>
-            <div className="p-6">
-              {quickWins.length === 0 ? (
-                <p className="text-gray-500 text-sm">No quick wins identified</p>
-              ) : (
-                <div className="space-y-3">
-                  {quickWins.map((win, index) => (
-                    <div key={win.id}>
-                      <CheckPill 
-                        code={win.id} 
-                        weight={win.weight} 
-                        score={0}
-                        alwaysShowLabel={true}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Check Categories */}
-        <div className="mb-8">
-          <CheckCategories scores={getAllCheckScores()} />
-        </div>
-
-        {/* Render Parity Panel (if data available) */}
-        {typeof audit.render_gap_ratio === 'number' && (
-          <div className="mb-8 bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">HTML vs Rendered DOM Analysis</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              This metric shows how much of your site's content is visible in the raw HTML (server response) 
-              versus content that only appears after JavaScript execution.
-            </p>
-            <RenderParityPanel ratio={audit.render_gap_ratio} />
-          </div>
-        )}
-
-        {/* Pages List */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">Pages Analyzed</h2>
-            <p className="text-sm text-gray-600">Individual page scores and details</p>
-          </div>
-          
-          {pages.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <p className="text-gray-500">No pages analyzed yet</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      URL
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      AEO Score
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      GEO Score
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {pages.map((page) => (
-                    <tr key={page.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                        <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
-                          {page.url}
-                        </a>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          page.status_code >= 200 && page.status_code < 300 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {page.status_code}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={getScoreColor(page.aeo_score)}>
-                          {page.aeo_score ? Math.round(page.aeo_score) : 'N/A'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={getScoreColor(page.geo_score)}>
-                          {page.geo_score ? Math.round(page.geo_score) : 'N/A'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Link
-                          to={`/audits/${id}/pages/${page.id}`}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          View Details
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
           </>
         )}

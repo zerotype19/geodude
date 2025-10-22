@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link, useParams } from 'react-router-dom';
 
 interface CategoryScore {
   category: string;
@@ -32,9 +33,13 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
 };
 
 export default function CategoryScoreCard({ categoryScore }: CategoryScoreCardProps) {
+  const { id } = useParams<{ id: string }>();
   const { category, score, checks_count } = categoryScore;
   const emoji = CATEGORY_EMOJIS[category] || '📊';
   const description = CATEGORY_DESCRIPTIONS[category] || '';
+
+  // Create URL-friendly category slug
+  const categorySlug = category.toLowerCase().replace(/\s+&\s+/g, '-').replace(/\s+/g, '-');
 
   // Color coding based on score
   const getScoreColor = (score: number) => {
@@ -55,7 +60,10 @@ export default function CategoryScoreCard({ categoryScore }: CategoryScoreCardPr
   const progressColor = getProgressColor(score);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+    <Link 
+      to={`/audits/${id}/category/${categorySlug}`}
+      className="block bg-white rounded-lg border border-gray-200 p-5 hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer"
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
@@ -77,11 +85,11 @@ export default function CategoryScoreCard({ categoryScore }: CategoryScoreCardPr
         />
       </div>
 
-      <div className="flex items-center justify-between text-xs text-gray-500">
-        <span>{checks_count} checks</span>
-        <span>{score >= 80 ? '✓ Excellent' : score >= 60 ? 'Good' : score >= 40 ? 'Needs work' : 'Critical'}</span>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-gray-500">{checks_count} checks</span>
+        <span className="text-blue-600 font-medium">View details →</span>
       </div>
-    </div>
+    </Link>
   );
 }
 
