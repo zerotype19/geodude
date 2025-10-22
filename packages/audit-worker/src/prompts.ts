@@ -46,14 +46,14 @@ export async function getHomepageContext(env: Env, domain: string): Promise<Home
            NULL as og_site_name,
            NULL as org_name
     FROM audits a
-    JOIN audit_pages p ON p.audit_id = a.id
-    JOIN audit_page_analysis pa ON pa.page_id = p.id
+    LEFT JOIN audit_pages p ON p.audit_id = a.id
+    LEFT JOIN audit_page_analysis pa ON pa.page_id = p.id
     WHERE (
       LOWER(a.root_url) LIKE '%' || ? || '%'
       OR LOWER(a.root_url) LIKE '%www.' || ? || '%'
     )
-    AND LENGTH(p.url) - LENGTH(REPLACE(p.url, '/', '')) <= 4
-    ORDER BY a.started_at DESC, LENGTH(p.url) ASC
+    AND (p.url IS NULL OR LENGTH(p.url) - LENGTH(REPLACE(p.url, '/', '')) <= 4)
+    ORDER BY a.started_at DESC, LENGTH(COALESCE(p.url, '')) ASC
     LIMIT 1
   `;
   const row = await env.DB.prepare(sql).bind(domain, normDomain, normDomain).first<HomepageRow>();
