@@ -2127,8 +2127,8 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
         new Promise<null>((_, reject) => setTimeout(() => reject('timeout'), 3000)),
       ]);
       
-      if (classifyResult && classifyResult.primary.confidence >= 0.80) {
-        // High confidence - use AI result
+      if (classifyResult && classifyResult.primary.confidence >= 0.60) {
+        // Good confidence - use AI result and update KV
         industryLock = {
           value: classifyResult.primary.industry_key,
           source: 'ai_worker',
@@ -2136,7 +2136,7 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
         };
         console.log(`[INDUSTRY_AI] ✅ ${domain} → ${classifyResult.primary.industry_key} (conf: ${classifyResult.primary.confidence.toFixed(3)})`);
         
-        // Update KV mapping for next time
+        // Update KV mapping for next time (auto-learning)
         try {
           const doc = await env.DOMAIN_RULES_KV.get('industry_packs_json', 'json') as any || { industry_rules: { domains: {} }, packs: {} };
           doc.industry_rules = doc.industry_rules || {};
@@ -2146,8 +2146,16 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
         } catch (kvErr) {
           console.error('[INDUSTRY_AI KV ERROR]', kvErr);
         }
+      } else if (classifyResult && classifyResult.primary.confidence >= 0.40) {
+        // Medium confidence - use but don't update KV
+        industryLock = {
+          value: classifyResult.primary.industry_key,
+          source: 'ai_worker_medium_conf',
+          locked: true,
+        };
+        console.log(`[INDUSTRY_AI] ⚠️  ${domain} → ${classifyResult.primary.industry_key} (conf: ${classifyResult.primary.confidence.toFixed(3)}) - MEDIUM CONFIDENCE, not caching`);
       } else if (classifyResult) {
-        console.log(`[INDUSTRY_AI] ⚠️  ${domain} → ${classifyResult.primary.industry_key} (conf: ${classifyResult.primary.confidence.toFixed(3)}) - LOW CONFIDENCE, using default`);
+        console.log(`[INDUSTRY_AI] ❌ ${domain} → ${classifyResult.primary.industry_key} (conf: ${classifyResult.primary.confidence.toFixed(3)}) - LOW CONFIDENCE, using default`);
       }
     } catch (aiErr: any) {
       console.log(`[INDUSTRY_AI] Failed for ${domain}: ${aiErr.message || aiErr}, using default`);

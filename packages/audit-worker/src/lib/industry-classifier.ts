@@ -62,6 +62,7 @@ const HEURISTICS: Record<IndustryKey, RegExp[]> = {
     /\b(sedan|suv|truck|pickup|crossover|hybrid|electric\s*vehicle|ev)\b/i,
     /\b(car\s*manufacturer|auto\s*manufacturer|automotive|vehicle|automobile)\b/i,
   ],
+  automotive_dealer: [],
   travel_cruise: [
     /\b(cruise|cruises|river\s*cruise|ocean\s*cruise|expedition|sailing|itinerary|itineraries)\b/i,
     /\b(stateroom|cabin|deck|port|embark|disembark|shore\s*excursion)\b/i,
@@ -94,7 +95,54 @@ const HEURISTICS: Record<IndustryKey, RegExp[]> = {
     /\b(medical\s*record|emr|ehr|clinic|hospital|emergency\s*room)\b/i,
     /\b(insurance\s*accepted|medicare|medicaid|copay)\b/i,
   ],
-  generic_consumer: [], // Fallback
+  food_restaurant: [
+    /\b(menu|reservation|dine[-\s]in|takeout|delivery|order\s*online)\b/i,
+    /\b(restaurant|cafe|bistro|eatery|dining|cuisine)\b/i,
+    /\b(chef|culinary|recipe|food\s*service)\b/i,
+  ],
+  real_estate: [
+    /\b(property|listing|homes?\s*for\s*sale|rent|lease|realtor)\b/i,
+    /\b(square\s*feet|bedroom|bathroom|mls|open\s*house)\b/i,
+    /\b(real\s*estate|property\s*management|landlord|tenant)\b/i,
+  ],
+  education: [
+    /\b(school|university|college|academy|learning|course)\b/i,
+    /\b(student|enrollment|tuition|degree|certificate|diploma)\b/i,
+    /\b(curriculum|faculty|admission|campus|education)\b/i,
+  ],
+  professional_services: [
+    /\b(consulting|advisory|legal|law\s*firm|attorney|lawyer)\b/i,
+    /\b(accounting|tax|audit|cpa|bookkeeping)\b/i,
+    /\b(professional\s*service|expertise|consultation)\b/i,
+  ],
+  saas_b2b: [
+    /\b(saas|software\s*as\s*a\s*service|cloud|platform|api)\b/i,
+    /\b(enterprise|b2b|business\s*solution|workflow)\b/i,
+    /\b(subscription|pricing\s*plan|free\s*trial|demo)\b/i,
+  ],
+  ecommerce_fashion: [],
+  media_entertainment: [
+    /\b(streaming|video|music|podcast|broadcast|content)\b/i,
+    /\b(movie|film|tv\s*show|series|episode|watch\s*now)\b/i,
+    /\b(media|entertainment|news|magazine|blog)\b/i,
+  ],
+  nonprofit: [
+    /\b(donate|donation|charity|nonprofit|non[-\s]profit|foundation)\b/i,
+    /\b(volunteer|fundrais|cause|mission|impact)\b/i,
+    /\b(501\(c\)|tax[-\s]deductible|giving)\b/i,
+  ],
+  government: [
+    /\b(\.gov|government|federal|state|municipal|county|city)\b/i,
+    /\b(agency|department|bureau|administration|commission)\b/i,
+    /\b(public\s*service|citizen|permit|license|regulation)\b/i,
+  ],
+  manufacturing: [
+    /\b(manufacturer|factory|production|industrial|supply\s*chain)\b/i,
+    /\b(wholesale|distributor|b2b|oem|component)\b/i,
+    /\b(manufacturing|fabrication|assembly|machinery)\b/i,
+  ],
+  generic_consumer: [],
+  unknown: [],
 };
 
 /**
@@ -236,13 +284,25 @@ function scoreDomain(domain: string): Map<IndustryKey, number> {
 
   const domainKeywords: Record<IndustryKey, string[]> = {
     automotive_oem: ['auto', 'car', 'motors', 'toyota', 'ford', 'honda', 'nissan', 'bmw', 'tesla'],
+    automotive_dealer: [],
     travel_cruise: ['cruise', 'cruises', 'viking', 'carnival', 'princess', 'royal', 'norwegian'],
     travel_hotels: ['hotel', 'hotels', 'resort', 'resorts', 'marriott', 'hilton', 'hyatt'],
     travel_air: ['airline', 'airlines', 'air', 'delta', 'united', 'american'],
     retail: ['shop', 'store', 'mall', 'retail', 'buy', 'cart', 'apple', 'samsung', 'microsoft', 'tech'],
     financial_services: ['bank', 'banking', 'credit', 'loan', 'mortgage', 'invest'],
     healthcare_provider: ['health', 'medical', 'clinic', 'hospital', 'doctor'],
+    food_restaurant: ['restaurant', 'cafe', 'pizza', 'burger', 'food', 'dining', 'menu'],
+    real_estate: ['realty', 'realtor', 'homes', 'property', 'estate', 'zillow'],
+    education: ['edu', 'school', 'university', 'college', 'academy', 'learn'],
+    professional_services: ['law', 'legal', 'consulting', 'advisory', 'services'],
+    saas_b2b: ['saas', 'cloud', 'platform', 'software', 'app'],
+    ecommerce_fashion: [],
+    media_entertainment: ['media', 'news', 'streaming', 'video', 'tv', 'entertainment'],
+    nonprofit: ['charity', 'foundation', 'nonprofit', 'donate'],
+    government: ['gov'],
+    manufacturing: ['manufacturing', 'industrial', 'factory'],
     generic_consumer: [],
+    unknown: [],
   };
 
   for (const [industry, keywords] of Object.entries(domainKeywords) as Array<[IndustryKey, string[]]>) {

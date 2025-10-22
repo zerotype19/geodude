@@ -12,8 +12,17 @@ export type IndustryKey =
   | "healthcare_provider"
   | "travel_air"
   | "travel_hotels"
+  | "travel_cruise"
   | "saas_b2b"
   | "ecommerce_fashion"
+  | "food_restaurant"
+  | "real_estate"
+  | "education"
+  | "professional_services"
+  | "media_entertainment"
+  | "nonprofit"
+  | "government"
+  | "manufacturing"
   | "generic_consumer"
   | "unknown";
 
