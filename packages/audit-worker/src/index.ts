@@ -744,11 +744,23 @@ export default {
 
       // Route handlers
       if (req.method === 'POST' && path === '/api/audits') {
-        const result = await createAudit(req, env, ctx);
-        return new Response(JSON.stringify(result), { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        });
+        try {
+          const result = await createAudit(req, env, ctx);
+          return new Response(JSON.stringify(result), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        } catch (createAuditError: any) {
+          console.error('[CREATE_AUDIT_HANDLER_ERROR]', createAuditError.message || createAuditError);
+          console.error('[CREATE_AUDIT_HANDLER_ERROR] Stack:', createAuditError.stack);
+          return new Response(JSON.stringify({ 
+            error: 'Internal server error', 
+            details: createAuditError.message 
+          }), { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
       }
 
       if (req.method === 'GET' && path === '/api/audits') {
