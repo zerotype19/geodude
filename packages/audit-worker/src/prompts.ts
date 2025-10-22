@@ -609,8 +609,16 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
   let realismAvg = 0.85;
   let version = 'v2-contextual';
   
-  // A/B: Try V4 first (if enabled), fall back to V3 on error
-  const tryV4 = useV4ForDomain(domain);
+  // Industries that V4 doesn't handle well (missing examples/templates)
+  // For these, always use V3 which has proper templates
+  const V4_SKIP_INDUSTRIES = [
+    'real_estate',        // V4 confuses with financial_services/trading
+    'food_restaurant',    // V4 confuses with healthcare_provider
+    'healthcare_provider', // Sometimes gets confused
+  ];
+  
+  // A/B: Try V4 first (if enabled AND industry is supported), fall back to V3 on error
+  const tryV4 = useV4ForDomain(domain) && !V4_SKIP_INDUSTRIES.includes(industry);
   
   if (tryV4) {
     try {
@@ -627,11 +635,8 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
       prompts = { branded: v4.branded, nonBranded: v4.nonBranded };
       realismAvg = v4.realismAvg;
       version = 'v4-llm';
-      // Update industry if V4 detected a better one via hot patch
-      if (v4.meta?.industry && v4.meta.industry !== 'default') {
-        industry = v4.meta.industry;
-        console.log(`[PROMPTS] V4 updated industry to: ${industry}`);
-      }
+      // REMOVED: Industry override - industry is already locked from audit!
+      // V4 should NOT change the locked industry
       console.log(`[PROMPTS] V4 success for ${domain}: ${v4.branded.length} branded, ${v4.nonBranded.length} non-branded`);
       
       // Enhanced V3 fallback: If V4 returned too few queries, augment with V3
