@@ -17,6 +17,7 @@
       "target.com": "retail",
       "walmart.com": "retail",
       "amazon.com": "retail",
+      "apple.com": "retail",
       "chase.com": "financial_services",
       "wellsfargo.com": "financial_services",
       "usaa.com": "financial_services",

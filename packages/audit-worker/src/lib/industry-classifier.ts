@@ -81,6 +81,8 @@ const HEURISTICS: Record<IndustryKey, RegExp[]> = {
     /\b(return\s*policy|free\s*shipping|add\s*to\s*cart|checkout|shopping\s*cart)\b/i,
     /\b(gift\s*card|promo\s*code|discount|sale|clearance|in\s*stock)\b/i,
     /\b(product|sku|inventory|order\s*status|track\s*order)\b/i,
+    /\b(computer\s*hardware|software|technology|electronics|iphone|ipad|macbook|laptop)\b/i,
+    /\b(smartphone|tablet|consumer\s*electronics|tech\s*company|innovation)\b/i,
   ],
   financial_services: [
     /\b(fdic|apr|apy|routing\s*number|account\s*number|nmls)\b/i,
@@ -237,7 +239,7 @@ function scoreDomain(domain: string): Map<IndustryKey, number> {
     travel_cruise: ['cruise', 'cruises', 'viking', 'carnival', 'princess', 'royal', 'norwegian'],
     travel_hotels: ['hotel', 'hotels', 'resort', 'resorts', 'marriott', 'hilton', 'hyatt'],
     travel_air: ['airline', 'airlines', 'air', 'delta', 'united', 'american'],
-    retail: ['shop', 'store', 'mall', 'retail', 'buy', 'cart'],
+    retail: ['shop', 'store', 'mall', 'retail', 'buy', 'cart', 'apple', 'samsung', 'microsoft', 'tech'],
     financial_services: ['bank', 'banking', 'credit', 'loan', 'mortgage', 'invest'],
     healthcare_provider: ['health', 'medical', 'clinic', 'hospital', 'doctor'],
     generic_consumer: [],
