@@ -308,7 +308,17 @@ function scoreDomain(domain: string): Map<IndustryKey, number> {
   };
 
   for (const [industry, keywords] of Object.entries(domainKeywords) as Array<[IndustryKey, string[]]>) {
-    const matches = tokens.filter((t) => keywords.includes(t)).length;
+    // Use substring matching to catch compound domains like "hollandamerica"
+    // Count unique keywords matched (not tokens) to handle multiple matches in one token
+    const matchedKeywords = new Set<string>();
+    for (const token of tokens) {
+      for (const kw of keywords) {
+        if (token.includes(kw)) {
+          matchedKeywords.add(kw);
+        }
+      }
+    }
+    const matches = matchedKeywords.size;
     if (matches > 0) {
       // Stronger scoring: 1 match = 0.70, 2+ matches = 0.95+
       scores.set(industry, Math.min(1.0, 0.70 + (matches - 1) * 0.25));
