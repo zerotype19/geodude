@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import CitationsTab from '/src/components/CitationsTab';
 import CheckPill from '/src/components/CheckPill';
 import ScoreBadge from '/src/components/ScoreBadge';
@@ -89,6 +89,7 @@ const API_BASE = 'https://api.optiview.ai';
 
 export default function AuditDetail() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const [audit, setAudit] = useState<Audit | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +97,14 @@ export default function AuditDetail() {
   const [rescoreLoading, setRescoreLoading] = useState(false);
   const [rerunLoading, setRerunLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'citations'>('overview');
+
+  // Handle tab from URL query parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'citations' || tabParam === 'pages' || tabParam === 'overview') {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (id) {
