@@ -2100,14 +2100,31 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
 // API Route Handlers
 
 async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
-  const body: AuditRequest = await req.json();
-  let { project_id, root_url, site_description, max_pages = 200, config = {} } = body;
+  const body: any = await req.json();
+  // Accept both 'url' and 'root_url' for backwards compatibility
+  let { project_id, root_url, url, site_description, max_pages = 200, config = {} } = body;
+  root_url = root_url || url;
+  
+  // Validate required fields
+  if (!root_url || typeof root_url !== 'string') {
+    throw new Error('url or root_url is required and must be a string');
+  }
+  
+  // Ensure root_url has a protocol
+  if (!root_url.startsWith('http://') && !root_url.startsWith('https://')) {
+    root_url = 'https://' + root_url;
+  }
+  
+  // Set default project_id if missing
+  if (!project_id) {
+    project_id = 'default';
+  }
   
   const id = crypto.randomUUID();
   
   // Extract user_id from session cookie
   const userId = await getUserIdFromRequest(req, env);
-  console.log(`[CREATE AUDIT] User ID from session: ${userId || 'none'}`);
+  console.log(`[CREATE AUDIT] User ID from session: ${userId || 'none'}, root_url: ${root_url}, project_id: ${project_id}`);
   
   // Pre-check domain validation
   console.log(`[PRECHECK] Starting validation for: ${root_url}`);
