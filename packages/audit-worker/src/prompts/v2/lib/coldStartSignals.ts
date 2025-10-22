@@ -16,7 +16,7 @@ export async function fetchColdStartHtml(
       signal: ctrl.signal, 
       headers: { 
         "Accept": "text/html",
-        "User-Agent": "OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)"
+        "User-Agent": "OptiviewAuditBot/1.0 (+https://optiview.ai/bot; admin@optiview.ai)"
       } 
     });
     

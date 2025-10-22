@@ -8,12 +8,6 @@ import NewAudit from './routes/audits/new.tsx'
 import AuditDetail from './routes/audits/[id]/index.tsx'
 import AuditPages from './routes/audits/[id]/pages/index.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
-import ScoreGuideIndex from './routes/score-guide/index.tsx'
-import ScoreGuideDetail from './routes/score-guide/$slug.tsx'
-import CitationsGuide from './routes/help/citations.tsx'
-import Terms from './routes/Terms.tsx'
-import Privacy from './routes/Privacy.tsx'
-import Methodology from './routes/Methodology.tsx'
 import AdminPage from './routes/admin.tsx'
 import ClassifierCompare from './routes/admin/classifier-compare.tsx'
 import HealthDashboard from './routes/admin/health.tsx'
@@ -88,29 +82,7 @@ function Navigation() {
                   : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              Audits
-            </Link>
-            <Link
-              to="/score-guide"
-              onClick={() => setMenuOpen(false)}
-              className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                location.pathname === '/score-guide'
-                  ? 'bg-blue-50 border-blue-500 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-              }`}
-            >
-              Score Guide
-            </Link>
-            <Link
-              to="/help/citations"
-              onClick={() => setMenuOpen(false)}
-              className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                location.pathname === '/help/citations'
-                  ? 'bg-blue-50 border-blue-500 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-              }`}
-            >
-              Citations Guide
+              My Audits
             </Link>
             {isAdmin && (
               <Link
@@ -177,9 +149,6 @@ function App() {
             <Route path="/audits/:id" element={<AuditDetail />} />
             <Route path="/audits/:id/pages" element={<AuditPages />} />
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
-            <Route path="/score-guide" element={<ScoreGuideIndex />} />
-            <Route path="/score-guide/:slug" element={<ScoreGuideDetail />} />
-            <Route path="/help/citations" element={<CitationsGuide />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/classifier-compare" element={<ClassifierCompare />} />
             <Route path="/admin/health" element={<HealthDashboard />} />
@@ -188,9 +157,6 @@ function App() {
             <Route path="/auth/check-email" element={<CheckEmail />} />
             <Route path="/auth/callback" element={<Callback />} />
             <Route path="/auth/error" element={<AuthError />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/methodology" element={<Methodology />} />
           </Routes>
         </main>
         <FooterLegal />

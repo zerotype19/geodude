@@ -18,7 +18,7 @@ export type MinimalContext = {
   brand_kind?: string | null;
 };
 
-const USER_AGENT = "OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)";
+const USER_AGENT = "OptiviewAuditBot/1.0 (+https://optiview.ai/bot; admin@optiview.ai)";
 
 export async function buildMinimalContext(domain: string): Promise<MinimalContext | null> {
   try {

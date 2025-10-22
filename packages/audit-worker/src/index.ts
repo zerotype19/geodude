@@ -19,7 +19,7 @@ import {
 } from './config';
 
 // Bot Identity Configuration
-const BOT_UA = "OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)";
+const BOT_UA = "OptiviewAuditBot/1.0 (+https://optiview.ai/bot; admin@optiview.ai)";
 
 // Helper: Sleep for polite crawling
 async function sleep(ms: number): Promise<void> {
@@ -1163,8 +1163,13 @@ export default {
         });
       }
 
-      // Bot documentation endpoints
+      // Bot documentation redirect
       if (req.method === 'GET' && path === '/bot') {
+        return Response.redirect('https://optiview.ai/bot', 301);
+      }
+      
+      // Legacy bot documentation - keeping for historical reference but never reached
+      if (req.method === 'GET' && path === '/bot-legacy') {
         const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -1227,7 +1232,7 @@ export default {
     <p>We are a responsible web crawler that runs site audits you initiate in Optiview. We respect robots.txt directives and follow best practices for web crawling.</p>
     
     <h2>Our Identity</h2>
-    <p><strong>User-Agent:</strong> <code>OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)</code></p>
+    <p><strong>User-Agent:</strong> <code>OptiviewAuditBot/1.0 (+https://optiview.ai/bot; admin@optiview.ai)</code></p>
     <p><strong>Identifying Header:</strong> <code>X-Optiview-Bot: audit</code></p>
     
     <h2>What We Respect</h2>
@@ -1323,7 +1328,7 @@ Crawl-delay: 5</code></pre>
           name: "OptiviewAuditBot",
           version: "1.0",
           user_agent: BOT_UA,
-          website: "https://api.optiview.ai/bot",
+          website: "https://optiview.ai/bot",
           contact: "admin@optiview.ai",
           respect_robots_txt: true,
           honors_crawl_delay: true,

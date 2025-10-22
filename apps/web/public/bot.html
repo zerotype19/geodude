@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OptiviewAuditBot - Optiview</title>
+  <meta name="description" content="Documentation for OptiviewAuditBot, our responsible web crawler that respects robots.txt and follows best practices.">
+  <link rel="canonical" href="https://optiview.ai/bot" />
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #1f2937; background: #fafafa; }
+    
+    /* Header */
+    header { background: white; border-bottom: 1px solid #e5e7eb; padding: 1rem 0; position: sticky; top: 0; z-index: 100; }
+    .header-content { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-size: 1.25rem; font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-decoration: none; }
+    nav { display: flex; gap: 2rem; }
+    nav a { color: #6b7280; text-decoration: none; font-size: 0.875rem; transition: color 0.2s; }
+    nav a:hover { color: #667eea; }
+    
+    /* Main Content */
+    main { max-width: 800px; margin: 0 auto; padding: 3rem 1.5rem; background: white; }
+    h1 { font-size: 2.5rem; font-weight: 700; color: #111827; margin-bottom: 1rem; }
+    h2 { font-size: 1.75rem; font-weight: 600; color: #111827; margin: 2.5rem 0 1rem; padding-top: 1rem; border-top: 2px solid #e5e7eb; }
+    h3 { font-size: 1.25rem; font-weight: 600; color: #374151; margin: 1.5rem 0 0.75rem; }
+    p { margin: 0.75rem 0; color: #4b5563; }
+    ul, ol { margin: 0.75rem 0; padding-left: 2rem; color: #4b5563; }
+    li { margin: 0.5rem 0; }
+    code { background: #f3f4f6; padding: 0.2em 0.5em; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9em; color: #1f2937; }
+    pre { background: #1f2937; color: #f9fafb; padding: 1.25rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; line-height: 1.5; }
+    pre code { background: transparent; color: #f9fafb; padding: 0; }
+    a { color: #667eea; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { font-weight: 600; color: #111827; }
+    
+    /* Footer */
+    footer { background: #f9fafb; border-top: 1px solid #e5e7eb; margin-top: 4rem; }
+    .footer-content { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .footer-links { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem; }
+    .footer-links a { color: #6b7280; font-size: 0.875rem; text-decoration: none; }
+    .footer-links a:hover { color: #667eea; }
+    .footer-copy { text-align: center; color: #9ca3af; font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="header-content">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Dashboard</a>
+        <a href="/score-guide">Scoring Guide</a>
+        <a href="/docs/citations.html">Citations Guide</a>
+        <a href="/methodology">Methodology</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <h1>OptiviewAuditBot</h1>
+    
+    <p>We are a responsible web crawler that runs site audits you initiate in Optiview. We respect robots.txt directives and follow best practices for web crawling.</p>
+    
+    <h2>Our Identity</h2>
+    <p><strong>User-Agent:</strong> <code>OptiviewAuditBot/1.0 (+https://optiview.ai/bot; admin@optiview.ai)</code></p>
+    <p><strong>Identifying Header:</strong> <code>X-Optiview-Bot: audit</code></p>
+    
+    <h2>What We Respect</h2>
+    <ul>
+      <li><strong>robots.txt</strong> - We check for <code>User-agent: OptiviewAuditBot</code> rules, falling back to <code>*</code></li>
+      <li><strong>Allow/Disallow</strong> - We respect path-based allow/disallow rules (longest match wins)</li>
+      <li><strong>Crawl-delay</strong> - We honor crawl delay directives (default: 1.5s between requests to same domain)</li>
+      <li><strong>Retry-After header</strong> - We parse and respect the <code>Retry-After</code> header for rate-limited responses (429)</li>
+      <li><strong>Exponential backoff</strong> - We implement exponential backoff for transient errors (429, 521) with up to 3 retries</li>
+      <li><strong>Meta tags</strong> - We respect <code>noindex</code>, <code>nofollow</code>, and <code>noai</code> meta tags</li>
+    </ul>
+    
+    <h2>How to Allow/Block Us</h2>
+    
+    <h3>Allow the bot:</h3>
+    <pre><code>User-agent: OptiviewAuditBot
+Allow: /</code></pre>
+    
+    <h3>Block the bot:</h3>
+    <pre><code>User-agent: OptiviewAuditBot
+Disallow: /</code></pre>
+  
+    
+    <h3>Block specific paths:</h3>
+    <pre><code>User-agent: OptiviewAuditBot
+Disallow: /admin/
+Disallow: /private/</code></pre>
+    
+    <h3>Set crawl delay:</h3>
+    <pre><code>User-agent: OptiviewAuditBot
+Crawl-delay: 5</code></pre>
+    
+    <h2>About Our Crawling</h2>
+    <p>We only crawl sites when you explicitly request an audit through Optiview. Our crawler is designed to be polite, efficient, and respectful of your server resources:</p>
+    <ul>
+      <li><strong>Targeted crawling</strong> - We fetch pages to analyze AEO/GEO optimization (typically 40-50 pages per audit)</li>
+      <li><strong>Structured data extraction</strong> - We extract JSON-LD, meta tags, headings, and content signals for analysis</li>
+      <li><strong>Dual-mode rendering</strong> - We fetch both static HTML and JavaScript-rendered content to detect visibility gaps</li>
+      <li><strong>Strict robots.txt compliance</strong> - We respect all robots.txt directives with longest-match path rules</li>
+      <li><strong>Configurable delays</strong> - Default 1.5s delay between requests, configurable via <code>Crawl-delay</code> directive</li>
+      <li><strong>Rate limit handling</strong> - We automatically back off when receiving 429 responses and respect <code>Retry-After</code> headers</li>
+      <li><strong>Retry logic</strong> - Up to 3 retries with exponential backoff for transient errors (429, 521)</li>
+      <li><strong>Clear identification</strong> - We identify ourselves with User-Agent and custom header on every request</li>
+      <li><strong>KV caching</strong> - We cache robots.txt rules for 24 hours to reduce redundant requests</li>
+    </ul>
+    
+    <h2>Crawling Limits & Scope</h2>
+    <p>To minimize server impact while providing comprehensive analysis:</p>
+    <ul>
+      <li><strong>Page limit</strong> - Maximum 50 pages per audit (prioritizes homepage and top-level navigation)</li>
+      <li><strong>Sitemap-first</strong> - We prioritize sitemap-listed URLs with 3s timeout for sitemap discovery</li>
+      <li><strong>Depth limits</strong> - We typically crawl homepage + 1-2 levels deep</li>
+      <li><strong>Language filtering</strong> - We focus on English (US) content, filtering non-English paths by default</li>
+      <li><strong>Per-request timeout</strong> - 25 seconds per batch request to prevent hung connections</li>
+      <li><strong>Total audit timeout</strong> - 2 minutes maximum runtime with automatic completion</li>
+    </ul>
+    
+    <h2>Contact</h2>
+    <p>Questions or concerns? Contact us at <a href="mailto:admin@optiview.ai">admin@optiview.ai</a></p>
+    
+    <h2>Machine-Readable Info</h2>
+    <p>For automated systems: <a href="https://api.optiview.ai/.well-known/optiview-bot.json">/.well-known/optiview-bot.json</a></p>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-content">
+      <div class="footer-links">
+        <a href="/score-guide">Scoring Guide</a>
+        <a href="/docs/citations.html">Citations Guide</a>
+        <a href="/methodology">Methodology</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/bot">Bot Info</a>
+      </div>
+      <div class="footer-copy">
+        © 2025 Optiview.ai. All rights reserved.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
+

@@ -224,7 +224,7 @@ async function fetchHomepage(
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'OptiviewAuditBot/1.0 (+https://api.optiview.ai/bot; admin@optiview.ai)',
+        'User-Agent': 'OptiviewAuditBot/1.0 (+https://optiview.ai/bot; admin@optiview.ai)',
       },
       signal: controller.signal,
     });
