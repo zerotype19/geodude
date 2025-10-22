@@ -115,6 +115,49 @@
     nav a.btn {
       color: #fff !important;
     }
+    
+    /* Hamburger Menu */
+    .menu-toggle {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+    }
+    .menu-toggle span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: var(--gray);
+      transition: all 0.3s;
+    }
+    .menu-toggle:hover span { background: var(--purple); }
+    
+    /* Mobile Navigation */
+    @media (max-width: 768px) {
+      nav {
+        position: fixed;
+        top: 65px;
+        right: -100%;
+        width: 250px;
+        height: calc(100vh - 65px);
+        background: #fff;
+        flex-direction: column;
+        gap: 0;
+        padding: 1rem 0;
+        box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        transition: right 0.3s;
+        align-items: stretch;
+      }
+      nav.active { right: 0; }
+      nav a {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .menu-toggle { display: flex; }
+    }
     .btn {
       display: inline-block;
       padding: 0.75rem 1.5rem;
@@ -362,9 +405,15 @@
   <header>
     <div class="header-inner">
       <a href="/" class="logo">OPTIVIEW.AI</a>
+      <button class="menu-toggle" onclick="document.querySelector('nav').classList.toggle('active')" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
       <nav>
-        <a href="/methodology">Methodology</a>
+        <a href="https://app.optiview.ai">Audits</a>
         <a href="/score-guide">Score Guide</a>
+        <a href="/docs/citations.html">Citations Guide</a>
       </nav>
     </div>
   </header>
@@ -447,13 +496,13 @@
   <footer>
     <p>&copy; 2025 Optiview. AEO + GEO auditing for modern search.</p>
     <nav>
+      <a href="https://app.optiview.ai">Audits</a>
       <a href="/score-guide">Scoring Guide</a>
       <a href="/docs/citations.html">Citations Guide</a>
       <a href="/methodology">Methodology</a>
-      <a href="/sources">Data Sources</a>
-      <a href="/bot">Bot Info</a>
       <a href="/terms">Terms</a>
       <a href="/privacy">Privacy</a>
+      <a href="/bot">Bot Info</a>
     </nav>
   </footer>
 </body>
