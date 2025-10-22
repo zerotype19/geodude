@@ -19,6 +19,8 @@
       "walmart.com": "retail",
       "amazon.com": "retail",
       "apple.com": "retail",
+      "nike.com": "retail",
+      "adidas.com": "retail",
       "chase.com": "financial_services",
       "wellsfargo.com": "financial_services",
       "usaa.com": "financial_services",
@@ -34,7 +36,9 @@
       "royalcaribbean.com": "travel_cruise",
       "norwegiancruiseline.com": "travel_cruise",
       "msccruises.com": "travel_cruise",
-      "celebritycruises.com": "travel_cruise"
+      "celebritycruises.com": "travel_cruise",
+      "hollandamerica.com": "travel_cruise",
+      "hollandamericaline.com": "travel_cruise"
     }
   },
   "packs": {

@@ -714,35 +714,41 @@ async function buildWithColdStart(env: Env, domain: string) {
   let industry: string | null = await env.RULES.get(kvKey);
   
   if (industry) {
-    console.log(`[INDUSTRY_V2] cached cold-start for ${domain}: ${industry}`);
+    console.log(`[INDUSTRY_COLDSTART] cached for ${domain}: ${industry}`);
   } else {
-    // 2) Fetch minimal HTML context (3s timeout, 500KB cap)
+    // 2) Use NEW AI classifier (same as audit creation)
     try {
-      const { fetchColdStartHtml, extractJsonLd, extractNavTerms } = 
-        await import('./prompts/v2/lib/coldStartSignals');
-      const { inferIndustryV2 } = await import('./prompts/v2/lib/inferIndustryV2');
+      const { resolveIndustry } = await import('./lib/industry');
       
-      const html = await fetchColdStartHtml(domain, 3000, 512_000);
-      const jsonld = extractJsonLd(html);
-      const nav = extractNavTerms(html);
-      
-      // 3) Hybrid inference (rules → jsonld → embeddings → fallback)
-      const inferredV2 = await inferIndustryV2(env, env.RULES, {
-        domain,
-        htmlText: html.slice(0, 2000),
-        jsonld,
-        nav,
-        fallback: "default"
+      // Call the same industry resolution used in audits
+      const industryLock = await resolveIndustry({
+        signals: {
+          domain,
+          homepageTitle: undefined,
+          homepageH1: undefined,
+          schemaTypes: undefined,
+          keywords: undefined,
+          navTerms: undefined,
+        },
+        env,
+        root_url: `https://${domain}`,
+        site_description: undefined,
       });
       
-      industry = inferredV2.industry;
+      industry = industryLock.value;
+      const source = industryLock.source;
+      const confidence = industryLock.confidence || 1.0;
       
-      // Cache for 14 days
-      await env.RULES.put(kvKey, industry, { expirationTtl: HOST_CACHE_TTL });
-      console.log(`[INDUSTRY_V2] cold-start detected for ${domain}: ${industry} (source: ${inferredV2.source})`);
+      // Cache high-confidence results for 14 days
+      if (confidence >= 0.60) {
+        await env.RULES.put(kvKey, industry, { expirationTtl: HOST_CACHE_TTL });
+        console.log(`[INDUSTRY_COLDSTART] Detected and cached ${domain}: ${industry} (source: ${source}, confidence: ${confidence.toFixed(2)})`);
+      } else {
+        console.log(`[INDUSTRY_COLDSTART] Detected ${domain}: ${industry} (source: ${source}, confidence: ${confidence.toFixed(2)}) - NOT cached (low confidence)`);
+      }
     } catch (error) {
-      console.error(`[INDUSTRY_V2] cold-start failed for ${domain}:`, error);
-      industry = "default";
+      console.error(`[INDUSTRY_COLDSTART] Failed for ${domain}:`, error);
+      industry = "generic_consumer"; // Better default than "default"
     }
   }
   

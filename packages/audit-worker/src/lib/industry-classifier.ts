@@ -290,7 +290,7 @@ function scoreDomain(domain: string): Map<IndustryKey, number> {
     travel_cruise: ['cruise', 'cruises', 'viking', 'carnival', 'princess', 'royal', 'norwegian', 'holland', 'america', 'msc', 'celebrity', 'cunard', 'seabourn'],
     travel_hotels: ['hotel', 'hotels', 'resort', 'resorts', 'marriott', 'hilton', 'hyatt', 'airbnb', 'expedia'],
     travel_air: ['airline', 'airlines', 'air', 'delta', 'united', 'american', 'southwest', 'jetblue'],
-    retail: ['shop', 'store', 'mall', 'retail', 'buy', 'cart', 'apple', 'samsung', 'microsoft', 'tech', 'amazon', 'walmart', 'target', 'nike', 'etsy', 'best', 'bestbuy'],
+    retail: ['shop', 'store', 'mall', 'retail', 'buy', 'cart', 'apple', 'samsung', 'microsoft', 'tech', 'amazon', 'walmart', 'target', 'nike', 'adidas', 'etsy', 'best', 'bestbuy'],
     financial_services: ['bank', 'banking', 'credit', 'loan', 'mortgage', 'invest', 'finance', 'capital', 'chase', 'wells', 'fargo', 'wellsfargo', 'allstate', 'progressive', 'aig', 'insurance'],
     healthcare_provider: ['health', 'medical', 'clinic', 'hospital', 'doctor', 'healthcare', 'mayo', 'cleveland', 'pfizer', 'merck', 'united', 'pharma', 'pharmaceutical'],
     food_restaurant: ['restaurant', 'cafe', 'pizza', 'burger', 'food', 'dining', 'menu', 'kitchen', 'grill', 'mcdonalds', 'mcd', 'starbucks', 'chipotle', 'dominos', 'domino', 'panera', 'bread'],
