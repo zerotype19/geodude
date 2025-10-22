@@ -15,16 +15,16 @@ export default function ScoreGuide() {
   const { mode } = useViewMode();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* Header */}
         <header className="mb-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">
                 Optiview Score Guide
               </h1>
-              <p className="text-lg text-gray-600 dark:text-gray-400">
+              <p className="text-lg text-gray-600">
                 21 checks that determine how assistants discover, understand, and cite your content
               </p>
             </div>
@@ -32,8 +32,8 @@ export default function ScoreGuide() {
           </div>
 
           {/* Explainer */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+            <p className="text-gray-700 leading-relaxed">
               {mode === 'business' ? (
                 <>
                   This guide organizes our 21 AEO/GEO checks into <strong>6 practical categories</strong> that 
@@ -67,7 +67,7 @@ export default function ScoreGuide() {
         ) : (
           // Technical View: Flat List by ID
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
               All Criteria (Technical)
             </h2>
             <div className="grid gap-6 md:grid-cols-2">
@@ -79,8 +79,8 @@ export default function ScoreGuide() {
         )}
 
         {/* Footer */}
-        <footer className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-500 dark:text-gray-400 space-y-2">
+        <footer className="mt-16 pt-8 border-t border-gray-200">
+          <div className="text-sm text-gray-500 space-y-2">
             <p>
               <strong>Weights:</strong> Each check has a weight (W4-W15) that determines its contribution 
               to the composite AEO/GEO scores.
