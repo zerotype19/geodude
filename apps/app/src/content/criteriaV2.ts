@@ -199,7 +199,7 @@ export const CRITERIA: CriterionMeta[] = [
   {
     id: 'A10',
     title: 'Citations & sources section',
-    description: 'A short sources section that's easy to parse. Concentrates authority signals in one place.',
+    description: 'A short sources section that is easy to parse. Concentrates authority signals in one place.',
     category: 'Authority & Trust',
     eeat: 'Authority/Trust',
     impact: 'High',
@@ -381,3 +381,39 @@ export function getWeight(id: string): number {
   return CRITERIA_BY_ID.get(id)?.weight || 0;
 }
 
+
+/**
+ * Category display order
+ */
+export const CATEGORY_ORDER: Category[] = [
+  'Content & Clarity',
+  'Structure & Organization',
+  'Authority & Trust',
+  'Technical Foundations',
+  'Crawl & Discoverability',
+  'Experience & Performance'
+];
+
+/**
+ * Category descriptions
+ */
+export const CATEGORY_DESCRIPTIONS: Record<Category, string> = {
+  'Content & Clarity': 'Make your content easy to understand and cite with clear, comprehensive answers.',
+  'Structure & Organization': 'Organize information so assistants can parse and extract key facts reliably.',
+  'Authority & Trust': 'Build credibility through authorship, citations, and demonstrable expertise.',
+  'Technical Foundations': 'Ensure assistants can access, parse, and understand your site structure.',
+  'Crawl & Discoverability': 'Make it easy for AI crawlers to find and index your content.',
+  'Experience & Performance': 'Deliver fast, mobile-friendly experiences that signal quality to assistants.'
+};
+
+/**
+ * Category icons
+ */
+export const CATEGORY_ICONS: Record<Category, string> = {
+  'Content & Clarity': '📝',
+  'Structure & Organization': '🗂️',
+  'Authority & Trust': '🛡️',
+  'Technical Foundations': '⚙️',
+  'Crawl & Discoverability': '🔍',
+  'Experience & Performance': '⚡'
+};
