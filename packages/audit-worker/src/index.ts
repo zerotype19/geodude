@@ -936,6 +936,83 @@ export default {
           });
         }
 
+        // Backfill scoring checks for existing audits
+        if (req.method === 'POST' && path.startsWith('/api/admin/audits/') && path.endsWith('/backfill-checks')) {
+          const auditId = path.split('/')[4];
+          if (!auditId) {
+            return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          try {
+            const { backfillChecks } = await import('./scripts/backfillChecks');
+            
+            // Get audit details for site info
+            const audit = await env.DB.prepare("SELECT root_url FROM audits WHERE id = ?")
+              .bind(auditId).first();
+            
+            if (!audit) {
+              return new Response(JSON.stringify({ error: 'Audit not found' }), {
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
+            }
+            
+            const url = new URL(audit.root_url as string);
+            const result = await backfillChecks(env, auditId, {
+              domain: url.hostname,
+              homepageUrl: audit.root_url as string,
+              targetLocale: "en-US"
+            });
+            
+            return new Response(JSON.stringify(result), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (error) {
+            console.error('[BACKFILL] Error:', error);
+            return new Response(JSON.stringify({ 
+              error: 'Backfill failed', 
+              message: (error as Error).message 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
+        // Batch backfill for multiple audits
+        if (req.method === 'POST' && path === '/api/admin/backfill-checks-batch') {
+          try {
+            const body = await req.json() as { audit_ids: string[] };
+            if (!body.audit_ids || !Array.isArray(body.audit_ids)) {
+              return new Response(JSON.stringify({ error: 'audit_ids array required' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
+            }
+
+            const { backfillMultipleAudits } = await import('./scripts/backfillChecks');
+            const results = await backfillMultipleAudits(env, body.audit_ids);
+            
+            return new Response(JSON.stringify({ results }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (error) {
+            console.error('[BACKFILL_BATCH] Error:', error);
+            return new Response(JSON.stringify({ 
+              error: 'Batch backfill failed', 
+              message: (error as Error).message 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
         // Admin classifier comparison endpoint
         if (req.method === 'GET' && path === '/api/admin/classifier-compare') {
         const host = url.searchParams.get('host');
@@ -2635,6 +2712,31 @@ async function runCrawl({ audit_id, root_url, site_description, max_pages }: any
               JSON.stringify({ classification_v2: classificationV2 })
             )
         ]);
+
+        // Run new HTML-based scoring checks if enabled
+        if (env.SCORING_V1_ENABLED === "true") {
+          try {
+            const { scoreAndPersistPage } = await import('./services/scorePage');
+            const hostname = new URL(url).hostname;
+            await scoreAndPersistPage(
+              env.DB,
+              {
+                id: ids.page_id,
+                url,
+                html_rendered: rendered?.html?.slice(0, 200000) || null,
+                html_static: page.html?.slice(0, 200000)
+              },
+              {
+                domain: hostname,
+                homepageUrl: root_url,
+                targetLocale: "en-US"
+              }
+            );
+            console.log(`[SCORING_V1] Scored page: ${url}`);
+          } catch (scoreError) {
+            console.error(`[SCORING_V1] Failed to score ${url}:`, scoreError);
+          }
+        }
 
         console.log(`Processed: ${url} (AEO: ${checks.aeo}, GEO: ${checks.geo})`);
 

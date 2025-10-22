@@ -210,6 +210,115 @@ export const CHECKS_METADATA: Record<string, CheckMeta> = {
     category: 'Experience & Performance',
     impact_level: 'Medium',
     why_it_matters: 'Readable mobile layouts reduce bounce and improve perceived quality.'
+  },
+
+  // ═════════════════════════════════════════════════════════════════
+  // Scoring V1 - HTML-based Deterministic Checks (Page-level)
+  // ═════════════════════════════════════════════════════════════════
+  
+  C1_title_quality: {
+    id: 'C1_title_quality',
+    label: 'Title tag quality',
+    weight: 12,
+    category: 'Technical Foundations',
+    impact_level: 'High',
+    why_it_matters: 'Well-crafted titles improve click-through and snippet generation.'
+  },
+  C2_meta_description: {
+    id: 'C2_meta_description',
+    label: 'Meta description present',
+    weight: 8,
+    category: 'Technical Foundations',
+    impact_level: 'Medium',
+    why_it_matters: 'Descriptions guide snippet generation and set user expectations.'
+  },
+  C3_h1_presence: {
+    id: 'C3_h1_presence',
+    label: 'Single H1 tag',
+    weight: 10,
+    category: 'Structure & Organization',
+    impact_level: 'High',
+    why_it_matters: 'Clear page hierarchy helps parsers identify main topic.'
+  },
+  A1_answer_first: {
+    id: 'A1_answer_first',
+    label: 'Answer-first hero section',
+    weight: 15,
+    category: 'Content & Clarity',
+    impact_level: 'High',
+    why_it_matters: 'Early value proposition improves snippet quality and engagement.'
+  },
+  A2_headings_semantic: {
+    id: 'A2_headings_semantic',
+    label: 'Semantic heading structure',
+    weight: 10,
+    category: 'Structure & Organization',
+    impact_level: 'High',
+    why_it_matters: 'Proper H1→H2→H3 hierarchy improves content parsing.'
+  },
+  A3_faq_presence: {
+    id: 'A3_faq_presence',
+    label: 'FAQ section present',
+    weight: 8,
+    category: 'Content & Clarity',
+    impact_level: 'Medium',
+    why_it_matters: 'FAQ blocks increase answer engine citation likelihood.'
+  },
+  A4_schema_faqpage: {
+    id: 'A4_schema_faqpage',
+    label: 'FAQPage schema',
+    weight: 10,
+    category: 'Technical Foundations',
+    impact_level: 'High',
+    why_it_matters: 'Structured FAQ data enables rich snippets and voice answers.'
+  },
+  A9_internal_linking: {
+    id: 'A9_internal_linking',
+    label: 'Internal linking & diversity',
+    weight: 7,
+    category: 'Structure & Organization',
+    impact_level: 'Medium',
+    why_it_matters: 'Rich internal links improve crawl depth and topical clustering.'
+  },
+  G10_canonical: {
+    id: 'G10_canonical',
+    label: 'Canonical URL correctness',
+    weight: 8,
+    category: 'Technical Foundations',
+    impact_level: 'Medium',
+    why_it_matters: 'Proper canonicals prevent duplicate content penalties.'
+  },
+  T1_mobile_viewport: {
+    id: 'T1_mobile_viewport',
+    label: 'Mobile viewport tag',
+    weight: 8,
+    category: 'Experience & Performance',
+    impact_level: 'Medium',
+    why_it_matters: 'Viewport meta ensures mobile-friendly rendering.'
+  },
+  T2_lang_region: {
+    id: 'T2_lang_region',
+    label: 'Language/region tags',
+    weight: 6,
+    category: 'Technical Foundations',
+    impact_level: 'Low',
+    why_it_matters: 'Correct lang attributes improve international targeting.'
+  },
+  T3_noindex_robots: {
+    id: 'T3_noindex_robots',
+    label: 'No blocking robots directives',
+    weight: 12,
+    category: 'Crawl & Discoverability',
+    impact_level: 'High',
+    why_it_matters: 'Noindex/nofollow prevent crawlers from seeing content.'
+  },
+  A12_entity_graph: {
+    id: 'A12_entity_graph',
+    label: 'Organization entity graph',
+    weight: 10,
+    category: 'Authority & Trust',
+    impact_level: 'High',
+    why_it_matters: 'Rich organization schema strengthens entity recognition.'
   }
 };
 

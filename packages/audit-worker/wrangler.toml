@@ -59,6 +59,9 @@ FEATURE_INTENT_GUARDS = "1"
 FEATURE_SOURCE_CIRCUIT = "1"
 FEATURE_INDUSTRY_AI_CLASSIFY = "1"
 
+# Scoring V1 - HTML-based deterministic checks
+SCORING_V1_ENABLED = "true"
+
 [triggers]
 crons = [
   "0 */6 * * *",  # Citations runs (every 6 hours)
