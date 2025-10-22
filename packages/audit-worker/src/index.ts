@@ -2118,10 +2118,15 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     }
   });
   
-  // If resolved to default, try AI classifier
-  if (industryLock.source === 'default' && env.FEATURE_INDUSTRY_AI_CLASSIFY !== '0') {
+  // If resolved to default OR weak heuristics, try AI classifier
+  const shouldCallAI = (
+    (industryLock.source === 'default' || industryLock.source === 'heuristics') &&
+    env.FEATURE_INDUSTRY_AI_CLASSIFY !== '0'
+  );
+  
+  if (shouldCallAI) {
     try {
-      console.log(`[INDUSTRY_AI] Calling AI classifier for ${domain}...`);
+      console.log(`[INDUSTRY_AI] Calling AI classifier for ${domain} (current: ${industryLock.value} from ${industryLock.source})...`);
       const { classifyIndustry } = await import('./lib/industry-classifier');
       const classifyResult = await Promise.race([
         classifyIndustry({
@@ -2129,29 +2134,37 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
           root_url,
           site_description: site_description || '',
           project_id,
-          crawl_budget: { homepage: true, timeout_ms: 3000 },
+          crawl_budget: { homepage: true, timeout_ms: 5000 },
         }),
-        new Promise<null>((_, reject) => setTimeout(() => reject('timeout'), 3000)),
+        new Promise<null>((_, reject) => setTimeout(() => reject('timeout'), 5000)),
       ]);
       
-      if (classifyResult && classifyResult.primary.confidence >= 0.60) {
+      // Use AI result if confidence is good (≥0.60) OR better than heuristics
+      const aiConfidenceThreshold = industryLock.source === 'heuristics' ? 0.50 : 0.60;
+      
+      if (classifyResult && classifyResult.primary.confidence >= aiConfidenceThreshold) {
         // Good confidence - use AI result and update KV
+        const oldValue = industryLock.value;
+        const oldSource = industryLock.source;
+        
         industryLock = {
           value: classifyResult.primary.industry_key,
           source: 'ai_worker',
           locked: true,
         };
-        console.log(`[INDUSTRY_AI] ✅ ${domain} → ${classifyResult.primary.industry_key} (conf: ${classifyResult.primary.confidence.toFixed(3)})`);
+        console.log(`[INDUSTRY_AI] ✅ ${domain} → ${classifyResult.primary.industry_key} (conf: ${classifyResult.primary.confidence.toFixed(3)}) [was: ${oldValue} from ${oldSource}]`);
         
-        // Update KV mapping for next time (auto-learning)
-        try {
-          const doc = await env.DOMAIN_RULES_KV.get('industry_packs_json', 'json') as any || { industry_rules: { domains: {} }, packs: {} };
-          doc.industry_rules = doc.industry_rules || {};
-          doc.industry_rules.domains = doc.industry_rules.domains || {};
-          doc.industry_rules.domains[domain] = classifyResult.primary.industry_key;
-          await env.DOMAIN_RULES_KV.put('industry_packs_json', JSON.stringify(doc));
-        } catch (kvErr) {
-          console.error('[INDUSTRY_AI KV ERROR]', kvErr);
+        // Update KV mapping for next time (auto-learning) - only for high confidence
+        if (classifyResult.primary.confidence >= 0.70) {
+          try {
+            const doc = await env.DOMAIN_RULES_KV.get('industry_packs_json', 'json') as any || { industry_rules: { domains: {} }, packs: {} };
+            doc.industry_rules = doc.industry_rules || {};
+            doc.industry_rules.domains = doc.industry_rules.domains || {};
+            doc.industry_rules.domains[domain] = classifyResult.primary.industry_key;
+            await env.DOMAIN_RULES_KV.put('industry_packs_json', JSON.stringify(doc));
+          } catch (kvErr) {
+            console.error('[INDUSTRY_AI KV ERROR]', kvErr);
+          }
         }
       } else if (classifyResult && classifyResult.primary.confidence >= 0.40) {
         // Medium confidence - use but don't update KV
