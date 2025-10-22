@@ -609,16 +609,31 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
   let realismAvg = 0.85;
   let version = 'v2-contextual';
   
-  // Industries that V4 doesn't handle well (missing examples/templates)
-  // For these, always use V3 which has proper templates
-  const V4_SKIP_INDUSTRIES = [
-    'real_estate',        // V4 confuses with financial_services/trading
-    'food_restaurant',    // V4 confuses with healthcare_provider
-    'healthcare_provider', // Sometimes gets confused
+  // Industries that have MSS templates but V4/V3 don't handle well
+  // For these, use MSS (buildMinimalSafeSetV2) which has proper industry-specific templates
+  const USE_MSS_INDUSTRIES = [
+    'real_estate',
+    'food_restaurant', 
+    'travel_cruise',
+    'automotive_dealer',
+    'professional_services',
+    'nonprofit',
+    'manufacturing',
+    'ecommerce_fashion',
+    'financial_advisory',
+    'local_services',
+    'technology_hardware',
+    'software_enterprise',
+    'media_streaming',
+    'gaming',
+    'personal_blog',
   ];
   
-  // A/B: Try V4 first (if enabled AND industry is supported), fall back to V3 on error
-  const tryV4 = useV4ForDomain(domain) && !V4_SKIP_INDUSTRIES.includes(industry);
+  // Check if we should use MSS instead of V4/V3
+  const useMSS = USE_MSS_INDUSTRIES.includes(industry);
+  
+  // A/B: Try V4 first (if enabled AND not MSS industry), fall back to V3 on error
+  const tryV4 = useV4ForDomain(domain) && !useMSS;
   
   if (tryV4) {
     try {
@@ -663,8 +678,25 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
       realismAvg = v3.realismScoreAvg ?? 0.85;
       version = 'v3-archetypes-fallback';
     }
+  } else if (useMSS) {
+    // Use MSS V2 (industry-specific templates)
+    console.log(`[PROMPTS] Using MSS V2 for ${domain} (industry: ${industry})`);
+    const { buildMinimalSafeSetV2 } = await import('./prompts/v2/minimalSafe');
+    const aliases = [brand.charAt(0).toUpperCase() + brand.slice(1)];
+    const mssContext = {
+      brand,
+      domain,
+      aliases,
+      industry,
+      categoryTerms: [brand],
+      siteType: classification.site_type || 'corporate'
+    };
+    const mss = await buildMinimalSafeSetV2(env, env.RULES, mssContext);
+    prompts = { branded: mss.branded || [], nonBranded: mss.nonBranded || [] };
+    realismAvg = mss.realism_score || 0.85;
+    version = 'mss-v2-industry';
   } else {
-    // Use V3 (template-based)
+    // Use V3 (template-based) for remaining industries
     const v3 = await generateContextualPromptsV3(env, domain, brand, classification, schemaTypes, industry);
     prompts = { branded: v3.branded, nonBranded: v3.nonBranded };
     realismAvg = v3.realismScoreAvg ?? 0.85;
