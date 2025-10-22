@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function FooterLegal() {
   const currentYear = new Date().getFullYear();
 
@@ -6,9 +8,9 @@ export default function FooterLegal() {
       <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         {/* Links */}
         <div className="flex flex-wrap gap-4">
-          <a href="https://optiview.ai/score-guide" className="hover:text-gray-900 transition-colors">
+          <Link to="/score-guide" className="hover:text-gray-900 transition-colors">
             Scoring Guide
-          </a>
+          </Link>
           <a href="https://optiview.ai/docs/citations.html" className="hover:text-gray-900 transition-colors">
             Citations Guide
           </a>

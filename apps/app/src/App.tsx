@@ -8,6 +8,8 @@ import NewAudit from './routes/audits/new.tsx'
 import AuditDetail from './routes/audits/[id]/index.tsx'
 import AuditPages from './routes/audits/[id]/pages/index.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
+import ScoreGuideIndex from './routes/score-guide/index.tsx'
+import ScoreGuideDetail from './routes/score-guide/$slug.tsx'
 import AdminPage from './routes/admin.tsx'
 import ClassifierCompare from './routes/admin/classifier-compare.tsx'
 import HealthDashboard from './routes/admin/health.tsx'
@@ -70,34 +72,45 @@ function Navigation() {
       </div>
 
       {/* Slide-out menu (all screen sizes) */}
-      {menuOpen && (
-        <div className="border-t border-gray-200">
-          <div className="pt-2 pb-3 space-y-1">
-            <Link
-              to="/audits"
-              onClick={() => setMenuOpen(false)}
-              className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                location.pathname === '/' || location.pathname === '/audits'
-                  ? 'bg-blue-50 border-blue-500 text-blue-700'
-                  : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-              }`}
-            >
-              My Audits
-            </Link>
-            {isAdmin && (
-              <Link
-                to="/admin"
-                onClick={() => setMenuOpen(false)}
-                className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                  location.pathname.startsWith('/admin')
-                    ? 'bg-blue-50 border-blue-500 text-blue-700'
-                    : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                Admin
-              </Link>
-            )}
-          </div>
+              {menuOpen && (
+                <div className="border-t border-gray-200">
+                  <div className="pt-2 pb-3 space-y-1">
+                    <Link
+                      to="/audits"
+                      onClick={() => setMenuOpen(false)}
+                      className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                        location.pathname === '/' || location.pathname === '/audits'
+                          ? 'bg-blue-50 border-blue-500 text-blue-700'
+                          : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                      }`}
+                    >
+                      My Audits
+                    </Link>
+                    <Link
+                      to="/score-guide"
+                      onClick={() => setMenuOpen(false)}
+                      className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                        location.pathname.startsWith('/score-guide')
+                          ? 'bg-blue-50 border-blue-500 text-blue-700'
+                          : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                      }`}
+                    >
+                      Score Guide
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setMenuOpen(false)}
+                        className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                          location.pathname.startsWith('/admin')
+                            ? 'bg-blue-50 border-blue-500 text-blue-700'
+                            : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                        }`}
+                      >
+                        Admin
+                      </Link>
+                    )}
+                  </div>
           {/* Auth section */}
           <div className="pt-4 pb-3 border-t border-gray-200">
             {isAuthed && me ? (
@@ -149,6 +162,8 @@ function App() {
             <Route path="/audits/:id" element={<AuditDetail />} />
             <Route path="/audits/:id/pages" element={<AuditPages />} />
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
+            <Route path="/score-guide" element={<ScoreGuideIndex />} />
+            <Route path="/score-guide/:slug" element={<ScoreGuideDetail />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/classifier-compare" element={<ClassifierCompare />} />
             <Route path="/admin/health" element={<HealthDashboard />} />
