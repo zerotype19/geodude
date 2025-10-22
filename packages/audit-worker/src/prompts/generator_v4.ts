@@ -1036,8 +1036,13 @@ export async function generateQueriesV4(
     const needsPaddingB = branded.length < PROMPTS_BRANDED_MAX;
     const needsPaddingN = nonBranded.length < PROMPTS_NONBRANDED_MAX;
     
-    // Ensure min counts with padding
-    ({ branded, nonBranded } = ensureMinCounts(input.brand, input.categoryTerms, branded, nonBranded));
+    // SKIP padding if we already used MSS top-up (prevents brand leak in padding)
+    // MSS already provided good queries, no need for generic padding
+    const usedMSSTopUp = nonBranded.length >= nonBrandedTarget && needsPaddingN;
+    if (!usedMSSTopUp) {
+      // Ensure min counts with padding (only if we didn't use MSS)
+      ({ branded, nonBranded } = ensureMinCounts(input.brand, input.categoryTerms, branded, nonBranded));
+    }
 
     // Sample scoring (first 6 branded + first 10 non-branded)
     const sample = [...branded.slice(0, 6), ...nonBranded.slice(0, 10)];

@@ -114,6 +114,8 @@ export async function queryPerplexity(query: string, env: ConnectorEnv): Promise
     });
 
     if (!response.ok) {
+      // IMPORTANT: Cancel response body to prevent deadlock
+      await response.body?.cancel();
       throw new Error(`Perplexity API error: ${response.status}`);
     }
 
@@ -173,6 +175,8 @@ export async function queryChatGPT(query: string, env: ConnectorEnv): Promise<Co
     });
 
     if (!response.ok) {
+      // IMPORTANT: Cancel response body to prevent deadlock
+      await response.body?.cancel();
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
@@ -239,6 +243,8 @@ export async function queryClaude(query: string, env: ConnectorEnv): Promise<Con
     });
 
     if (!response.ok) {
+      // IMPORTANT: Cancel response body to prevent deadlock
+      await response.body?.cancel();
       throw new Error(`Claude API error: ${response.status}`);
     }
 
@@ -273,7 +279,7 @@ export async function queryClaude(query: string, env: ConnectorEnv): Promise<Con
 }
 
 // Brave Search Connector (for AEO coverage)
-export async function queryBrave(query: string, env: ConnectorEnv): Promise<ConnectorResult> {
+export async function queryBrave(query: string, env: ConnectorEnv, retryCount = 0): Promise<ConnectorResult> {
   const apiKey = env.BRAVE_API_KEY || env.BRAVE_SEARCH;
   if (!apiKey) {
     return { source: 'brave', query, answer_text: '', cited_urls: [], confidence: 0, error: 'API key not configured' };
@@ -288,6 +294,16 @@ export async function queryBrave(query: string, env: ConnectorEnv): Promise<Conn
     });
 
     if (!response.ok) {
+      // IMPORTANT: Cancel response body to prevent deadlock
+      await response.body?.cancel();
+      
+      // Handle rate limiting with exponential backoff (max 2 retries)
+      if (response.status === 429 && retryCount < 2) {
+        const delayMs = 1000 * Math.pow(2, retryCount); // 1s, 2s
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        return queryBrave(query, env, retryCount + 1);
+      }
+      
       throw new Error(`Brave API error: ${response.status}`);
     }
 

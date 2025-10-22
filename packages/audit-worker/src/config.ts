@@ -47,7 +47,7 @@ export const PRECHECK_RETRY_MAX_MS = 30000;            // Max retry delay (30s)
 export const DISABLE_BRAVE_TEMP = false;                // Temporarily disable Brave if connector broken (Note: 0 URLs = quota exhausted, not broken)
 export const CITATIONS_BATCH_SIZE = 5;                  // Concurrent queries per source
 export const CITATIONS_TIMEOUT_MS = 10000;              // 10s timeout per query
-export const CITATIONS_PERPLEXITY_TIMEOUT_MS = 10000;   // Perplexity specific timeout
+export const CITATIONS_PERPLEXITY_TIMEOUT_MS = 15000;   // Perplexity specific timeout (increased - it's slower)
 export const CITATIONS_CHATGPT_TIMEOUT_MS = 8000;       // ChatGPT specific timeout
 export const CITATIONS_CLAUDE_TIMEOUT_MS = 8000;        // Claude specific timeout
 export const CITATIONS_BRAVE_TIMEOUT_MS = 5000;         // Brave specific timeout
