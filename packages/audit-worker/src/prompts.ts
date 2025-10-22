@@ -671,9 +671,24 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
   // Detect language
   const lang = detectLangHint(row.site_description ?? row.meta_description ?? '');
 
+  // Apply intent filtering based on industry allow/deny lists
+  const { filterIntentsByPack } = await import('./lib/intent-guards');
+  const brandedIntents = prompts.branded.map(text => ({ text }));
+  const nonBrandedIntents = prompts.nonBranded.map(text => ({ text }));
+  
+  const filteredBranded = filterIntentsByPack(brandedIntents, industry).map(i => i.text);
+  const filteredNonBranded = filterIntentsByPack(nonBrandedIntents, industry).map(i => i.text);
+  
+  const originalCount = prompts.branded.length + prompts.nonBranded.length;
+  const filteredCount = filteredBranded.length + filteredNonBranded.length;
+  
+  if (filteredCount < originalCount) {
+    console.log(`[INTENT_FILTER] Filtered out ${originalCount - filteredCount} queries for industry ${industry} (${originalCount} → ${filteredCount})`);
+  }
+
   return { 
-    branded: prompts.branded,
-    nonBranded: prompts.nonBranded,
+    branded: filteredBranded,
+    nonBranded: filteredNonBranded,
     envelope,
     realismScoreAvg: realismAvg,
     meta: { 
@@ -683,7 +698,7 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
       category_terms: categoryTerms,
       ...classification, 
       prompt_gen_version: version
-    } 
+    }
   };
 }
 
@@ -764,15 +779,31 @@ async function buildWithColdStart(env: Env, domain: string) {
     
     console.log(`[COLD_START_MSS] ✅ SUCCESS: ${mss.branded?.length || 0} branded, ${mss.nonBranded?.length || 0} non-branded`);
     
+    // Apply intent filtering based on industry allow/deny lists
+    const { filterIntentsByPack } = await import('./lib/intent-guards');
+    const actualIndustry = mss.industry || industry || 'default';
+    const brandedIntents = (mss.branded || []).map(text => ({ text }));
+    const nonBrandedIntents = (mss.nonBranded || []).map(text => ({ text }));
+    
+    const filteredBranded = filterIntentsByPack(brandedIntents, actualIndustry).map(i => i.text);
+    const filteredNonBranded = filterIntentsByPack(nonBrandedIntents, actualIndustry).map(i => i.text);
+    
+    const originalCount = (mss.branded?.length || 0) + (mss.nonBranded?.length || 0);
+    const filteredCount = filteredBranded.length + filteredNonBranded.length;
+    
+    if (filteredCount < originalCount) {
+      console.log(`[INTENT_FILTER] Cold-start filtered out ${originalCount - filteredCount} queries for industry ${actualIndustry} (${originalCount} → ${filteredCount})`);
+    }
+    
     return {
-      branded: mss.branded || [],
-      nonBranded: mss.nonBranded || [],
+      branded: filteredBranded,
+      nonBranded: filteredNonBranded,
       envelope: `You are analyzing ${domain}, a ${industry} website.`,
       realismScoreAvg: mss.realism_score || 0.78,
       meta: {
         brand: brandCapitalized,
         lang: 'en',
-        industry: mss.industry || industry || 'default',
+        industry: actualIndustry,
         category_terms: [brand],
         site_type: 'corporate',
         primary_entities: [brand],
