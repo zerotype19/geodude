@@ -60,7 +60,8 @@ const HEURISTICS: Record<IndustryKey, RegExp[]> = {
     /\b(msrp|vin|dealer|build\s*(&|and)\s*price|configure|inventory|test\s*drive)\b/i,
     /\b(iihs|nhtsa|safety\s*rating|crash\s*test|warranty|towing|payload)\b/i,
     /\b(sedan|suv|truck|pickup|crossover|hybrid|electric\s*vehicle|ev)\b/i,
-    /\b(car\s*manufacturer|auto\s*manufacturer|automotive|vehicle|automobile)\b/i,
+    /\b(car\s*manufacturer|auto\s*manufacturer|automotive|vehicle|automobile|auto\s*manufacturing)\b/i,
+    /\b(chrysler|dodge|jeep|fiat|alfa\s*romeo|peugeot|citroen|opel|vauxhall)\b/i,
   ],
   automotive_dealer: [],
   travel_cruise: [
@@ -283,7 +284,7 @@ function scoreDomain(domain: string): Map<IndustryKey, number> {
   const tokens = domain.toLowerCase().split(/[.-]/);
 
   const domainKeywords: Record<IndustryKey, string[]> = {
-    automotive_oem: ['auto', 'car', 'motors', 'toyota', 'ford', 'honda', 'nissan', 'bmw', 'tesla'],
+    automotive_oem: ['auto', 'car', 'motors', 'toyota', 'ford', 'honda', 'nissan', 'bmw', 'tesla', 'stellantis', 'chrysler', 'dodge', 'jeep'],
     automotive_dealer: [],
     travel_cruise: ['cruise', 'cruises', 'viking', 'carnival', 'princess', 'royal', 'norwegian'],
     travel_hotels: ['hotel', 'hotels', 'resort', 'resorts', 'marriott', 'hilton', 'hyatt'],
