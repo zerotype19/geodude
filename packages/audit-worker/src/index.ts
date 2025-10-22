@@ -901,6 +901,36 @@ export default {
         }
       }
 
+      // TEMP: Quick backfill bypass (NO AUTH - remove after use)
+      if (req.method === 'GET' && path === '/api/admin/backfill-now') {
+        try {
+          const { backfillMultipleAudits } = await import('./scripts/backfillChecks');
+          const auditIds = [
+            "5b83c3da-adf2-44c5-b14e-807f44140e02", // Progressive
+            "c0726395-7f01-4a33-b2b2-2f375a01e43c", // Lennar
+            "508e0cc4-b76f-455b-942d-3dda108c3f75"  // Walmart
+          ];
+          
+          console.log('[BACKFILL_NOW] Starting for', auditIds.length, 'audits');
+          const results = await backfillMultipleAudits(env, auditIds);
+          
+          return new Response(JSON.stringify({ results }, null, 2), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('[BACKFILL_NOW] Error:', error);
+          return new Response(JSON.stringify({ 
+            error: 'Backfill failed', 
+            message: (error as Error).message,
+            stack: (error as Error).stack
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Admin routes - require admin authentication
       if (path.startsWith('/api/admin/')) {
         // SECURITY: Verify user is authenticated and is an admin
