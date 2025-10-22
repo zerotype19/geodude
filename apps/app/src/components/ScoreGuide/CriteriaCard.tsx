@@ -74,15 +74,10 @@ export default function CriteriaCard({ criterion }: CriteriaCardProps) {
         </span>
       </div>
 
-      {/* Description */}
-      <p className="text-sm text-gray-600 mb-3">
-        {criterion.description}
-      </p>
-
-      {/* Why It Matters */}
+      {/* Description (includes why it matters) */}
       <div className="bg-blue-50 rounded-lg p-3 mb-3 border border-blue-100">
-        <p className="text-sm font-medium text-blue-900">
-          💡 {criterion.whyItMatters}
+        <p className="text-sm text-gray-700 leading-relaxed">
+          {criterion.description}
         </p>
       </div>
 
