@@ -64,17 +64,23 @@ export default function CategoryDetail() {
   const [loading, setLoading] = useState(true);
 
   // Convert slug back to category name
-  const categoryName = category
-    ?.split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-    .replace(/\sAnd\s/g, ' & ') || '';
+  // Mapping of slugs to exact category names
+  const SLUG_TO_CATEGORY: Record<string, string> = {
+    'content-clarity': 'Content & Clarity',
+    'structure-organization': 'Structure & Organization',
+    'authority-trust': 'Authority & Trust',
+    'technical-foundations': 'Technical Foundations',
+    'crawl-discoverability': 'Crawl & Discoverability',
+    'experience-performance': 'Experience & Performance'
+  };
+
+  const categoryName = SLUG_TO_CATEGORY[category || ''] || '';
 
   const emoji = CATEGORY_EMOJIS[categoryName] || '📊';
   const description = CATEGORY_DESCRIPTIONS[categoryName] || '';
 
   // Get checks for this category
-  const checksInCategory = CRITERIA_BY_CATEGORY[categoryName] || [];
+  const checksInCategory = CRITERIA_BY_CATEGORY[categoryName as keyof typeof CRITERIA_BY_CATEGORY] || [];
 
   // Find the category score
   const categoryScore = audit?.category_scores?.find(cs => cs.category === categoryName);
@@ -217,7 +223,7 @@ export default function CategoryDetail() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-1">
                         <span className="text-xs font-mono text-gray-500">{check.id}</span>
-                        <h3 className="font-medium text-gray-900">{check.name}</h3>
+                        <h3 className="font-medium text-gray-900">{check.title}</h3>
                       </div>
                       <p className="text-sm text-gray-600">{check.description}</p>
                     </div>

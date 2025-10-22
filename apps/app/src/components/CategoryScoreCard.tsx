@@ -39,7 +39,8 @@ export default function CategoryScoreCard({ categoryScore }: CategoryScoreCardPr
   const description = CATEGORY_DESCRIPTIONS[category] || '';
 
   // Create URL-friendly category slug
-  const categorySlug = category.toLowerCase().replace(/\s+&\s+/g, '-').replace(/\s+/g, '-');
+  // "Content & Clarity" -> "content-clarity"
+  const categorySlug = category.toLowerCase().replace(/\s*&\s*/g, '-').replace(/\s+/g, '-');
 
   // Color coding based on score
   const getScoreColor = (score: number) => {
