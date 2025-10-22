@@ -57,55 +57,64 @@ export async function buildMinimalSafeSetV2(
     console.warn(`[MSS_V2] Failed to init embedding model:`, error);
   }
 
-  // Try to get cached industry classification
-  const cacheKey = `industry:v2:host:${ctx.domain}`;
-  let industry: IndustryKey = "default";
-  let source: "rules" | "jsonld" | "embedding" | "fallback" = "fallback";
+  // If industry is already provided in context (from audit lock), use it!
+  let industry: IndustryKey;
+  let source: "rules" | "jsonld" | "embedding" | "fallback" | "context" = "fallback";
   let confidence: number | undefined;
 
-  const cached = await kv.get(cacheKey);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      industry = parsed.industry;
-      source = parsed.source;
-      confidence = parsed.confidence;
-      console.log(`[MSS_V2] Using cached industry for ${ctx.domain}: ${industry}`);
-    } catch {
-      industry = cached as IndustryKey;
-    }
+  if (ctx.industry && ctx.industry !== "default") {
+    // Industry already determined (from audit lock or domain rules)
+    industry = ctx.industry as IndustryKey;
+    source = "context";
+    confidence = 1.0;
+    console.log(`[MSS_V2] Using provided industry for ${ctx.domain}: ${industry}`);
   } else {
-    // Fetch cold-start signals if not provided
-    let html = ctx.coldStartHtml || "";
-    let jsonld = ctx.coldStartJsonLd || [];
-    let nav = ctx.coldStartNav || [];
+    // No industry provided, try to detect it
+    const cacheKey = `industry:v2:host:${ctx.domain}`;
+    const cached = await kv.get(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        industry = parsed.industry;
+        source = parsed.source;
+        confidence = parsed.confidence;
+        console.log(`[MSS_V2] Using cached industry for ${ctx.domain}: ${industry}`);
+      } catch {
+        industry = cached as IndustryKey;
+      }
+    } else {
+      // Fetch cold-start signals if not provided
+      let html = ctx.coldStartHtml || "";
+      let jsonld = ctx.coldStartJsonLd || [];
+      let nav = ctx.coldStartNav || [];
 
-    if (!html) {
-      console.log(`[MSS_V2] Fetching cold-start HTML for ${ctx.domain}`);
-      html = await fetchColdStartHtml(ctx.domain);
-      jsonld = extractJsonLd(html);
-      nav = extractNavTerms(html);
+      if (!html) {
+        console.log(`[MSS_V2] Fetching cold-start HTML for ${ctx.domain}`);
+        html = await fetchColdStartHtml(ctx.domain);
+        jsonld = extractJsonLd(html);
+        nav = extractNavTerms(html);
+      }
+
+      // Infer industry using hybrid approach
+      const result = await inferIndustryV2(env, kv, {
+        domain: ctx.domain,
+        htmlText: html,
+        jsonld,
+        nav,
+        fallback: "default"
+      });
+
+      industry = result.industry;
+      source = result.source;
+      confidence = result.confidence;
+
+      // Cache classification (14 days)
+      await kv.put(cacheKey, JSON.stringify({ industry, source, confidence }), {
+        expirationTtl: 14 * 24 * 3600
+      });
+
+      console.log(`[MSS_V2] Classified ${ctx.domain} as ${industry} (source: ${source})`);
     }
-
-    // Infer industry using hybrid approach
-    const result = await inferIndustryV2(env, kv, {
-      domain: ctx.domain,
-      htmlText: html,
-      jsonld,
-      nav,
-      fallback: ctx.industry || "default"
-    });
-
-    industry = result.industry;
-    source = result.source;
-    confidence = result.confidence;
-
-    // Cache classification (14 days)
-    await kv.put(cacheKey, JSON.stringify({ industry, source, confidence }), {
-      expirationTtl: 14 * 24 * 3600
-    });
-
-    console.log(`[MSS_V2] Classified ${ctx.domain} as ${industry} (source: ${source})`);
   }
 
   // Load template for detected industry
