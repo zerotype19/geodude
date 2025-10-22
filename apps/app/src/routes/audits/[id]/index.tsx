@@ -5,10 +5,30 @@ import CheckPill from '/src/components/CheckPill';
 import ScoreBadge from '/src/components/ScoreBadge';
 import ScoreLegend from '/src/components/ScoreLegend';
 import CheckCategories from '/src/components/CheckCategories';
+import CategoryScoreCard from '/src/components/CategoryScoreCard';
+import FixFirst from '/src/components/FixFirst';
+import CitationSummaryCard from '/src/components/CitationSummaryCard';
 import PagesTab from '/src/components/PagesTab';
 import RenderParityPanel from '/src/components/RenderParityPanel';
 import AuditTour from '/src/components/AuditTour';
 import { apiGet, apiPost } from '/src/lib/api';
+
+interface CategoryScore {
+  category: string;
+  score: number;
+  weight_total: number;
+  checks_count: number;
+}
+
+interface FixItem {
+  id: string;
+  name: string;
+  category: string;
+  impact_level: 'High' | 'Medium' | 'Low';
+  weight: number;
+  score: number;
+  why_it_matters?: string;
+}
 
 interface Audit {
   id: string;
@@ -39,6 +59,10 @@ interface Audit {
   fail_reason?: string;
   fail_at?: string;
   render_gap_ratio?: number; // Average render visibility across all pages (0-1)
+  // Scorecard V2 fields
+  category_scores?: CategoryScore[];
+  fix_first?: FixItem[];
+  scorecard_v2?: boolean;
 }
 
 interface CheckResult {
@@ -537,6 +561,38 @@ export default function AuditDetail() {
         {/* Score Legend */}
         <div className="mb-8">
           <ScoreLegend />
+        </div>
+
+        {/* Category Scores (Scorecard V2) */}
+        {audit.scorecard_v2 && audit.category_scores && audit.category_scores.length > 0 && (
+          <div className="mb-8">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">Category Breakdown</h2>
+              <p className="text-sm text-gray-600">
+                Your site performance across 6 key categories (0-100 scale)
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {audit.category_scores.map((categoryScore) => (
+                <CategoryScoreCard 
+                  key={categoryScore.category} 
+                  categoryScore={categoryScore} 
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fix First (Scorecard V2) */}
+        {audit.scorecard_v2 && audit.fix_first && (
+          <div className="mb-8">
+            <FixFirst fixes={audit.fix_first} />
+          </div>
+        )}
+
+        {/* Citation Summary */}
+        <div className="mb-8">
+          <CitationSummaryCard auditId={id!} />
         </div>
 
         {/* Top Blockers & Quick Wins */}
