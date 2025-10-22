@@ -2139,8 +2139,9 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
         new Promise<null>((_, reject) => setTimeout(() => reject('timeout'), 5000)),
       ]);
       
-      // Use AI result if confidence is good (≥0.60) OR better than heuristics
-      const aiConfidenceThreshold = industryLock.source === 'heuristics' ? 0.50 : 0.60;
+      // Use AI result if confidence is reasonable
+      // Lower threshold when overriding heuristics since they're often weak
+      const aiConfidenceThreshold = industryLock.source === 'heuristics' ? 0.40 : 0.50;
       
       if (classifyResult && classifyResult.primary.confidence >= aiConfidenceThreshold) {
         // Good confidence - use AI result and update KV

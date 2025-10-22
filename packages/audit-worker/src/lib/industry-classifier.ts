@@ -278,25 +278,26 @@ function scoreHeuristics(signals: ExtractedSignals): Map<IndustryKey, number> {
 
 /**
  * Score based on domain name tokens
+ * Returns higher scores (0-1.0) when domain keywords match
  */
 function scoreDomain(domain: string): Map<IndustryKey, number> {
   const scores = new Map<IndustryKey, number>();
   const tokens = domain.toLowerCase().split(/[.-]/);
 
   const domainKeywords: Record<IndustryKey, string[]> = {
-    automotive_oem: ['auto', 'car', 'motors', 'toyota', 'ford', 'honda', 'nissan', 'bmw', 'tesla', 'stellantis', 'chrysler', 'dodge', 'jeep'],
-    automotive_dealer: [],
-    travel_cruise: ['cruise', 'cruises', 'viking', 'carnival', 'princess', 'royal', 'norwegian'],
+    automotive_oem: ['auto', 'car', 'motors', 'toyota', 'ford', 'honda', 'nissan', 'bmw', 'tesla', 'stellantis', 'chrysler', 'dodge', 'jeep', 'carvana', 'carmax', 'vroom', 'shift', 'cars'],
+    automotive_dealer: ['dealer', 'dealership', 'usedcars', 'newcars'],
+    travel_cruise: ['cruise', 'cruises', 'viking', 'carnival', 'princess', 'royal', 'norwegian', 'holland', 'america', 'msc', 'celebrity', 'cunard', 'seabourn'],
     travel_hotels: ['hotel', 'hotels', 'resort', 'resorts', 'marriott', 'hilton', 'hyatt'],
-    travel_air: ['airline', 'airlines', 'air', 'delta', 'united', 'american'],
-    retail: ['shop', 'store', 'mall', 'retail', 'buy', 'cart', 'apple', 'samsung', 'microsoft', 'tech'],
-    financial_services: ['bank', 'banking', 'credit', 'loan', 'mortgage', 'invest'],
-    healthcare_provider: ['health', 'medical', 'clinic', 'hospital', 'doctor'],
-    food_restaurant: ['restaurant', 'cafe', 'pizza', 'burger', 'food', 'dining', 'menu'],
-    real_estate: ['realty', 'realtor', 'homes', 'property', 'estate', 'zillow'],
-    education: ['edu', 'school', 'university', 'college', 'academy', 'learn'],
-    professional_services: ['law', 'legal', 'consulting', 'advisory', 'services'],
-    saas_b2b: ['saas', 'cloud', 'platform', 'software', 'app'],
+    travel_air: ['airline', 'airlines', 'air', 'delta', 'united', 'american', 'southwest', 'jetblue'],
+    retail: ['shop', 'store', 'mall', 'retail', 'buy', 'cart', 'apple', 'samsung', 'microsoft', 'tech', 'amazon', 'walmart', 'target'],
+    financial_services: ['bank', 'banking', 'credit', 'loan', 'mortgage', 'invest', 'finance', 'capital'],
+    healthcare_provider: ['health', 'medical', 'clinic', 'hospital', 'doctor', 'healthcare'],
+    food_restaurant: ['restaurant', 'cafe', 'pizza', 'burger', 'food', 'dining', 'menu', 'kitchen', 'grill'],
+    real_estate: ['realty', 'realtor', 'homes', 'property', 'estate', 'zillow', 'redfin', 'trulia'],
+    education: ['edu', 'school', 'university', 'college', 'academy', 'learn', 'education'],
+    professional_services: ['law', 'legal', 'consulting', 'advisory', 'services', 'consulting'],
+    saas_b2b: ['saas', 'cloud', 'platform', 'software', 'app', 'api', 'service'],
     ecommerce_fashion: [],
     media_entertainment: ['media', 'news', 'streaming', 'video', 'tv', 'entertainment'],
     nonprofit: ['charity', 'foundation', 'nonprofit', 'donate'],
@@ -309,7 +310,8 @@ function scoreDomain(domain: string): Map<IndustryKey, number> {
   for (const [industry, keywords] of Object.entries(domainKeywords) as Array<[IndustryKey, string[]]>) {
     const matches = tokens.filter((t) => keywords.includes(t)).length;
     if (matches > 0) {
-      scores.set(industry, Math.min(1.0, matches * 0.3)); // Cap at 1.0
+      // Stronger scoring: 1 match = 0.70, 2+ matches = 0.95+
+      scores.set(industry, Math.min(1.0, 0.70 + (matches - 1) * 0.25));
     }
   }
 
@@ -318,10 +320,12 @@ function scoreDomain(domain: string): Map<IndustryKey, number> {
 
 /**
  * Fuse scores from multiple sources
+ * Weights: [heuristics, domain, embeddings/LLM]
+ * Domain gets higher weight because it's a strong signal
  */
 function fuseScores(...scoreMaps: Map<IndustryKey, number>[]): Map<IndustryKey, number> {
   const fused = new Map<IndustryKey, number>();
-  const weights = [0.5, 0.3, 0.2]; // Heuristics, domain, embeddings/LLM
+  const weights = [0.4, 0.5, 0.1]; // Heuristics, domain, embeddings/LLM (domain is most reliable)
 
   for (let i = 0; i < scoreMaps.length; i++) {
     const weight = weights[i] || 0.1;
