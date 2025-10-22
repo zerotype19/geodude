@@ -2104,24 +2104,36 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   // Resolve industry early (before any INSERT)
   const domain = new URL(root_url).hostname.toLowerCase().replace(/^www\./, '');
   
-  let industryLock = await resolveIndustry({
-    override: config.industry as IndustryKey | undefined,
-    project: undefined, // Could read from project table if needed
-    signals: {
-      domain,
-      // These could be populated from precheck response if available
-      homepageTitle: undefined,
-      homepageH1: undefined,
-      schemaTypes: undefined,
-      keywords: site_description ? site_description.toLowerCase().split(/\s+/).slice(0, 20) : undefined,
-      navTerms: undefined,
-    },
-    env,
-    root_url,
-    site_description,
-  });
-  
-  console.log(`[INDUSTRY] resolved: ${industryLock.value} (source=${industryLock.source}) domain=${domain} locked`);
+  let industryLock;
+  try {
+    industryLock = await resolveIndustry({
+      override: config.industry as IndustryKey | undefined,
+      project: undefined, // Could read from project table if needed
+      signals: {
+        domain,
+        // These could be populated from precheck response if available
+        homepageTitle: undefined,
+        homepageH1: undefined,
+        schemaTypes: undefined,
+        keywords: site_description ? site_description.toLowerCase().split(/\s+/).slice(0, 20) : undefined,
+        navTerms: undefined,
+      },
+      env,
+      root_url,
+      site_description,
+    });
+    
+    console.log(`[INDUSTRY] resolved: ${industryLock.value} (source=${industryLock.source}) domain=${domain} locked`);
+  } catch (industryError: any) {
+    console.error(`[INDUSTRY_ERROR] Failed to resolve industry for ${domain}:`, industryError.message || industryError);
+    console.error(`[INDUSTRY_ERROR] Stack:`, industryError.stack);
+    // Fallback to default industry
+    industryLock = {
+      value: 'generic_consumer',
+      source: 'default',
+      locked: true
+    };
+  }
   
   if (!precheck.ok) {
     // Domain failed validation - create audit as failed immediately
