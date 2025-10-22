@@ -9,9 +9,10 @@ import type { IndustryKey, HeuristicVote } from '../config/industry-packs.schema
 
 export interface IndustryLock {
   value: IndustryKey;
-  source: 'override' | 'domain_rules' | 'heuristics' | 'default';
+  source: 'override' | 'domain_rules' | 'heuristics' | 'ai_worker' | 'ai_worker_medium_conf' | 'default';
   locked: true;
   votes?: HeuristicVote[];  // For logging/debugging
+  confidence?: number;  // AI classifier confidence
 }
 
 export interface IndustrySignals {
@@ -98,14 +99,18 @@ function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
  * 1. Explicit override (project/audit)
  * 2. Domain rules (from config)
  * 3. Heuristics vote
- * 4. Default industry
+ * 4. AI Classifier (if enabled and needed)
+ * 5. Default industry
  */
-export function resolveIndustry(ctx: {
+export async function resolveIndustry(ctx: {
   audit?: { industry?: IndustryKey; industry_source?: string };
   project?: { industry_override?: IndustryKey | null };
   override?: IndustryKey | null;
   signals: IndustrySignals;
-}): IndustryLock {
+  env?: any;  // For AI classifier
+  root_url?: string;
+  site_description?: string;
+}): Promise<IndustryLock> {
   // 1. Explicit override
   if (ctx.override) {
     return {
@@ -148,16 +153,71 @@ export function resolveIndustry(ctx: {
 
   // 5. Heuristics
   const votes = heuristicsVote(ctx.signals);
-  if (votes.length > 0 && votes[0].score > 0.4) {
+  const heuristicsResult = votes.length > 0 && votes[0].score > 0.4 ? votes[0] : null;
+  
+  // 6. AI Classifier (if enabled and no strong match yet)
+  const shouldCallAI = (
+    !heuristicsResult || (heuristicsResult && heuristicsResult.score < 0.6)
+  ) && ctx.env?.FEATURE_INDUSTRY_AI_CLASSIFY !== '0' && ctx.root_url;
+  
+  if (shouldCallAI) {
+    try {
+      const { classifyIndustry } = await import('./industry-classifier');
+      const result = await Promise.race([
+        classifyIndustry({
+          domain,
+          root_url: ctx.root_url!,
+          site_description: ctx.site_description || '',
+          project_id: 'default',
+          crawl_budget: { homepage: true, timeout_ms: 5000 },
+        }),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error('AI classifier timeout')), 8000)),
+      ]);
+
+      if (result && result.primary.confidence >= 0.40) {
+        const source = result.primary.confidence >= 0.70 ? 'ai_worker' : 'ai_worker_medium_conf';
+        console.log(`[INDUSTRY_AI] ${domain} → ${result.primary.industry_key} (conf: ${result.primary.confidence.toFixed(3)}, source: ${source})`);
+        
+        // Cache high-confidence results to KV
+        if (result.primary.confidence >= 0.70 && ctx.env?.DOMAIN_RULES_KV) {
+          try {
+            const doc = await ctx.env.DOMAIN_RULES_KV.get('industry_packs_json', 'json') as any || { industry_rules: { domains: {} }, packs: {} };
+            doc.industry_rules = doc.industry_rules || {};
+            doc.industry_rules.domains = doc.industry_rules.domains || {};
+            doc.industry_rules.domains[domain] = result.primary.industry_key;
+            await ctx.env.DOMAIN_RULES_KV.put('industry_packs_json', JSON.stringify(doc));
+            console.log(`[INDUSTRY_AI] Cached ${domain} → ${result.primary.industry_key} to KV`);
+          } catch (kvErr) {
+            console.error('[INDUSTRY_AI KV ERROR]', kvErr);
+          }
+        }
+        
+        return {
+          value: result.primary.industry_key,
+          source,
+          locked: true,
+          confidence: result.primary.confidence,
+          votes
+        };
+      } else if (result) {
+        console.log(`[INDUSTRY_AI] ${domain} → ${result.primary.industry_key} (conf: ${result.primary.confidence.toFixed(3)}) - TOO LOW, using heuristics or default`);
+      }
+    } catch (aiErr: any) {
+      console.log(`[INDUSTRY_AI] Failed for ${domain}: ${aiErr.message || aiErr}`);
+    }
+  }
+  
+  // 7. Use heuristics if we have them
+  if (heuristicsResult) {
     return {
-      value: votes[0].key,
+      value: heuristicsResult.key,
       source: 'heuristics',
       locked: true,
       votes: votes.slice(0, 3)
     };
   }
 
-  // 6. Default
+  // 8. Default
   return {
     value: getDefaultIndustry() as IndustryKey,
     source: 'default',
