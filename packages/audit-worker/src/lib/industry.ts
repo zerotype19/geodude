@@ -150,7 +150,7 @@ export async function resolveIndustry(ctx: {
 
   const domain = ctx.signals.domain.toLowerCase();
 
-  // 4. Domain rules
+  // 4. Domain rules (whitelist - no AI needed)
   const domainRules = getDomainRules();
   const byDomain = domainRules[domain];
   if (byDomain) {
@@ -161,14 +161,13 @@ export async function resolveIndustry(ctx: {
     };
   }
 
-  // 5. Heuristics
+  // 5. Heuristics (run but don't return yet - used for fusion)
   const votes = heuristicsVote(ctx.signals);
   const heuristicsResult = votes.length > 0 && votes[0].score > 0.4 ? votes[0] : null;
   
-  // 6. AI Classifier (if enabled and no strong match yet)
-  const shouldCallAI = (
-    !heuristicsResult || (heuristicsResult && heuristicsResult.score < 0.6)
-  ) && ctx.env?.FEATURE_INDUSTRY_AI_CLASSIFY !== '0' && ctx.root_url;
+  // 6. AI Classifier (PRIMARY - always call if available)
+  const shouldCallAI = ctx.env?.FEATURE_INDUSTRY_AI_CLASSIFY !== '0' && ctx.root_url;
+  let aiResult: { industry_key: IndustryKey; confidence: number } | null = null;
   
   if (shouldCallAI) {
     try {
@@ -184,55 +183,74 @@ export async function resolveIndustry(ctx: {
         new Promise<null>((_, reject) => setTimeout(() => reject(new Error('AI classifier timeout')), 8000)),
       ]);
 
-      if (result && result.primary.confidence >= 0.40) {
-        const source = result.primary.confidence >= 0.70 ? 'ai_worker' : 'ai_worker_medium_conf';
-        console.log(`[INDUSTRY_AI] ${domain} → ${result.primary.industry_key} (conf: ${result.primary.confidence.toFixed(3)}, source: ${source})`);
-        
-        // Cache high-confidence results to KV
-        if (result.primary.confidence >= 0.70 && ctx.env?.DOMAIN_RULES_KV) {
-          try {
-            const doc = await ctx.env.DOMAIN_RULES_KV.get('industry_packs_json', 'json') as any || { industry_rules: { domains: {} }, packs: {} };
-            doc.industry_rules = doc.industry_rules || {};
-            doc.industry_rules.domains = doc.industry_rules.domains || {};
-            doc.industry_rules.domains[domain] = result.primary.industry_key;
-            await ctx.env.DOMAIN_RULES_KV.put('industry_packs_json', JSON.stringify(doc));
-            console.log(`[INDUSTRY_AI] Cached ${domain} → ${result.primary.industry_key} to KV`);
-          } catch (kvErr) {
-            console.error('[INDUSTRY_AI KV ERROR]', kvErr);
-          }
-        }
-        
-        return {
-          value: result.primary.industry_key,
-          source,
-          locked: true,
-          confidence: result.primary.confidence,
-          votes
+      if (result && result.primary.confidence > 0) {
+        aiResult = {
+          industry_key: result.primary.industry_key,
+          confidence: result.primary.confidence
         };
-      } else if (result) {
-        console.log(`[INDUSTRY_AI] ${domain} → ${result.primary.industry_key} (conf: ${result.primary.confidence.toFixed(3)}) - TOO LOW, using heuristics or default`);
+        
+        // 🔥 LOWERED THRESHOLD: 0.35 (was 0.40)
+        if (result.primary.confidence >= 0.35) {
+          const source = result.primary.confidence >= 0.70 ? 'ai_worker' : 'ai_worker_medium_conf';
+          
+          // 🔥 FUSION: Boost confidence if heuristics agrees
+          const heuristicsAgrees = heuristicsResult?.key === result.primary.industry_key;
+          const finalConfidence = heuristicsAgrees 
+            ? Math.min(1.0, result.primary.confidence + 0.15)  // Boost by 15% if heuristics agrees
+            : result.primary.confidence;
+          
+          console.log(`[INDUSTRY_AI] ${domain} → ${result.primary.industry_key} (conf: ${result.primary.confidence.toFixed(3)}, final: ${finalConfidence.toFixed(3)}, heuristics: ${heuristicsAgrees ? 'agrees' : 'differs'}, source: ${source})`);
+          
+          // Cache high-confidence results to KV
+          if (finalConfidence >= 0.70 && ctx.env?.DOMAIN_RULES_KV) {
+            try {
+              const doc = await ctx.env.DOMAIN_RULES_KV.get('industry_packs_json', 'json') as any || { industry_rules: { domains: {} }, packs: {} };
+              doc.industry_rules = doc.industry_rules || {};
+              doc.industry_rules.domains = doc.industry_rules.domains || {};
+              doc.industry_rules.domains[domain] = result.primary.industry_key;
+              await ctx.env.DOMAIN_RULES_KV.put('industry_packs_json', JSON.stringify(doc));
+              console.log(`[INDUSTRY_AI] Cached ${domain} → ${result.primary.industry_key} to KV (boosted conf: ${finalConfidence.toFixed(3)})`);
+            } catch (kvErr) {
+              console.error('[INDUSTRY_AI KV ERROR]', kvErr);
+            }
+          }
+          
+          return {
+            value: result.primary.industry_key,
+            source,
+            locked: true,
+            confidence: finalConfidence,
+            votes
+          };
+        } else {
+          console.log(`[INDUSTRY_AI] ${domain} → ${result.primary.industry_key} (conf: ${result.primary.confidence.toFixed(3)}) - below threshold (0.35), trying heuristics`);
+        }
       }
     } catch (aiErr: any) {
       console.log(`[INDUSTRY_AI] Failed for ${domain}: ${aiErr.message || aiErr}`);
     }
   }
   
-  // 7. Use heuristics if we have them
-  if (heuristicsResult) {
+  // 7. Heuristics fallback (only if AI unavailable or too low confidence)
+  if (heuristicsResult && heuristicsResult.score >= 0.5) {
+    console.log(`[INDUSTRY_HEURISTICS] ${domain} → ${heuristicsResult.key} (score: ${heuristicsResult.score.toFixed(3)}, AI: ${aiResult ? `${aiResult.industry_key} @ ${aiResult.confidence.toFixed(3)}` : 'unavailable'})`);
     return {
       value: heuristicsResult.key,
       source: 'heuristics',
       locked: true,
-      votes: votes.slice(0, 3)
+      votes: votes.slice(0, 3),
+      confidence: heuristicsResult.score
     };
   }
 
-  // 8. Default
+  // 8. Default fallback
+  console.log(`[INDUSTRY_DEFAULT] ${domain} → ${getDefaultIndustry()} (AI: ${aiResult ? `${aiResult.confidence.toFixed(3)}` : 'N/A'}, heuristics: ${heuristicsResult ? heuristicsResult.score.toFixed(3) : 'N/A'})`);
   return {
     value: getDefaultIndustry() as IndustryKey,
     source: 'default',
     locked: true,
-    votes
+    votes,
+    confidence: aiResult?.confidence || heuristicsResult?.score
   };
 }
 
