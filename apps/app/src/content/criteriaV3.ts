@@ -1213,3 +1213,8 @@ export const SLUG_TO_CATEGORY: Record<string, Category> = {
   "crawl-discoverability": "Crawl & Discoverability",
   "experience-performance": "Experience & Performance"
 };
+
+// Helper function to get criteria for a specific category
+export function getCriteriaForCategory(category: Category): CriterionMeta[] {
+  return CRITERIA_BY_CATEGORY[category] || [];
+}
