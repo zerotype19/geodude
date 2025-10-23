@@ -5,7 +5,7 @@
  * Run: npm run sync-score-guide to update from latest D1 export.
  * 
  * Includes all 36 checks (23 page-level + 13 site-level)
- * Last synced: ${new Date().toISOString()}
+ * Last synced: 2025-10-23T07:35:09Z
  */
 
 import scoringCriteriaExport from '../data/scoring_criteria.json';
