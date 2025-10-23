@@ -137,7 +137,7 @@ export default function PageDetail() {
           <h3 className="text-lg font-medium  mb-2">Error Loading Page</h3>
           <p className="muted mb-4">{error || 'Page not found'}</p>
           <Link
-            to={`/audits/${id}/pages`}
+            to={`/audits/${id}?tab=pages`}
             className="bg-brand hover:bg-brand text-white font-medium py-2 px-4 rounded-lg transition-colors"
           >
             Back to Pages
@@ -213,7 +213,7 @@ export default function PageDetail() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <Link to={`/audits/${id}/pages`} className="text-brand hover:text-brand mb-2 inline-block">
+              <Link to={`/audits/${id}?tab=pages`} className="text-brand hover:text-brand mb-2 inline-block">
                 ← Back to Pages
               </Link>
               <h1 className="text-3xl font-bold ">Page Analysis</h1>
