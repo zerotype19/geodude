@@ -9,18 +9,25 @@
 
 import { useViewMode } from '../../store/viewMode';
 import { 
-  CRITERIA, 
-  PAGE_CRITERIA, 
-  SITE_CRITERIA,
+  ALL_CRITERIA, 
   CATEGORY_ORDER, 
   CRITERIA_BY_CATEGORY, 
   CATEGORY_DESCRIPTIONS, 
-  CATEGORY_ICONS,
-  STATS
+  CATEGORY_EMOJIS,
+  type Category
 } from '../../content/criteriaV3';
 import ViewToggle from '../../components/ViewToggle';
 import CategorySection from '../../components/ScoreGuide/CategorySection';
 import CriteriaCard from '../../components/ScoreGuide/CriteriaCard';
+
+// Calculate stats from ALL_CRITERIA
+const STATS = {
+  total: ALL_CRITERIA.length,
+  production: ALL_CRITERIA.filter(c => !c.preview).length,
+  preview: ALL_CRITERIA.filter(c => c.preview).length,
+  page: ALL_CRITERIA.filter(c => c.scope === 'page').length,
+  site: ALL_CRITERIA.filter(c => c.scope === 'site').length,
+};
 
 export default function ScoreGuide() {
   const { mode } = useViewMode();
@@ -87,7 +94,7 @@ export default function ScoreGuide() {
               <CategorySection
                 key={category}
                 title={category}
-                icon={CATEGORY_ICONS[category]}
+                icon={CATEGORY_EMOJIS[category]}
                 description={CATEGORY_DESCRIPTIONS[category]}
                 criteria={CRITERIA_BY_CATEGORY[category] || []}
               />
@@ -100,7 +107,7 @@ export default function ScoreGuide() {
               All Criteria (Technical)
             </h2>
             <div className="grid gap-6 md:grid-cols-2">
-              {CRITERIA.sort((a, b) => a.id.localeCompare(b.id)).map((criterion) => (
+              {ALL_CRITERIA.sort((a, b) => a.id.localeCompare(b.id)).map((criterion) => (
                 <CriteriaCard key={criterion.id} criterion={criterion} />
               ))}
             </div>

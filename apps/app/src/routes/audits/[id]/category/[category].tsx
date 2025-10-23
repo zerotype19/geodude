@@ -274,6 +274,51 @@ export default function CategoryDetail() {
           </div>
         </div>
 
+        {/* How to Improve - Show quick guidance from failing checks */}
+        {pagesWithIssues.length > 0 && checksInCategory.some(c => c.how_to_fix) && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 p-6 mb-8">
+            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <span>🎯</span> How to Improve This Category
+            </h2>
+            <div className="space-y-4">
+              {checksInCategory
+                .filter(check => check.scope === 'page' && check.how_to_fix)
+                .slice(0, 3)
+                .map(check => (
+                  <div key={check.id} className="bg-white rounded-lg border border-blue-200 p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">🔧</span>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 mb-1">{check.title}</h3>
+                        <p className="text-sm text-gray-700 mb-2">{check.why_it_matters}</p>
+                        <div className="bg-green-50 border border-green-200 rounded p-3 text-sm text-green-900">
+                          <strong className="block mb-1">How to fix:</strong>
+                          <p className="whitespace-pre-line">{check.how_to_fix}</p>
+                        </div>
+                        {check.quick_fixes && (
+                          <div className="mt-2 bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-900">
+                            <strong className="block mb-1">⚡ Quick fixes:</strong>
+                            <p>{check.quick_fixes}</p>
+                          </div>
+                        )}
+                        {check.official_docs && (
+                          <a
+                            href={check.official_docs}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            📖 Official Docs ↗
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
         {/* Check Breakdown */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">

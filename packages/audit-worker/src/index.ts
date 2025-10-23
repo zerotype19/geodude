@@ -2941,7 +2941,7 @@ async function getAudit(auditId: string, env: Env) {
             checks_count: data.count
           }));
           
-          // Compute top fixes (failing checks: score < 60)
+          // Compute top fixes (failing checks: score < 60) with full D1 content
           const impactWeight = { High: 3, Medium: 2, Low: 1 };
           fixFirst = enrichedChecks
             .filter((c: any) => c.score < 60) // Failing threshold
@@ -2952,7 +2952,13 @@ async function getAudit(auditId: string, env: Env) {
               impact_level: c.impact_level,
               weight: c.weight,
               score: c.score,
-              why_it_matters: c.why_it_matters
+              why_it_matters: c.why_it_matters,
+              how_to_fix: c.how_to_fix,
+              examples: c.examples,
+              quick_fixes: c.quick_fixes,
+              common_issues: c.common_issues,
+              official_docs: c.official_docs,
+              learn_more_links: c.learn_more_links
             }))
             .sort((a: any, b: any) => {
               const impactDiff = impactWeight[b.impact_level] - impactWeight[a.impact_level];
