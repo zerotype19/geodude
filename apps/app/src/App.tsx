@@ -10,7 +10,7 @@ import AuditPages from './routes/audits/[id]/pages/index.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
 import CategoryDetail from './routes/audits/[id]/category/[category].tsx'
 import ScoreGuideIndex from './routes/score-guide/index.tsx'
-import ScoreGuideDetail from './routes/score-guide/$slug.tsx'
+import CriterionDetail from './routes/score-guide/[criterionId].tsx'
 import AdminPage from './routes/admin.tsx'
 import ClassifierCompare from './routes/admin/classifier-compare.tsx'
 import HealthDashboard from './routes/admin/health.tsx'
@@ -165,7 +165,7 @@ function App() {
             <Route path="/audits/:id/pages" element={<AuditPages />} />
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
             <Route path="/score-guide" element={<ScoreGuideIndex />} />
-            <Route path="/score-guide/:slug" element={<ScoreGuideDetail />} />
+            <Route path="/score-guide/:criterionId" element={<CriterionDetail />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/admin/classifier-compare" element={<ClassifierCompare />} />
             <Route path="/admin/health" element={<HealthDashboard />} />
