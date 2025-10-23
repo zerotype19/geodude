@@ -33,16 +33,16 @@ export default function ScoreGuide() {
   const { mode } = useViewMode();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="min-h-screen bg-surface-1">
+      <div className="page-max container-px py-8">
         {/* Header */}
         <header className="mb-12">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-4xl font-bold mb-2">
                 Optiview Score Guide
               </h1>
-              <p className="text-lg text-gray-600">
+              <p className="text-lg muted">
                 {STATS.total} checks ({STATS.page} page-level + {STATS.site} site-level) that determine how assistants discover, understand, and cite your content
               </p>
             </div>
@@ -68,7 +68,7 @@ export default function ScoreGuide() {
         ) : (
           // Technical View: Flat List by ID
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <h2 className="text-2xl font-bold mb-6">
               All Criteria (Technical)
             </h2>
             <div className="grid gap-6 md:grid-cols-2">
@@ -80,28 +80,28 @@ export default function ScoreGuide() {
         )}
 
         {/* Footer */}
-        <footer className="mt-16 pt-8 border-t border-gray-200">
-          <div className="text-sm text-gray-500 space-y-2">
+        <footer className="mt-16 pt-8 border-t border-border">
+          <div className="text-sm subtle space-y-2">
             <p>
               <strong>Check Types:</strong> {' '}
               <span className="inline-flex items-center gap-1">
-                <span className="font-mono text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">html_dom</span> (deterministic HTML analysis), {' '}
+                <span className="pill pill-brand">html_dom</span> (deterministic HTML analysis), {' '}
               </span>
               <span className="inline-flex items-center gap-1">
-                <span className="font-mono text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">llm</span> (AI-assisted), {' '}
+                <span className="pill pill-brand">llm</span> (AI-assisted), {' '}
               </span>
               <span className="inline-flex items-center gap-1">
-                <span className="font-mono text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">aggregate</span> (site-level rollups), {' '}
+                <span className="pill pill-success">aggregate</span> (site-level rollups), {' '}
               </span>
               <span className="inline-flex items-center gap-1">
-                <span className="font-mono text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">http</span> (robots/sitemap validation)
+                <span className="pill pill-warn">http</span> (robots/sitemap validation)
               </span>
             </p>
             <p>
               <strong>Impact Levels:</strong> {' '}
-              <span className="text-red-600">High</span>, {' '}
-              <span className="text-amber-600">Medium</span>, {' '}
-              <span className="text-green-600">Low</span> {' '}
+              <span className="text-danger">High</span>, {' '}
+              <span className="text-warn">Medium</span>, {' '}
+              <span className="text-success">Low</span> {' '}
               indicate priority for fixing failures.
             </p>
           </div>
