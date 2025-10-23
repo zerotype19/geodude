@@ -5,161 +5,1211 @@
  * Run: npm run sync-score-guide to update from latest D1 export.
  * 
  * Includes all 36 checks (23 page-level + 13 site-level)
- * Last synced: 2025-10-23T07:35:09Z
+ * Last synced: 2025-10-23T08:13:56.212Z
  */
 
-import scoringCriteriaExport from '../data/scoring_criteria.json';
-
-export type Impact = 'High' | 'Medium' | 'Low';
-
-export type Category =
-  | 'Content & Clarity'
-  | 'Structure & Organization'
-  | 'Authority & Trust'
-  | 'Technical Foundations'
-  | 'Crawl & Discoverability'
-  | 'Experience & Performance';
-
-export type Scope = 'page' | 'site';
-export type CheckType = 'html_dom' | 'llm' | 'aggregate' | 'http';
+export type Category = 
+  | "Content & Clarity"
+  | "Structure & Organization"
+  | "Authority & Trust"
+  | "Technical Foundations"
+  | "Crawl & Discoverability"
+  | "Experience & Performance";
 
 export interface CriterionMeta {
   id: string;
+  version: number;
+  label: string;
   title: string;
   description: string;
   category: Category;
-  scope: Scope;
+  scope: "page" | "site";
   weight: number;
-  impact: Impact;
-  check_type: CheckType;
+  impact: "High" | "Medium" | "Low";
+  pass_threshold: number;
+  warn_threshold: number;
+  check_type: "html_dom" | "http" | "aggregate" | "llm";
+  enabled: boolean;
   preview: boolean;
-  why_it_matters: string;
-  how_to_fix: string;
-  common_issues: string;
-  quick_fixes: string;
-  scoring_approach: string;
-  display_order: number | null;
+  why_it_matters?: string;
+  how_to_fix?: string;
+  common_issues?: string;
+  quick_fixes?: string;
+  references?: string[];
+  learn_more_links?: string;
+  official_docs?: string;
+  examples?: string;
+  display_order?: number;
+  points_possible?: number;
+  importance_rank?: number;
+  scoring_approach?: string;
+  view_in_ui?: boolean;
 }
 
-// Transform D1 export to CriterionMeta format
-export const CRITERIA: CriterionMeta[] = (scoringCriteriaExport as any[])
-  .filter((c: any) => c.enabled === 1)
-  .map((c: any) => ({
-    id: c.id,
-    title: c.label,
-    description: c.description || c.label,
-    category: c.category as Category,
-    scope: c.scope as Scope,
-    weight: c.weight,
-    impact: c.impact_level as Impact,
-    check_type: c.check_type as CheckType,
-    preview: c.preview === 1,
-    why_it_matters: c.why_it_matters || '',
-    how_to_fix: c.how_to_fix || '',
-    common_issues: c.common_issues || '',
-    quick_fixes: c.quick_fixes || '',
-    scoring_approach: c.scoring_approach || '',
-    display_order: c.display_order
-  }))
-  .sort((a, b) => (a.display_order || 999) - (b.display_order || 999));
+export const ALL_CRITERIA: CriterionMeta[] = [
+  {
+    "id": "C1_title_quality",
+    "version": 1,
+    "label": "Title tag quality",
+    "title": "Title tag quality",
+    "description": "Clear, descriptive title with sensible length and brand signal.",
+    "category": "Technical Foundations",
+    "scope": "page",
+    "weight": 12,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "The <title> is the strongest on-page signal for topic focus. Assistants and search systems use it to form link text and snippets; clear titles reduce entity confusion and improve click-through.",
+    "how_to_fix": "1) Keep 15–65 chars. 2) Lead with the topic/intent; add brand on key pages (e.g., home, pricing). 3) Use one primary keyword naturally. 4) Make every title unique. 5) Prefer ‘Topic – Brand’.",
+    "common_issues": "Missing <title>; duplicated across templates; >70 chars; vague taglines; keyword stuffing; brand-only.",
+    "quick_fixes": "Export duplicates; rewrite to “Topic – Brand”; trim to <65 chars; add one intent term.",
+    "references": [
+      "https://developers.google.com/search/docs/appearance/title-link",
+      "https://ahrefs.com/blog/title-tags/"
+    ],
+    "learn_more_links": "Short guide: make titles specific, unique, and branded where it helps.",
+    "official_docs": "https://developers.google.com/search/docs/appearance/title-link",
+    "examples": "<title>AI Analytics for Assistant Traffic – Optiview</title>",
+    "display_order": 1,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "C2_meta_description",
+    "version": 1,
+    "label": "Meta description present",
+    "title": "Meta description present",
+    "description": "Meta description exists and is within recommended length.",
+    "category": "Technical Foundations",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Descriptions guide snippet generation and help assistants summarize intent, improving CTR and answer quality.",
+    "how_to_fix": "Add one <meta name=\"description\"> of ~120–155 chars summarizing the page’s value in plain language; avoid boilerplate; keep unique per URL.",
+    "common_issues": "Missing tag; too short/long; duplicated; keyword lists; vague marketing fluff.",
+    "quick_fixes": "Draft crisp summary answering “What is this page?”; keep unique by URL.",
+    "references": [
+      "https://developers.google.com/search/docs/appearance/snippet",
+      "https://moz.com/learn/seo/meta-description"
+    ],
+    "learn_more_links": "Tips for compelling, accurate descriptions.",
+    "official_docs": "https://developers.google.com/search/docs/appearance/snippet",
+    "examples": "<meta name=\"description\" content=\"Measure AI assistant traffic, citations, and conversions with Optiview.\"/>",
+    "display_order": 2,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "C3_h1_presence",
+    "version": 1,
+    "label": "Single H1 tag",
+    "title": "Single H1 tag",
+    "description": "Exactly one H1 indicating the main topic of the page.",
+    "category": "Structure & Organization",
+    "scope": "page",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "A single, descriptive H1 clarifies the main topic. Parsers and assistive tech rely on heading structure to understand content hierarchy.",
+    "how_to_fix": "Ensure exactly one <h1>. Demote other large headings to <h2>/<h3>. Keep H1 aligned with <title> but not identical.",
+    "common_issues": "Multiple H1s from logo/hero; missing H1; styled divs as headings.",
+    "quick_fixes": "Retag hero heading as <h1>; demote extras to <h2>/<h3>.",
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Heading_Elements"
+    ],
+    "learn_more_links": "Heading hierarchy best practices.",
+    "official_docs": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Heading_Elements",
+    "examples": "<h1>Analytics for AI-Influenced Traffic</h1>",
+    "display_order": 3,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A1_answer_first",
+    "version": 1,
+    "label": "Answer-first hero section",
+    "title": "Answer-first hero section",
+    "description": "Clear value proposition and a primary CTA above the fold.",
+    "category": "Content & Clarity",
+    "scope": "page",
+    "weight": 15,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Assistant snippets often mirror the first viewport. A direct answer + CTA improves inclusion in answers and drives outcomes.",
+    "how_to_fix": "Lead with a 1–2 sentence summary of value, then a single primary CTA (Sign up / Request demo) inside the hero.",
+    "common_issues": "Vague hero; CTA buried; conflicting CTAs; jargon.",
+    "quick_fixes": "Write a crisp one-liner + single CTA in the first viewport.",
+    "references": [
+      "https://developers.google.com/search/docs/appearance/snippet",
+      "https://www.nngroup.com/articles/homepage-content/"
+    ],
+    "learn_more_links": "Why clear, early answers improve snippets.",
+    "official_docs": "https://developers.google.com/search/docs/appearance/snippet",
+    "examples": "<section class=\"hero\"><h1>Measure assistant-driven traffic</h1><p>Optiview shows which AI sources drive outcomes.</p><a class=\"btn\">Request demo</a></section>",
+    "display_order": 4,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A2_headings_semantic",
+    "version": 1,
+    "label": "Semantic heading structure",
+    "title": "Semantic heading structure",
+    "description": "Proper H1→H2→H3 hierarchy without skipping levels.",
+    "category": "Structure & Organization",
+    "scope": "page",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Assistants parse headings to extract answers and build summaries. Skipped levels and styled divs reduce extractability.",
+    "how_to_fix": "Use one H1. Nest sections with H2/H3 in order, no H1→H3 jumps. Avoid empty headings and styling misuse.",
+    "common_issues": "H1 followed by H3; headings for styling only; empty headings.",
+    "quick_fixes": "Convert styled blocks to proper heading tags and fill missing levels.",
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Heading_Elements",
+      "https://web.dev/semantic-markup/"
+    ],
+    "learn_more_links": "Semantic HTML that parses well.",
+    "official_docs": "https://developer.mozilla.org/en-US/docs/Web/HTML/Element/Heading_Elements",
+    "examples": "<h1>Topic</h1><h2>Key concept</h2><h3>Example</h3>",
+    "display_order": 5,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A3_faq_presence",
+    "version": 1,
+    "label": "FAQ section present",
+    "title": "FAQ section present",
+    "description": "Detectable FAQ/Q&A block on the page.",
+    "category": "Content & Clarity",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Visible FAQs map directly to common user questions and improve citation odds for query-style prompts.",
+    "how_to_fix": "Add a 'Frequently asked questions' section with 3–6 concise Q&As in plain language; keep answers 1–3 sentences.",
+    "common_issues": "Accordion headings without answers; marketing Qs; walls of text.",
+    "quick_fixes": "Pick real questions from search/support logs; keep answers short.",
+    "references": [
+      "https://developers.google.com/search/docs/appearance/structured-data/faqpage"
+    ],
+    "learn_more_links": "Writing FAQs that get cited.",
+    "official_docs": "https://developers.google.com/search/docs/appearance/structured-data/faqpage",
+    "examples": "<h2>FAQs</h2><dl><dt>How does pricing work?</dt><dd>We bill monthly based on tracked properties.</dd></dl>",
+    "display_order": 6,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A4_schema_faqpage",
+    "version": 1,
+    "label": "FAQPage schema",
+    "title": "FAQPage schema",
+    "description": "Valid FAQPage JSON-LD with 3+ Q&A pairs.",
+    "category": "Technical Foundations",
+    "scope": "page",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "FAQPage JSON-LD enables rich results and makes Q&A extraction deterministic for assistants.",
+    "how_to_fix": "Mirror visible FAQ text in JSON-LD. Include ≥3 Q/A pairs. Validate with a testing tool and keep answers concise.",
+    "common_issues": "Schema doesn’t match visible text; <3 items; invalid JSON.",
+    "quick_fixes": "Generate JSON-LD from the rendered FAQ; keep answers short.",
+    "references": [
+      "https://schema.org/FAQPage",
+      "https://developers.google.com/search/docs/appearance/structured-data/faqpage"
+    ],
+    "learn_more_links": "How to validate FAQ JSON-LD.",
+    "official_docs": "https://developers.google.com/search/docs/appearance/structured-data/faqpage",
+    "examples": "{ \"@context\":\"https://schema.org\",\"@type\":\"FAQPage\",\"mainEntity\":[{\"@type\":\"Question\",\"name\":\"What is Optiview?\",\"acceptedAnswer\":{\"@type\":\"Answer\",\"text\":\"Analytics for AI-influenced traffic.\"}}]}",
+    "display_order": 7,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A9_internal_linking",
+    "version": 1,
+    "label": "Internal linking & diversity",
+    "title": "Internal linking & diversity",
+    "description": "Adequate internal links with diverse, descriptive anchors.",
+    "category": "Structure & Organization",
+    "scope": "page",
+    "weight": 7,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Contextual links guide crawlers, connect topics, and help assistants trace relationships between pages.",
+    "how_to_fix": "Add 3–10 contextual links to related guides/products. Use descriptive anchors (not “learn more”). Link both to pillars and across clusters.",
+    "common_issues": "Menu-only links; repeated generic anchors; orphan pages.",
+    "quick_fixes": "Add a 'Related' section; rewrite anchors to be descriptive.",
+    "references": [
+      "https://developers.google.com/search/docs/fundamentals/seo-starter-guide#linking"
+    ],
+    "learn_more_links": "Internal link strategies for topic clusters.",
+    "official_docs": "https://developers.google.com/search/docs/fundamentals/seo-starter-guide#linking",
+    "examples": "<p>See our <a href=\"/guides/assistant-attribution\">assistant attribution guide</a> for details.</p>",
+    "display_order": 8,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "G10_canonical",
+    "version": 1,
+    "label": "Canonical URL correctness",
+    "title": "Canonical URL correctness",
+    "description": "Canonical tag present and points to same domain.",
+    "category": "Technical Foundations",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Canonicals consolidate duplicate signals so assistants cite the preferred URL.",
+    "how_to_fix": "Add <link rel=\"canonical\" href=\"https://example.com/preferred\"/>. Use HTTPS, same host, and avoid redirects/chains.",
+    "common_issues": "Missing tag; cross-domain; canonical to non-200; querystring canonicals.",
+    "quick_fixes": "Self-canonicalize preferred pages; fix http→https; remove duplicates.",
+    "references": [
+      "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls"
+    ],
+    "learn_more_links": "Common canonical pitfalls and fixes.",
+    "official_docs": "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+    "examples": "<link rel=\"canonical\" href=\"https://app.optiview.ai/score-guide\"/>",
+    "display_order": 9,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "T1_mobile_viewport",
+    "version": 1,
+    "label": "Mobile viewport tag",
+    "title": "Mobile viewport tag",
+    "description": "Viewport meta with device-width for responsive layout.",
+    "category": "Experience & Performance",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Mobile rendering is required for good UX and indexing. Assistants prefer mobile-friendly sources.",
+    "how_to_fix": "Add exactly one <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> in the head; avoid max-scale=1 that blocks zoom.",
+    "common_issues": "Missing tag; desktop-only layouts; duplicated metas; zoom disabled.",
+    "quick_fixes": "Add a single correct viewport; verify responsive CSS.",
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/HTML/Viewport_meta_tag"
+    ],
+    "learn_more_links": "Mobile-ready checklists.",
+    "official_docs": "https://developer.mozilla.org/en-US/docs/Web/HTML/Viewport_meta_tag",
+    "examples": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+    "display_order": 10,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "T2_lang_region",
+    "version": 1,
+    "label": "Language/region tags",
+    "title": "Language/region tags",
+    "description": "HTML lang attribute matches the target locale.",
+    "category": "Technical Foundations",
+    "scope": "page",
+    "weight": 6,
+    "impact": "Low",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Correct language hints improve international targeting and text processing for assistants.",
+    "how_to_fix": "Set <html lang=\"en\"> or a locale like en-US. Keep consistent with page language and hreflang (if used).",
+    "common_issues": "Missing/incorrect lang; inconsistent locales; invalid codes (e.g., en-UK).",
+    "quick_fixes": "Standardize in base layout; lint in CI.",
+    "references": [
+      "https://www.w3.org/International/questions/qa-html-language-declarations",
+      "https://developers.google.com/search/docs/specialty/international/localized-versions"
+    ],
+    "learn_more_links": "Language and locale best practices.",
+    "official_docs": "https://www.w3.org/International/questions/qa-html-language-declarations",
+    "examples": "<html lang=\"en-US\">",
+    "display_order": 11,
+    "points_possible": 100,
+    "importance_rank": 3,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "T3_noindex_robots",
+    "version": 1,
+    "label": "No blocking robots directives",
+    "title": "No blocking robots directives",
+    "description": "No 'noindex' or overly restrictive robots meta directives.",
+    "category": "Crawl & Discoverability",
+    "scope": "page",
+    "weight": 12,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "‘noindex’ or disallow blocks prevent assistants from using your content. Many sites accidentally ship staging settings.",
+    "how_to_fix": "Remove noindex on canonical pages. Default to index,follow. Verify robots.txt doesn’t block core paths.",
+    "common_issues": "Staging flags left on; meta injected via JS; blanket disallow in robots.txt.",
+    "quick_fixes": "Audit templates; remove legacy disallow; re-crawl.",
+    "references": [
+      "https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag",
+      "https://developers.google.com/search/docs/crawling-indexing/robots/intro"
+    ],
+    "learn_more_links": "Robots directives that block indexing.",
+    "official_docs": "https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag",
+    "examples": "<meta name=\"robots\" content=\"index,follow\">",
+    "display_order": 12,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A12_entity_graph",
+    "version": 1,
+    "label": "Organization entity graph",
+    "title": "Organization entity graph",
+    "description": "Organization/LocalBusiness schema with logo and 2+ sameAs links.",
+    "category": "Authority & Trust",
+    "scope": "page",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Clear org identity (name, logo, sameAs) reduces ambiguity in knowledge graphs and improves brand citation.",
+    "how_to_fix": "Add Organization or LocalBusiness JSON-LD with name, url, logo, and ≥2 sameAs profiles (e.g., LinkedIn, X, GitHub).",
+    "common_issues": "Missing logo; no sameAs; name mismatch vs H1/title.",
+    "quick_fixes": "Centralize org schema in base layout; align name/logo; add sameAs.",
+    "references": [
+      "https://schema.org/Organization",
+      "https://schema.org/LocalBusiness"
+    ],
+    "learn_more_links": "Entity graph basics for brands.",
+    "official_docs": "https://schema.org/Organization",
+    "examples": "{ \"@context\":\"https://schema.org\",\"@type\":\"Organization\",\"name\":\"Optiview\",\"url\":\"https://optiview.ai\",\"logo\":\"https://optiview.ai/logo.png\",\"sameAs\":[\"https://www.linkedin.com/company/optiview\",\"https://twitter.com/optiview\"] }",
+    "display_order": 13,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "G2_og_tags_completeness",
+    "version": 1,
+    "label": "Open Graph basics",
+    "title": "Open Graph basics",
+    "description": "Presence of og:title, og:description, og:url, and og:image.",
+    "category": "Technical Foundations",
+    "scope": "page",
+    "weight": 6,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "OG ensures consistent rich cards across surfaces (assistants, social, chat). Missing pieces reduce clarity and CTR.",
+    "how_to_fix": "Add og:title, og:description, og:url (canonical), and og:image (absolute, ~1200×630). Keep values page-specific.",
+    "common_issues": "Missing og:image; relative URLs; global homepage OG reused everywhere.",
+    "quick_fixes": "Add per-page OG and absolute og:image; set og:url to canonical.",
+    "references": [
+      "https://ogp.me/",
+      "https://developers.facebook.com/docs/sharing/webmasters/"
+    ],
+    "learn_more_links": "Open Graph essentials.",
+    "official_docs": "https://ogp.me/",
+    "examples": "<meta property=\"og:title\" content=\"Optiview Score Guide\"/>\n<meta property=\"og:description\" content=\"36 checks used to evaluate assistant-readiness.\"/>\n<meta property=\"og:url\" content=\"https://app.optiview.ai/score-guide\"/>\n<meta property=\"og:image\" content=\"https://optiview.ai/og/score-guide.jpg\"/>",
+    "display_order": 14,
+    "points_possible": 100,
+    "importance_rank": 3,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A6_contact_cta_presence",
+    "version": 1,
+    "label": "Primary CTA above the fold",
+    "title": "Primary CTA above the fold",
+    "description": "Detects a clear Contact/Pricing/Signup CTA in the hero section.",
+    "category": "Content & Clarity",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Assistants often direct users to the nearest action. A visible CTA improves outcome continuity from answer → action.",
+    "how_to_fix": "Place a single primary CTA button in the hero with action-oriented label (e.g., Get started, Request demo).",
+    "common_issues": "CTA buried; multiple competing CTAs; ‘Learn more’ label everywhere.",
+    "quick_fixes": "Promote one clear CTA in hero; use direct action verbs.",
+    "references": [
+      "https://www.nngroup.com/articles/call-to-action-buttons/"
+    ],
+    "learn_more_links": "CTA design patterns that convert.",
+    "official_docs": "https://www.nngroup.com/articles/call-to-action-buttons/",
+    "examples": "<a class=\"btn btn-primary\" href=\"/demo\">Request demo</a>",
+    "display_order": 15,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A5_related_questions_block",
+    "version": 1,
+    "label": "Related questions block",
+    "title": "Related questions block",
+    "description": "Detects a Q&A/related-questions section with multiple questions.",
+    "category": "Content & Clarity",
+    "scope": "page",
+    "weight": 6,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Captures longer-tail intents and improves answer depth for assistants.",
+    "how_to_fix": "Add a ‘Related questions’ section (3–6 Q&As) with 1–2 sentence answers and links to deeper pages.",
+    "common_issues": "Only 1–2 questions; no answers; marketing headlines instead of questions.",
+    "quick_fixes": "Pull real Qs from PPC/support; add brief answers + links.",
+    "references": [],
+    "learn_more_links": "Designing related Q/A that parse well.",
+    "examples": "<h2>Related questions</h2><ul><li>How do I track AI referrals?</li><li>What counts as a conversion?</li></ul>",
+    "display_order": 16,
+    "points_possible": 100,
+    "importance_rank": 3,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "C5_h2_coverage_ratio",
+    "version": 1,
+    "label": "H2 coverage (content-per-section)",
+    "title": "H2 coverage (content-per-section)",
+    "description": "Measures the % of H2s with ≥100 characters of body content following.",
+    "category": "Structure & Organization",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Sections with substance are easier to quote and more authoritative to assistants.",
+    "how_to_fix": "Ensure most H2s have ≥100–150 words of explanatory text, bullets, tables, or examples.",
+    "common_issues": "Heading lists with no body; decorative headings; one-liners.",
+    "quick_fixes": "Expand thin sections; merge redundant H2s; add examples.",
+    "references": [],
+    "learn_more_links": "How assistants parse sections for answers.",
+    "examples": "<h2>How Optiview detects AI referrals</h2><p>We use referer heuristics, headers, and session patterns...</p>",
+    "display_order": 17,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "T4_core_web_vitals_hints",
+    "version": 1,
+    "label": "Core Web Vitals hints",
+    "title": "Core Web Vitals hints",
+    "description": "Heuristics: lazy images, key font preloads, and limited blocking CSS.",
+    "category": "Experience & Performance",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Preconnect/preload/lazy-load patterns are practical proxies for better LCP/FCP — assistants prefer fast sources.",
+    "how_to_fix": "1) Preconnect to critical origins (CDN, fonts). 2) Preload hero image and main font. 3) Lazy-load below-the-fold media. 4) Defer non-critical scripts.",
+    "common_issues": "No preconnect; hero image not preloaded; all images eager; blocking scripts in head.",
+    "quick_fixes": "Add preconnect to CDN; preload hero; lazy-load non-hero media; defer analytics.",
+    "references": [
+      "https://web.dev/fast/",
+      "https://web.dev/optimize-lcp/"
+    ],
+    "learn_more_links": "Practical patterns to improve LCP.",
+    "official_docs": "https://web.dev/optimize-lcp/",
+    "examples": "<link rel=\"preconnect\" href=\"https://cdn.example.com\">\n<link rel=\"preload\" as=\"image\" href=\"/hero.webp\">\n<img loading=\"lazy\" src=\"/gallery/img2.webp\">",
+    "display_order": 18,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "G12_topic_depth_semantic",
+    "version": 1,
+    "label": "Topic depth & semantic coverage",
+    "title": "Topic depth & semantic coverage",
+    "description": "Evaluates semantic completeness using LLM topic embeddings.",
+    "category": "Content & Clarity",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "llm",
+    "enabled": true,
+    "preview": true,
+    "why_it_matters": "Pages that cover related subtopics and co-occurring terms are more likely to be cited by assistants.",
+    "how_to_fix": "Expand with definitions, comparisons, examples, and alternatives; incorporate key terms naturally; avoid fluff.",
+    "common_issues": "Overly brief pages; no examples; missing related intents.",
+    "quick_fixes": "Add a ‘Key concepts’ subsection; include two examples and a comparison table.",
+    "references": [],
+    "learn_more_links": "What semantic coverage means for AEO.",
+    "examples": "Add sections like “How it works”, “Examples”, “Pros & Cons”, “Alternatives”, and comparison tables.",
+    "display_order": 19,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "AI-assisted content analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "G11_entity_graph_completeness",
+    "version": 1,
+    "label": "Entity graph completeness",
+    "title": "Entity graph completeness",
+    "description": "Measures the presence of internal links and schema connections between entities.",
+    "category": "Structure & Organization",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": true,
+    "why_it_matters": "Interlinked entities (Organization, Product, Person) are easier for assistants to map into knowledge graphs and cite accurately.",
+    "how_to_fix": "Link entity mentions to canonical pages; add schema with '@id' or 'url'; connect via sameAs relations.",
+    "common_issues": "Entity mentions without links; isolated schema; no sameAs.",
+    "quick_fixes": "Link first mention; add schema with stable @id; include sameAs.",
+    "references": [
+      "https://schema.org/Organization",
+      "https://schema.org/Person",
+      "https://schema.org/Product"
+    ],
+    "learn_more_links": "Entity linking patterns.",
+    "official_docs": "https://schema.org/Organization",
+    "examples": "{ \"@type\":\"Person\",\"name\":\"Jane Doe\",\"url\":\"/about/jane\",\"worksFor\":{\"@id\":\"#org\"}}",
+    "display_order": 20,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "G6_fact_url_stability",
+    "version": 1,
+    "label": "Canonical fact URLs",
+    "title": "Canonical fact URLs",
+    "description": "Stable URLs and anchors for key facts or product specs.",
+    "category": "Structure & Organization",
+    "scope": "page",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": true,
+    "why_it_matters": "Assistants increasingly cite at the fact level. Stable anchors prevent link rot and improve retrievability.",
+    "how_to_fix": "Add stable id attributes to fact sections/tables; avoid changing anchors; link to deep sections where useful.",
+    "common_issues": "Dynamic auto-generated IDs; headings without IDs; frequent URL changes.",
+    "quick_fixes": "Assign predictable IDs to key headings; avoid renaming anchors.",
+    "references": [],
+    "learn_more_links": "Designing stable anchors for citations.",
+    "examples": "<h3 id=\"pricing-monthly\">Monthly pricing</h3>",
+    "display_order": 21,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML analysis",
+    "view_in_ui": true
+  },
+  {
+    "id": "A13_page_speed_lcp",
+    "version": 1,
+    "label": "Page speed (LCP)",
+    "title": "Page speed (LCP)",
+    "description": "Largest Contentful Paint below 2.5s target.",
+    "category": "Experience & Performance",
+    "scope": "page",
+    "weight": 7,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Faster LCP improves engagement and eligibility for assistant surfaces. Heavy hero assets slow indexing and usage.",
+    "how_to_fix": "Compress hero media; serve responsive images (srcset/sizes); preload the single hero image; inline critical CSS; defer non-critical JS.",
+    "common_issues": "4K hero images; background images without sizing; blocking CSS/JS.",
+    "quick_fixes": "Convert hero to AVIF/WebP; cap width; preload one hero element.",
+    "references": [
+      "https://web.dev/lcp/",
+      "https://web.dev/optimize-lcp/"
+    ],
+    "learn_more_links": "Largest Contentful Paint optimization steps.",
+    "official_docs": "https://web.dev/lcp/",
+    "examples": "<link rel=\"preload\" as=\"image\" href=\"/hero.webp\" imagesrcset=\"/hero-800.webp 800w, /hero-1400.webp 1400w\" imagesizes=\"100vw\">",
+    "display_order": 22,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTML and performance timing proxy",
+    "view_in_ui": true
+  },
+  {
+    "id": "A14_qna_scaffold",
+    "version": 1,
+    "label": "Q&A scaffold",
+    "title": "Q&A scaffold",
+    "description": "Detects visible FAQ or Q&A blocks that match structured schema.",
+    "category": "Content & Clarity",
+    "scope": "page",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "html_dom",
+    "enabled": true,
+    "preview": true,
+    "why_it_matters": "Explicit Q→A blocks are easy for assistants to parse and quote, improving citation odds and snippet quality.",
+    "how_to_fix": "Add a short Q&A list near the top (3–5 items) with concise accepted answers; mirror with FAQ schema where suitable.",
+    "common_issues": "Hidden behind tabs; schema mismatch; long answers; no visible Q&A.",
+    "quick_fixes": "Add visible 3–5 Q&A items; keep answers short; add JSON-LD.",
+    "references": [
+      "https://schema.org/FAQPage"
+    ],
+    "learn_more_links": "Q&A patterns that parse well.",
+    "official_docs": "https://schema.org/FAQPage",
+    "examples": "<section aria-labelledby=\"qna\"><h2 id=\"qna\">Q&A</h2><dl><dt>What does Optiview track?</dt><dd>AI referrals, content engagement, and conversions.</dd></dl></section>",
+    "display_order": 23,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated HTML analysis + schema validation",
+    "view_in_ui": true
+  },
+  {
+    "id": "S1_faq_coverage_pct",
+    "version": 1,
+    "label": "FAQ coverage (site)",
+    "title": "FAQ coverage (site)",
+    "description": "Share of crawled pages that include a detectable FAQ block.",
+    "category": "Content & Clarity",
+    "scope": "site",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 70,
+    "warn_threshold": 40,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Broad FAQ coverage increases the number of direct questions your site can answer and be cited for.",
+    "how_to_fix": "Template a FAQ block and roll it to informational pages (docs, product, pricing, service). Keep 3–6 concise Q&As.",
+    "common_issues": "Only homepage has FAQs; duplicated Qs; long answers.",
+    "quick_fixes": "Ship a reusable FAQ component; enforce limits per item.",
+    "references": [],
+    "learn_more_links": "Scaling FAQs across a site.",
+    "examples": "Target: ≥70% of informational pages include a visible FAQ.",
+    "display_order": 101,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Aggregate of page checks (A3_faq_presence)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S2_faq_schema_adoption_pct",
+    "version": 1,
+    "label": "FAQ schema adoption (site)",
+    "title": "FAQ schema adoption (site)",
+    "description": "Share of pages with valid FAQPage JSON-LD (≥3 Q&A).",
+    "category": "Technical Foundations",
+    "scope": "site",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 70,
+    "warn_threshold": 40,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Sitewide schema adoption scales rich-result eligibility and reliable extraction.",
+    "how_to_fix": "Mirror visible Q&A blocks with valid FAQPage JSON-LD. Validate as part of CI.",
+    "common_issues": "Schema only on a few pages; invalid JSON-LD; mismatched content.",
+    "quick_fixes": "Generate JSON-LD from CMS component automatically.",
+    "references": [
+      "https://schema.org/FAQPage",
+      "https://developers.google.com/search/docs/appearance/structured-data/faqpage"
+    ],
+    "learn_more_links": "Roll out schema at scale.",
+    "official_docs": "https://developers.google.com/search/docs/appearance/structured-data/faqpage",
+    "examples": "Target: ≥70% of pages that have FAQs also include valid schema.",
+    "display_order": 102,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Aggregate of page checks (A4_schema_faqpage)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S3_canonical_correct_pct",
+    "version": 1,
+    "label": "Canonical correctness (site)",
+    "title": "Canonical correctness (site)",
+    "description": "Share of pages with valid, same-host canonical tags.",
+    "category": "Technical Foundations",
+    "scope": "site",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Higher canonical correctness reduces duplication and chooses the right URL for citation.",
+    "how_to_fix": "Self-canonicalize preferred pages; use HTTPS and same host; avoid redirected canonicals.",
+    "common_issues": "Mixed http/https; pointing to redirects; missing on programmatic pages.",
+    "quick_fixes": "Fix base layout canonical; enforce https in generator.",
+    "references": [
+      "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls"
+    ],
+    "learn_more_links": "Duplicate handling strategies.",
+    "official_docs": "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+    "examples": "Goal: ≥85% pages pass canonical checks.",
+    "display_order": 103,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Aggregate of page checks (G10_canonical)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S4_mobile_ready_pct",
+    "version": 1,
+    "label": "Mobile-ready pages (site)",
+    "title": "Mobile-ready pages (site)",
+    "description": "Share of pages with proper viewport meta.",
+    "category": "Experience & Performance",
+    "scope": "site",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 95,
+    "warn_threshold": 80,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Mobile-ready templates improve usability and assistant preference.",
+    "how_to_fix": "Include a correct viewport meta in the base layout and ensure responsive CSS across templates.",
+    "common_issues": "Legacy templates missing viewport; inconsistent head partials.",
+    "quick_fixes": "Move viewport into base layout; backfill legacy pages.",
+    "references": [
+      "https://developer.mozilla.org/en-US/docs/Web/HTML/Viewport_meta_tag"
+    ],
+    "learn_more_links": "Sitewide mobile readiness checklist.",
+    "official_docs": "https://developer.mozilla.org/en-US/docs/Web/HTML/Viewport_meta_tag",
+    "examples": "Target: ≥95% of pages pass the viewport check.",
+    "display_order": 104,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Aggregate of page checks (T1_mobile_viewport)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S5_lang_correct_pct",
+    "version": 1,
+    "label": "Correct lang/region (site)",
+    "title": "Correct lang/region (site)",
+    "description": "Share of pages whose HTML lang matches target locale.",
+    "category": "Technical Foundations",
+    "scope": "site",
+    "weight": 6,
+    "impact": "Low",
+    "pass_threshold": 90,
+    "warn_threshold": 70,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Consistent language declarations help indexing and snippet generation by locale.",
+    "how_to_fix": "Standardize <html lang> in base layouts; ensure alternates use hreflang patterns (separate feature).",
+    "common_issues": "Mixed locales; inherited defaults; invalid codes.",
+    "quick_fixes": "Normalize to ISO codes; lint in CI.",
+    "references": [
+      "https://www.w3.org/International/questions/qa-html-language-declarations"
+    ],
+    "learn_more_links": "i18n HTML language and locale tips.",
+    "official_docs": "https://www.w3.org/International/questions/qa-html-language-declarations",
+    "examples": "Goal: ≥90% locale correctness across the crawl.",
+    "display_order": 105,
+    "points_possible": 100,
+    "importance_rank": 3,
+    "scoring_approach": "Aggregate of page checks (T2_lang_region)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S6_entity_graph_adoption_pct",
+    "version": 1,
+    "label": "Entity graph adoption (site)",
+    "title": "Entity graph adoption (site)",
+    "description": "Share of pages with Organization/LocalBusiness schema set correctly.",
+    "category": "Authority & Trust",
+    "scope": "site",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 70,
+    "warn_threshold": 40,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Consistent org schema reduces identity ambiguity across assistants and panels.",
+    "how_to_fix": "Roll Organization/LocalBusiness JSON-LD to all relevant templates; keep name/logo/@id/sameAs consistent.",
+    "common_issues": "Schema only on the homepage; inconsistent fields; different logos per template.",
+    "quick_fixes": "Move schema to layout; verify with a structured data tester.",
+    "references": [
+      "https://schema.org/Organization"
+    ],
+    "learn_more_links": "Rolling out org schema at scale.",
+    "official_docs": "https://schema.org/Organization",
+    "examples": "Target: ≥70% of pages include correct org schema.",
+    "display_order": 106,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Aggregate of page checks (A12_entity_graph)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S7_dup_title_pct",
+    "version": 1,
+    "label": "Duplicate titles (site)",
+    "title": "Duplicate titles (site)",
+    "description": "Percent of pages sharing a duplicate <title> across the crawl.",
+    "category": "Technical Foundations",
+    "scope": "site",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 90,
+    "warn_threshold": 75,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Duplicate titles dilute relevance and make it harder for assistants to choose the correct URL.",
+    "how_to_fix": "Parameterize titles with differentiators (product, city, category, year). Ensure unique titles per URL.",
+    "common_issues": "Paginated lists share a title; boilerplate titles reused across categories.",
+    "quick_fixes": "Append context like “Pricing”, “2025”, or the product name.",
+    "references": [
+      "https://developers.google.com/search/docs/appearance/title-link"
+    ],
+    "learn_more_links": "Uniqueness strategies for titles.",
+    "official_docs": "https://developers.google.com/search/docs/appearance/title-link",
+    "examples": "Goal: <10% of pages share the same title.",
+    "display_order": 107,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Aggregate of page titles from C1_title_quality details",
+    "view_in_ui": true
+  },
+  {
+    "id": "S8_avg_h2_coverage",
+    "version": 1,
+    "label": "Average H2 coverage (site)",
+    "title": "Average H2 coverage (site)",
+    "description": "Mean H2 coverage ratio across crawled pages.",
+    "category": "Structure & Organization",
+    "scope": "site",
+    "weight": 6,
+    "impact": "Low",
+    "pass_threshold": 70,
+    "warn_threshold": 50,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Richer sections improve topical authority signals across templates.",
+    "how_to_fix": "Set a minimum content rule per H2 in CMS; add examples, bullets, and tables where helpful.",
+    "common_issues": "Programmatic pages with headings only; placeholder sections.",
+    "quick_fixes": "Enforce minimum word/element counts per section.",
+    "references": [],
+    "learn_more_links": "Section depth and topic coverage.",
+    "examples": "Target: sitewide mean ≥70% H2 coverage.",
+    "display_order": 108,
+    "points_possible": 100,
+    "importance_rank": 3,
+    "scoring_approach": "Aggregate of page checks (C5_h2_coverage_ratio)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S9_og_tags_coverage_pct",
+    "version": 1,
+    "label": "OG coverage (site)",
+    "title": "OG coverage (site)",
+    "description": "Share of pages meeting the OG basics threshold.",
+    "category": "Technical Foundations",
+    "scope": "site",
+    "weight": 6,
+    "impact": "Low",
+    "pass_threshold": 80,
+    "warn_threshold": 60,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Consistent OG improves unfurls on share/chat surfaces and helps assistants generate cards.",
+    "how_to_fix": "Bake an OG partial into base layout; set per-page overrides; ensure absolute og:image URLs.",
+    "common_issues": "Some templates omit og:image or og:description; relative image paths.",
+    "quick_fixes": "Add default OG + dynamic per-page fields; use absolute image URLs.",
+    "references": [
+      "https://ogp.me/"
+    ],
+    "learn_more_links": "Scaling OG tags across a site.",
+    "official_docs": "https://ogp.me/",
+    "examples": "Goal: ≥80% of pages pass OG basics.",
+    "display_order": 109,
+    "points_possible": 100,
+    "importance_rank": 3,
+    "scoring_approach": "Aggregate of page checks (G2_og_tags_completeness)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S10_cta_above_fold_pct",
+    "version": 1,
+    "label": "CTA above-the-fold (site)",
+    "title": "CTA above-the-fold (site)",
+    "description": "Share of pages with a detectable CTA near the hero.",
+    "category": "Content & Clarity",
+    "scope": "site",
+    "weight": 6,
+    "impact": "Low",
+    "pass_threshold": 70,
+    "warn_threshold": 40,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Clear first-step actions improve conversion and guidance from assistant answers.",
+    "how_to_fix": "Standardize a hero CTA component across templates; keep a single primary action per page.",
+    "common_issues": "CTA missing on key templates; conflicting CTAs.",
+    "quick_fixes": "Promote one action; audit hero sections.",
+    "references": [],
+    "learn_more_links": "CTA systems that scale.",
+    "examples": "Goal: ≥70% hero sections with a primary CTA.",
+    "display_order": 110,
+    "points_possible": 100,
+    "importance_rank": 3,
+    "scoring_approach": "Aggregate of page checks (A6_contact_cta_presence)",
+    "view_in_ui": true
+  },
+  {
+    "id": "S11_internal_link_health_pct",
+    "version": 1,
+    "label": "Internal link health (site)",
+    "title": "Internal link health (site)",
+    "description": "Share of pages meeting internal link quantity/diversity thresholds.",
+    "category": "Structure & Organization",
+    "scope": "site",
+    "weight": 8,
+    "impact": "Medium",
+    "pass_threshold": 70,
+    "warn_threshold": 50,
+    "check_type": "aggregate",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Healthy link graphs improve discovery and prove topical breadth to assistants.",
+    "how_to_fix": "Define pillar ↔ cluster link patterns; add related sections; diversify anchors.",
+    "common_issues": "Only nav/footer links; repeated 'learn more' anchors; orphan content.",
+    "quick_fixes": "Add 3–5 in-body links with descriptive anchors.",
+    "references": [],
+    "learn_more_links": "Topic clusters and link structure.",
+    "examples": "Goal: ≥70% pages meet internal link quantity/diversity.",
+    "display_order": 111,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Aggregate of page checks (A9_internal_linking)",
+    "view_in_ui": true
+  },
+  {
+    "id": "A8_sitemap_discoverability",
+    "version": 1,
+    "label": "Sitemaps & discoverability",
+    "title": "Sitemaps & discoverability",
+    "description": "Valid XML sitemap with fresh lastmod dates and full coverage.",
+    "category": "Crawl & Discoverability",
+    "scope": "site",
+    "weight": 6,
+    "impact": "Medium",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "http",
+    "enabled": true,
+    "preview": false,
+    "why_it_matters": "Accurate, fresh sitemaps accelerate discovery for both search and AI crawlers, signaling update cadence.",
+    "how_to_fix": "Serve /sitemap.xml or an index; include canonical URLs and <lastmod>; update on publish; ensure 200 status.",
+    "common_issues": "Stale lastmod; wrong host; 404s in sitemap; includes non-canonical URLs.",
+    "quick_fixes": "Auto-generate on deploy/publish; validate weekly.",
+    "references": [
+      "https://www.sitemaps.org/",
+      "https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview"
+    ],
+    "learn_more_links": "Sitemap formats and best practices.",
+    "official_docs": "https://www.sitemaps.org/",
+    "examples": "<url><loc>https://example.com/guides/</loc><lastmod>2025-10-20</lastmod></url>",
+    "display_order": 112,
+    "points_possible": 100,
+    "importance_rank": 2,
+    "scoring_approach": "Automated HTTP/XML validation",
+    "view_in_ui": true
+  },
+  {
+    "id": "T5_ai_bot_access",
+    "version": 1,
+    "label": "AI bot access status",
+    "title": "AI bot access status",
+    "description": "Verifies whether major AI crawlers are allowed in robots.txt and headers.",
+    "category": "Crawl & Discoverability",
+    "scope": "site",
+    "weight": 10,
+    "impact": "High",
+    "pass_threshold": 85,
+    "warn_threshold": 60,
+    "check_type": "http",
+    "enabled": true,
+    "preview": true,
+    "why_it_matters": "If reputable AI crawlers (e.g., GPTBot, Claude-Web, PerplexityBot) are blocked, your content is less likely to be included or cited in assistants.",
+    "how_to_fix": "In robots.txt, add explicit User-agent sections and Allow rules for supported bots; ensure HTML parity between bot and user fetches.",
+    "common_issues": "Global Disallow; conflicting Disallow and meta robots; no explicit AI bot rules.",
+    "quick_fixes": "Add explicit allow blocks; verify a sample page with bot UA.",
+    "references": [
+      "https://openai.com/gptbot",
+      "https://www.anthropic.com/claude/claude-web",
+      "https://docs.perplexity.ai/docs/ai-crawler"
+    ],
+    "learn_more_links": "Balancing policy and access for AI crawlers.",
+    "official_docs": "https://openai.com/gptbot",
+    "examples": "robots.txt sample:\\nUser-agent: GPTBot\\nAllow: /\\n\\nUser-agent: Claude-Web\\nAllow: /",
+    "display_order": 113,
+    "points_possible": 100,
+    "importance_rank": 1,
+    "scoring_approach": "Automated robots.txt + header fetch test",
+    "view_in_ui": true
+  }
+];
 
-// Page-level checks only
-export const PAGE_CRITERIA = CRITERIA.filter(c => c.scope === 'page');
+// Create lookup maps
+export const CRITERIA_BY_ID = new Map<string, CriterionMeta>(
+  ALL_CRITERIA.map(c => [c.id, c])
+);
 
-// Site-level checks only
-export const SITE_CRITERIA = CRITERIA.filter(c => c.scope === 'site');
-
-/**
- * Lookup maps
- */
-export const CRITERIA_BY_ID = new Map(CRITERIA.map(c => [c.id, c]));
-
-export const CRITERIA_BY_CATEGORY = CRITERIA.reduce((acc, c) => {
+export const CRITERIA_BY_CATEGORY = ALL_CRITERIA.reduce((acc, c) => {
   if (!acc[c.category]) acc[c.category] = [];
   acc[c.category].push(c);
   return acc;
 }, {} as Record<Category, CriterionMeta[]>);
 
-export const CRITERIA_BY_SCOPE = CRITERIA.reduce((acc, c) => {
-  if (!acc[c.scope]) acc[c.scope] = [];
-  acc[c.scope].push(c);
-  return acc;
-}, {} as Record<Scope, CriterionMeta[]>);
-
-export const CRITERIA_BY_IMPACT = CRITERIA.reduce((acc, c) => {
-  if (!acc[c.impact]) acc[c.impact] = [];
-  acc[c.impact].push(c);
-  return acc;
-}, {} as Record<Impact, CriterionMeta[]>);
-
-/**
- * Helper functions
- */
-export function getCriteriaForCategory(category: Category): CriterionMeta[] {
-  return CRITERIA_BY_CATEGORY[category] || [];
-}
-
-export function getCriteriaForScope(scope: Scope): CriterionMeta[] {
-  return CRITERIA_BY_SCOPE[scope] || [];
-}
-
-export function getHighImpactCriteria(): CriterionMeta[] {
-  return CRITERIA_BY_IMPACT['High'] || [];
-}
-
-export function isPreviewCriterion(id: string): boolean {
-  return CRITERIA_BY_ID.get(id)?.preview === true;
-}
-
-export function getWeight(id: string): number {
-  return CRITERIA_BY_ID.get(id)?.weight || 0;
-}
-
-/**
- * Category display order
- */
 export const CATEGORY_ORDER: Category[] = [
-  'Technical Foundations',
-  'Structure & Organization',
-  'Content & Clarity',
-  'Authority & Trust',
-  'Crawl & Discoverability',
-  'Experience & Performance'
+  "Content & Clarity",
+  "Structure & Organization",
+  "Authority & Trust",
+  "Technical Foundations",
+  "Crawl & Discoverability",
+  "Experience & Performance"
 ];
 
-/**
- * Category descriptions
- */
 export const CATEGORY_DESCRIPTIONS: Record<Category, string> = {
-  'Technical Foundations': 'Core technical setup that enables assistants to access and understand your content.',
-  'Structure & Organization': 'Organize information so assistants can parse and extract key facts reliably.',
-  'Content & Clarity': 'Make your content easy to understand and cite with clear, comprehensive answers.',
-  'Authority & Trust': 'Build credibility through authorship, citations, and demonstrable expertise.',
-  'Crawl & Discoverability': 'Make it easy for AI crawlers to find and index your content.',
-  'Experience & Performance': 'Deliver fast, mobile-friendly experiences that signal quality to assistants.'
+  "Content & Clarity": "Clear, comprehensive content that answers user intent directly",
+  "Structure & Organization": "Semantic markup, headings, and structured data for AI understanding",
+  "Authority & Trust": "Signals of expertise, credibility, and entity authority",
+  "Technical Foundations": "Core metadata, tags, and technical SEO elements",
+  "Crawl & Discoverability": "Sitemaps, canonicals, robots, and crawl efficiency",
+  "Experience & Performance": "Speed, mobile-readiness, and user experience metrics"
 };
 
-/**
- * Category icons
- */
-export const CATEGORY_ICONS: Record<Category, string> = {
-  'Technical Foundations': '⚙️',
-  'Structure & Organization': '🗂️',
-  'Content & Clarity': '📝',
-  'Authority & Trust': '🛡️',
-  'Crawl & Discoverability': '🔍',
-  'Experience & Performance': '⚡'
+export const CATEGORY_EMOJIS: Record<Category, string> = {
+  "Content & Clarity": "📝",
+  "Structure & Organization": "🏗️",
+  "Authority & Trust": "🎖️",
+  "Technical Foundations": "⚙️",
+  "Crawl & Discoverability": "🔍",
+  "Experience & Performance": "⚡"
 };
 
-/**
- * Stats
- */
-export const STATS = {
-  total: CRITERIA.length,
-  page: PAGE_CRITERIA.length,
-  site: SITE_CRITERIA.length,
-  preview: CRITERIA.filter(c => c.preview).length,
-  production: CRITERIA.filter(c => !c.preview).length,
-  highImpact: CRITERIA.filter(c => c.impact === 'High').length
+export const CATEGORY_SLUGS: Record<Category, string> = {
+  "Content & Clarity": "content-clarity",
+  "Structure & Organization": "structure-organization",
+  "Authority & Trust": "authority-trust",
+  "Technical Foundations": "technical-foundations",
+  "Crawl & Discoverability": "crawl-discoverability",
+  "Experience & Performance": "experience-performance"
 };
 
+export const SLUG_TO_CATEGORY: Record<string, Category> = {
+  "content-clarity": "Content & Clarity",
+  "structure-organization": "Structure & Organization",
+  "authority-trust": "Authority & Trust",
+  "technical-foundations": "Technical Foundations",
+  "crawl-discoverability": "Crawl & Discoverability",
+  "experience-performance": "Experience & Performance"
+};
