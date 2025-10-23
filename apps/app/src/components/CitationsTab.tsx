@@ -239,22 +239,16 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
           <h3 className="text-lg font-medium ">Top Cited URLs</h3>
           <p className="text-sm muted">Your pages that are being cited</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-surface-2">
+        <div className="table-wrap">
+          <table className="ui">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                  URL
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                  Citations
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                  Last Seen
-                </th>
+                <th>URL</th>
+                <th>Citations</th>
+                <th>Last Seen</th>
               </tr>
             </thead>
-            <tbody className="bg-surface-1 divide-y divide-gray-200">
+            <tbody>
               {summary?.topCitedUrls.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="px-6 py-4 text-center subtle">
@@ -301,22 +295,16 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
             </span>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-surface-2">
+        <div className="table-wrap">
+          <table className="ui">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                  Query
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                  Sources
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                  Actions
-                </th>
+                <th>Query</th>
+                <th>Sources</th>
+                <th>Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-surface-1 divide-y divide-gray-200">
+            <tbody>
               {summary?.topCitingQueries.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="px-6 py-4 text-center subtle">
@@ -370,25 +358,17 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
               </span>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-surface-2">
+          <div className="table-wrap">
+            <table className="ui">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Query
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Tested On
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th>Query</th>
+                  <th>Type</th>
+                  <th>Tested On</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-surface-1 divide-y divide-gray-200">
+              <tbody>
                 {summary.missingQueries.map((query, index) => (
                   <tr key={index} className="hover:bg-orange-50">
                     <td className="px-6 py-4">

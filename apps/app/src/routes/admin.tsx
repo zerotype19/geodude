@@ -562,19 +562,19 @@ export default function AdminPage() {
           {loading ? (
             <div className="p-8 text-center muted">Loading audits...</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-surface-2">
+            <div className="table-wrap">
+              <table className="ui">
+                <thead>
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Domain</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Pages</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">AEO / GEO</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Started</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Actions</th>
+                    <th>Domain</th>
+                    <th>Status</th>
+                    <th>Pages</th>
+                    <th>AEO / GEO</th>
+                    <th>Started</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-surface-1 divide-y divide-gray-200">
+                <tbody>
                   {filteredAudits().map(audit => (
                     <tr key={audit.id} className="hover:bg-surface-2">
                       <td className="px-6 py-4">

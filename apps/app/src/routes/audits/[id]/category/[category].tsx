@@ -377,25 +377,17 @@ export default function CategoryDetail() {
               <p className="subtle text-sm">No issues found in this category</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-surface-2">
+            <div className="table-wrap">
+              <table className="ui">
+                <thead>
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                      URL
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                      Failing Checks
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                      Avg Score
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th>URL</th>
+                    <th>Failing Checks</th>
+                    <th>Avg Score</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-surface-1 divide-y divide-gray-200">
+                <tbody>
                   {pagesWithIssues.map((page) => {
                     const avgPageScore = page.failingChecks.length > 0
                       ? Math.round(page.failingChecks.reduce((sum, c) => sum + c.score, 0) / page.failingChecks.length)

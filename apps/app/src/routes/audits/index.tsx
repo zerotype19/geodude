@@ -316,7 +316,7 @@ export default function AuditsIndex() {
             </div>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="ui">
                 <thead>
                   <tr>
                     <th>Project</th>

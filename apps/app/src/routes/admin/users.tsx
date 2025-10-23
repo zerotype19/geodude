@@ -141,28 +141,18 @@ export default function UsersPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-surface-2">
+          <div className="table-wrap">
+            <table className="ui">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Created
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Last Login
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Audits
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
-                    Active Sessions
-                  </th>
+                  <th>Email</th>
+                  <th>Created</th>
+                  <th>Last Login</th>
+                  <th>Audits</th>
+                  <th>Active Sessions</th>
                 </tr>
               </thead>
-              <tbody className="bg-surface-1 divide-y divide-gray-200">
+              <tbody>
                 {users.map((user) => (
                   <tr key={user.id} className="hover:bg-surface-2">
                     <td className="px-6 py-4 whitespace-nowrap">
