@@ -64,8 +64,17 @@ p {
   @apply leading-7 text-ink-muted;
 }
 
+/* Base link styles - no underline on hover for structural links */
 a {
-  @apply text-brand underline-offset-2 hover:underline;
+  @apply text-brand underline-offset-2;
+}
+
+/* Text links within prose content should underline on hover */
+p a:hover,
+li a:hover,
+.prose a:hover,
+.text-link:hover {
+  text-decoration-line: underline;
 }
 
 /* Component utilities */
