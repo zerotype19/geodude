@@ -1882,6 +1882,19 @@ export default {
           }
         }
 
+        // Admin prompt canary test endpoint (test prompt naturalness/realism)
+        if (req.method === 'GET' && path === '/api/admin/prompt-canary') {
+          try {
+            const { handlePromptCanary } = await import('./routes/admin/prompt-canary');
+            return handlePromptCanary(env);
+          } catch (error: any) {
+            return new Response(JSON.stringify({ error: error.message, stack: error.stack }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
         // Admin circuit breaker reset endpoint
         if (req.method === 'POST' && path === '/api/admin/circuit-breaker/reset') {
           try {

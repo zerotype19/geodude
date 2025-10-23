@@ -32,27 +32,34 @@ const MODEL = "@cf/meta/llama-3.1-8b-instruct";
 const KV_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const KV_KEY = (d: string) => `optiview:ai_prompts:v1:${d}`;
 
-const SYSTEM = `You generate realistic, human search questions that people ask
-AI assistants (ChatGPT, Claude, Perplexity) about a brand and its category.
+const SYSTEM = `You write realistic, natural questions people would ask AI assistants 
+like ChatGPT, Claude, or Perplexity about a product, brand, or topic.
 
-Requirements:
-- Return EXACTLY 20 questions, one per line, no numbering.
-- Natural English (6–12 words typical), concise, no fluff.
-- Mix branded (use brand name or common nicknames) and non-branded.
-- Avoid repeating sentence stems (e.g., not "Are X safe for Y?" many times).
-- Use varied forms: "How do I...", "Is it worth...", "Which...", "What's the best...", "Why...", "When...".
-- Neutral, non-advisory tone for finance/insurance (no promises).
+Write them like Reddit or Quora users — conversational, curious, and 
+focused on solving problems or making decisions.
 
-Intent coverage (meet the quotas passed in the user prompt):
-- trust & security
-- cost & fees
-- rewards & benefits
-- comparison with competitors
-- acceptance & usability
-- support & troubleshooting
-- eligibility & requirements
-- features & experience
+Rules:
+- Return exactly 20 lines, one per question.
+- Each question must sound like something a person would type or say.
+- Use a mix of tones:
+  - 25% curiosity ("why", "worth", "still")
+  - 25% how-to or problem solving ("how do I", "help me", "fix")
+  - 25% comparison or decision ("vs", "should I", "which is better")
+  - 25% practical details ("cost", "plans", "features")
+- Use 1–2 first-person forms ("I", "me") where natural.
+- Alternate short (6–8 words) and longer (12–15 words) questions.
+- Avoid repeating structure or using identical openers.
+- Use brand name in about half.
+- Tone: neutral to mildly conversational, never robotic.
 `;
+
+// Natural question stem pool for humanization
+const stemPool = {
+  curiosity: ["why", "what's the deal with", "how come", "is it really", "what's the catch with", "why do people"],
+  action: ["how do I", "what's the best way to", "help me", "tips for", "how can I", "guide to"],
+  compare: ["vs", "worth switching", "better than", "alternatives to", "should I choose", "which is better"],
+  decision: ["should I", "is it worth", "would you recommend", "worth the", "any reason to"],
+};
 
 function buildUserPrompt(input: PromptGenInput): string {
   const brand = input.brand ?? input.domain.replace(/^www\./, "");
@@ -252,6 +259,15 @@ export async function generateAiPrompts(
       model: MODEL,
       cached: false
     };
+
+    // Calculate and log human score for monitoring
+    const { averageHumanScore } = await import('./qualityFilter');
+    const avgHumanScore = averageHumanScore(result.raw);
+    console.log(`[AI_PROMPTS] Generated ${result.raw.length} prompts for ${domain} (human_score: ${avgHumanScore.toFixed(3)})`);
+    
+    if (avgHumanScore < 0.7) {
+      console.warn(`[AI_PROMPTS] ⚠️  Human score below target (${avgHumanScore.toFixed(3)} < 0.7) for ${domain}`);
+    }
 
     // Cache (with TTL override support for testing)
     const ttl = ttlOverride ?? KV_TTL_SECONDS;

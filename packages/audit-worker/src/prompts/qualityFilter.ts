@@ -90,6 +90,59 @@ export function isNaturalQuery(query: string): QualityCheckResult {
 }
 
 /**
+ * Calculate human-likelihood score for a query (0-1)
+ * Higher scores indicate more natural, conversational phrasing
+ * Target: ≥ 0.7 for production queries
+ */
+export function humanScore(q: string): number {
+  let score = 0;
+  
+  // 1. Personal language (+0.2)
+  const personal = /\b(I|me|my|should I|would you|help me|worth it|actually|really|vs)\b/i.test(q);
+  if (personal) score += 0.2;
+  
+  // 2. Length appropriateness (+0.5)
+  const wordCount = q.split(/\s+/).length;
+  if (wordCount >= 6 && wordCount <= 15) {
+    score += 0.5;
+  } else if (wordCount >= 4 && wordCount <= 20) {
+    score += 0.3;  // Partial credit for reasonable length
+  } else {
+    score += 0.1;  // Too short or too long
+  }
+  
+  // 3. Natural punctuation (+0.3)
+  if (q.includes('?')) score += 0.3;
+  else if (q.includes('.')) score += 0.1;
+  
+  // 4. Conversational stems (+0.2)
+  const conversationalStems = [
+    /^(why|what's the|how come|is it really|what's the catch)/i,
+    /^(how do I|help me|tips for|guide to)/i,
+    /\b(vs|worth switching|better than|alternatives to|should I choose)\b/i,
+    /\b(worth the|any reason to|would you recommend)\b/i
+  ];
+  const hasConversationalStem = conversationalStems.some(pattern => pattern.test(q));
+  if (hasConversationalStem) score += 0.2;
+  
+  // 5. Deductions for unnatural patterns
+  if (/\b(steps to|explain how|when should someone)\b/i.test(q)) score -= 0.3;
+  if (/availability and limits/i.test(q)) score -= 0.4;
+  if (q.endsWith('.')) score -= 0.1;  // Questions shouldn't end with periods
+  
+  return Math.max(0, Math.min(1, score));  // Clamp to 0-1 range
+}
+
+/**
+ * Calculate average human score for a batch of queries
+ */
+export function averageHumanScore(queries: string[]): number {
+  if (queries.length === 0) return 0;
+  const sum = queries.reduce((acc, q) => acc + humanScore(q), 0);
+  return sum / queries.length;
+}
+
+/**
  * Filter an array of queries, removing low-quality ones
  */
 export function filterQueriesByQuality(queries: string[]): {
