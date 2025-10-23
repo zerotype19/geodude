@@ -180,10 +180,16 @@ function Status({ status }: StatusProps) {
     error: 'bg-rose-500',
     not_applicable: 'bg-gray-400',
     preview: 'bg-purple-500',
-  }[status];
+  }[status] || 'bg-gray-400';
 
   const label =
-    status === 'not_applicable' ? 'N/A' : status === 'preview' ? 'Preview' : status.toUpperCase();
+    status === 'not_applicable'
+      ? 'N/A'
+      : status === 'preview'
+      ? 'Preview'
+      : status && typeof status === 'string'
+      ? status.toUpperCase()
+      : 'Unknown';
 
   return (
     <span className={`text-[10px] font-bold text-white px-2 py-1 rounded uppercase ${m}`}>
