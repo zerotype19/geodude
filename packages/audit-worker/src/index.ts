@@ -747,7 +747,7 @@ async function processQueuedCitations(env: Env): Promise<void> {
   
   // Get the oldest queued job
   const audit = await env.DB.prepare(`
-    SELECT id, project_id, root_url
+    SELECT id, project_id, root_url, site_description, industry, industry_source
     FROM audits
     WHERE citations_status = 'queued'
     ORDER BY citations_queued_at ASC
@@ -770,8 +770,81 @@ async function processQueuedCitations(env: Env): Promise<void> {
   `).bind(audit.id).run();
   
   try {
-    // Call the actual citations processing (the old runCitations logic)
     const domain = normalizeDomain(new URL(audit.root_url as string).hostname);
+    
+    // 🔥 RE-CLASSIFY INDUSTRY with rich signals from crawled pages
+    console.log(`[CITATIONS_CRON] Re-classifying industry for ${domain} (was: ${audit.industry} from ${audit.industry_source})`);
+    
+    try {
+      // Fetch homepage data for rich signals
+      const homepage = await env.DB.prepare(`
+        SELECT p.url, p.html_static, p.html_rendered, apa.title, apa.h1, apa.schema_types
+        FROM audit_pages p
+        LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+        WHERE p.audit_id = ?1 AND p.url = ?2
+        LIMIT 1
+      `).bind(audit.id, audit.root_url).first();
+      
+      // Build rich signals from crawled data
+      const signals = {
+        domain,
+        homepageTitle: homepage?.title || undefined,
+        homepageH1: homepage?.h1 || undefined,
+        schemaTypes: homepage?.schema_types ? JSON.parse(homepage.schema_types as string) : undefined,
+        keywords: audit.site_description ? audit.site_description.toLowerCase().split(/\s+/).slice(0, 20) : undefined,
+        navTerms: homepage?.html_static ? 
+          (homepage.html_static as string)
+            .match(/<nav[^>]*>(.*?)<\/nav>/is)?.[1]
+            ?.replace(/<[^>]+>/g, ' ')
+            .toLowerCase()
+            .split(/\s+/)
+            .filter(w => w.length > 3)
+            .slice(0, 20) : undefined
+      };
+      
+      console.log(`[CITATIONS_CRON] Signals:`, { 
+        hasTitle: !!signals.homepageTitle,
+        hasH1: !!signals.homepageH1,
+        hasSchema: !!signals.schemaTypes,
+        hasKeywords: !!signals.keywords,
+        hasNav: !!signals.navTerms
+      });
+      
+      // Re-run industry classification with rich signals
+      const { resolveIndustry } = await import('./lib/industry');
+      const newIndustryLock = await resolveIndustry({
+        signals,
+        env,
+        root_url: audit.root_url as string,
+        site_description: audit.site_description as string | undefined
+      });
+      
+      // If industry changed AND new classification is more confident, update it
+      const shouldUpdate = 
+        newIndustryLock.value !== audit.industry &&
+        (
+          newIndustryLock.source === 'ai_worker' ||  // High confidence AI
+          newIndustryLock.source === 'domain_rules' ||  // Explicit rule
+          newIndustryLock.source === 'heuristics' ||  // Strong signal match
+          (newIndustryLock.source === 'ai_worker_medium_conf' && audit.industry_source === 'default')  // Medium conf better than default
+        );
+      
+      if (shouldUpdate) {
+        console.log(`[CITATIONS_CRON] ✅ Industry re-classified: ${audit.industry} → ${newIndustryLock.value} (source: ${newIndustryLock.source}, conf: ${newIndustryLock.confidence?.toFixed(3) || 'N/A'})`);
+        
+        // Update audit with better classification
+        await env.DB.prepare(`
+          UPDATE audits
+          SET industry = ?,
+              industry_source = ?
+          WHERE id = ?
+        `).bind(newIndustryLock.value, `${newIndustryLock.source}_citations_reclass`, audit.id).run();
+      } else {
+        console.log(`[CITATIONS_CRON] Keeping original industry: ${audit.industry} (new: ${newIndustryLock.value} from ${newIndustryLock.source} not confident enough)`);
+      }
+    } catch (reclassErr) {
+      console.error(`[CITATIONS_CRON] Industry re-classification failed, using original:`, reclassErr);
+    }
     
     // Build a mock request to reuse existing processCitations logic
     const mockRequest = new Request('https://api.optiview.ai/api/citations/run', {
