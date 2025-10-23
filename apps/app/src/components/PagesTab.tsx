@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { apiGet } from '../lib/api';
 import { Link } from 'react-router-dom';
-import CheckPill from './CheckPill';
+
+interface PageCheck {
+  id: string;
+  score: number;
+  status: string;
+  scope: 'page';
+  preview?: boolean;
+  impact?: string;
+  details?: Record<string, any>;
+}
 
 interface Page {
   id: string;
@@ -23,8 +32,8 @@ export default function PagesTab({ auditId }: PagesTabProps) {
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'aeo' | 'geo'>('all');
-  const [sortBy, setSortBy] = useState<'url' | 'aeo_score' | 'geo_score'>('url');
+  const [filter, setFilter] = useState<'all' | 'issues' | 'good'>('all');
+  const [sortBy, setSortBy] = useState<'url' | 'score'>('url');
 
   useEffect(() => {
     fetchPages();
@@ -41,33 +50,68 @@ export default function PagesTab({ auditId }: PagesTabProps) {
     }
   };
 
-  const getCheckChips = (checksJson?: string) => {
+  const parseChecks = (checksJson?: string): PageCheck[] => {
     if (!checksJson) return [];
     
     try {
       const checks = JSON.parse(checksJson);
-      return checks.map((check: any) => ({
-        id: check.id,
-        score: check.score,
-        weight: check.weight
-      }));
+      return Array.isArray(checks) ? checks : [];
     } catch (e) {
       return [];
     }
   };
 
-  const filteredAndSortedPages = pages
-    .filter(page => {
-      if (filter === 'aeo') return page.aeo_score !== undefined && page.aeo_score < 70;
-      if (filter === 'geo') return page.geo_score !== undefined && page.geo_score < 70;
+  const calculatePageScore = (checks: PageCheck[]): number => {
+    // Filter out preview checks
+    const productionChecks = checks.filter((c) => !c.preview);
+    if (productionChecks.length === 0) return 0;
+    
+    // Simple average for now (could use weights from criteria table)
+    const sum = productionChecks.reduce((acc, check) => acc + check.score, 0);
+    return Math.round(sum / productionChecks.length);
+  };
+
+  const getScoreColor = (score: number): string => {
+    if (score >= 85) return 'text-green-600';
+    if (score >= 60) return 'text-amber-600';
+    return 'text-red-600';
+  };
+
+  const getScoreBadgeColor = (score: number): string => {
+    if (score >= 85) return 'bg-green-100 text-green-800';
+    if (score >= 60) return 'bg-amber-100 text-amber-800';
+    return 'bg-red-100 text-red-800';
+  };
+
+  const getStatusChip = (status: string): string => {
+    switch (status) {
+      case 'ok':
+        return 'bg-green-500';
+      case 'warn':
+        return 'bg-amber-500';
+      case 'fail':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  const pagesWithScores = pages.map((page) => {
+    const checks = parseChecks(page.checks_json);
+    const score = calculatePageScore(checks);
+    return { ...page, checks, diagnosticScore: score };
+  });
+
+  const filteredAndSortedPages = pagesWithScores
+    .filter((page) => {
+      if (filter === 'issues') return page.diagnosticScore < 60;
+      if (filter === 'good') return page.diagnosticScore >= 85;
       return true;
     })
     .sort((a, b) => {
       switch (sortBy) {
-        case 'aeo_score':
-          return (b.aeo_score || 0) - (a.aeo_score || 0);
-        case 'geo_score':
-          return (b.geo_score || 0) - (a.geo_score || 0);
+        case 'score':
+          return b.diagnosticScore - a.diagnosticScore;
         case 'url':
         default:
           return a.url.localeCompare(b.url);
@@ -115,8 +159,8 @@ export default function PagesTab({ auditId }: PagesTabProps) {
                 className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Pages</option>
-                <option value="aeo">AEO Issues (&lt;70)</option>
-                <option value="geo">GEO Issues (&lt;70)</option>
+                <option value="issues">Issues (&lt;60)</option>
+                <option value="good">Good (≥85)</option>
               </select>
             </div>
             
@@ -128,8 +172,7 @@ export default function PagesTab({ auditId }: PagesTabProps) {
                 className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="url">URL</option>
-                <option value="aeo_score">AEO Score</option>
-                <option value="geo_score">GEO Score</option>
+                <option value="score">Diagnostic Score</option>
               </select>
             </div>
           </div>
@@ -143,10 +186,11 @@ export default function PagesTab({ auditId }: PagesTabProps) {
       {/* Pages Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredAndSortedPages.map((page) => {
-          const checkChips = getCheckChips(page.checks_json);
+          const failingChecks = page.checks.filter((c) => !c.preview && c.status === 'fail');
+          const warningChecks = page.checks.filter((c) => !c.preview && c.status === 'warn');
           
           return (
-            <div key={page.id} className="bg-white shadow rounded-lg">
+            <div key={page.id} className="bg-white shadow rounded-lg hover:shadow-md transition-shadow">
               <div className="p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
@@ -165,45 +209,60 @@ export default function PagesTab({ auditId }: PagesTabProps) {
                   </span>
                 </div>
 
-                {/* Scores */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {page.aeo_score ? Math.round(page.aeo_score) : 'N/A'}
-                    </div>
-                    <div className="text-xs text-gray-500">AEO Score</div>
+                {/* Diagnostic Score */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-medium text-gray-700">Diagnostic Score</div>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded ${getScoreBadgeColor(page.diagnosticScore)}`}>
+                      {page.diagnosticScore >= 85 ? 'Good' : page.diagnosticScore >= 60 ? 'Fair' : 'Needs Work'}
+                    </span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {page.geo_score ? Math.round(page.geo_score) : 'N/A'}
-                    </div>
-                    <div className="text-xs text-gray-500">GEO Score</div>
+                  <div className={`text-3xl font-bold ${getScoreColor(page.diagnosticScore)} mb-2`}>
+                    {page.diagnosticScore}
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${
+                        page.diagnosticScore >= 85 ? 'bg-green-500' : page.diagnosticScore >= 60 ? 'bg-amber-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${Math.min(100, page.diagnosticScore)}%` }}
+                    />
                   </div>
                 </div>
 
-                {/* Check Chips */}
-                <div className="mb-4">
-                  <div className="text-xs font-medium text-gray-700 mb-2">Check Results</div>
-                  <div className="flex flex-wrap gap-1">
-                    {checkChips.slice(0, 8).map((check) => (
-                      <CheckPill
-                        key={check.id}
-                        code={check.id}
-                        score={check.score}
-                        weight={check.weight}
-                        compact={true}
-                      />
-                    ))}
-                    {checkChips.length > 8 && (
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                        +{checkChips.length - 8}
-                      </span>
+                {/* Check Summary */}
+                <div className="mb-4 text-sm text-gray-600">
+                  <div className="flex items-center justify-between">
+                    <span>{page.checks.filter(c => !c.preview).length} active checks</span>
+                    {failingChecks.length > 0 && (
+                      <span className="text-red-600 font-semibold">{failingChecks.length} failing</span>
+                    )}
+                    {failingChecks.length === 0 && warningChecks.length > 0 && (
+                      <span className="text-amber-600 font-semibold">{warningChecks.length} warnings</span>
                     )}
                   </div>
                 </div>
 
+                {/* Top Issues */}
+                {failingChecks.length > 0 && (
+                  <div className="mb-4">
+                    <div className="text-xs font-medium text-gray-700 mb-2">Top Issues</div>
+                    <div className="space-y-1">
+                      {failingChecks.slice(0, 3).map((check) => (
+                        <div key={check.id} className="flex items-center text-xs">
+                          <span className={`w-2 h-2 rounded-full ${getStatusChip(check.status)} mr-2`}></span>
+                          <span className="font-mono text-gray-600">{check.id}</span>
+                        </div>
+                      ))}
+                      {failingChecks.length > 3 && (
+                        <div className="text-xs text-gray-500 pl-4">+{failingChecks.length - 3} more</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Actions */}
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-4 border-t border-gray-100">
                   <Link
                     to={`/audits/${auditId}/pages/${page.id}`}
                     className="text-blue-600 hover:text-blue-800 text-sm font-medium"
@@ -231,4 +290,3 @@ export default function PagesTab({ auditId }: PagesTabProps) {
     </div>
   );
 }
-

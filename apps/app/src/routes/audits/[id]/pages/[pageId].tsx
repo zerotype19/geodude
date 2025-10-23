@@ -3,6 +3,8 @@ import { apiGet } from '../../../../lib/api';
 import { useParams, Link } from 'react-router-dom';
 import CheckPill from '/src/components/CheckPill';
 import { getCheckMeta } from '/src/content/checks';
+import PageChecksTable from '/src/components/PageChecksTable';
+import { useAuditDiagnostics } from '/src/hooks/useAuditDiagnostics';
 
 interface PageDetails {
   id: string;
@@ -53,6 +55,9 @@ export default function PageDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'checks' | 'schema' | 'html'>('checks');
+  
+  // Load diagnostics data
+  const diagnostics = useAuditDiagnostics(id);
 
   useEffect(() => {
     if (pageId) {
@@ -234,7 +239,49 @@ export default function PageDetail() {
         </div>
 
         {/* Score Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Diagnostic Score */}
+          {pageId && diagnostics.pageChecks[pageId] && (
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">D</span>
+                    </div>
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Diagnostic Score</dt>
+                      <dd className={`text-3xl font-semibold ${
+                        diagnostics.pageChecks[pageId]
+                          ? getScoreColor(
+                              Math.round(
+                                diagnostics.pageChecks[pageId]
+                                  .filter((c) => !c.preview)
+                                  .reduce((sum, c) => sum + c.score, 0) /
+                                  diagnostics.pageChecks[pageId].filter((c) => !c.preview).length
+                              )
+                            )
+                          : 'text-gray-500'
+                      }`}>
+                        {diagnostics.pageChecks[pageId]
+                          ? Math.round(
+                              diagnostics.pageChecks[pageId]
+                                .filter((c) => !c.preview)
+                                .reduce((sum, c) => sum + c.score, 0) /
+                                diagnostics.pageChecks[pageId].filter((c) => !c.preview).length
+                            )
+                          : 'N/A'}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* AEO Score (Legacy) */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="p-6">
               <div className="flex items-center">
@@ -245,7 +292,7 @@ export default function PageDetail() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">AEO Score</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">AEO Score (Legacy)</dt>
                     <dd className={`text-3xl font-semibold ${getScoreColor(page.aeo_score)}`}>
                       {page.aeo_score ? Math.round(page.aeo_score) : 'N/A'}
                     </dd>
@@ -255,6 +302,7 @@ export default function PageDetail() {
             </div>
           </div>
 
+          {/* GEO Score (Legacy) */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="p-6">
               <div className="flex items-center">
@@ -265,7 +313,7 @@ export default function PageDetail() {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">GEO Score</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">GEO Score (Legacy)</dt>
                     <dd className={`text-3xl font-semibold ${getScoreColor(page.geo_score)}`}>
                       {page.geo_score ? Math.round(page.geo_score) : 'N/A'}
                     </dd>
