@@ -1360,6 +1360,53 @@ export default {
           }
         }
 
+        // Re-score recent audits with new preview=0 criteria
+        if (req.method === 'POST' && path === '/api/admin/rescore-recent') {
+          try {
+            const body = await req.json() as { limit?: number };
+            const limit = body.limit || 10;
+            
+            // Get recent completed audits
+            const audits = await env.DB.prepare(`
+              SELECT id, root_url, created_at 
+              FROM audits 
+              WHERE status = 'complete' 
+              ORDER BY created_at DESC 
+              LIMIT ?
+            `).bind(limit).all();
+            
+            const results = [];
+            for (const audit of (audits.results || [])) {
+              try {
+                console.log(`[RESCORE] Starting ${audit.id} (${audit.root_url})`);
+                await recomputeAudit(audit.id as string, env);
+                results.push({ id: audit.id, status: 'success' });
+                console.log(`[RESCORE] ✅ ${audit.id}`);
+              } catch (err) {
+                console.error(`[RESCORE] ❌ ${audit.id}:`, err);
+                results.push({ id: audit.id, status: 'error', error: String(err) });
+              }
+            }
+            
+            return new Response(JSON.stringify({
+              ok: true,
+              rescored: results.length,
+              results
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (error) {
+            console.error('[RESCORE] Batch failed:', error);
+            return new Response(JSON.stringify({ 
+              error: error instanceof Error ? error.message : 'Unknown error' 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
         // Compute site-level diagnostics for an audit
         if (req.method === 'POST' && path.startsWith('/api/admin/audits/') && path.endsWith('/compute-site-diagnostics')) {
           const auditId = path.split('/')[4];

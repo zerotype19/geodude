@@ -49,41 +49,6 @@ export default function ScoreGuide() {
             <ViewToggle />
           </div>
 
-          {/* Explainer */}
-          <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-            <p className="text-gray-700 leading-relaxed mb-4">
-              {mode === 'business' ? (
-                <>
-                  This guide organizes our {STATS.total} checks into <strong>6 practical categories</strong> that 
-                  map to business outcomes. Each check includes its ID, impact level, and plain-language explanation 
-                  of why it matters for AI visibility.
-                </>
-              ) : (
-                <>
-                  Technical view shows all checks sorted by ID with detection weights and implementation 
-                  notes. {STATS.preview > 0 && `${STATS.preview} checks marked "Preview" are in shadow mode and don't yet affect composite scores.`}
-                </>
-              )}
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm pt-4 border-t border-gray-100">
-              <div>
-                <div className="text-2xl font-bold text-blue-600">{STATS.production}</div>
-                <div className="text-gray-600">Production Ready</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-amber-600">{STATS.preview}</div>
-                <div className="text-gray-600">In Preview</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-green-600">{STATS.page}</div>
-                <div className="text-gray-600">Page-Level</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-purple-600">{STATS.site}</div>
-                <div className="text-gray-600">Site-Level</div>
-              </div>
-            </div>
-          </div>
         </header>
 
         {/* Content */}

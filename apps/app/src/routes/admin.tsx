@@ -166,6 +166,29 @@ export default function AdminPage() {
     showMessage('success', '✅ All prompts regenerated!');
   };
 
+  const rescoreRecent = async () => {
+    if (!confirm('Re-score the last 10 completed audits with new production criteria? This may take a minute.')) {
+      return;
+    }
+
+    try {
+      showMessage('success', 'Re-scoring audits...');
+      const data = await apiPost<any>('/api/admin/rescore-recent', { limit: 10 });
+      
+      if (data.ok) {
+        const successCount = data.results.filter((r: any) => r.status === 'success').length;
+        const errorCount = data.results.filter((r: any) => r.status === 'error').length;
+        showMessage('success', `✅ Re-scored ${successCount} audits (${errorCount} errors)`);
+        fetchAudits();
+      } else {
+        showMessage('error', 'Failed to re-score audits');
+      }
+    } catch (error) {
+      console.error('Failed to re-score:', error);
+      showMessage('error', 'Failed to re-score audits');
+    }
+  };
+
   const deleteFailedAudits = async () => {
     const failedAudits = audits.filter(a => a.status === 'failed');
     if (failedAudits.length === 0) {
@@ -297,6 +320,20 @@ export default function AdminPage() {
                 </div>
               </div>
             </a>
+
+            {/* Re-score Recent Audits */}
+            <button
+              onClick={rescoreRecent}
+              className="block w-full bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-purple-100 text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-3xl">🔄</div>
+                <div>
+                  <div className="font-semibold text-gray-900">Re-score Recent</div>
+                  <div className="text-sm text-gray-600">Re-compute last 10 audits (all criteria live)</div>
+                </div>
+              </div>
+            </button>
 
             {/* Cloudflare Analytics */}
             <a

@@ -21,7 +21,6 @@ export default function CompositeBanner({ data }: Props) {
       <Tile 
         title="Optiview Score" 
         value={fmt(data.total)} 
-        subtitle={data.counts.preview > 0 ? `${data.counts.preview} preview excluded` : undefined}
         color="blue"
       />
       <Tile 
