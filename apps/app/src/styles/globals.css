@@ -37,30 +37,7 @@
   --color-info-soft: oklch(94% 0.04 240);
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-brand: oklch(70% 0.23 274);
-    --color-brand-foreground: oklch(22% 0.02 250);
-    --color-brand-soft: oklch(18% 0.15 274);
-    
-    --color-ink: oklch(96% 0 0);
-    --color-ink-muted: oklch(70% 0 0);
-    --color-ink-subtle: oklch(62% 0 0);
-    --color-ink-inverse: oklch(22% 0.02 250);
-    
-    --color-surface-1: oklch(15% 0.01 250);
-    --color-surface-2: oklch(18% 0.01 250);
-    --color-surface-3: oklch(22% 0.01 250);
-    
-    --color-border: oklch(30% 0 0);
-    --color-ring: oklch(70% 0.23 274);
-    
-    --color-success-soft: oklch(25% 0.10 158);
-    --color-warn-soft: oklch(25% 0.10 85);
-    --color-danger-soft: oklch(25% 0.15 20);
-    --color-info-soft: oklch(25% 0.10 240);
-  }
-}
+/* Dark mode disabled for now - will add opt-in toggle later */
 
 /* Base styles */
 * {
