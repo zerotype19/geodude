@@ -4724,8 +4724,8 @@ async function runCitations(req: Request, env: Env) {
     // Process each source-query combination with batched concurrency + timeouts
     for (const source of activeSources) {
       console.log(`[CITATIONS] Processing source: ${source}`);
-      // Global cap: max 24 queries per run (configurable)
-      const MAX_QUERIES = 27;
+      // Global cap: max queries per source (increased from 27 to 40 for better coverage)
+      const MAX_QUERIES = 40;
       
       // Get source-specific timeout
       const getTimeout = (src: string) => {

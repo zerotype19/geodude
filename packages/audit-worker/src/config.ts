@@ -26,8 +26,8 @@ export const PROMPTS_MAX_PER_INTENT = 3;
 
 // Shared settings
 export const PROMPTS_ENABLE_REALISM_SCORER = true;     // set false if no AI binding
-export const PROMPTS_BRANDED_MAX = 10;                 // max branded queries to return
-export const PROMPTS_NONBRANDED_MAX = 18;              // max non-branded queries to return
+export const PROMPTS_BRANDED_MAX = 15;                 // max branded queries to return (was 10)
+export const PROMPTS_NONBRANDED_MAX = 25;              // max non-branded queries to return (was 18)
 
 // Industry V2 (Horizon 1) - New unified pipeline
 export const INDUSTRY_V2_ENABLED = true;               // Enable industry taxonomy 2.0 + MSS templates
