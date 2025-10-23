@@ -10,6 +10,11 @@ interface FixItem {
   impact_level: 'High' | 'Medium' | 'Low';
   weight: number;
   score: number;
+  page_url?: string;
+  page_title?: string;
+  page_h1?: string;
+  details?: Record<string, any>;
+  evidence?: string[];
   why_it_matters?: string;
   how_to_fix?: string;
   examples?: string;
@@ -24,7 +29,7 @@ interface FixFirstProps {
 }
 
 export default function FixFirst({ fixes }: FixFirstProps) {
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedFixes, setExpandedFixes] = useState<Set<string>>(new Set());
 
   if (!fixes || fixes.length === 0) {
@@ -40,31 +45,36 @@ export default function FixFirst({ fixes }: FixFirstProps) {
     );
   }
 
-  // Group fixes by category
-  const fixesByCategory = fixes.reduce((acc, fix) => {
-    if (!acc[fix.category]) {
-      acc[fix.category] = [];
+  // Group fixes by page URL
+  const fixesByPage = fixes.reduce((acc, fix) => {
+    const pageKey = fix.page_url || 'Site-Level Issues';
+    if (!acc[pageKey]) {
+      acc[pageKey] = {
+        url: fix.page_url,
+        title: fix.page_title,
+        fixes: []
+      };
     }
-    acc[fix.category].push(fix);
+    acc[pageKey].fixes.push(fix);
     return acc;
-  }, {} as Record<string, FixItem[]>);
+  }, {} as Record<string, { url?: string; title?: string; fixes: FixItem[] }>);
 
-  // Sort categories by total impact (High Impact items count first)
-  const sortedCategories = Object.entries(fixesByCategory).sort(([, aFixes], [, bFixes]) => {
-    const aHighCount = aFixes.filter(f => f.impact_level === 'High').length;
-    const bHighCount = bFixes.filter(f => f.impact_level === 'High').length;
+  // Sort pages by number of high-impact issues, then by total issues
+  const sortedPages = Object.entries(fixesByPage).sort(([, aData], [, bData]) => {
+    const aHighCount = aData.fixes.filter(f => f.impact_level === 'High').length;
+    const bHighCount = bData.fixes.filter(f => f.impact_level === 'High').length;
     if (aHighCount !== bHighCount) return bHighCount - aHighCount;
-    return bFixes.length - aFixes.length;
+    return bData.fixes.length - aData.fixes.length;
   });
 
-  const toggleCategory = (category: string) => {
-    const newExpanded = new Set(expandedCategories);
-    if (newExpanded.has(category)) {
-      newExpanded.delete(category);
+  const togglePage = (pageUrl: string) => {
+    const newExpanded = new Set(expandedPages);
+    if (newExpanded.has(pageUrl)) {
+      newExpanded.delete(pageUrl);
     } else {
-      newExpanded.add(category);
+      newExpanded.add(pageUrl);
     }
-    setExpandedCategories(newExpanded);
+    setExpandedPages(newExpanded);
   };
 
   const toggleFix = (fixId: string) => {
@@ -77,203 +87,215 @@ export default function FixFirst({ fixes }: FixFirstProps) {
     setExpandedFixes(newExpanded);
   };
 
+  const formatCurrentState = (details: Record<string, any> | undefined, evidence: string[] | undefined) => {
+    if (!details && !evidence) return null;
+    
+    // Extract meaningful current state from details
+    const parts: string[] = [];
+    if (details) {
+      if (details.current_title) parts.push(`Current: "${details.current_title}"`);
+      if (details.current_h1) parts.push(`H1: "${details.current_h1}"`);
+      if (details.current_value) parts.push(`Current: "${details.current_value}"`);
+      if (details.message) parts.push(details.message);
+      if (details.found !== undefined) parts.push(`Found: ${details.found}`);
+      if (details.expected !== undefined) parts.push(`Expected: ${details.expected}`);
+    }
+    if (evidence && evidence.length > 0) {
+      parts.push(...evidence.slice(0, 2));
+    }
+    
+    return parts.length > 0 ? parts.join(' | ') : null;
+  };
+
   return (
     <Card>
       <CardBody>
         <h2 className="section-title mb-2">Fix First</h2>
         <p className="text-sm muted mb-4">
-          Top priority improvements organized by category
+          Priority issues organized by page • Fix these to improve your score
         </p>
 
         <div className="space-y-3">
-          {sortedCategories.map(([category, categoryFixes]) => {
-            const isExpanded = expandedCategories.has(category);
-            const highCount = categoryFixes.filter(f => f.impact_level === 'High').length;
-            const mediumCount = categoryFixes.filter(f => f.impact_level === 'Medium').length;
-            const lowCount = categoryFixes.filter(f => f.impact_level === 'Low').length;
+          {sortedPages.map(([pageKey, pageData]) => {
+            const isPageExpanded = expandedPages.has(pageKey);
+            const highCount = pageData.fixes.filter(f => f.impact_level === 'High').length;
+            const mediumCount = pageData.fixes.filter(f => f.impact_level === 'Medium').length;
+            const lowCount = pageData.fixes.filter(f => f.impact_level === 'Low').length;
 
             return (
-              <div key={category} className="card overflow-hidden">
-                {/* Category Header */}
+              <div key={pageKey} className="card overflow-hidden">
+                {/* Page Header */}
                 <button
-                  onClick={() => toggleCategory(category)}
-                  className="w-full px-4 py-3 bg-surface-2 hover:bg-surface-3 transition-colors flex items-center justify-between"
+                  onClick={() => togglePage(pageKey)}
+                  className="w-full px-4 py-3 bg-surface-2 hover:bg-surface-3 transition-colors text-left"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">{category}</span>
-                    <span className="text-sm subtle">
-                      {categoryFixes.length} issue{categoryFixes.length !== 1 ? 's' : ''}
-                    </span>
-                    {highCount > 0 && <Badge variant="danger">{highCount} High</Badge>}
-                    {mediumCount > 0 && <Badge variant="warn">{mediumCount} Medium</Badge>}
-                    {lowCount > 0 && <Badge variant="success">{lowCount} Low</Badge>}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      {pageData.url ? (
+                        <>
+                          <div className="text-sm font-medium text-brand truncate mb-1">
+                            {pageData.url}
+                          </div>
+                          {pageData.title && (
+                            <div className="text-xs muted truncate">
+                              {pageData.title}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-sm font-medium">Site-Level Issues</div>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="text-xs subtle">
+                          {pageData.fixes.length} issue{pageData.fixes.length !== 1 ? 's' : ''}
+                        </span>
+                        {highCount > 0 && <Badge variant="danger">{highCount} High</Badge>}
+                        {mediumCount > 0 && <Badge variant="warn">{mediumCount} Medium</Badge>}
+                        {lowCount > 0 && <Badge variant="success">{lowCount} Low</Badge>}
+                      </div>
+                    </div>
+                    <svg
+                      className={`w-5 h-5 subtle transition-transform flex-shrink-0 ${isPageExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </div>
-                  <svg
-                    className={`w-5 h-5 subtle transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
                 </button>
 
-              {/* Category Fixes (Collapsible) */}
-              {isExpanded && (
-                <div className="p-4 space-y-3 bg-surface-1">
-                  {categoryFixes.map((fix, index) => {
-                    const isFixExpanded = expandedFixes.has(fix.id);
-                    const impactVariant = fix.impact_level === 'High' ? 'danger' : fix.impact_level === 'Medium' ? 'warn' : 'success';
-                    
-                    return (
-                      <div
-                        key={fix.id}
-                        className="card hover:border-brand transition-all overflow-hidden"
-                      >
-                        {/* Fix Header */}
-                        <button
-                          onClick={() => toggleFix(fix.id)}
-                          className="w-full p-4 hover:bg-surface-2 transition-colors"
+                {/* Page Issues (Collapsible) */}
+                {isPageExpanded && (
+                  <div className="p-4 space-y-3 bg-surface-1">
+                    {pageData.fixes.map((fix, index) => {
+                      const isFixExpanded = expandedFixes.has(`${pageKey}-${fix.id}`);
+                      const impactVariant = fix.impact_level === 'High' ? 'danger' : fix.impact_level === 'Medium' ? 'warn' : 'success';
+                      const currentState = formatCurrentState(fix.details, fix.evidence);
+                      
+                      return (
+                        <div
+                          key={`${pageKey}-${fix.id}`}
+                          className="card hover:border-brand transition-all overflow-hidden"
                         >
-                          <div className="flex items-start gap-3">
-                            {/* Priority number within category */}
-                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand text-brand-foreground font-bold flex items-center justify-center text-sm">
-                              {index + 1}
+                          {/* Issue Header */}
+                          <button
+                            onClick={() => toggleFix(`${pageKey}-${fix.id}`)}
+                            className="w-full p-4 hover:bg-surface-2 transition-colors text-left"
+                          >
+                            <div className="flex items-start gap-3">
+                              {/* Priority number within page */}
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand text-brand-foreground font-bold flex items-center justify-center text-sm">
+                                {index + 1}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                {/* Issue name and category */}
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                  <h3 className="text-sm font-bold">{fix.name}</h3>
+                                  <span className="tag">{fix.category}</span>
+                                  <Badge variant={impactVariant}>{fix.impact_level}</Badge>
+                                </div>
+
+                                {/* Current State */}
+                                {currentState && (
+                                  <div className="mb-2">
+                                    <span className="text-xs font-semibold muted">Current State: </span>
+                                    <span className="text-xs muted">{currentState}</span>
+                                  </div>
+                                )}
+
+                                {/* Score preview */}
+                                <div className="text-xs subtle">
+                                  Score: {Math.round(fix.score)} | Weight: {fix.weight}
+                                </div>
+                              </div>
+
+                              {/* Expand/Collapse Icon */}
+                              <svg
+                                className={`w-5 h-5 subtle transition-transform flex-shrink-0 ${isFixExpanded ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
                             </div>
+                          </button>
 
-                            <div className="flex-1 min-w-0 text-left">
-                              {/* Check name and pill */}
-                              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <CheckPill code={fix.id} score={fix.score} weight={fix.weight} />
-                                <h3 className="text-sm font-bold">{fix.name}</h3>
-                              </div>
+                          {/* Expanded Fix Details */}
+                          {isFixExpanded && (
+                            <div className="px-4 pb-4 space-y-3 border-t border-border bg-surface-2">
+                              {/* Why it matters */}
+                              {fix.why_it_matters && (
+                                <div className="card-muted rounded-xl p-3">
+                                  <h4 className="font-bold text-xs mb-1">Why This Matters</h4>
+                                  <p className="text-xs leading-relaxed">
+                                    {fix.why_it_matters}
+                                  </p>
+                                </div>
+                              )}
 
-                              {/* Impact and weight */}
-                              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <Badge variant={impactVariant}>{fix.impact_level} Impact</Badge>
-                                <span className="text-xs subtle">
-                                  Weight: {fix.weight} | Score: {Math.round(fix.score)}
-                                </span>
-                              </div>
+                              {/* How to fix */}
+                              {fix.how_to_fix && (
+                                <div className="card-muted rounded-xl p-3">
+                                  <h4 className="font-bold text-xs mb-1">How to Fix</h4>
+                                  <p className="text-xs leading-relaxed whitespace-pre-line">
+                                    {fix.how_to_fix}
+                                  </p>
+                                </div>
+                              )}
 
-                              {/* Why it matters - preview */}
-                              {fix.why_it_matters && !isFixExpanded && (
-                                <p className="text-xs muted leading-relaxed line-clamp-2">
-                                  {fix.why_it_matters}
-                                </p>
+                              {/* Quick fixes */}
+                              {fix.quick_fixes && (
+                                <div className="card-muted rounded-xl p-3">
+                                  <h4 className="font-bold text-xs mb-1">Quick Fixes</h4>
+                                  <p className="text-xs leading-relaxed">
+                                    {fix.quick_fixes}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Examples */}
+                              {fix.examples && (
+                                <div className="card-muted rounded-xl p-3">
+                                  <h4 className="font-bold text-xs mb-1">Example</h4>
+                                  <pre className="text-xs bg-surface-1 rounded p-2 overflow-x-auto border border-border font-mono whitespace-pre-wrap">
+                                    {fix.examples}
+                                  </pre>
+                                </div>
+                              )}
+
+                              {/* Official docs */}
+                              {fix.official_docs && (
+                                <div className="card-muted rounded-xl p-3">
+                                  <h4 className="font-bold text-xs mb-1">Learn More</h4>
+                                  <a
+                                    href={fix.official_docs}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-brand hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    Official Documentation →
+                                  </a>
+                                </div>
                               )}
                             </div>
-
-                            {/* Expand/Collapse Icon */}
-                            <svg
-                              className={`w-5 h-5 subtle transition-transform flex-shrink-0 ${isFixExpanded ? 'rotate-180' : ''}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </button>
-
-                        {/* Expanded Fix Details */}
-                        {isFixExpanded && (
-                          <div className="px-4 pb-4 space-y-3 border-t border-border bg-surface-2">
-                            {/* Why it matters */}
-                            {fix.why_it_matters && (
-                              <div className="card-muted p-3">
-                                <h4 className="font-bold text-xs mb-1">
-                                  Why This Matters
-                                </h4>
-                                <p className="text-xs muted leading-relaxed">
-                                  {fix.why_it_matters}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* How to fix */}
-                            {fix.how_to_fix && (
-                              <div className="card-muted p-3">
-                                <h4 className="font-bold text-xs mb-1">
-                                  How to Fix
-                                </h4>
-                                <p className="text-xs muted leading-relaxed whitespace-pre-line">
-                                  {fix.how_to_fix}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Quick fixes */}
-                            {fix.quick_fixes && (
-                              <div className="card-muted p-3">
-                                <h4 className="font-bold text-xs mb-1">
-                                  Quick Fixes
-                                </h4>
-                                <p className="text-xs muted leading-relaxed">
-                                  {fix.quick_fixes}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Examples */}
-                            {fix.examples && (
-                              <div className="card-muted p-3">
-                                <h4 className="font-bold text-xs mb-1">
-                                  Example
-                                </h4>
-                                <pre className="text-xs bg-surface-1 rounded p-2 overflow-x-auto border border-border font-mono">
-                                  {fix.examples}
-                                </pre>
-                              </div>
-                            )}
-
-                            {/* Common issues */}
-                            {fix.common_issues && (
-                              <div className="card-muted p-3">
-                                <h4 className="font-bold text-xs mb-1">
-                                  Common Issues
-                                </h4>
-                                <p className="text-xs muted leading-relaxed">
-                                  {fix.common_issues}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Official docs */}
-                            {fix.official_docs && (
-                              <div className="card-muted p-3">
-                                <h4 className="font-bold text-xs mb-1">Learn More</h4>
-                                <a
-                                  href={fix.official_docs}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-brand hover:underline"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  Official Documentation →
-                                </a>
-                                {fix.learn_more_links && (
-                                  <p className="text-xs muted mt-2 pt-2 border-t border-border">
-                                    {fix.learn_more_links}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
         <div className="mt-4 pt-4 border-t border-border">
           <p className="text-xs subtle">
-            <strong>Tip:</strong> Focus on High Impact items first for maximum improvement to your Optiview score.
+            <strong>Tip:</strong> Fix high-impact issues first for the biggest score improvement. Click any page to see its specific issues and recommended fixes.
           </p>
         </div>
       </CardBody>

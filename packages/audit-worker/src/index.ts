@@ -3012,21 +3012,30 @@ async function getAudit(auditId: string, env: Env) {
         // Load D1 criteria metadata
         const criteriaMap = await loadCriteriaMap(env.DB);
         
-        // Get all page checks from the audit
+        // Get all page checks from the audit WITH page URLs
         const pages = (await env.DB.prepare(`
-          SELECT apa.checks_json
+          SELECT ap.url, ap.id as page_id, apa.checks_json, apa.title, apa.h1
           FROM audit_page_analysis apa
           JOIN audit_pages ap ON apa.page_id = ap.id
           WHERE ap.audit_id = ?
         `).bind(auditId).all()).results || [];
         
-        // Aggregate all page-level checks
+        // Aggregate all page-level checks WITH page context
         const allPageChecks: any[] = [];
+        const pageChecksByUrl = new Map<string, any[]>();
+        
         for (const page of pages as any[]) {
           if (page.checks_json) {
             try {
               const checks = JSON.parse(page.checks_json);
-              allPageChecks.push(...checks);
+              const checksWithPage = checks.map((c: any) => ({
+                ...c,
+                page_url: page.url,
+                page_title: page.title,
+                page_h1: page.h1
+              }));
+              allPageChecks.push(...checksWithPage);
+              pageChecksByUrl.set(page.url, checksWithPage);
             } catch {}
           }
         }
@@ -3075,7 +3084,7 @@ async function getAudit(auditId: string, env: Env) {
             checks_count: data.count
           }));
           
-          // Compute top fixes (failing checks: score < 60) with full D1 content
+          // Compute top fixes (failing checks: score < 60) with full D1 content AND page context
           const impactWeight = { High: 3, Medium: 2, Low: 1 };
           fixFirst = enrichedChecks
             .filter((c: any) => c.score < 60) // Failing threshold
@@ -3086,6 +3095,11 @@ async function getAudit(auditId: string, env: Env) {
               impact_level: c.impact_level,
               weight: c.weight,
               score: c.score,
+              page_url: c.page_url,
+              page_title: c.page_title,
+              page_h1: c.page_h1,
+              details: c.details, // Current state information
+              evidence: c.evidence,
               why_it_matters: c.why_it_matters,
               how_to_fix: c.how_to_fix,
               examples: c.examples,
@@ -3099,7 +3113,7 @@ async function getAudit(auditId: string, env: Env) {
               if (impactDiff !== 0) return impactDiff;
               return b.weight - a.weight;
             })
-            .slice(0, 8); // Top 8 fixes
+            .slice(0, 50); // Top 50 fixes (will be grouped by page in UI)
           
           scorecardV2 = true;
         }
