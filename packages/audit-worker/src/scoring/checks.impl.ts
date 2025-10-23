@@ -42,8 +42,16 @@ export const Checks = {
     if (!title) return { id:"C1_title_quality", scope:"page", score:0, status:"fail", details:{reason:"missing"} };
     const length = title.length;
     const base = clamp(lenScore(length, 15, 65));
-    const brand = input.site?.domain?.split(".")[0]?.toLowerCase() ?? "";
-    const hasBrand = brand && title.toLowerCase().includes(brand);
+    
+    // Extract brand from domain, skipping common subdomains
+    const domain = input.site?.domain ?? "";
+    const parts = domain.split(".");
+    const brand = (parts[0] === "www" && parts.length > 2 ? parts[1] : parts[0]).toLowerCase();
+    
+    // Normalize title for comparison (remove trademark symbols, convert to lowercase)
+    const normalizedTitle = title.toLowerCase().replace(/[®™©℠]/g, "");
+    const hasBrand = brand.length > 0 && normalizedTitle.includes(brand);
+    
     const score = clamp(base*0.6 + (hasBrand?40:0));
     return { id:"C1_title_quality", scope:"page", score, status:statusFromScore(score), details:{title,length,hasBrand}, evidence:[title] };
   },
