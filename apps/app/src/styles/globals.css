@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+/* Tailwind v4 Theme Configuration */
+@theme {
+  /* Fonts */
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+
+  /* Brand colors */
+  --color-brand: oklch(63% 0.23 274);
+  --color-brand-foreground: oklch(100% 0 0);
+  --color-brand-soft: oklch(96% 0.03 274);
+  
+  /* Text */
+  --color-ink: oklch(22% 0.02 250);
+  --color-ink-muted: oklch(52% 0.01 250);
+  --color-ink-subtle: oklch(60% 0.01 250);
+  --color-ink-inverse: oklch(100% 0 0);
+  
+  /* Surfaces */
+  --color-surface-1: oklch(100% 0 0);
+  --color-surface-2: oklch(97% 0 0);
+  --color-surface-3: oklch(94% 0 0);
+  
+  /* System */
+  --color-border: oklch(91% 0 0);
+  --color-ring: oklch(63% 0.23 274);
+  
+  /* Status */
+  --color-success: oklch(52% 0.14 158);
+  --color-success-soft: oklch(94% 0.04 158);
+  --color-warn: oklch(70% 0.18 85);
+  --color-warn-soft: oklch(94% 0.04 85);
+  --color-danger: oklch(62% 0.23 20);
+  --color-danger-soft: oklch(95% 0.04 20);
+  --color-info: oklch(61% 0.18 240);
+  --color-info-soft: oklch(94% 0.04 240);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-brand: oklch(70% 0.23 274);
+    --color-brand-foreground: oklch(22% 0.02 250);
+    --color-brand-soft: oklch(18% 0.15 274);
+    
+    --color-ink: oklch(96% 0 0);
+    --color-ink-muted: oklch(70% 0 0);
+    --color-ink-subtle: oklch(62% 0 0);
+    --color-ink-inverse: oklch(22% 0.02 250);
+    
+    --color-surface-1: oklch(15% 0.01 250);
+    --color-surface-2: oklch(18% 0.01 250);
+    --color-surface-3: oklch(22% 0.01 250);
+    
+    --color-border: oklch(30% 0 0);
+    --color-ring: oklch(70% 0.23 274);
+    
+    --color-success-soft: oklch(25% 0.10 158);
+    --color-warn-soft: oklch(25% 0.10 85);
+    --color-danger-soft: oklch(25% 0.15 20);
+    --color-info-soft: oklch(25% 0.10 240);
+  }
+}
+
+/* Base styles */
+* {
+  @apply antialiased;
+}
+
+body {
+  @apply bg-surface-1 text-ink;
+}
+
+h1 {
+  @apply text-3xl font-semibold tracking-tight;
+}
+
+h2 {
+  @apply text-2xl font-semibold tracking-tight;
+}
+
+h3 {
+  @apply text-xl font-semibold;
+}
+
+p {
+  @apply leading-7 text-ink-muted;
+}
+
+a {
+  @apply text-brand underline-offset-2 hover:underline;
+}
+
+/* Component utilities - Defined with @utility in v4 */
+@utility card {
+  @apply bg-surface-1 rounded-2xl border border-border;
+  box-shadow: 0 1px 1px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.06);
+}
+
+@utility card-muted {
+  @apply bg-surface-2;
+}
+
+@utility card-header {
+  @apply px-5 py-4 border-b border-border;
+}
+
+@utility card-body {
+  @apply p-5;
+}
+
+@utility card-footer {
+  @apply px-5 py-4 border-t border-border;
+}
+
+@utility pill {
+  @apply inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-medium bg-surface-2 text-ink-muted;
+}
+
+@utility pill-brand {
+  @apply bg-brand-soft text-brand border-transparent;
+}
+
+@utility pill-success {
+  @apply bg-success-soft text-success border-transparent;
+}
+
+@utility pill-warn {
+  @apply bg-warn-soft text-warn border-transparent;
+}
+
+@utility pill-danger {
+  @apply bg-danger-soft text-danger border-transparent;
+}
+
+@utility tag {
+  @apply inline-flex items-center rounded-md bg-surface-2 px-2 py-1 text-xs text-ink-subtle;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium border border-transparent shadow-sm;
+  transition: all 0.2s cubic-bezier(.2,.8,.2,1);
+}
+
+@utility btn-primary {
+  @apply bg-brand text-brand-foreground hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring;
+}
+
+@utility btn-soft {
+  @apply bg-brand-soft text-brand hover:bg-brand/10;
+}
+
+@utility btn-ghost {
+  @apply bg-transparent text-ink hover:bg-surface-2 border-border;
+}
+
+@utility field {
+  @apply block w-full rounded-xl border border-border bg-surface-1 px-3 py-2 text-sm text-ink placeholder:text-ink-subtle;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+}
+
+@utility stat {
+  @apply card p-5 text-center;
+}
+
+@utility stat-value {
+  @apply text-3xl font-semibold text-ink;
+}
+
+@utility stat-label {
+  @apply mt-1 text-sm text-ink-subtle;
+}
+
+@utility stat-meta {
+  @apply mt-2 text-xs text-ink-muted;
+}
+
+@utility kpi-grid {
+  @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
+}
+
+@utility section-title {
+  @apply text-lg font-semibold text-ink;
+}
+
+@utility muted {
+  @apply text-ink-muted;
+}
+
+@utility subtle {
+  @apply text-ink-subtle;
+}
+
+@utility table-wrap {
+  @apply relative w-full overflow-x-auto rounded-xl border border-border bg-surface-1;
+}
+
+/* Table styles - regular CSS since they use complex selectors */
+table.ui {
+  @apply w-full text-sm;
+}
+
+table.ui thead th {
+  @apply text-left font-medium text-ink-subtle uppercase tracking-wide text-xs bg-surface-2;
+  @apply sticky top-0 z-10 px-3 py-2.5 align-middle border-b border-border;
+}
+
+table.ui td {
+  @apply px-3 py-2.5 align-middle border-b border-border;
+}
+
+table.ui tr:hover td {
+  @apply bg-surface-2;
+}
+
+/* Mobile stacking */
+@media (max-width: 640px) {
+  table.ui[data-stack="true"] thead {
+    display: none;
+  }
+  
+  table.ui[data-stack="true"] tr {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  
+  table.ui[data-stack="true"] td {
+    display: grid;
+    grid-template-columns: 10ch 1fr;
+    gap: .75rem;
+  }
+  
+  table.ui[data-stack="true"] td::before {
+    content: attr(data-th);
+    @apply text-ink-subtle font-medium;
+  }
+}
+
+/* Button disabled state */
+.btn:disabled {
+  @apply opacity-60 cursor-not-allowed;
+}
+
+/* Tabs */
+.tabs {
+  @apply inline-flex items-center gap-2 rounded-xl bg-surface-2 p-1 border border-border;
+}
+
+.tab {
+  @apply rounded-lg px-3 py-1.5 text-sm text-ink-muted hover:text-ink;
+}
+
+.tab[data-active="true"] {
+  @apply bg-surface-1 text-ink font-medium;
+  box-shadow: 0 1px 1px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.06);
+}
+
+/* Progress bar */
+.bar {
+  @apply relative h-2 overflow-hidden rounded-full bg-surface-3;
+}
+
+.bar > span {
+  @apply absolute left-0 top-0 h-full rounded-full bg-brand;
+}
