@@ -150,21 +150,52 @@ export default function PageDetail() {
   const pageChecks: CheckResult[] = pageId && diagnostics.pageChecks[pageId] ? diagnostics.pageChecks[pageId] : [];
   const productionChecks = pageChecks.filter(c => !c.preview);
   
-  // Group checks by category
-  const checksByCategory = productionChecks.reduce((acc, check) => {
-    const criteria = CRITERIA_BY_ID.get(check.id);
-    const category = criteria?.category || 'Uncategorized';
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push({ ...check, criteria });
-    return acc;
-  }, {} as Record<string, Array<CheckResult & { criteria?: any }>>);
+  // Filter checks by what they're analyzing
+  const schemaMetadataCheckIds = [
+    'A2_schema_present', 'A3_semantic_sections', 'A12_entity_graph',
+    'C1_title_quality', 'C2_h1_present', 'C3_page_title', 'C5_semantic_richness',
+    'A1_answer_first', 'B1_title_h1_alignment'
+  ];
+  
+  const htmlStructureCheckIds = [
+    'A3_semantic_sections', 'A5_nav_structure', 'A6_footer_present',
+    'C4_faq_present', 'C6_q_and_a_scaffold', 'C7_related_questions',
+    'E1_crawlable', 'E2_render_parity', 'F1_meta_viewport', 'F2_images_alt_text'
+  ];
+  
+  const schemaMetadataChecks = productionChecks.filter(c => schemaMetadataCheckIds.includes(c.id));
+  const htmlStructureChecks = productionChecks.filter(c => htmlStructureCheckIds.includes(c.id));
+  const otherChecks = productionChecks.filter(c => 
+    !schemaMetadataCheckIds.includes(c.id) && !htmlStructureCheckIds.includes(c.id)
+  );
+  
+  // Group checks by category for each tab
+  const groupChecksByCategory = (checks: CheckResult[]) => {
+    return checks.reduce((acc, check) => {
+      const criteria = CRITERIA_BY_ID.get(check.id);
+      const category = criteria?.category || 'Uncategorized';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push({ ...check, criteria });
+      return acc;
+    }, {} as Record<string, Array<CheckResult & { criteria?: any }>>);
+  };
+  
+  const checksByCategory = groupChecksByCategory(productionChecks);
+  const schemaMetadataByCategory = groupChecksByCategory(schemaMetadataChecks);
+  const htmlStructureByCategory = groupChecksByCategory(htmlStructureChecks);
 
-  // Calculate average score
-  const avgScore = productionChecks.length > 0
-    ? Math.round(productionChecks.reduce((sum, c) => sum + c.score, 0) / productionChecks.length)
-    : 0;
+  // Calculate average scores for each tab
+  const calculateAvgScore = (checks: CheckResult[]) => {
+    return checks.length > 0
+      ? Math.round(checks.reduce((sum, c) => sum + c.score, 0) / checks.length)
+      : 0;
+  };
+  
+  const avgScore = calculateAvgScore(productionChecks);
+  const schemaMetadataScore = calculateAvgScore(schemaMetadataChecks);
+  const htmlStructureScore = calculateAvgScore(htmlStructureChecks);
 
   const getScoreColor = (score: number) => {
     if (score >= 85) return 'text-success';
@@ -233,9 +264,9 @@ export default function PageDetail() {
           <div className="border-b border-border">
             <nav className="-mb-px flex space-x-8 px-6">
               {[
-                { id: 'checks', label: 'Diagnostic Checks', count: productionChecks.length },
-                { id: 'metadata', label: 'Schema & Metadata', count: schemaTypes.length },
-                { id: 'html', label: 'HTML Analysis' }
+                { id: 'checks', label: 'All Diagnostic Checks', count: productionChecks.length, score: avgScore },
+                { id: 'metadata', label: 'Schema & Metadata', count: schemaMetadataChecks.length, score: schemaMetadataScore },
+                { id: 'html', label: 'HTML Analysis', count: htmlStructureChecks.length, score: htmlStructureScore }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -248,9 +279,16 @@ export default function PageDetail() {
                 >
                   {tab.label}
                   {tab.count !== undefined && (
-                    <span className="ml-2 bg-surface-2 muted py-0.5 px-2 rounded-full text-xs">
-                      {tab.count}
-                    </span>
+                    <>
+                      <span className="ml-2 pill pill-brand">
+                        {tab.count}
+                      </span>
+                      {tab.count > 0 && (
+                        <span className={`ml-2 text-xs font-bold ${getScoreColor(tab.score)}`}>
+                          {tab.score}
+                        </span>
+                      )}
+                    </>
                   )}
                 </button>
               ))}
@@ -419,66 +457,274 @@ export default function PageDetail() {
             {/* Metadata Tab */}
             {activeTab === 'metadata' && (
               <div>
-                {/* Basic Metadata */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-medium  mb-4">Basic Metadata</h3>
-                  <div className="bg-surface-2 rounded-lg p-4">
-                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <dt className="text-sm font-medium subtle">Title</dt>
-                        <dd className="text-sm  mt-1">{page.title || 'Not found'}</dd>
+                {/* Metadata Diagnostic Checks */}
+                <div className="space-y-4">
+                  {CATEGORY_ORDER.filter(cat => schemaMetadataByCategory[cat] && schemaMetadataByCategory[cat].length > 0).map((category) => {
+                    const categoryChecks = schemaMetadataByCategory[category] || [];
+                    const isExpanded = expandedCategories.has(category);
+                    const categoryAvg = Math.round(
+                      categoryChecks.reduce((sum, c) => sum + c.score, 0) / categoryChecks.length
+                    );
+                    const failCount = categoryChecks.filter(c => c.status === 'fail').length;
+                    const warnCount = categoryChecks.filter(c => c.status === 'warn').length;
+                    const okCount = categoryChecks.filter(c => c.status === 'ok').length;
+
+                    return (
+                      <div key={category} className="border border-border rounded-lg">
+                        <button
+                          onClick={() => toggleCategory(category)}
+                          className="w-full px-4 py-3 bg-surface-2 hover:bg-surface-3 transition-colors flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium">{category}</span>
+                            <span className="text-sm muted">{categoryChecks.length} checks</span>
+                            <span className={`text-sm font-bold ${getScoreColor(categoryAvg)}`}>{categoryAvg}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex gap-2 text-xs">
+                              {okCount > 0 && <span className="text-success">{okCount} ok</span>}
+                              {warnCount > 0 && <span className="text-warn">{warnCount} warn</span>}
+                              {failCount > 0 && <span className="text-danger">{failCount} fail</span>}
+                            </div>
+                            <svg
+                              className={`w-5 h-5 muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="p-4 space-y-3">
+                            {categoryChecks.map((check: any) => (
+                              <div key={check.id} className={`p-4 rounded-lg border ${STATUS_COLORS[check.status]}`}>
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-sm mb-1">
+                                      {check.criteria?.label || check.id}
+                                    </h4>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="tag">{check.criteria?.category || 'Uncategorized'}</span>
+                                      {check.criteria?.impact_level && (
+                                        <span className={`pill ${IMPACT_COLORS[check.criteria.impact_level]}`}>
+                                          {check.criteria.impact_level}
+                                        </span>
+                                      )}
+                                      <span className="text-xs muted">Score: {Math.round(check.score)}</span>
+                                    </div>
+                                    {check.details && Object.keys(check.details).length > 0 && (
+                                      <div className="text-xs muted mb-2">
+                                        {Object.entries(check.details).map(([key, value]: [string, any]) => (
+                                          <div key={key}>
+                                            <span className="font-medium">{key}:</span> {JSON.stringify(value)}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <div className={`text-2xl font-bold ${getScoreColor(check.score)}`}>
+                                      {Math.round(check.score)}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {check.evidence && check.evidence.length > 0 && (
+                                  <div className="mt-2">
+                                    <span className="text-xs font-medium muted">Evidence:</span>
+                                    <div className="text-xs text-brand space-y-1">
+                                      {check.evidence.map((ev, idx) => (
+                                        <div key={idx} className="break-all">{ev}</div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {(check.criteria?.why_it_matters || check.criteria?.how_to_fix) && (
+                                  <div className="mt-3 pt-3 border-t border-border">
+                                    {check.criteria.why_it_matters && (
+                                      <div className="mb-2">
+                                        <span className="text-xs font-medium muted">Why it matters:</span>
+                                        <p className="text-xs muted mt-1">{check.criteria.why_it_matters}</p>
+                                      </div>
+                                    )}
+                                    {check.criteria.how_to_fix && check.status !== 'ok' && (
+                                      <div>
+                                        <span className="text-xs font-medium muted">How to fix:</span>
+                                        <p className="text-xs muted mt-1">{check.criteria.how_to_fix}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <dt className="text-sm font-medium subtle">H1</dt>
-                        <dd className="text-sm  mt-1">{page.h1 || 'Not found'}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium subtle">Canonical</dt>
-                        <dd className="text-sm  mt-1 break-all">{page.canonical || 'Not found'}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium subtle">Content Type</dt>
-                        <dd className="text-sm  mt-1">{page.content_type || 'Not found'}</dd>
-                      </div>
-                    </dl>
-                  </div>
+                    );
+                  })}
+                  
+                  {schemaMetadataChecks.length === 0 && (
+                    <div className="text-center py-12 subtle">
+                      <p>No schema & metadata checks available for this page.</p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Schema Types */}
-                {schemaTypes.length > 0 && (
-                  <div className="mb-8">
-                    <h3 className="text-lg font-medium  mb-4">Schema Types</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {schemaTypes.map((type, index) => (
-                        <span key={index} className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-brand-soft text-brand">
-                          {type}
-                        </span>
-                      ))}
+                {/* Current Values */}
+                <div className="mt-8 card card-body">
+                  <h3 className="section-title mb-4">Current Values</h3>
+                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <dt className="text-sm font-medium subtle">Title</dt>
+                      <dd className="text-sm mt-1">{page.title || 'Not found'}</dd>
                     </div>
-                  </div>
-                )}
-
-                {/* JSON-LD */}
-                {jsonld.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-medium  mb-4">JSON-LD Schema</h3>
-                    <div className="bg-surface-2 rounded-lg p-4">
-                      <pre className="text-xs muted overflow-x-auto">
-                        {JSON.stringify(jsonld, null, 2)}
-                      </pre>
+                    <div>
+                      <dt className="text-sm font-medium subtle">H1</dt>
+                      <dd className="text-sm mt-1">{page.h1 || 'Not found'}</dd>
                     </div>
-                  </div>
-                )}
+                    <div>
+                      <dt className="text-sm font-medium subtle">Canonical</dt>
+                      <dd className="text-sm mt-1 break-all">{page.canonical || 'Not found'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium subtle">Schema Types</dt>
+                      <dd className="text-sm mt-1">
+                        {schemaTypes.length > 0 ? schemaTypes.join(', ') : 'None found'}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               </div>
             )}
 
             {/* HTML Analysis Tab */}
             {activeTab === 'html' && (
               <div>
+                {/* HTML Structure Diagnostic Checks */}
+                <div className="space-y-4 mb-8">
+                  {CATEGORY_ORDER.filter(cat => htmlStructureByCategory[cat] && htmlStructureByCategory[cat].length > 0).map((category) => {
+                    const categoryChecks = htmlStructureByCategory[category] || [];
+                    const isExpanded = expandedCategories.has(category);
+                    const categoryAvg = Math.round(
+                      categoryChecks.reduce((sum, c) => sum + c.score, 0) / categoryChecks.length
+                    );
+                    const failCount = categoryChecks.filter(c => c.status === 'fail').length;
+                    const warnCount = categoryChecks.filter(c => c.status === 'warn').length;
+                    const okCount = categoryChecks.filter(c => c.status === 'ok').length;
+
+                    return (
+                      <div key={category} className="border border-border rounded-lg">
+                        <button
+                          onClick={() => toggleCategory(category)}
+                          className="w-full px-4 py-3 bg-surface-2 hover:bg-surface-3 transition-colors flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium">{category}</span>
+                            <span className="text-sm muted">{categoryChecks.length} checks</span>
+                            <span className={`text-sm font-bold ${getScoreColor(categoryAvg)}`}>{categoryAvg}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex gap-2 text-xs">
+                              {okCount > 0 && <span className="text-success">{okCount} ok</span>}
+                              {warnCount > 0 && <span className="text-warn">{warnCount} warn</span>}
+                              {failCount > 0 && <span className="text-danger">{failCount} fail</span>}
+                            </div>
+                            <svg
+                              className={`w-5 h-5 muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="p-4 space-y-3">
+                            {categoryChecks.map((check: any) => (
+                              <div key={check.id} className={`p-4 rounded-lg border ${STATUS_COLORS[check.status]}`}>
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-sm mb-1">
+                                      {check.criteria?.label || check.id}
+                                    </h4>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <span className="tag">{check.criteria?.category || 'Uncategorized'}</span>
+                                      {check.criteria?.impact_level && (
+                                        <span className={`pill ${IMPACT_COLORS[check.criteria.impact_level]}`}>
+                                          {check.criteria.impact_level}
+                                        </span>
+                                      )}
+                                      <span className="text-xs muted">Score: {Math.round(check.score)}</span>
+                                    </div>
+                                    {check.details && Object.keys(check.details).length > 0 && (
+                                      <div className="text-xs muted mb-2">
+                                        {Object.entries(check.details).map(([key, value]: [string, any]) => (
+                                          <div key={key}>
+                                            <span className="font-medium">{key}:</span> {JSON.stringify(value)}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <div className={`text-2xl font-bold ${getScoreColor(check.score)}`}>
+                                      {Math.round(check.score)}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {check.evidence && check.evidence.length > 0 && (
+                                  <div className="mt-2">
+                                    <span className="text-xs font-medium muted">Evidence:</span>
+                                    <div className="text-xs text-brand space-y-1">
+                                      {check.evidence.map((ev, idx) => (
+                                        <div key={idx} className="break-all">{ev}</div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {(check.criteria?.why_it_matters || check.criteria?.how_to_fix) && (
+                                  <div className="mt-3 pt-3 border-t border-border">
+                                    {check.criteria.why_it_matters && (
+                                      <div className="mb-2">
+                                        <span className="text-xs font-medium muted">Why it matters:</span>
+                                        <p className="text-xs muted mt-1">{check.criteria.why_it_matters}</p>
+                                      </div>
+                                    )}
+                                    {check.criteria.how_to_fix && check.status !== 'ok' && (
+                                      <div>
+                                        <span className="text-xs font-medium muted">How to fix:</span>
+                                        <p className="text-xs muted mt-1">{check.criteria.how_to_fix}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  
+                  {htmlStructureChecks.length === 0 && (
+                    <div className="text-center py-12 subtle">
+                      <p>No HTML analysis checks available for this page.</p>
+                    </div>
+                  )}
+                </div>
+
                 {/* HTML Preview */}
-                <div>
-                  <h3 className="text-lg font-medium  mb-4">HTML Preview</h3>
-                  <div className="bg-surface-2 rounded-lg p-4">
+                <div className="card card-body">
+                  <h3 className="section-title mb-4">HTML Preview</h3>
+                  <div className="card-muted rounded-xl p-4">
                     <div className="mb-4">
                       <span className="text-sm muted">
                         Static HTML (first 1000 characters)
