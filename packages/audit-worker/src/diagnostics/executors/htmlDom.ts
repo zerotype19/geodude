@@ -13,6 +13,7 @@ function base(input: PageContext) {
 }
 
 // Helper to wrap existing check results
+// Caches results per pageContext to avoid redundant parsing
 function wrapExistingCheck(
   ctx: PageContext,
   checkId: string,
@@ -23,8 +24,12 @@ function wrapExistingCheck(
   const html = ctx.html_rendered || ctx.html_static || "";
   if (!html) return undefined;
   
-  const out = runChecksOnHtml({ url: ctx.url, html, site: ctx.site });
-  const r = out.find((x) => x.id === checkId);
+  // Cache check results to avoid re-parsing DOM for each check
+  if (!(ctx as any)._cachedChecks) {
+    (ctx as any)._cachedChecks = runChecksOnHtml({ url: ctx.url, html, site: ctx.site });
+  }
+  
+  const r = (ctx as any)._cachedChecks.find((x: any) => x.id === checkId);
   if (!r) return undefined;
   
   return { ...r, scope, preview, impact };
@@ -74,24 +79,22 @@ export const htmlExecutors: Record<string, Executor> = {
     id: "G2_og_tags_completeness",
     async runPage(ctx) {
       const { document } = base(ctx);
-      const ogTitle = q(document, 'meta[property="og:title"]');
-      const ogDesc = q(document, 'meta[property="og:description"]');
-      const ogImage = q(document, 'meta[property="og:image"]');
-      const ogUrl = q(document, 'meta[property="og:url"]');
+      const ogTags = ["og:title", "og:description", "og:image", "og:url", "og:type"];
+      const filled = ogTags.filter(t => {
+        const content = attr(q(document, `meta[property="${t}"]`), "content");
+        return content && content.trim().length > 0;
+      });
       
-      const present = [ogTitle, ogDesc, ogImage, ogUrl].filter(Boolean).length;
-      const score = Math.round((present / 4) * 100);
+      const score = Math.round((filled.length / ogTags.length) * 100);
       
       return {
         id: "G2_og_tags_completeness",
         score,
         status: statusFromScore(score, 85, 60),
         details: {
-          ogTitle: !!ogTitle,
-          ogDesc: !!ogDesc,
-          ogImage: !!ogImage,
-          ogUrl: !!ogUrl,
-          present,
+          filled: filled,
+          total: ogTags.length,
+          present: filled.length,
         },
         scope: "page",
         preview: false,
@@ -132,6 +135,19 @@ export const htmlExecutors: Record<string, Executor> = {
       const h2Count = qa(document, "h2").length;
       const wordCount = html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
       
+      // Guard for low word count pages (give them a pass)
+      if (wordCount < 300) {
+        return {
+          id: "C5_h2_coverage_ratio",
+          score: 100,
+          status: statusFromScore(100, 85, 60),
+          details: { h2Count, wordCount, ratio: 0, note: "short_page_exempt" },
+          scope: "page",
+          preview: false,
+          impact: "Medium",
+        };
+      }
+      
       // Ideal: 1 H2 per ~150-250 words
       const ratio = wordCount > 0 ? h2Count / (wordCount / 200) : 0;
       const score = ratio >= 0.8 && ratio <= 1.5 ? 100 : ratio >= 0.5 ? 70 : 40;
@@ -159,9 +175,13 @@ export const htmlExecutors: Record<string, Executor> = {
       
       scripts.forEach((s) => {
         try {
-          const json = JSON.parse(txt(s as Element));
-          const items = Array.isArray(json) ? json : [json];
-          items.forEach((j) => {
+          const raw = txt(s as Element);
+          if (!raw.trim()) return;
+          const json = JSON.parse(raw);
+          // Handle @graph arrays
+          const items = Array.isArray(json) ? json : (json['@graph'] || [json]);
+          items.forEach((j: any) => {
+            if (!j || !j["@type"]) return;
             const types = Array.isArray(j["@type"]) ? j["@type"] : [j["@type"]];
             if (types?.includes("Organization") || types?.includes("LocalBusiness")) hasOrg = true;
             if (types?.includes("Product")) hasProduct = true;
@@ -189,15 +209,18 @@ export const htmlExecutors: Record<string, Executor> = {
     id: "G6_fact_url_stability",
     async runPage(ctx) {
       const { document } = base(ctx);
-      const anchors = Array.from(document.querySelectorAll("[id]")).length;
+      // Filter out framework IDs (root, app, main, page, __, etc.)
+      const semanticAnchors = Array.from(document.querySelectorAll("[id]"))
+        .map((e: any) => e.id)
+        .filter(id => !/^(root|app|main|page|__)/i.test(id)).length;
       const dlDt = document.querySelectorAll("dl dt").length;
-      const score = anchors >= 10 || dlDt >= 5 ? 100 : anchors >= 3 || dlDt >= 2 ? 60 : 20;
+      const score = semanticAnchors >= 10 || dlDt >= 5 ? 100 : semanticAnchors >= 3 || dlDt >= 2 ? 60 : 20;
       
       return {
         id: "G6_fact_url_stability",
         score,
         status: statusFromScore(score, 85, 60),
-        details: { anchors, dlDt },
+        details: { semanticAnchors, dlDt },
         scope: "page",
         preview: true,
         impact: "Medium",
@@ -227,36 +250,31 @@ export const htmlExecutors: Record<string, Executor> = {
     id: "A6_contact_cta_presence",
     async runPage(ctx) {
       const { document } = base(ctx);
-      const ctaSelectors = [
-        'a[href*="contact"]',
-        'a[href*="get-started"]',
-        'a[href*="pricing"]',
-        'button:has-text("Contact")',
-        'button:has-text("Get Started")',
-        'a[href^="mailto:"]',
-        'a[href^="tel:"]',
-      ];
+      // Check href patterns
+      const hrefCtaCount = 
+        qa(document, 'a[href*="contact"]').length +
+        qa(document, 'a[href*="get-started"]').length +
+        qa(document, 'a[href*="pricing"]').length +
+        qa(document, 'a[href^="mailto:"]').length +
+        qa(document, 'a[href^="tel:"]').length;
       
-      let ctaCount = 0;
-      ctaSelectors.forEach((sel) => {
-        try {
-          ctaCount += qa(document, sel).length;
-        } catch {}
-      });
+      // Check text patterns
+      const buttons = qa(document, "a, button");
+      const pattern = /\b(contact|get\s*started|book|schedule|sign\s*up|try\s*free|demo|pricing)\b/i;
+      const matches = buttons.filter(b => pattern.test(txt(b as Element)));
       
-      // Also check for common CTA text patterns
-      const buttons = qa(document, "button, a");
-      const ctaPatterns = /contact|get started|book|schedule|sign up|try free|request demo|call us/i;
-      const textMatches = buttons.filter((el) => ctaPatterns.test(txt(el as Element))).length;
+      // Track unique text to avoid over-counting repeated nav links
+      const uniqueTexts = new Set(matches.map(b => txt(b as Element).toLowerCase().trim()));
+      const uniqueMatches = Math.min(matches.length, uniqueTexts.size);
       
-      const total = ctaCount + textMatches;
+      const total = hrefCtaCount + uniqueMatches;
       const score = total >= 3 ? 100 : total >= 1 ? 70 : 20;
       
       return {
         id: "A6_contact_cta_presence",
         score,
         status: statusFromScore(score, 85, 60),
-        details: { ctaCount: total, above_fold: total > 0 },
+        details: { ctaCount: total, uniqueCount: uniqueTexts.size, above_fold: total > 0 },
         scope: "page",
         preview: false,
         impact: "Medium",
@@ -268,8 +286,8 @@ export const htmlExecutors: Record<string, Executor> = {
     id: "A5_related_questions_block",
     async runPage(ctx) {
       const { document } = base(ctx);
-      const headings = qa(document, "h2, h3, h4");
-      const relatedPatterns = /related questions?|people also ask|common questions?|more questions?/i;
+      const headings = qa(document, "h2, h3, h4, summary");
+      const relatedPatterns = /related questions?|people also ask|common questions?|more questions?|faq/i;
       
       const hasRelatedSection = headings.some((h) => relatedPatterns.test(txt(h as Element)));
       const questionHeadings = headings.filter((h) =>
@@ -299,18 +317,18 @@ export const htmlExecutors: Record<string, Executor> = {
       const words = html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
       const lists = qa(document, "ul, ol").length;
       
-      // Depth heuristic: headings + word count + structured content
-      const depthScore = Math.min(
-        100,
-        h2s * 12 + h3s * 8 + (words > 1500 ? 40 : words > 800 ? 25 : words > 400 ? 15 : 5) + lists * 3
-      );
+      // Cap word contribution at 40 points to prevent inflated scores for long content
+      const wordScore = Math.min(40, words > 1500 ? 40 : words > 800 ? 25 : words > 400 ? 15 : 5);
+      
+      // Depth heuristic: headings + capped word score + structured content
+      const depthScore = Math.min(100, h2s * 12 + h3s * 8 + wordScore + lists * 3);
       const score = Math.round(Math.max(20, Math.min(depthScore, 95)));
       
       return {
         id: "G12_topic_depth_semantic",
         score,
         status: statusFromScore(score, 85, 60),
-        details: { h2s, h3s, words, lists },
+        details: { h2s, h3s, words, lists, wordScore },
         scope: "page",
         preview: true,
         impact: "Medium",
@@ -324,9 +342,26 @@ export const htmlExecutors: Record<string, Executor> = {
       const html = ctx.html_rendered || ctx.html_static || "";
       if (!html) return undefined;
       
-      const out = runChecksOnHtml({ url: ctx.url, html, site: ctx.site });
-      const faq = out.find((x) => x.id === "A3_faq_presence");
-      const faqSchema = out.find((x) => x.id === "A4_schema_faqpage");
+      // Use cached checks if available
+      if (!(ctx as any)._cachedChecks) {
+        (ctx as any)._cachedChecks = runChecksOnHtml({ url: ctx.url, html, site: ctx.site });
+      }
+      
+      const faq = (ctx as any)._cachedChecks.find((x: any) => x.id === "A3_faq_presence");
+      const faqSchema = (ctx as any)._cachedChecks.find((x: any) => x.id === "A4_schema_faqpage");
+      
+      // Guard: ensure at least one check exists
+      if (!faq && !faqSchema) {
+        return {
+          id: "A14_qna_scaffold",
+          score: 0,
+          status: "fail" as const,
+          details: { a3_score: null, a4_score: null, note: "no_checks_found" },
+          scope: "page",
+          preview: false,
+          impact: "High",
+        };
+      }
       
       const score = Math.max(faq?.score ?? 0, faqSchema?.score ?? 0);
       
@@ -336,7 +371,7 @@ export const htmlExecutors: Record<string, Executor> = {
         status: statusFromScore(score, 85, 60),
         details: { a3_score: faq?.score ?? null, a4_score: faqSchema?.score ?? null },
         scope: "page",
-        preview: true,
+        preview: false,
         impact: "High",
       };
     },
@@ -384,19 +419,22 @@ export const htmlExecutors: Record<string, Executor> = {
       const hasPreconnect = !!q(document, 'link[rel="preconnect"]');
       const hasPrefetch = !!q(document, 'link[rel="prefetch"]');
       const hasPreload = !!q(document, 'link[rel="preload"]');
+      const hasFetchPriority = qa(document, '[fetchpriority="high"]').length > 0;
+      const hasAsyncDecoding = qa(document, 'img[decoding="async"]').length > 0;
       const lazyImages = qa(document, 'img[loading="lazy"]').length;
       const totalImages = qa(document, "img").length;
       
-      const hints = [hasPreconnect, hasPrefetch, hasPreload, lazyImages > 0].filter(Boolean).length;
+      const hints = [hasPreconnect, hasPrefetch, hasPreload, hasFetchPriority, hasAsyncDecoding, lazyImages > 0].filter(Boolean).length;
       const lazyRatio = totalImages > 0 ? lazyImages / totalImages : 0;
       
-      const score = hints >= 3 && lazyRatio > 0.5 ? 100 : hints >= 2 ? 70 : hints >= 1 ? 50 : 20;
+      // Adjusted: 0.3 lazy ratio is more realistic for marketing pages
+      const score = hints >= 4 && lazyRatio > 0.3 ? 100 : hints >= 3 ? 75 : hints >= 2 ? 60 : hints >= 1 ? 40 : 20;
       
       return {
         id: "T4_core_web_vitals_hints",
         score,
         status: statusFromScore(score, 85, 60),
-        details: { hasPreconnect, hasPrefetch, hasPreload, lazyImages, totalImages, lazyRatio },
+        details: { hasPreconnect, hasPrefetch, hasPreload, hasFetchPriority, hasAsyncDecoding, lazyImages, totalImages, lazyRatio },
         scope: "page",
         preview: false,
         impact: "Medium",
@@ -404,37 +442,35 @@ export const htmlExecutors: Record<string, Executor> = {
     },
   },
 
-  A13_page_speed_lcp: {
-    id: "A13_page_speed_lcp",
+  T5_page_speed_lcp: {
+    id: "T5_page_speed_lcp",
     async runPage(ctx) {
       const { document, html } = base(ctx);
       
-      // Heuristic proxy for LCP: check for large images, hero sections
+      // Heuristic proxy for LCP: check for large images, hero sections, inline styles
       const images = qa(document, "img");
       const largeImages = images.filter((img) => {
-        const width = (img as HTMLImageElement).getAttribute("width");
-        const height = (img as HTMLImageElement).getAttribute("height");
+        const width = (img as any).getAttribute("width");
+        const height = (img as any).getAttribute("height");
         return (width && parseInt(width) > 500) || (height && parseInt(height) > 400);
       }).length;
       
       const heroSections = qa(document, 'section[class*="hero"], div[class*="hero"], header[class*="hero"]').length;
       const htmlSize = html.length;
       
-      // Smaller HTML + optimized images = better LCP proxy
-      const score =
-        htmlSize < 100000 && largeImages <= 2
-          ? 100
-          : htmlSize < 200000 && largeImages <= 4
-          ? 75
-          : htmlSize < 500000
-          ? 50
-          : 30;
+      // Check for large inline style blocks (critical CSS over 100KB is a red flag)
+      const inlineStyleSize = (html.match(/<style[^>]*>([\s\S]{0,100000})<\/style>/g)?.join('').length || 0);
+      const stylePenalty = inlineStyleSize > 100000 ? 10 : 0;
+      
+      // Refined formula: penalize large HTML, large images, and excessive inline styles
+      const baseScore = 100 - stylePenalty - Math.floor(htmlSize / 50000) - (largeImages * 10);
+      const score = Math.max(30, Math.min(100, baseScore));
       
       return {
-        id: "A13_page_speed_lcp",
+        id: "T5_page_speed_lcp",
         score,
         status: statusFromScore(score, 85, 60),
-        details: { htmlSize, largeImages, heroSections },
+        details: { htmlSize, largeImages, heroSections, inlineStyleSize, stylePenalty },
         scope: "page",
         preview: true,
         impact: "Medium",
