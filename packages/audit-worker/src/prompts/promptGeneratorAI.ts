@@ -51,6 +51,11 @@ Rules:
 - Avoid repeating structure or using identical openers.
 - Use brand name in about half.
 - Tone: neutral to mildly conversational, never robotic.
+
+CRITICAL:
+- When using the brand name, use it EXACTLY as provided - do not invent product names or variations.
+- Do NOT create fictional products (e.g., "Adobe Makers", "Nike Pro Plus").
+- If you need to reference a specific product, use only generic category terms from the context provided.
 `;
 
 // Natural question stem pool for humanization

@@ -50,6 +50,23 @@ export function isNaturalQuery(query: string): QualityCheckResult {
     }
   }
   
+  // 2b. Reject queries with hallucinated brand combinations
+  // E.g., "Adobe makers", "Nike pros", "Stripe merchants" (when not actual products)
+  // Pattern: [Brand] + [generic noun that sounds like a product but isn't]
+  const suspiciousPatterns = [
+    /\b(adobe|salesforce|stripe|microsoft|google|amazon|apple)\s+(makers|builders|creators|pros|plus|premium|enterprise|business)\b/i,
+    /\b(makers|builders|creators|pros)\s+(pricing|cost|fees|support|reviews)\b/i, // "Makers pricing" when "Makers" isn't the brand
+  ];
+  
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(lower)) {
+      return { 
+        isValid: false, 
+        reason: `Potential brand hallucination: ${pattern}` 
+      };
+    }
+  }
+  
   // 3. Reject queries that are too generic or vague
   if (lower.length < 10) {
     return { 
