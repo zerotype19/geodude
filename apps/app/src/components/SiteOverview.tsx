@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 interface SiteCheck {
   id: string;
@@ -52,9 +53,9 @@ export default function SiteOverview({ siteChecks, criteriaMap }: Props) {
   return (
     <div className="mb-8">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold  mb-1">Site-Level Diagnostics</h2>
+        <h2 className="text-xl font-semibold mb-1">Site-Level Diagnostics</h2>
         <p className="text-sm muted">
-          Aggregate scores across all pages and site-wide checks
+          Aggregate scores across all pages • Click any metric to see detailed guidance on what to fix and where
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -85,10 +86,13 @@ function MetricTile({ row, meta }: MetricTileProps) {
   };
 
   return (
-    <div className={`rounded-xl border p-4 bg-surface-1 hover:shadow-md transition-shadow ${getScoreGlow(row.score)}`}>
+    <Link 
+      to={`/score-guide/${row.id}`}
+      className={`block rounded-xl border p-4 bg-surface-1 hover:shadow-xl hover:border-brand transition-all group ${getScoreGlow(row.score)}`}
+    >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
-          <div className="font-semibold  text-sm">
+          <div className="font-semibold text-sm group-hover:text-brand transition-colors">
             {meta?.label ?? row.id}
           </div>
           {meta?.impact_level && (
@@ -99,7 +103,7 @@ function MetricTile({ row, meta }: MetricTileProps) {
         </div>
         <StatusChip status={badge as any} />
       </div>
-      <div className="text-3xl font-bold  mb-2">
+      <div className="text-3xl font-bold mb-2">
         {Math.round(row.score)}
         <span className="text-lg subtle ml-1">
           {row.id.includes('pct') || row.id.includes('coverage') ? '%' : ''}
@@ -108,7 +112,10 @@ function MetricTile({ row, meta }: MetricTileProps) {
       {meta?.why_it_matters && (
         <div className="text-xs muted line-clamp-2">{meta.why_it_matters}</div>
       )}
-    </div>
+      <div className="mt-2 text-xs text-brand opacity-0 group-hover:opacity-100 transition-opacity">
+        Click to learn how to fix →
+      </div>
+    </Link>
   );
 }
 
