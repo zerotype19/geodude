@@ -53,9 +53,9 @@ export default function CategorySection({
   const displayEmoji = emoji || CATEGORY_EMOJIS[category];
   const displayDescription = description || CATEGORY_DESCRIPTIONS[category];
   
-  const scoreColor = score && score.score >= 80 ? 'text-green-600' : 
-                     score && score.score >= 50 ? 'text-yellow-600' : 
-                     'text-red-600';
+  const scoreColor = score && score.score >= 80 ? 'text-success' : 
+                     score && score.score >= 50 ? 'text-warn' : 
+                     'text-danger';
 
   return (
     <section className="mb-12">
@@ -64,7 +64,7 @@ export default function CategorySection({
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">{displayEmoji}</span>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold ">
               {category}
             </h2>
             {score && (
@@ -73,7 +73,7 @@ export default function CategorySection({
               </span>
             )}
           </div>
-          <p className="text-gray-600 text-sm max-w-3xl">
+          <p className="muted text-sm max-w-3xl">
             {displayDescription}
           </p>
         </div>
@@ -82,17 +82,17 @@ export default function CategorySection({
       {/* Score Bar */}
       {score && (
         <div className="mb-6">
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-2 bg-surface-2 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 ${
-                score.score >= 80 ? 'bg-green-500' :
-                score.score >= 50 ? 'bg-yellow-500' :
-                'bg-red-500'
+                score.score >= 80 ? 'bg-success-soft0' :
+                score.score >= 50 ? 'bg-warn-soft0' :
+                'bg-danger-soft0'
               }`}
               style={{ width: `${score.score}%` }}
             />
           </div>
-          <div className="mt-1 text-xs text-gray-500">
+          <div className="mt-1 text-xs subtle">
             {score.checks_count} checks • Total weight: {score.weight_total}
           </div>
         </div>

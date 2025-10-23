@@ -23,13 +23,13 @@ export default function ViewToggle({ onChange }: ViewToggleProps) {
   };
 
   return (
-    <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+    <div className="inline-flex rounded-lg border border-border bg-surface-1 p-1">
       <button
         onClick={() => handleToggle('business')}
         className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
           view === 'business'
             ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-            : 'text-gray-600 hover:text-gray-900'
+            : 'muted hover:'
         }`}
       >
         Business View
@@ -39,7 +39,7 @@ export default function ViewToggle({ onChange }: ViewToggleProps) {
         className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
           view === 'technical'
             ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-            : 'text-gray-600 hover:text-gray-900'
+            : 'muted hover:'
         }`}
       >
         Technical View

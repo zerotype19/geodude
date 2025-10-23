@@ -51,12 +51,12 @@ export default function CitationSummaryCard({ auditId }: CitationSummaryCardProp
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-surface-1 rounded-lg border border-border p-6">
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div className="h-4 bg-surface-3 rounded w-1/2 mb-4"></div>
           <div className="space-y-3">
-            <div className="h-8 bg-gray-200 rounded"></div>
-            <div className="h-8 bg-gray-200 rounded"></div>
+            <div className="h-8 bg-surface-3 rounded"></div>
+            <div className="h-8 bg-surface-3 rounded"></div>
           </div>
         </div>
       </div>
@@ -65,12 +65,12 @@ export default function CitationSummaryCard({ auditId }: CitationSummaryCardProp
 
   if (!summary || !summary.bySource || summary.bySource.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-surface-1 rounded-lg border border-border p-6">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-2xl">📊</span>
-          <h3 className="text-lg font-semibold text-gray-900">AI Citation Testing</h3>
+          <h3 className="text-lg font-semibold ">AI Citation Testing</h3>
         </div>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm muted mb-4">
           Test how often AI assistants cite your site when answering relevant queries.
         </p>
         <Link
@@ -89,15 +89,15 @@ export default function CitationSummaryCard({ auditId }: CitationSummaryCardProp
   const overallPercentage = totalQueries > 0 ? Math.round((totalCited / totalQueries) * 100) : 0;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-surface-1 rounded-lg border border-border p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-2xl">📊</span>
-          <h3 className="text-lg font-semibold text-gray-900">Citation Performance</h3>
+          <h3 className="text-lg font-semibold ">Citation Performance</h3>
         </div>
         <Link
           to={`/audits/${auditId}?tab=citations`}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          className="text-sm text-brand hover:text-brand font-medium"
         >
           View Details →
         </Link>
@@ -107,14 +107,14 @@ export default function CitationSummaryCard({ auditId }: CitationSummaryCardProp
       <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 mb-1">Overall Citation Rate</p>
+            <p className="text-sm muted mb-1">Overall Citation Rate</p>
             <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
               {overallPercentage}%
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-600">Cited</p>
-            <p className="text-2xl font-semibold text-gray-900">
+            <p className="text-sm muted">Cited</p>
+            <p className="text-2xl font-semibold ">
               {totalCited}/{totalQueries}
             </p>
           </div>
@@ -132,16 +132,16 @@ export default function CitationSummaryCard({ auditId }: CitationSummaryCardProp
             <div key={source.ai_source} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
               <div className="flex items-center gap-2">
                 <span className="text-lg">{icon}</span>
-                <span className="text-sm font-medium text-gray-700">{name}</span>
+                <span className="text-sm font-medium muted">{name}</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500">
+                <span className="text-xs subtle">
                   {source.cited_queries}/{source.total_queries}
                 </span>
                 <span className={`text-sm font-semibold ${
-                  percentage >= 70 ? 'text-green-600' :
-                  percentage >= 40 ? 'text-yellow-600' :
-                  'text-red-600'
+                  percentage >= 70 ? 'text-success' :
+                  percentage >= 40 ? 'text-warn' :
+                  'text-danger'
                 }`}>
                   {percentage}%
                 </span>

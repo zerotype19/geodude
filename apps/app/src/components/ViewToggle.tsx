@@ -10,14 +10,14 @@ export default function ViewToggle() {
   const { mode, setMode } = useViewMode();
 
   return (
-    <div className="inline-flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+    <div className="inline-flex items-center gap-2 bg-surface-2 dark:bg-gray-800 rounded-lg p-1">
       <button
         onClick={() => setMode('business')}
         className={`
           px-4 py-2 rounded-md text-sm font-medium transition-colors
           ${mode === 'business' 
-            ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm' 
-            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            ? 'bg-surface-1 dark:bg-gray-700 text-brand dark:text-purple-400 shadow-sm' 
+            : 'muted dark:subtle hover: dark:hover:text-gray-200'
           }
         `}
       >
@@ -28,8 +28,8 @@ export default function ViewToggle() {
         className={`
           px-4 py-2 rounded-md text-sm font-medium transition-colors
           ${mode === 'technical' 
-            ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm' 
-            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            ? 'bg-surface-1 dark:bg-gray-700 text-brand dark:text-purple-400 shadow-sm' 
+            : 'muted dark:subtle hover: dark:hover:text-gray-200'
           }
         `}
       >

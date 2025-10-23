@@ -76,12 +76,12 @@ export default function AdminPage() {
   // Show login form if not authenticated
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Admin Access</h1>
+      <div className="min-h-screen bg-surface-2 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-surface-1 rounded-lg shadow-lg p-8">
+          <h1 className="text-2xl font-bold  mb-6 text-center">Admin Access</h1>
           <form onSubmit={handleAuth}>
             <div className="mb-4">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium muted mb-2">
                 Password
               </label>
               <input
@@ -89,19 +89,19 @@ export default function AdminPage() {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent"
                 placeholder="Enter admin password"
                 autoFocus
               />
             </div>
             {authError && (
-              <div className="mb-4 p-3 bg-red-50 text-red-800 rounded-lg text-sm">
+              <div className="mb-4 p-3 bg-danger-soft text-danger rounded-lg text-sm">
                 {authError}
               </div>
             )}
             <button
               type="submit"
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+              className="w-full px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand transition font-medium"
             >
               Access Admin
             </button>
@@ -247,30 +247,30 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-2">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="mt-2 text-gray-600">System management and audit cleanup</p>
+          <h1 className="text-3xl font-bold ">Admin Dashboard</h1>
+          <p className="mt-2 muted">System management and audit cleanup</p>
         </div>
 
         {/* System Health & Monitoring */}
         <div className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <h2 className="text-xl font-bold  mb-4 flex items-center gap-2">
             <span>🏥</span> System Health & Monitoring
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Classifier Health */}
             <a
               href="/admin/health"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">🧠</div>
                 <div>
-                  <div className="font-semibold text-gray-900">Classifier Health</div>
-                  <div className="text-sm text-gray-600">V2 metrics, alerts, cache hit rate</div>
+                  <div className="font-semibold ">Classifier Health</div>
+                  <div className="text-sm muted">V2 metrics, alerts, cache hit rate</div>
                 </div>
               </div>
             </a>
@@ -278,13 +278,13 @@ export default function AdminPage() {
             {/* Classifier Compare */}
             <a
               href="/admin/classifier-compare"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">🔍</div>
                 <div>
-                  <div className="font-semibold text-gray-900">Classifier Compare</div>
-                  <div className="text-sm text-gray-600">Legacy vs V2 side-by-side</div>
+                  <div className="font-semibold ">Classifier Compare</div>
+                  <div className="text-sm muted">Legacy vs V2 side-by-side</div>
                 </div>
               </div>
             </a>
@@ -294,13 +294,13 @@ export default function AdminPage() {
               href="https://api.optiview.ai/api/admin/classifier-health"
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">📊</div>
                 <div>
-                  <div className="font-semibold text-gray-900">API Health JSON</div>
-                  <div className="text-sm text-gray-600">Raw metrics endpoint →</div>
+                  <div className="font-semibold ">API Health JSON</div>
+                  <div className="text-sm muted">Raw metrics endpoint →</div>
                 </div>
               </div>
             </a>
@@ -310,13 +310,13 @@ export default function AdminPage() {
               href="https://api.optiview.ai/bot"
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-green-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-green-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">🤖</div>
                 <div>
-                  <div className="font-semibold text-gray-900">Bot Documentation</div>
-                  <div className="text-sm text-gray-600">OptiviewAuditBot info →</div>
+                  <div className="font-semibold ">Bot Documentation</div>
+                  <div className="text-sm muted">OptiviewAuditBot info →</div>
                 </div>
               </div>
             </a>
@@ -324,13 +324,13 @@ export default function AdminPage() {
             {/* Re-score Recent Audits */}
             <button
               onClick={rescoreRecent}
-              className="block w-full bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-purple-100 text-left"
+              className="block w-full bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-purple-100 text-left"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">🔄</div>
                 <div>
-                  <div className="font-semibold text-gray-900">Re-score Recent</div>
-                  <div className="text-sm text-gray-600">Re-compute last 10 audits (all criteria live)</div>
+                  <div className="font-semibold ">Re-score Recent</div>
+                  <div className="text-sm muted">Re-compute last 10 audits (all criteria live)</div>
                 </div>
               </div>
             </button>
@@ -340,13 +340,13 @@ export default function AdminPage() {
               href="https://dash.cloudflare.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-orange-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-orange-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">☁️</div>
                 <div>
-                  <div className="font-semibold text-gray-900">Cloudflare Dashboard</div>
-                  <div className="text-sm text-gray-600">Worker logs, D1, KV →</div>
+                  <div className="font-semibold ">Cloudflare Dashboard</div>
+                  <div className="text-sm muted">Worker logs, D1, KV →</div>
                 </div>
               </div>
             </a>
@@ -356,13 +356,13 @@ export default function AdminPage() {
               href="https://dash.cloudflare.com/workers/view/optiview-audit-worker"
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-purple-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-purple-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">📝</div>
                 <div>
-                  <div className="font-semibold text-gray-900">Worker Logs</div>
-                  <div className="text-sm text-gray-600">Real-time logs & errors →</div>
+                  <div className="font-semibold ">Worker Logs</div>
+                  <div className="text-sm muted">Real-time logs & errors →</div>
                 </div>
               </div>
             </a>
@@ -370,16 +370,16 @@ export default function AdminPage() {
             {/* Prompts Compare (NEW) */}
             <a
               href="/admin/prompts-compare"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-green-100 ring-2 ring-green-200"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-green-100 ring-2 ring-green-200"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">✨</div>
                 <div>
-                  <div className="font-semibold text-gray-900 flex items-center gap-2">
+                  <div className="font-semibold  flex items-center gap-2">
                     Prompts Compare
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">NEW</span>
+                    <span className="text-xs bg-success-soft text-success px-2 py-0.5 rounded-full font-medium">NEW</span>
                   </div>
-                  <div className="text-sm text-gray-600">Rules | AI | Blended side-by-side</div>
+                  <div className="text-sm muted">Rules | AI | Blended side-by-side</div>
                 </div>
               </div>
             </a>
@@ -389,13 +389,13 @@ export default function AdminPage() {
               href="https://api.optiview.ai/api/admin/system-status"
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-teal-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-teal-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">💚</div>
                 <div>
-                  <div className="font-semibold text-gray-900">System Status JSON</div>
-                  <div className="text-sm text-gray-600">Full system overview →</div>
+                  <div className="font-semibold ">System Status JSON</div>
+                  <div className="text-sm muted">Full system overview →</div>
                 </div>
               </div>
             </a>
@@ -405,13 +405,13 @@ export default function AdminPage() {
               href="https://api.optiview.ai/.well-known/optiview-bot.json"
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-gray-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-gray-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">🔧</div>
                 <div>
-                  <div className="font-semibold text-gray-900">Bot Metadata</div>
-                  <div className="text-sm text-gray-600">Machine-readable info →</div>
+                  <div className="font-semibold ">Bot Metadata</div>
+                  <div className="text-sm muted">Machine-readable info →</div>
                 </div>
               </div>
             </a>
@@ -421,13 +421,13 @@ export default function AdminPage() {
               href="https://analytics.google.com/analytics/web/#/p467849140"
               target="_blank"
               rel="noopener noreferrer"
-              className="block bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition border border-yellow-100"
+              className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-yellow-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-3xl">📈</div>
                 <div>
-                  <div className="font-semibold text-gray-900">Google Analytics</div>
-                  <div className="text-sm text-gray-600">Traffic & usage stats →</div>
+                  <div className="font-semibold ">Google Analytics</div>
+                  <div className="text-sm muted">Traffic & usage stats →</div>
                 </div>
               </div>
             </a>
@@ -437,49 +437,49 @@ export default function AdminPage() {
           <div className="mt-6 pt-6 border-t border-blue-200">
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
               <div>
-                <div className="text-gray-600">Worker Version</div>
-                <div className="font-mono text-xs text-gray-900">dce747bb</div>
+                <div className="muted">Worker Version</div>
+                <div className="font-mono text-xs ">dce747bb</div>
               </div>
               <div>
-                <div className="text-gray-600">V4 Pipeline</div>
-                <div className="font-semibold text-green-600 flex items-center gap-1">
+                <div className="muted">V4 Pipeline</div>
+                <div className="font-semibold text-success flex items-center gap-1">
                   ✓ Active
-                  <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Blended</span>
+                  <span className="text-xs bg-success-soft text-success px-1.5 py-0.5 rounded">Blended</span>
                 </div>
               </div>
               <div>
-                <div className="text-gray-600">MSS V2 Fallback</div>
-                <div className="font-semibold text-green-600">✓ Live</div>
+                <div className="muted">MSS V2 Fallback</div>
+                <div className="font-semibold text-success">✓ Live</div>
               </div>
               <div>
-                <div className="text-gray-600">Industry Detection</div>
-                <div className="font-semibold text-green-600">✓ 18+ Verticals</div>
+                <div className="muted">Industry Detection</div>
+                <div className="font-semibold text-success">✓ 18+ Verticals</div>
               </div>
               <div>
-                <div className="text-gray-600">Cron Jobs</div>
-                <div className="font-semibold text-green-600">✓ Hourly</div>
+                <div className="muted">Cron Jobs</div>
+                <div className="font-semibold text-success">✓ Hourly</div>
               </div>
               <div>
-                <div className="text-gray-600">Citations</div>
-                <div className="font-semibold text-green-600">✓ 3 Sources</div>
+                <div className="muted">Citations</div>
+                <div className="font-semibold text-success">✓ 3 Sources</div>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
               <div>
-                <div className="text-gray-600">Auto-Finalize</div>
-                <div className="font-mono text-gray-900">Hourly @ :00</div>
+                <div className="muted">Auto-Finalize</div>
+                <div className="font-mono ">Hourly @ :00</div>
               </div>
               <div>
-                <div className="text-gray-600">Prompt Refresh</div>
-                <div className="font-mono text-gray-900">Hourly @ :00</div>
+                <div className="muted">Prompt Refresh</div>
+                <div className="font-mono ">Hourly @ :00</div>
               </div>
               <div>
-                <div className="text-gray-600">Quality Gates</div>
-                <div className="font-semibold text-green-600">Leak=0, Plural=0</div>
+                <div className="muted">Quality Gates</div>
+                <div className="font-semibold text-success">Leak=0, Plural=0</div>
               </div>
               <div>
-                <div className="text-gray-600">Realism Avg</div>
-                <div className="font-semibold text-green-600">0.85-0.95</div>
+                <div className="muted">Realism Avg</div>
+                <div className="font-semibold text-success">0.85-0.95</div>
               </div>
             </div>
           </div>
@@ -488,7 +488,7 @@ export default function AdminPage() {
         {/* Message Banner */}
         {message && (
           <div className={`mb-6 p-4 rounded-lg ${
-            message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+            message.type === 'success' ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
           }`}>
             {message.text}
           </div>
@@ -496,25 +496,25 @@ export default function AdminPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-            <div className="text-sm text-gray-600">Total Audits</div>
+          <div className="bg-surface-1 p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold ">{stats.total}</div>
+            <div className="text-sm muted">Total Audits</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-            <div className="text-sm text-gray-600">Completed</div>
+          <div className="bg-surface-1 p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-success">{stats.completed}</div>
+            <div className="text-sm muted">Completed</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-blue-600">{stats.running}</div>
-            <div className="text-sm text-gray-600">Running</div>
+          <div className="bg-surface-1 p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-brand">{stats.running}</div>
+            <div className="text-sm muted">Running</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-            <div className="text-sm text-gray-600">Failed</div>
+          <div className="bg-surface-1 p-4 rounded-lg shadow">
+            <div className="text-2xl font-bold text-danger">{stats.failed}</div>
+            <div className="text-sm muted">Failed</div>
           </div>
-          <div className="bg-white p-4 rounded-lg shadow">
+          <div className="bg-surface-1 p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-orange-600">{stats.duplicates}</div>
-            <div className="text-sm text-gray-600">Duplicate Groups</div>
+            <div className="text-sm muted">Duplicate Groups</div>
           </div>
         </div>
 
@@ -522,7 +522,7 @@ export default function AdminPage() {
         <div className="mb-8 flex flex-wrap gap-4">
           <button
             onClick={regenerateAllPrompts}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand transition"
           >
             🔄 Regenerate All Prompts
           </button>
@@ -541,15 +541,15 @@ export default function AdminPage() {
         </div>
 
         {/* Filter Tabs */}
-        <div className="mb-6 flex gap-2 border-b border-gray-200">
+        <div className="mb-6 flex gap-2 border-b border-border">
           {(['all', 'failed', 'duplicates'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-4 py-2 font-medium transition ${
                 filter === f
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'text-brand border-b-2 border-blue-600'
+                  : 'muted hover:'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -558,56 +558,56 @@ export default function AdminPage() {
         </div>
 
         {/* Audits Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-surface-1 rounded-lg shadow overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-gray-600">Loading audits...</div>
+            <div className="p-8 text-center muted">Loading audits...</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-surface-2">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Domain</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pages</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AEO / GEO</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Domain</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Pages</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">AEO / GEO</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Started</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-surface-1 divide-y divide-gray-200">
                   {filteredAudits().map(audit => (
-                    <tr key={audit.id} className="hover:bg-gray-50">
+                    <tr key={audit.id} className="hover:bg-surface-2">
                       <td className="px-6 py-4">
                         <a
                           href={`/audits/${audit.id}`}
-                          className="text-blue-600 hover:underline font-medium"
+                          className="text-brand hover:underline font-medium"
                         >
                           {audit.root_url}
                         </a>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 text-xs rounded-full ${
-                          audit.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          audit.status === 'running' ? 'bg-blue-100 text-blue-800' :
-                          'bg-red-100 text-red-800'
+                          audit.status === 'completed' ? 'bg-success-soft text-success' :
+                          audit.status === 'running' ? 'bg-brand-soft text-brand' :
+                          'bg-danger-soft text-danger'
                         }`}>
                           {audit.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{audit.pages_analyzed}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
+                      <td className="px-6 py-4 text-sm ">{audit.pages_analyzed}</td>
+                      <td className="px-6 py-4 text-sm ">
                         {audit.aeo_score !== null && audit.geo_score !== null
                           ? `${Math.round(audit.aeo_score)} / ${Math.round(audit.geo_score)}`
                           : '-'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm muted">
                         {new Date(audit.started_at + 'Z').toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <button
                           onClick={() => deleteAudit(audit.id)}
                           disabled={deletingIds.has(audit.id)}
-                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                          className="text-danger hover:text-red-900 disabled:opacity-50"
                         >
                           {deletingIds.has(audit.id) ? 'Deleting...' : '🗑️ Delete'}
                         </button>

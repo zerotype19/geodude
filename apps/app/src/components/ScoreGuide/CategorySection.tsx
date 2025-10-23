@@ -23,9 +23,9 @@ export default function CategorySection({ title, icon, description, criteria }: 
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-4xl">{icon}</span>
-          <h2 className="text-3xl font-bold text-gray-900">{title}</h2>
+          <h2 className="text-3xl font-bold ">{title}</h2>
         </div>
-        <p className="text-lg text-gray-600 ml-14">{description}</p>
+        <p className="text-lg muted ml-14">{description}</p>
       </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

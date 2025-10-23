@@ -47,10 +47,10 @@ export default function PageChecksTable({ rows, criteriaMap }: Props) {
   };
 
   return (
-    <div className="rounded-xl border-2 border-gray-200 bg-white overflow-hidden">
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-        <h3 className="font-semibold text-gray-900">Page-Level Checks</h3>
-        <div className="text-xs text-gray-600">
+    <div className="rounded-xl border-2 border-border bg-surface-1 overflow-hidden">
+      <div className="flex items-center justify-between p-4 border-b border-border bg-surface-2">
+        <h3 className="font-semibold ">Page-Level Checks</h3>
+        <div className="text-xs muted">
           Active: {active}/{rows.length}
         </div>
       </div>
@@ -93,12 +93,12 @@ function Row({ r, label, impact, why, how, checkType, isExpanded, onToggle }: Ro
     <div>
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors text-left"
+        className="w-full flex items-center gap-3 p-4 hover:bg-surface-2 transition-colors text-left"
       >
         <Status status={r.preview ? 'preview' : r.status} />
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-gray-900 text-sm">{label}</div>
-          <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
+          <div className="font-medium  text-sm">{label}</div>
+          <div className="text-xs subtle mt-0.5 flex items-center gap-2">
             <span className="font-mono">{r.id}</span>
             {impact && (
               <>
@@ -109,7 +109,7 @@ function Row({ r, label, impact, why, how, checkType, isExpanded, onToggle }: Ro
             {checkType && (
               <>
                 <span>•</span>
-                <span className="font-mono text-[10px] bg-gray-100 px-1.5 py-0.5 rounded">
+                <span className="font-mono text-[10px] bg-surface-2 px-1.5 py-0.5 rounded">
                   {checkType}
                 </span>
               </>
@@ -118,7 +118,7 @@ function Row({ r, label, impact, why, how, checkType, isExpanded, onToggle }: Ro
         </div>
         <ScoreBar score={r.score} />
         <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${
+          className={`w-5 h-5 subtle transition-transform ${
             isExpanded ? 'rotate-180' : ''
           }`}
           fill="none"
@@ -129,33 +129,33 @@ function Row({ r, label, impact, why, how, checkType, isExpanded, onToggle }: Ro
         </svg>
       </button>
       {isExpanded && (
-        <div className="px-4 pb-4 pl-16 space-y-3 bg-gray-50 border-t border-gray-100">
+        <div className="px-4 pb-4 pl-16 space-y-3 bg-surface-2 border-t border-gray-100">
           {why && (
             <div className="text-sm">
-              <span className="font-semibold text-gray-900">Why it matters:</span>
-              <p className="text-gray-700 mt-1">{why}</p>
+              <span className="font-semibold ">Why it matters:</span>
+              <p className="muted mt-1">{why}</p>
             </div>
           )}
           {how && (
             <div className="text-sm">
-              <span className="font-semibold text-gray-900">How to fix:</span>
-              <p className="text-gray-700 mt-1">{how}</p>
+              <span className="font-semibold ">How to fix:</span>
+              <p className="muted mt-1">{how}</p>
             </div>
           )}
           {r.details && Object.keys(r.details).length > 0 && (
             <div className="text-sm">
-              <span className="font-semibold text-gray-900">Details:</span>
-              <pre className="bg-white rounded-lg p-3 overflow-x-auto text-xs mt-2 border border-gray-200">
+              <span className="font-semibold ">Details:</span>
+              <pre className="bg-surface-1 rounded-lg p-3 overflow-x-auto text-xs mt-2 border border-border">
                 {JSON.stringify(r.details, null, 2)}
               </pre>
             </div>
           )}
           {r.evidence && r.evidence.length > 0 && (
             <div className="text-sm">
-              <span className="font-semibold text-gray-900">Evidence:</span>
+              <span className="font-semibold ">Evidence:</span>
               <div className="mt-2 space-y-1">
                 {r.evidence.slice(0, 3).map((ev, i) => (
-                  <div key={i} className="text-xs text-gray-600 bg-white rounded px-3 py-2 border border-gray-200">
+                  <div key={i} className="text-xs muted bg-surface-1 rounded px-3 py-2 border border-border">
                     {ev}
                   </div>
                 ))}
@@ -174,12 +174,12 @@ interface StatusProps {
 
 function Status({ status }: StatusProps) {
   const m = {
-    ok: 'bg-green-500',
-    warn: 'bg-amber-500',
-    fail: 'bg-red-500',
+    ok: 'bg-success-soft0',
+    warn: 'bg-warn-soft0',
+    fail: 'bg-danger-soft0',
     error: 'bg-rose-500',
     not_applicable: 'bg-gray-400',
-    preview: 'bg-purple-500',
+    preview: 'bg-brand',
   }[status] || 'bg-gray-400';
 
   const label =
@@ -205,14 +205,14 @@ interface ScoreBarProps {
 function ScoreBar({ score }: ScoreBarProps) {
   const clamped = Math.max(0, Math.min(100, score));
   const color =
-    score >= 85 ? 'bg-green-500' : score >= 60 ? 'bg-amber-500' : 'bg-red-500';
+    score >= 85 ? 'bg-success-soft0' : score >= 60 ? 'bg-warn-soft0' : 'bg-danger-soft0';
 
   return (
     <div className="w-32">
-      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-surface-3 rounded-full overflow-hidden">
         <div className={`h-2 rounded-full ${color}`} style={{ width: `${clamped}%` }} />
       </div>
-      <div className="text-xs text-right mt-1 font-semibold text-gray-700">
+      <div className="text-xs text-right mt-1 font-semibold muted">
         {Math.round(score)}
       </div>
     </div>

@@ -47,11 +47,11 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         ></div>
 
         {/* Modal */}
-        <div className="relative w-full max-w-md transform overflow-hidden rounded-lg bg-white p-6 shadow-xl transition-all">
+        <div className="relative w-full max-w-md transform overflow-hidden rounded-lg bg-surface-1 p-6 shadow-xl transition-all">
           <div className="absolute right-4 top-4">
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="subtle hover:muted"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -65,17 +65,17 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </div>
-            <h3 className="mt-4 text-center text-lg font-semibold text-gray-900">
+            <h3 className="mt-4 text-center text-lg font-semibold ">
               Sign In to Optiview
             </h3>
-            <p className="mt-2 text-center text-sm text-gray-600">
+            <p className="mt-2 text-center text-sm muted">
               Enter your email to receive a secure sign-in link
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium muted">
                 Email address
               </label>
               <input
@@ -85,21 +85,21 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 shadow-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
                 disabled={loading}
               />
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-50 p-3">
-                <p className="text-sm text-red-800">{error}</p>
+              <div className="rounded-md bg-danger-soft p-3">
+                <p className="text-sm text-danger">{error}</p>
               </div>
             )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-md bg-gradient-to-r from-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+              className="w-full rounded-md bg-gradient-to-r from-purple-500 to-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:from-purple-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -115,7 +115,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             </button>
           </form>
 
-          <p className="mt-4 text-center text-xs text-gray-500">
+          <p className="mt-4 text-center text-xs subtle">
             We'll send you a secure link to sign in. No password required!
           </p>
         </div>

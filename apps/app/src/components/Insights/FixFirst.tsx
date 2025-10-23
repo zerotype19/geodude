@@ -83,14 +83,14 @@ export default function FixFirst({ pages, onFilterClick }: FixFirstProps) {
 
   if (sortedFailures.length === 0) {
     return (
-      <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-6">
+      <div className="bg-success-soft dark:bg-green-900/20 rounded-2xl p-6">
         <div className="flex items-center gap-3">
           <span className="text-3xl">✨</span>
           <div>
             <h3 className="font-semibold text-green-900 dark:text-green-300">
               All high-impact checks passing!
             </h3>
-            <p className="text-sm text-green-700 dark:text-green-400">
+            <p className="text-sm text-success dark:text-green-400">
               Your content is well-optimized for AI visibility.
             </p>
           </div>
@@ -100,12 +100,12 @@ export default function FixFirst({ pages, onFilterClick }: FixFirstProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+    <div className="bg-surface-1 dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-lg font-semibold  dark:text-white">
           🎯 Fix First
         </h3>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="text-sm subtle dark:subtle">
           Top {sortedFailures.length} priorities
         </span>
       </div>
@@ -115,23 +115,23 @@ export default function FixFirst({ pages, onFilterClick }: FixFirstProps) {
           <button
             key={failure.criterionId}
             onClick={() => onFilterClick?.(failure.criterionId)}
-            className="w-full text-left p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="w-full text-left p-4 rounded-lg bg-surface-2 dark:bg-gray-700/50 hover:bg-surface-2 dark:hover:bg-gray-700 transition-colors"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg font-bold text-gray-400 dark:text-gray-500">
+                  <span className="text-lg font-bold subtle dark:subtle">
                     {idx + 1}.
                   </span>
-                  <span className="font-medium text-gray-900 dark:text-white">
+                  <span className="font-medium  dark:text-white">
                     {failure.title}
                   </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-surface-3 muted dark:bg-gray-600 dark:text-gray-300">
                     {failure.criterionId}
                   </span>
                   {failure.preview && <PreviewBadge />}
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm muted dark:subtle">
                   {failure.failureCount} page{failure.failureCount !== 1 ? 's' : ''} failing
                   {failure.uncitedFailures > 0 && (
                     <span className="text-orange-600 dark:text-orange-400 font-medium">
@@ -141,7 +141,7 @@ export default function FixFirst({ pages, onFilterClick }: FixFirstProps) {
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-xs text-gray-500 dark:text-gray-400">
+                <div className="text-xs subtle dark:subtle">
                   Weight: {failure.weight}
                 </div>
               </div>
@@ -150,8 +150,8 @@ export default function FixFirst({ pages, onFilterClick }: FixFirstProps) {
         ))}
       </div>
 
-      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+      <div className="mt-4 pt-4 border-t border-border dark:border-gray-700">
+        <p className="text-xs subtle dark:subtle">
           💡 Tip: Click an item to filter the pages table to show only failing pages for that check.
         </p>
       </div>

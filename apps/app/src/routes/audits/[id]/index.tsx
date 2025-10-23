@@ -190,27 +190,27 @@ export default function AuditDetail() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'complete': return 'bg-green-100 text-green-800';
-      case 'running': return 'bg-blue-100 text-blue-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'complete': return 'bg-success-soft text-success';
+      case 'running': return 'bg-brand-soft text-brand';
+      case 'failed': return 'bg-danger-soft text-danger';
+      default: return 'bg-surface-2 text-gray-800';
     }
   };
 
   const getScoreColor = (score?: number) => {
-    if (!score) return 'text-gray-500';
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
+    if (!score) return 'subtle';
+    if (score >= 80) return 'text-success';
+    if (score >= 60) return 'text-warn';
+    return 'text-danger';
   };
 
   const getCheckScoreColor = (score: number) => {
     switch (score) {
-      case 3: return 'bg-green-100 text-green-800';
-      case 2: return 'bg-blue-100 text-blue-800';
-      case 1: return 'bg-yellow-100 text-yellow-800';
-      case 0: return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 3: return 'bg-success-soft text-success';
+      case 2: return 'bg-brand-soft text-brand';
+      case 1: return 'bg-warn-soft text-warn';
+      case 0: return 'bg-danger-soft text-danger';
+      default: return 'bg-surface-2 text-gray-800';
     }
   };
 
@@ -320,10 +320,10 @@ export default function AuditDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-2 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading audit details...</p>
+          <p className="mt-4 muted">Loading audit details...</p>
         </div>
       </div>
     );
@@ -331,18 +331,18 @@ export default function AuditDetail() {
 
   if (error || !audit) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-2 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-red-600 mb-4">
+          <div className="text-danger mb-4">
             <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Audit</h3>
-          <p className="text-gray-600 mb-4">{error || 'Audit not found'}</p>
+          <h3 className="text-lg font-medium  mb-2">Error Loading Audit</h3>
+          <p className="muted mb-4">{error || 'Audit not found'}</p>
           <Link
             to="/audits"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            className="bg-brand hover:bg-brand text-white font-medium py-2 px-4 rounded-lg transition-colors"
           >
             Back to Audits
           </Link>
@@ -509,7 +509,7 @@ export default function AuditDetail() {
                   </p>
                 </div>
                 {audit.fail_at && (
-                  <p className="mt-2 text-xs text-red-600">
+                  <p className="mt-2 text-xs text-danger">
                     Failed at: {new Date(audit.fail_at).toLocaleString()}
                   </p>
                 )}
@@ -533,8 +533,8 @@ export default function AuditDetail() {
                 <FixFirst fixes={audit.fix_first} />
               </div>
             ) : (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                <p className="text-gray-600">No priority actions identified yet. Complete the audit to see recommendations.</p>
+              <div className="bg-surface-1 rounded-lg border border-border p-8 text-center">
+                <p className="muted">No priority actions identified yet. Complete the audit to see recommendations.</p>
               </div>
             )}
           </>
@@ -544,11 +544,11 @@ export default function AuditDetail() {
             {diagnostics.loading ? (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-4 text-gray-600">Loading diagnostics...</p>
+                <p className="mt-4 muted">Loading diagnostics...</p>
               </div>
             ) : diagnostics.error ? (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                <p className="text-red-700">{diagnostics.error}</p>
+              <div className="bg-danger-soft border border-danger rounded-lg p-6 text-center">
+                <p className="text-danger">{diagnostics.error}</p>
               </div>
             ) : (
               <>
@@ -569,8 +569,8 @@ export default function AuditDetail() {
                 {pages.length > 0 && diagnostics.pageChecks[pages[0].id] && (
                   <div className="mb-8">
                     <div className="mb-4">
-                      <h2 className="text-xl font-semibold text-gray-900 mb-1">Sample Page Checks</h2>
-                      <p className="text-sm text-gray-600">
+                      <h2 className="text-xl font-semibold  mb-1">Sample Page Checks</h2>
+                      <p className="text-sm muted">
                         Showing checks for: <span className="font-mono text-xs">{pages[0].url}</span>
                       </p>
                     </div>
@@ -583,11 +583,11 @@ export default function AuditDetail() {
 
                 {/* Empty State */}
                 {diagnostics.siteChecks.length === 0 && Object.keys(diagnostics.pageChecks).length === 0 && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
-                    <p className="text-yellow-800 mb-4">
+                  <div className="bg-warn-soft border border-warn rounded-lg p-8 text-center">
+                    <p className="text-warn mb-4">
                       No diagnostics data available yet. The scoring system may still be processing this audit.
                     </p>
-                    <p className="text-sm text-yellow-700">
+                    <p className="text-sm text-warn">
                       Try refreshing the page in a few moments, or re-run the audit to generate new scores.
                     </p>
                   </div>
@@ -606,8 +606,8 @@ export default function AuditDetail() {
         {audit.scorecard_v2 && audit.category_scores && audit.category_scores.length > 0 && (
           <div className="mb-8">
             <div className="mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 mb-1">Category Breakdown</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-xl font-semibold  mb-1">Category Breakdown</h2>
+              <p className="text-sm muted">
                 Your site performance across 6 key categories (0-100 scale)
               </p>
             </div>

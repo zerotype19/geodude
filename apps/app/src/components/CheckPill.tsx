@@ -26,11 +26,11 @@ export default function CheckPill({
   
   // Color by score (0-3 scale)
   const color =
-    score === 3 ? "bg-green-100 text-green-800 border-green-200"
-  : score === 2 ? "bg-amber-100 text-amber-800 border-amber-200"
+    score === 3 ? "bg-success-soft text-success border-success"
+  : score === 2 ? "bg-warn-soft text-warn border-warn"
   : score === 1 ? "bg-orange-100 text-orange-800 border-orange-200"
-  : score === 0 ? "bg-red-100 text-red-800 border-red-200"
-  : "bg-gray-100 text-gray-700 border-gray-200"; // no score provided
+  : score === 0 ? "bg-danger-soft text-danger border-danger"
+  : "bg-surface-2 muted border-border"; // no score provided
 
   const handleClick = (e: React.MouseEvent) => {
     if (showGuideLink) {

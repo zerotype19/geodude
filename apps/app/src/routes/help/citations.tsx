@@ -417,21 +417,21 @@ Beyond citation counts, you get entity-level insights, competitive benchmarking,
 
 export default function CitationsGuide() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-2">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <Link to="/audits" className="text-blue-600 hover:text-blue-800 mb-2 inline-block">
+          <Link to="/audits" className="text-brand hover:text-brand mb-2 inline-block">
             ← Back to Audits
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Citations Guide</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-3xl font-bold ">Citations Guide</h1>
+          <p className="mt-2 muted">
             Self-learning citation intelligence powered by human-realistic query generation
           </p>
         </div>
 
         {/* Content */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-surface-1 shadow rounded-lg">
           <div className="px-6 py-8">
             <div className="prose prose-lg max-w-none">
               <ReactMarkdown
@@ -440,11 +440,11 @@ export default function CitationsGuide() {
                 components={{
                   // Style h1
                   h1: ({ node, ...props }) => (
-                    <h1 className="text-4xl font-bold text-gray-900 mb-8 mt-0" {...props} />
+                    <h1 className="text-4xl font-bold  mb-8 mt-0" {...props} />
                   ),
                   // Style h2
                   h2: ({ node, ...props }) => (
-                    <h2 className="text-3xl font-bold text-gray-900 first:mt-0 mt-16 mb-6 pb-3 border-b-2 border-gray-200" {...props} />
+                    <h2 className="text-3xl font-bold  first:mt-0 mt-16 mb-6 pb-3 border-b-2 border-border" {...props} />
                   ),
                   // Style h3
                   h3: ({ node, ...props }) => (
@@ -452,21 +452,21 @@ export default function CitationsGuide() {
                   ),
                   // Style h4 (for numbered sections)
                   h4: ({ node, ...props }) => (
-                    <h4 className="text-2xl font-bold text-gray-900 mb-4 mt-10 pb-2 border-b border-gray-200" {...props} />
+                    <h4 className="text-2xl font-bold  mb-4 mt-10 pb-2 border-b border-border" {...props} />
                   ),
                   // Style lists with proper indentation
                   ul: ({ node, ...props }) => (
-                    <ul className="list-disc ml-6 space-y-2 text-gray-700 my-4 [&_ul]:ml-6 [&_ul]:mt-2" {...props} />
+                    <ul className="list-disc ml-6 space-y-2 muted my-4 [&_ul]:ml-6 [&_ul]:mt-2" {...props} />
                   ),
                   ol: ({ node, ...props }) => (
-                    <ol className="list-decimal ml-6 space-y-2 text-gray-700 my-4 [&_ol]:ml-6 [&_ol]:mt-2" {...props} />
+                    <ol className="list-decimal ml-6 space-y-2 muted my-4 [&_ol]:ml-6 [&_ol]:mt-2" {...props} />
                   ),
                   li: ({ node, ...props }) => (
                     <li className="leading-relaxed" {...props} />
                   ),
                   // Style paragraphs
                   p: ({ node, ...props }) => (
-                    <p className="text-gray-700 leading-relaxed my-3" {...props} />
+                    <p className="muted leading-relaxed my-3" {...props} />
                   ),
                   // Style code blocks
                   code: ({ node, inline, className, children, ...props }) => {
@@ -489,11 +489,11 @@ export default function CitationsGuide() {
                   },
                   // Style strong (bold) text
                   strong: ({ node, ...props }) => (
-                    <strong className="font-semibold text-gray-900" {...props} />
+                    <strong className="font-semibold " {...props} />
                   ),
                   // Style emphasis (italic) text
                   em: ({ node, ...props }) => (
-                    <em className="italic text-gray-600" {...props} />
+                    <em className="italic muted" {...props} />
                   ),
                 }}
               >

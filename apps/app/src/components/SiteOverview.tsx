@@ -52,8 +52,8 @@ export default function SiteOverview({ siteChecks, criteriaMap }: Props) {
   return (
     <div className="mb-8">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold text-gray-900 mb-1">Site-Level Diagnostics</h2>
-        <p className="text-sm text-gray-600">
+        <h2 className="text-xl font-semibold  mb-1">Site-Level Diagnostics</h2>
+        <p className="text-sm muted">
           Aggregate scores across all pages and site-wide checks
         </p>
       </div>
@@ -78,28 +78,28 @@ function MetricTile({ row, meta }: MetricTileProps) {
   const badge = row.preview ? 'preview' : row.status;
 
   return (
-    <div className="rounded-xl border-2 border-gray-200 p-4 bg-white hover:shadow-md transition-shadow">
+    <div className="rounded-xl border-2 border-border p-4 bg-surface-1 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
-          <div className="font-semibold text-gray-900 text-sm">
+          <div className="font-semibold  text-sm">
             {meta?.label ?? row.id}
           </div>
           {meta?.impact_level && (
-            <div className="text-xs text-gray-500 mt-0.5">
+            <div className="text-xs subtle mt-0.5">
               {meta.impact_level} Impact
             </div>
           )}
         </div>
         <StatusChip status={badge as any} />
       </div>
-      <div className="text-3xl font-bold text-gray-900 mb-2">
+      <div className="text-3xl font-bold  mb-2">
         {Math.round(row.score)}
-        <span className="text-lg text-gray-500 ml-1">
+        <span className="text-lg subtle ml-1">
           {row.id.includes('pct') || row.id.includes('coverage') ? '%' : ''}
         </span>
       </div>
       {meta?.why_it_matters && (
-        <div className="text-xs text-gray-600 line-clamp-2">{meta.why_it_matters}</div>
+        <div className="text-xs muted line-clamp-2">{meta.why_it_matters}</div>
       )}
     </div>
   );
@@ -112,16 +112,16 @@ interface StatusChipProps {
 function StatusChip({ status }: StatusChipProps) {
   const cls =
     status === 'ok'
-      ? 'bg-green-100 text-green-700'
+      ? 'bg-success-soft text-success'
       : status === 'warn'
-      ? 'bg-amber-100 text-amber-800'
+      ? 'bg-warn-soft text-warn'
       : status === 'fail'
-      ? 'bg-red-100 text-red-800'
+      ? 'bg-danger-soft text-danger'
       : status === 'preview'
-      ? 'bg-purple-100 text-purple-700'
+      ? 'bg-purple-100 text-brand'
       : status === 'not_applicable'
-      ? 'bg-gray-100 text-gray-700'
-      : 'bg-gray-100 text-gray-700';
+      ? 'bg-surface-2 muted'
+      : 'bg-surface-2 muted';
 
   const label =
     status === 'preview'

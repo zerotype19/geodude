@@ -5,33 +5,33 @@ export default function Methodology() {
   const lastUpdated = "January 17, 2025";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-2">
       <div className="max-w-4xl mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-8">
-          <Link to="/" className="text-blue-600 hover:text-blue-800 text-sm mb-4 inline-block">
+          <Link to="/" className="text-brand hover:text-brand text-sm mb-4 inline-block">
             ← Back to Home
           </Link>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold  mb-2">
             Data Sources & Methodology Disclosure
           </h1>
-          <p className="text-gray-600">Last updated: {lastUpdated}</p>
+          <p className="muted">Last updated: {lastUpdated}</p>
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-lg shadow-sm p-8 space-y-8">
+        <div className="bg-surface-1 rounded-lg shadow-sm p-8 space-y-8">
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">1. Purpose</h2>
-            <p className="text-gray-700 leading-relaxed">
+            <h2 className="text-2xl font-semibold  mb-3">1. Purpose</h2>
+            <p className="muted leading-relaxed">
               This document explains how Optiview generates its audit scores, data points, and visibility insights. 
               Our goal is to ensure transparency about what data we use and how we interpret it.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">2. Data Sources</h2>
-            <p className="text-gray-700 leading-relaxed mb-3">Optiview combines multiple input types:</p>
-            <ul className="space-y-3 text-gray-700">
+            <h2 className="text-2xl font-semibold  mb-3">2. Data Sources</h2>
+            <p className="muted leading-relaxed mb-3">Optiview combines multiple input types:</p>
+            <ul className="space-y-3 muted">
               <li>
                 <strong>Crawled HTML & metadata</strong> - collected directly from publicly available web pages that you 
                 authorize us to audit, including both static HTML and JavaScript-rendered content for visibility analysis.
@@ -63,10 +63,10 @@ export default function Methodology() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">3. How Scoring Works</h2>
-            <div className="space-y-4 text-gray-700">
+            <h2 className="text-2xl font-semibold  mb-3">3. How Scoring Works</h2>
+            <div className="space-y-4 muted">
               <div>
-                <h3 className="font-semibold text-lg text-gray-900 mb-2">
+                <h3 className="font-semibold text-lg  mb-2">
                   AEO (Answer Engine Optimization)
                 </h3>
                 <p className="leading-relaxed">
@@ -75,7 +75,7 @@ export default function Methodology() {
                 </p>
               </div>
               <div>
-                <h3 className="font-semibold text-lg text-gray-900 mb-2">
+                <h3 className="font-semibold text-lg  mb-2">
                   GEO (Generative Engine Optimization)
                 </h3>
                 <p className="leading-relaxed">
@@ -83,13 +83,13 @@ export default function Methodology() {
                 </p>
               </div>
             </div>
-            <div className="mt-4 p-4 bg-gray-50 rounded border border-gray-200">
-              <p className="text-sm text-gray-700 mb-2">
+            <div className="mt-4 p-4 bg-surface-2 rounded border border-border">
+              <p className="text-sm muted mb-2">
                 Each check (A1–A11, G1–G10) is scored 0–3 using static and rendered page data. Weights (4–15) determine the 
                 relative importance of each check. <strong>Scores are heuristic indicators only</strong> - not predictive 
                 models or guarantees.
               </p>
-              <p className="text-sm text-gray-700">
+              <p className="text-sm muted">
                 <strong>Site-level penalties:</strong> AEO scores may receive up to a -5 point penalty if average render 
                 visibility (static HTML vs. JavaScript-rendered content) falls below 30%. GEO scores may receive a -5 to -10 
                 point penalty if render visibility is below 50%. This reflects the reality that AI crawlers and search engines 
@@ -99,14 +99,14 @@ export default function Methodology() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">4. Citation Intelligence Methodology</h2>
-            <p className="text-gray-700 leading-relaxed mb-3">
+            <h2 className="text-2xl font-semibold  mb-3">4. Citation Intelligence Methodology</h2>
+            <p className="muted leading-relaxed mb-3">
               Optiview's citation system uses a <strong>self-learning, context-aware approach</strong> to generate 
               human-realistic queries that mirror actual user search patterns:
             </p>
-            <div className="space-y-4 text-gray-700">
+            <div className="space-y-4 muted">
               <div>
-                <h3 className="font-semibold text-lg text-gray-900 mb-2">Adaptive Query Generation (V4)</h3>
+                <h3 className="font-semibold text-lg  mb-2">Adaptive Query Generation (V4)</h3>
                 <p className="leading-relaxed">
                   Rather than static templates, our system analyzes each domain's homepage, meta descriptions, JSON-LD, 
                   and navigation structure to generate ~28 unique queries (10 branded + 18 non-branded) that:
@@ -119,7 +119,7 @@ export default function Methodology() {
                 </ul>
               </div>
               <div>
-                <h3 className="font-semibold text-lg text-gray-900 mb-2">Continuous Learning Architecture</h3>
+                <h3 className="font-semibold text-lg  mb-2">Continuous Learning Architecture</h3>
                 <p className="leading-relaxed">
                   After each audit, the system automatically updates a <strong>Prompt Intelligence Index</strong> that stores:
                 </p>
@@ -135,7 +135,7 @@ export default function Methodology() {
                 </p>
               </div>
               <div>
-                <h3 className="font-semibold text-lg text-gray-900 mb-2">Three-Tier Caching</h3>
+                <h3 className="font-semibold text-lg  mb-2">Three-Tier Caching</h3>
                 <ul className="list-disc ml-6 space-y-1">
                   <li><strong>Hot cache (KV)</strong>: 5-10ms response, 7-day TTL, serves 90% of requests</li>
                   <li><strong>Canonical store (D1)</strong>: 50-100ms, durable history with version tracking</li>
@@ -146,8 +146,8 @@ export default function Methodology() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">5. External Data Limitations</h2>
-            <ul className="list-disc ml-6 space-y-2 text-gray-700">
+            <h2 className="text-2xl font-semibold  mb-3">5. External Data Limitations</h2>
+            <ul className="list-disc ml-6 space-y-2 muted">
               <li>Data from search and AI platforms may be incomplete, cached, or regionally restricted.</li>
               <li>AI citation monitoring depends on public availability and can change without notice.</li>
               <li>Rendered content checks depend on browser automation and may miss dynamic elements.</li>
@@ -158,8 +158,8 @@ export default function Methodology() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">6. Interpretive Nature</h2>
-            <p className="text-gray-700 leading-relaxed">
+            <h2 className="text-2xl font-semibold  mb-3">6. Interpretive Nature</h2>
+            <p className="muted leading-relaxed">
               All insights, rankings, and "Quick Win" recommendations represent <strong>interpretations of observed 
               patterns</strong>, not official documentation or endorsements by any external entity. Use these results to guide 
               experimentation, not as definitive fact.
@@ -167,21 +167,21 @@ export default function Methodology() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">7. Methodology Updates</h2>
-            <p className="text-gray-700 leading-relaxed">
+            <h2 className="text-2xl font-semibold  mb-3">7. Methodology Updates</h2>
+            <p className="muted leading-relaxed">
               We refine our scoring logic periodically to reflect emerging best practices and changes in the digital ecosystem. 
               Updates may alter prior scores or interpretations. Changelogs are published on the{' '}
-              <Link to="/score-guide" className="text-blue-600 hover:underline">scoring guide</Link> page when material 
+              <Link to="/score-guide" className="text-brand hover:underline">scoring guide</Link> page when material 
               changes occur.
             </p>
           </section>
 
           {/* Scoring Details Box */}
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="font-semibold text-lg text-gray-900 mb-3">Scoring Framework Details</h3>
-            <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-700">
+            <h3 className="font-semibold text-lg  mb-3">Scoring Framework Details</h3>
+            <div className="grid md:grid-cols-2 gap-4 text-sm muted">
               <div>
-                <h4 className="font-medium text-gray-900 mb-1">AEO Checks (A1-A11)</h4>
+                <h4 className="font-medium  mb-1">AEO Checks (A1-A11)</h4>
                 <ul className="list-disc ml-4 space-y-1">
                   <li>Answer-first design</li>
                   <li>Topical cluster integrity</li>
@@ -197,7 +197,7 @@ export default function Methodology() {
                 </ul>
               </div>
               <div>
-                <h4 className="font-medium text-gray-900 mb-1">GEO Checks (G1-G10)</h4>
+                <h4 className="font-medium  mb-1">GEO Checks (G1-G10)</h4>
                 <ul className="list-disc ml-4 space-y-1">
                   <li>Citable facts block</li>
                   <li>Provenance schema</li>
@@ -213,9 +213,9 @@ export default function Methodology() {
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-blue-200">
-              <p className="text-xs text-gray-600">
+              <p className="text-xs muted">
                 For complete scoring details, see the{' '}
-                <Link to="/score-guide" className="text-blue-600 hover:underline font-medium">
+                <Link to="/score-guide" className="text-brand hover:underline font-medium">
                   AEO + GEO Scoring Guide
                 </Link>
               </p>
@@ -223,7 +223,7 @@ export default function Methodology() {
           </div>
 
           {/* Summary Box */}
-          <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+          <div className="bg-success-soft border-l-4 border-green-500 p-4 rounded">
             <p className="text-sm text-gray-800">
               <strong>Summary:</strong> Optiview's data and scores are based on proprietary heuristics, public sources, and 
               experimental testing. They are informative, not authoritative.

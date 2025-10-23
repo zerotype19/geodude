@@ -97,10 +97,10 @@ export default function AuditsIndex() {
     switch (status) {
       case 'completed':
       case 'complete': // Legacy support
-        return 'bg-green-100 text-green-800';
-      case 'running': return 'bg-blue-100 text-blue-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+        return 'bg-success-soft text-success';
+      case 'running': return 'bg-brand-soft text-brand';
+      case 'failed': return 'bg-danger-soft text-danger';
+      default: return 'bg-surface-2 text-gray-800';
     }
   };
 
@@ -234,7 +234,7 @@ export default function AuditsIndex() {
                 <p className="text-sm">
                   🔐 <strong>Magic link authentication</strong>
                 </p>
-                <p className="text-sm text-blue-800 mt-1">
+                <p className="text-sm text-brand mt-1">
                   We'll send you a secure link to start this audit. This ensures your audits are private and only accessible by you.
                 </p>
               </div>

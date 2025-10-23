@@ -56,11 +56,11 @@ export function getBandFromRatio(ratio: number): string {
 // Helper for score badge colors
 export function getBandColor(band: string): string {
   switch (band) {
-    case 'Strong': return 'bg-green-100 text-green-800';
-    case 'Moderate': return 'bg-amber-100 text-amber-800';
+    case 'Strong': return 'bg-success-soft text-success';
+    case 'Moderate': return 'bg-warn-soft text-warn';
     case 'Weak': return 'bg-orange-100 text-orange-800';
-    case 'Poor': return 'bg-red-100 text-red-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case 'Poor': return 'bg-danger-soft text-danger';
+    default: return 'bg-surface-2 text-gray-800';
   }
 }
 

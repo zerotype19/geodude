@@ -13,7 +13,7 @@ export default function CategoryRollup({ data }: CategoryRollupProps) {
 
   if (entries.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-12 subtle dark:subtle">
         No category data available
       </div>
     );
@@ -21,10 +21,10 @@ export default function CategoryRollup({ data }: CategoryRollupProps) {
 
   // Color scale based on score
   const getColor = (score: number) => {
-    if (score >= 80) return 'bg-green-500';
-    if (score >= 60) return 'bg-yellow-500';
+    if (score >= 80) return 'bg-success-soft0';
+    if (score >= 60) return 'bg-warn-soft0';
     if (score >= 40) return 'bg-orange-500';
-    return 'bg-red-500';
+    return 'bg-danger-soft0';
   };
 
   return (
@@ -32,14 +32,14 @@ export default function CategoryRollup({ data }: CategoryRollupProps) {
       {entries.map(([category, score]) => (
         <div key={category} className="space-y-1">
           <div className="flex justify-between items-center text-sm">
-            <span className="font-medium text-gray-700 dark:text-gray-300">
+            <span className="font-medium muted dark:text-gray-300">
               {category}
             </span>
-            <span className="text-gray-600 dark:text-gray-400 font-mono">
+            <span className="muted dark:subtle font-mono">
               {Math.round(score)}%
             </span>
           </div>
-          <div className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-surface-3 dark:bg-gray-700 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-300 ${getColor(score)}`}
               style={{ width: `${Math.min(100, Math.max(0, score))}%` }}

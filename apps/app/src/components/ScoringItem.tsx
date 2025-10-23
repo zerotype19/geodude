@@ -23,17 +23,17 @@ const ScoringItem: React.FC<ScoringItemProps> = ({
   
   if (!tooltip) {
     return (
-      <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+      <div className="flex items-center justify-between p-3 bg-surface-2 rounded">
         <span className="font-medium">{code}</span>
-        <span className="text-sm text-gray-500">No tooltip available</span>
+        <span className="text-sm subtle">No tooltip available</span>
       </div>
     );
   }
 
   const getScoreColor = (score: number) => {
-    if (score <= 1) return 'bg-red-100 text-red-800 border-red-200';
-    if (score === 2) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    return 'bg-green-100 text-green-800 border-green-200';
+    if (score <= 1) return 'bg-danger-soft text-danger border-danger';
+    if (score === 2) return 'bg-warn-soft text-warn border-warn';
+    return 'bg-success-soft text-success border-success';
   };
 
   const getScoreLabel = (score: number) => {
@@ -44,18 +44,18 @@ const ScoringItem: React.FC<ScoringItemProps> = ({
 
   return (
     <div className="relative">
-      <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded hover:bg-gray-50">
+      <div className="flex items-center justify-between p-3 bg-surface-1 border border-border rounded hover:bg-surface-2">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900">{code}</span>
-            <span className="text-sm text-gray-500">({weight})</span>
+            <span className="font-medium ">{code}</span>
+            <span className="text-sm subtle">({weight})</span>
           </div>
-          <span className="text-sm text-gray-600">{tooltip.title}</span>
+          <span className="text-sm muted">{tooltip.title}</span>
           {showTooltip && (
             <button
               onMouseEnter={() => setShowTooltipContent(true)}
               onMouseLeave={() => setShowTooltipContent(false)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="subtle hover:muted transition-colors"
               title="Show tooltip"
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -68,25 +68,25 @@ const ScoringItem: React.FC<ScoringItemProps> = ({
           <span className={`px-2 py-1 text-xs font-medium rounded border ${getScoreColor(score)}`}>
             {getScoreLabel(score)}
           </span>
-          <span className="text-sm font-medium text-gray-900">{score}/3</span>
+          <span className="text-sm font-medium ">{score}/3</span>
         </div>
       </div>
 
       {showTooltipContent && showTooltip && (
-        <div className="absolute z-10 w-80 p-4 bg-white border border-gray-200 rounded-lg shadow-lg top-full left-0 mt-1">
+        <div className="absolute z-10 w-80 p-4 bg-surface-1 border border-border rounded-lg shadow-lg top-full left-0 mt-1">
           <div className="space-y-2">
-            <h4 className="font-semibold text-gray-900">{tooltip.title}</h4>
-            <p className="text-sm text-gray-600">{tooltip.description}</p>
-            <p className="text-sm text-blue-600">{tooltip.tooltip}</p>
+            <h4 className="font-semibold ">{tooltip.title}</h4>
+            <p className="text-sm muted">{tooltip.description}</p>
+            <p className="text-sm text-brand">{tooltip.tooltip}</p>
             <div className="pt-2 border-t border-gray-100">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs subtle">
                 <strong>How to win:</strong> {tooltip.howToWin}
               </p>
             </div>
             <div className="pt-2 border-t border-gray-100">
               <Link 
                 to="/score-guide" 
-                className="text-xs text-blue-600 hover:text-blue-800"
+                className="text-xs text-brand hover:text-brand"
               >
                 Learn more →
               </Link>
@@ -96,10 +96,10 @@ const ScoringItem: React.FC<ScoringItemProps> = ({
       )}
 
       {evidence && (
-        <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+        <div className="mt-2 p-2 bg-surface-2 rounded text-sm">
           <details className="cursor-pointer">
-            <summary className="font-medium text-gray-700">Evidence</summary>
-            <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap">
+            <summary className="font-medium muted">Evidence</summary>
+            <pre className="mt-2 text-xs muted whitespace-pre-wrap">
               {JSON.stringify(evidence, null, 2)}
             </pre>
           </details>

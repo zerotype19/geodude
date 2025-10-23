@@ -29,10 +29,10 @@ export default function CheckCategories({ scores = {} }: CheckCategoriesProps) {
   const checksByCategory = getChecksByCategory();
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-medium text-gray-900">Check Categories</h2>
-        <p className="text-sm text-gray-600">All AEO/GEO checks organized by category</p>
+    <div className="bg-surface-1 shadow rounded-lg">
+      <div className="px-6 py-4 border-b border-border">
+        <h2 className="text-lg font-medium ">Check Categories</h2>
+        <p className="text-sm muted">All AEO/GEO checks organized by category</p>
       </div>
       <div className="p-6 space-y-6">
         {CATEGORY_ORDER.map(category => {
@@ -42,11 +42,11 @@ export default function CheckCategories({ scores = {} }: CheckCategoriesProps) {
           return (
             <div key={category} className="space-y-3">
               <div>
-                <h4 className="text-sm font-semibold text-gray-900">
+                <h4 className="text-sm font-semibold ">
                   {CATEGORY_ICONS[category] && <span className="mr-2">{CATEGORY_ICONS[category]}</span>}
                   {category}
                 </h4>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs subtle mt-0.5">
                   {CATEGORY_DESCRIPTIONS[category]}
                 </p>
               </div>

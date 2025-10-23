@@ -60,16 +60,16 @@ export default function PromptsComparePage() {
 
   const renderPromptColumn = (title: string, prompts: PromptSet | null, bgColor: string) => (
     <div className={`flex-1 ${bgColor} rounded-lg p-6`}>
-      <h3 className="text-lg font-bold mb-4 text-gray-900">{title}</h3>
+      <h3 className="text-lg font-bold mb-4 ">{title}</h3>
       
       {prompts && (
         <>
           {/* Metadata Chips */}
           <div className="mb-4 flex flex-wrap gap-2">
-            {renderChip('Industry', prompts.meta?.industry, 'bg-blue-100 text-blue-800')}
-            {renderChip('Version', prompts.meta?.prompt_gen_version || prompts.meta?.template_version, 'bg-purple-100 text-purple-800')}
-            {renderChip('Source', prompts.meta?.source, 'bg-green-100 text-green-800')}
-            {renderChip('Branded', prompts.branded?.length, 'bg-yellow-100 text-yellow-800')}
+            {renderChip('Industry', prompts.meta?.industry, 'bg-brand-soft text-brand')}
+            {renderChip('Version', prompts.meta?.prompt_gen_version || prompts.meta?.template_version, 'bg-purple-100 text-brand')}
+            {renderChip('Source', prompts.meta?.source, 'bg-success-soft text-success')}
+            {renderChip('Branded', prompts.branded?.length, 'bg-warn-soft text-warn')}
             {renderChip('Non-Branded', prompts.nonBranded?.length, 'bg-orange-100 text-orange-800')}
             {prompts.meta?.realism_avg && renderChip('Realism', prompts.meta.realism_avg.toFixed(3), 'bg-pink-100 text-pink-800')}
             {prompts.meta?.realism_target && renderChip('Target', prompts.meta.realism_target.toFixed(2), 'bg-indigo-100 text-indigo-800')}
@@ -77,12 +77,12 @@ export default function PromptsComparePage() {
 
           {/* Branded Queries */}
           <div className="mb-6">
-            <h4 className="font-semibold text-sm text-gray-700 mb-2">
+            <h4 className="font-semibold text-sm muted mb-2">
               Branded ({prompts.branded?.length || 0})
             </h4>
             <div className="space-y-1">
               {prompts.branded?.map((q, i) => (
-                <div key={i} className="text-sm bg-white/50 rounded px-2 py-1">
+                <div key={i} className="text-sm bg-surface-1/50 rounded px-2 py-1">
                   {i + 1}. {q}
                 </div>
               ))}
@@ -91,12 +91,12 @@ export default function PromptsComparePage() {
 
           {/* Non-Branded Queries */}
           <div>
-            <h4 className="font-semibold text-sm text-gray-700 mb-2">
+            <h4 className="font-semibold text-sm muted mb-2">
               Non-Branded ({prompts.nonBranded?.length || 0})
             </h4>
             <div className="space-y-1">
               {prompts.nonBranded?.map((q, i) => (
-                <div key={i} className="text-sm bg-white/50 rounded px-2 py-1">
+                <div key={i} className="text-sm bg-surface-1/50 rounded px-2 py-1">
                   {i + 1}. {q}
                 </div>
               ))}
@@ -108,22 +108,22 @@ export default function PromptsComparePage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-2">
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-2">
-            <a href="/admin" className="text-blue-600 hover:underline">← Admin</a>
-            <h1 className="text-3xl font-bold text-gray-900">Prompts Compare</h1>
+            <a href="/admin" className="text-brand hover:underline">← Admin</a>
+            <h1 className="text-3xl font-bold ">Prompts Compare</h1>
           </div>
-          <p className="text-gray-600">Compare Rules | AI | Blended prompt generation side-by-side</p>
+          <p className="muted">Compare Rules | AI | Blended prompt generation side-by-side</p>
         </div>
 
         {/* Search Form */}
-        <form onSubmit={handleSubmit} className="mb-8 bg-white rounded-lg shadow p-6">
+        <form onSubmit={handleSubmit} className="mb-8 bg-surface-1 rounded-lg shadow p-6">
           <div className="flex gap-4">
             <div className="flex-1">
-              <label htmlFor="domain" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="domain" className="block text-sm font-medium muted mb-2">
                 Domain
               </label>
               <input
@@ -132,14 +132,14 @@ export default function PromptsComparePage() {
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
                 placeholder="e.g., cologuard.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent"
               />
             </div>
             <div className="flex items-end">
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                className="px-6 py-2 bg-brand text-white rounded-lg hover:bg-brand transition disabled:opacity-50"
               >
                 {loading ? 'Loading...' : 'Compare Prompts'}
               </button>
@@ -149,7 +149,7 @@ export default function PromptsComparePage() {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-8 p-4 bg-red-50 text-red-800 rounded-lg">
+          <div className="mb-8 p-4 bg-danger-soft text-danger rounded-lg">
             {error}
           </div>
         )}
@@ -157,15 +157,15 @@ export default function PromptsComparePage() {
         {/* Comparison Columns */}
         {(rulesPrompts || aiPrompts || blendedPrompts) && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {renderPromptColumn('Rules (V3)', rulesPrompts, 'bg-blue-50')}
-            {renderPromptColumn('AI (V4)', aiPrompts, 'bg-green-50')}
+            {renderPromptColumn('Rules (V3)', rulesPrompts, 'bg-brand-soft')}
+            {renderPromptColumn('AI (V4)', aiPrompts, 'bg-success-soft')}
             {renderPromptColumn('Blended (Production)', blendedPrompts, 'bg-purple-50')}
           </div>
         )}
 
         {/* Instructions */}
         {!rulesPrompts && !aiPrompts && !blendedPrompts && !loading && (
-          <div className="bg-white rounded-lg shadow p-8 text-center text-gray-600">
+          <div className="bg-surface-1 rounded-lg shadow p-8 text-center muted">
             <p className="mb-4">Enter a domain and click "Compare Prompts" to see:</p>
             <ul className="text-left max-w-2xl mx-auto space-y-2">
               <li>• <strong>Rules</strong>: V3 template-based generation (legacy)</li>

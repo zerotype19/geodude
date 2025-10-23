@@ -75,13 +75,13 @@ export default function HealthDashboard() {
   const getStatusColor = (value: number, threshold: number, inverse = false) => {
     if (hasInsufficientData) return 'text-neutral-500';
     const isGood = inverse ? value < threshold : value > threshold;
-    return isGood ? 'text-green-600' : 'text-red-600';
+    return isGood ? 'text-success' : 'text-danger';
   };
 
   const getStatusBg = (value: number, threshold: number, inverse = false) => {
-    if (hasInsufficientData) return 'bg-white border-neutral-200';
+    if (hasInsufficientData) return 'bg-surface-1 border-neutral-200';
     const isGood = inverse ? value < threshold : value > threshold;
-    return isGood ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200';
+    return isGood ? 'bg-success-soft border-success' : 'bg-danger-soft border-danger';
   };
   
   const formatMetric = (value: number, format: 'percentage' | 'ms' = 'percentage') => {
@@ -97,7 +97,7 @@ export default function HealthDashboard() {
           <h1 className="text-3xl font-bold">Classifier Health Dashboard</h1>
           <button
             onClick={fetchHealth}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-brand text-white rounded-md hover:bg-brand"
           >
             Refresh
           </button>
@@ -105,17 +105,17 @@ export default function HealthDashboard() {
 
         {/* Insufficient Data Banner */}
         {metrics && metrics.total_classifications < 10 && (
-          <div className="p-4 rounded-md border bg-blue-50 border-blue-200">
+          <div className="p-4 rounded-md border bg-brand-soft border-blue-200">
             <div className="flex items-start gap-3">
               <span className="text-2xl">ℹ️</span>
               <div className="flex-1">
-                <div className="font-semibold text-blue-900">Insufficient Data for Health Metrics</div>
-                <div className="text-sm text-blue-700 mt-1">
+                <div className="font-semibold text-brand">Insufficient Data for Health Metrics</div>
+                <div className="text-sm text-brand mt-1">
                   Only <strong>{metrics.total_classifications}</strong> classifications in the last 24h. 
                   Health thresholds require at least <strong>10 classifications</strong> for accurate monitoring.
                   Metrics showing 0.0% are expected with low traffic.
                 </div>
-                <div className="text-sm text-blue-600 mt-2">
+                <div className="text-sm text-brand mt-2">
                   💡 Run a few audits to populate the health dashboard with meaningful data.
                 </div>
               </div>
@@ -130,7 +130,7 @@ export default function HealthDashboard() {
               <div
                 key={i}
                 className={`p-4 rounded-md border ${
-                  alert.level === 'error' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+                  alert.level === 'error' ? 'bg-danger-soft border-danger' : 'bg-warn-soft border-warn'
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -156,7 +156,7 @@ export default function HealthDashboard() {
         {metrics && (
           <div className="grid grid-cols-4 gap-6">
             {/* Cache Hit Rate */}
-            <div className={`bg-white rounded-lg shadow-sm p-6 border-2 ${getStatusBg(metrics.cache_hit_rate, 0.80)}`}>
+            <div className={`bg-surface-1 rounded-lg shadow-sm p-6 border-2 ${getStatusBg(metrics.cache_hit_rate, 0.80)}`}>
               <div className="text-sm text-neutral-500 mb-2">Cache Hit Rate</div>
               <div className={`text-3xl font-bold ${getStatusColor(metrics.cache_hit_rate, 0.80)}`}>
                 {formatMetric(metrics.cache_hit_rate)}
@@ -165,7 +165,7 @@ export default function HealthDashboard() {
             </div>
 
             {/* P95 Latency */}
-            <div className={`bg-white rounded-lg shadow-sm p-6 border-2 ${getStatusBg(metrics.classifier_p95_latency_ms, 25, true)}`}>
+            <div className={`bg-surface-1 rounded-lg shadow-sm p-6 border-2 ${getStatusBg(metrics.classifier_p95_latency_ms, 25, true)}`}>
               <div className="text-sm text-neutral-500 mb-2">P95 Latency</div>
               <div className={`text-3xl font-bold ${getStatusColor(metrics.classifier_p95_latency_ms, 25, true)}`}>
                 {formatMetric(metrics.classifier_p95_latency_ms, 'ms')}
@@ -174,7 +174,7 @@ export default function HealthDashboard() {
             </div>
 
             {/* Site Type Agreement */}
-            <div className={`bg-white rounded-lg shadow-sm p-6 border-2 ${getStatusBg(metrics.site_type_agreement_pct, 0.80)}`}>
+            <div className={`bg-surface-1 rounded-lg shadow-sm p-6 border-2 ${getStatusBg(metrics.site_type_agreement_pct, 0.80)}`}>
               <div className="text-sm text-neutral-500 mb-2">Site Type Agreement</div>
               <div className={`text-3xl font-bold ${getStatusColor(metrics.site_type_agreement_pct, 0.80)}`}>
                 {formatMetric(metrics.site_type_agreement_pct)}
@@ -183,7 +183,7 @@ export default function HealthDashboard() {
             </div>
 
             {/* Industry Agreement */}
-            <div className={`bg-white rounded-lg shadow-sm p-6 border-2 ${getStatusBg(metrics.industry_agreement_pct, 0.70)}`}>
+            <div className={`bg-surface-1 rounded-lg shadow-sm p-6 border-2 ${getStatusBg(metrics.industry_agreement_pct, 0.70)}`}>
               <div className="text-sm text-neutral-500 mb-2">Industry Agreement</div>
               <div className={`text-3xl font-bold ${getStatusColor(metrics.industry_agreement_pct, 0.70)}`}>
                 {formatMetric(metrics.industry_agreement_pct)}
@@ -197,7 +197,7 @@ export default function HealthDashboard() {
         {metrics && (
           <div className="grid grid-cols-3 gap-6">
             {/* Low Confidence Rate */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-surface-1 rounded-lg shadow-sm p-6">
               <div className="text-sm text-neutral-500 mb-2">Low Confidence Rate</div>
               <div className={`text-2xl font-bold ${getStatusColor(metrics.low_confidence_rate_pct, 0.15, true)}`}>
                 {formatMetric(metrics.low_confidence_rate_pct)}
@@ -206,7 +206,7 @@ export default function HealthDashboard() {
               {!hasInsufficientData && (
                 <div className="mt-4 h-2 bg-neutral-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full ${metrics.low_confidence_rate_pct > 0.15 ? 'bg-red-500' : 'bg-green-500'}`}
+                    className={`h-full ${metrics.low_confidence_rate_pct > 0.15 ? 'bg-danger-soft0' : 'bg-success-soft0'}`}
                     style={{ width: `${Math.min(100, metrics.low_confidence_rate_pct * 100 / 15 * 100)}%` }}
                   />
                 </div>
@@ -214,7 +214,7 @@ export default function HealthDashboard() {
             </div>
 
             {/* Error Rate */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-surface-1 rounded-lg shadow-sm p-6">
               <div className="text-sm text-neutral-500 mb-2">Error Rate</div>
               <div className={`text-2xl font-bold ${getStatusColor(metrics.error_rate_pct, 0.005, true)}`}>
                 {hasInsufficientData ? 'N/A' : `${(metrics.error_rate_pct * 100).toFixed(2)}%`}
@@ -223,7 +223,7 @@ export default function HealthDashboard() {
               {!hasInsufficientData && (
                 <div className="mt-4 h-2 bg-neutral-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full ${metrics.error_rate_pct > 0.005 ? 'bg-red-500' : 'bg-green-500'}`}
+                    className={`h-full ${metrics.error_rate_pct > 0.005 ? 'bg-danger-soft0' : 'bg-success-soft0'}`}
                     style={{ width: `${Math.min(100, metrics.error_rate_pct * 100 / 0.5 * 100)}%` }}
                   />
                 </div>
@@ -231,9 +231,9 @@ export default function HealthDashboard() {
             </div>
 
             {/* Total Classifications */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-surface-1 rounded-lg shadow-sm p-6">
               <div className="text-sm text-neutral-500 mb-2">Total Classifications (24h)</div>
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-brand">
                 {metrics.total_classifications.toLocaleString()}
               </div>
               <div className="text-xs text-neutral-400 mt-1">Last 24 hours</div>
@@ -243,7 +243,7 @@ export default function HealthDashboard() {
 
         {/* Go/No-Go Status */}
         {metrics && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-surface-1 rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-semibold mb-4">Go/No-Go Status</h2>
             <div className="space-y-2">
               <StatusCheck

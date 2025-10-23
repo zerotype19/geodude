@@ -42,20 +42,20 @@ export default function AuthError() {
   const details = getErrorDetails(reason);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+    <div className="min-h-screen bg-surface-2 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-surface-1 rounded-lg shadow-lg p-8">
         <div className="text-center mb-6">
           <div className="text-5xl mb-4">{details.icon}</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{details.title}</h1>
-          <p className="text-sm text-gray-600 mb-6">
+          <h1 className="text-2xl font-bold  mb-2">{details.title}</h1>
+          <p className="text-sm muted mb-6">
             {details.message}
           </p>
 
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-left mb-6">
+          <div className="bg-danger-soft border border-danger rounded-lg p-4 text-sm text-left mb-6">
             <p className="text-red-900 mb-2">
               <strong>What happened?</strong>
             </p>
-            <p className="text-red-800">
+            <p className="text-danger">
               {reason === 'expired_or_invalid' && 'Magic links are single-use and expire after 20 minutes. This keeps your account secure.'}
               {reason === 'unauthorized' && 'This audit belongs to another account. Each user can only access their own audits.'}
               {reason === 'missing' && 'The sign-in link was incomplete or malformed.'}
@@ -73,16 +73,16 @@ export default function AuthError() {
             </Link>
             <Link
               to="/audits"
-              className="block w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
+              className="block w-full px-4 py-2 bg-surface-2 muted rounded-lg hover:bg-surface-3 transition font-medium"
             >
               View my audits
             </Link>
           </div>
         </div>
 
-        <div className="border-t border-gray-200 pt-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-            <p className="text-blue-900">
+        <div className="border-t border-border pt-6">
+          <div className="bg-brand-soft border border-blue-200 rounded-lg p-3 text-sm">
+            <p className="text-brand">
               💡 <strong>Tip:</strong> Magic links work only once and expire quickly. 
               Save the link or click it right away when you receive it.
             </p>

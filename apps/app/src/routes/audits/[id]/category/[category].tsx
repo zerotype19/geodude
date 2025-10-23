@@ -169,11 +169,11 @@ export default function CategoryDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-surface-2 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
+            <div className="h-8 bg-surface-3 rounded w-1/3"></div>
+            <div className="h-64 bg-surface-3 rounded"></div>
           </div>
         </div>
       </div>
@@ -181,35 +181,35 @@ export default function CategoryDetail() {
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 85) return 'text-green-600 bg-green-50 border-green-200';
-    if (score >= 60) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    if (score >= 85) return 'text-success bg-success-soft border-success';
+    if (score >= 60) return 'text-warn bg-warn-soft border-warn';
     if (score >= 40) return 'text-orange-600 bg-orange-50 border-orange-200';
-    return 'text-red-600 bg-red-50 border-red-200';
+    return 'text-danger bg-danger-soft border-danger';
   };
 
   const getCheckScoreColor = (score: number) => {
-    if (score >= 85) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
+    if (score >= 85) return 'text-success';
+    if (score >= 60) return 'text-warn';
     if (score >= 40) return 'text-orange-600';
-    return 'text-red-600';
+    return 'text-danger';
   };
 
   const getStatusBadge = (score: number) => {
     if (score >= 85) {
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-success-soft text-success">
           Excellent
         </span>
       );
     } else if (score >= 60) {
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-warn-soft text-warn">
           Good
         </span>
       );
     } else {
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-danger-soft text-danger">
           Needs Work
         </span>
       );
@@ -217,28 +217,28 @@ export default function CategoryDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-surface-2 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <div className="mb-6">
           <Link 
             to={`/audits/${id}`} 
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            className="text-brand hover:text-brand text-sm font-medium"
           >
             ← Back to Audit Overview
           </Link>
         </div>
 
         {/* Category Header */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+        <div className="bg-surface-1 rounded-lg border border-border p-6 mb-8">
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{categoryName}</h1>
-              <p className="text-gray-600 mb-3">{description}</p>
-              <div className="text-sm text-gray-500 mb-4">
+              <h1 className="text-2xl font-bold  mb-2">{categoryName}</h1>
+              <p className="muted mb-3">{description}</p>
+              <div className="text-sm subtle mb-4">
                 {audit?.root_url && (
                   <span>
-                    Analyzing: <span className="font-medium text-gray-700">{audit.root_url}</span>
+                    Analyzing: <span className="font-medium muted">{audit.root_url}</span>
                   </span>
                 )}
               </div>
@@ -246,7 +246,7 @@ export default function CategoryDetail() {
               {/* Learn More Link */}
               <Link
                 to={`/score-guide#${categorySlug}`}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                className="text-sm text-brand hover:text-brand font-medium"
               >
                 Learn how to fix these issues →
               </Link>
@@ -261,8 +261,8 @@ export default function CategoryDetail() {
 
         {/* How to Improve - Show quick guidance from failing checks */}
         {pagesWithIssues.length > 0 && checksInCategory.some(c => c.how_to_fix) && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
+          <div className="bg-surface-1 rounded-lg border border-border p-6 mb-8">
+            <h2 className="text-lg font-bold  mb-4">
               How to Improve This Category
             </h2>
             <div className="space-y-4">
@@ -270,19 +270,19 @@ export default function CategoryDetail() {
                 .filter(check => check.scope === 'page' && check.how_to_fix)
                 .slice(0, 3)
                 .map(check => (
-                  <div key={check.id} className="bg-white rounded-lg border border-blue-200 p-4">
+                  <div key={check.id} className="bg-surface-1 rounded-lg border border-blue-200 p-4">
                     <div className="flex items-start gap-3">
                       <span className="text-2xl">🔧</span>
                       <div className="flex-1">
-                        <h3 className="font-bold text-gray-900 mb-1">{check.title}</h3>
-                        <p className="text-sm text-gray-700 mb-2">{check.why_it_matters}</p>
-                        <div className="bg-green-50 border border-green-200 rounded p-3 text-sm text-green-900">
+                        <h3 className="font-bold  mb-1">{check.title}</h3>
+                        <p className="text-sm muted mb-2">{check.why_it_matters}</p>
+                        <div className="bg-success-soft border border-success rounded p-3 text-sm text-green-900">
                           <strong className="block mb-1">How to fix:</strong>
                           <p className="whitespace-pre-line">{check.how_to_fix}</p>
                         </div>
                         {check.quick_fixes && (
-                          <div className="mt-2 bg-gray-50 border border-gray-200 rounded p-3 text-sm text-gray-700">
-                            <strong className="block mb-1 text-gray-900">Quick fixes:</strong>
+                          <div className="mt-2 bg-surface-2 border border-border rounded p-3 text-sm muted">
+                            <strong className="block mb-1 ">Quick fixes:</strong>
                             <p>{check.quick_fixes}</p>
                           </div>
                         )}
@@ -291,7 +291,7 @@ export default function CategoryDetail() {
                             href={check.official_docs}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                            className="mt-2 text-sm text-brand hover:text-brand font-medium"
                           >
                             Official Docs →
                           </a>
@@ -305,44 +305,44 @@ export default function CategoryDetail() {
         )}
 
         {/* Check Breakdown */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-surface-1 rounded-lg border border-border p-6 mb-8">
+          <h2 className="text-lg font-semibold  mb-4">
             Category Score Breakdown
           </h2>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm muted mb-4">
             Performance on each check within this category (0-100 scale)
           </p>
           <div className="space-y-3">
             {checkBreakdown.length === 0 ? (
-              <p className="text-gray-500 text-sm">No page-level checks defined for this category.</p>
+              <p className="subtle text-sm">No page-level checks defined for this category.</p>
             ) : (
               checkBreakdown.map(({ check, avgScore, passingPages, failingPages, totalPages }) => (
                 <div 
                   key={check.id} 
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-surface-2"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      <span className="text-xs font-mono subtle bg-surface-2 px-2 py-1 rounded">
                         {check.id}
                       </span>
-                      <h3 className="font-medium text-gray-900">{check.title}</h3>
+                      <h3 className="font-medium ">{check.title}</h3>
                       {getStatusBadge(avgScore)}
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">{check.description}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-600">
+                    <p className="text-sm muted mb-2">{check.description}</p>
+                    <div className="flex items-center gap-4 text-xs muted">
                       <span>
-                        <span className="font-semibold text-green-700">{passingPages}</span> passing
+                        <span className="font-semibold text-success">{passingPages}</span> passing
                       </span>
                       <span>
-                        <span className="font-semibold text-red-700">{failingPages}</span> failing
+                        <span className="font-semibold text-danger">{failingPages}</span> failing
                       </span>
-                      <span className="text-gray-500">
+                      <span className="subtle">
                         of {totalPages} pages
                       </span>
                     </div>
                     {check.why_it_matters && (
-                      <div className="mt-2 text-xs text-gray-500 border-l-2 border-blue-200 pl-3">
+                      <div className="mt-2 text-xs subtle border-l-2 border-blue-200 pl-3">
                         <strong>Why it matters:</strong> {check.why_it_matters}
                       </div>
                     )}
@@ -351,7 +351,7 @@ export default function CategoryDetail() {
                     <div className={`text-2xl font-bold ${getCheckScoreColor(avgScore)}`}>
                       {Math.round(avgScore)}
                     </div>
-                    <div className="text-xs text-gray-500">avg score</div>
+                    <div className="text-xs subtle">avg score</div>
                   </div>
                 </div>
               ))
@@ -360,12 +360,12 @@ export default function CategoryDetail() {
         </div>
 
         {/* Pages with Issues */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
+        <div className="bg-surface-1 rounded-lg border border-border">
+          <div className="px-6 py-4 border-b border-border">
+            <h2 className="text-lg font-semibold ">
               Impacted Pages ({pagesWithIssues.length})
             </h2>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm muted">
               Pages scoring below 60 on checks in this category
             </p>
           </div>
@@ -373,42 +373,42 @@ export default function CategoryDetail() {
           {pagesWithIssues.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <div className="text-4xl mb-2">🎉</div>
-              <p className="text-gray-900 font-medium mb-1">All pages passing!</p>
-              <p className="text-gray-500 text-sm">No issues found in this category</p>
+              <p className=" font-medium mb-1">All pages passing!</p>
+              <p className="subtle text-sm">No issues found in this category</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-surface-2">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
                       URL
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
                       Failing Checks
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
                       Avg Score
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium subtle uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-surface-1 divide-y divide-gray-200">
                   {pagesWithIssues.map((page) => {
                     const avgPageScore = page.failingChecks.length > 0
                       ? Math.round(page.failingChecks.reduce((sum, c) => sum + c.score, 0) / page.failingChecks.length)
                       : 0;
                     
                     return (
-                      <tr key={page.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
+                      <tr key={page.id} className="hover:bg-surface-2">
+                        <td className="px-6 py-4 text-sm  max-w-md">
                           <a 
                             href={page.url} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="hover:text-blue-600 break-all"
+                            className="hover:text-brand break-all"
                           >
                             {page.url}
                           </a>
@@ -418,14 +418,14 @@ export default function CategoryDetail() {
                             {page.failingChecks.slice(0, 5).map((check) => (
                               <span 
                                 key={check.id}
-                                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800"
+                                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-danger-soft text-danger"
                                 title={CRITERIA_BY_ID.get(check.id)?.title || check.id}
                               >
                                 {check.id}
                               </span>
                             ))}
                             {page.failingChecks.length > 5 && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs subtle">
                                 +{page.failingChecks.length - 5} more
                               </span>
                             )}
@@ -435,14 +435,14 @@ export default function CategoryDetail() {
                           <span className={`font-semibold ${getCheckScoreColor(avgPageScore)}`}>
                             {avgPageScore}
                           </span>
-                          <span className="text-gray-500 text-xs ml-1">
+                          <span className="subtle text-xs ml-1">
                             ({page.failingChecks.length} issue{page.failingChecks.length !== 1 ? 's' : ''})
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <Link
                             to={`/audits/${id}/pages/${page.id}`}
-                            className="text-blue-600 hover:text-blue-900"
+                            className="text-brand hover:text-brand"
                           >
                             View Details →
                           </Link>

@@ -167,7 +167,7 @@ export default function AuditTour() {
       
       {/* Tooltip */}
       <div
-        className="fixed z-[9999] bg-white rounded-lg shadow-2xl border-2 border-blue-500 p-6 max-w-sm animate-fadeIn"
+        className="fixed z-[9999] bg-surface-1 rounded-lg shadow-2xl border-2 border-brand p-6 max-w-sm animate-fadeIn"
         style={{
           top: `${position.top}px`,
           left: `${position.left}px`,
@@ -179,7 +179,7 @@ export default function AuditTour() {
             <div
               key={index}
               className={`h-1 flex-1 rounded-full ${
-                index === currentStep ? 'bg-blue-600' : index < currentStep ? 'bg-blue-300' : 'bg-gray-200'
+                index === currentStep ? 'bg-brand' : index < currentStep ? 'bg-blue-300' : 'bg-surface-3'
               }`}
             />
           ))}
@@ -187,15 +187,15 @@ export default function AuditTour() {
         
         {/* Content */}
         <div className="mb-4">
-          <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
+          <h3 className="text-lg font-bold  mb-2 flex items-center">
             {step.title}
             {currentStep === 3 && (
-              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-soft text-success">
                 Click this!
               </span>
             )}
           </h3>
-          <p className="text-sm text-gray-600 leading-relaxed">
+          <p className="text-sm muted leading-relaxed">
             {step.content}
           </p>
         </div>
@@ -204,18 +204,18 @@ export default function AuditTour() {
         <div className="flex items-center justify-between">
           <button
             onClick={handleSkip}
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-sm subtle hover:muted transition-colors"
           >
             Skip tour
           </button>
           
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">
+            <span className="text-xs subtle">
               {currentStep + 1} of {TOUR_STEPS.length}
             </span>
             <button
               onClick={handleNext}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="bg-brand hover:bg-brand text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               {currentStep < TOUR_STEPS.length - 1 ? 'Next' : 'Got it!'}
             </button>

@@ -35,11 +35,11 @@ interface CheckResult {
 const API_BASE = 'https://api.optiview.ai';
 
 const STATUS_COLORS = {
-  ok: 'bg-green-100 text-green-800 border-green-300',
-  warn: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  fail: 'bg-red-100 text-red-800 border-red-300',
-  error: 'bg-gray-100 text-gray-800 border-gray-300',
-  not_applicable: 'bg-gray-50 text-gray-600 border-gray-200'
+  ok: 'bg-success-soft text-success border-success',
+  warn: 'bg-warn-soft text-warn border-warn',
+  fail: 'bg-danger-soft text-danger border-danger',
+  error: 'bg-surface-2 text-gray-800 border-border',
+  not_applicable: 'bg-surface-2 muted border-border'
 };
 
 const STATUS_ICONS = {
@@ -51,9 +51,9 @@ const STATUS_ICONS = {
 };
 
 const IMPACT_COLORS = {
-  High: 'bg-red-50 text-red-700',
-  Medium: 'bg-yellow-50 text-yellow-700',
-  Low: 'bg-blue-50 text-blue-700'
+  High: 'bg-danger-soft text-danger',
+  Medium: 'bg-warn-soft text-warn',
+  Low: 'bg-brand-soft text-brand'
 };
 
 export default function PageDetail() {
@@ -116,10 +116,10 @@ export default function PageDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-2 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading page details...</p>
+          <p className="mt-4 muted">Loading page details...</p>
         </div>
       </div>
     );
@@ -127,18 +127,18 @@ export default function PageDetail() {
 
   if (error || !page) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-2 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-red-600 mb-4">
+          <div className="text-danger mb-4">
             <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Page</h3>
-          <p className="text-gray-600 mb-4">{error || 'Page not found'}</p>
+          <h3 className="text-lg font-medium  mb-2">Error Loading Page</h3>
+          <p className="muted mb-4">{error || 'Page not found'}</p>
           <Link
             to={`/audits/${id}/pages`}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            className="bg-brand hover:bg-brand text-white font-medium py-2 px-4 rounded-lg transition-colors"
           >
             Back to Pages
           </Link>
@@ -167,34 +167,34 @@ export default function PageDetail() {
     : 0;
 
   const getScoreColor = (score: number) => {
-    if (score >= 85) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
+    if (score >= 85) return 'text-success';
+    if (score >= 60) return 'text-warn';
+    return 'text-danger';
   };
 
   const schemaTypes = parseSchemaTypes();
   const jsonld = parseJsonld();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-2">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <Link to={`/audits/${id}/pages`} className="text-blue-600 hover:text-blue-800 mb-2 inline-block">
+              <Link to={`/audits/${id}/pages`} className="text-brand hover:text-brand mb-2 inline-block">
                 ← Back to Pages
               </Link>
-              <h1 className="text-3xl font-bold text-gray-900">Page Analysis</h1>
-              <p className="mt-2 text-gray-600">
-                <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 break-all">
+              <h1 className="text-3xl font-bold ">Page Analysis</h1>
+              <p className="mt-2 muted">
+                <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-brand break-all">
                   {page.url}
                 </a>
               </p>
             </div>
             <div className="flex items-center space-x-4">
               <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${
-                page.status_code >= 200 && page.status_code < 300 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                page.status_code >= 200 && page.status_code < 300 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
               }`}>
                 HTTP {page.status_code}
               </span>
@@ -203,11 +203,11 @@ export default function PageDetail() {
         </div>
 
         {/* Page Score Card */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
+        <div className="bg-surface-1 rounded-lg shadow p-6 mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-1">Page Diagnostic Score</h2>
-              <p className="text-sm text-gray-600">{productionChecks.length} checks analyzed</p>
+              <h2 className="text-lg font-medium  mb-1">Page Diagnostic Score</h2>
+              <p className="text-sm muted">{productionChecks.length} checks analyzed</p>
             </div>
             <div className={`text-5xl font-bold ${getScoreColor(avgScore)}`}>
               {avgScore}
@@ -215,22 +215,22 @@ export default function PageDetail() {
           </div>
           
           {/* Quick status summary */}
-          <div className="mt-4 pt-4 border-t border-gray-200 flex gap-4 text-sm">
-            <div className="text-gray-600">
-              <span className="font-semibold text-green-700">{productionChecks.filter(c => c.status === 'ok').length}</span> passing
+          <div className="mt-4 pt-4 border-t border-border flex gap-4 text-sm">
+            <div className="muted">
+              <span className="font-semibold text-success">{productionChecks.filter(c => c.status === 'ok').length}</span> passing
             </div>
-            <div className="text-gray-600">
-              <span className="font-semibold text-yellow-700">{productionChecks.filter(c => c.status === 'warn').length}</span> warnings
+            <div className="muted">
+              <span className="font-semibold text-warn">{productionChecks.filter(c => c.status === 'warn').length}</span> warnings
             </div>
-            <div className="text-gray-600">
-              <span className="font-semibold text-red-700">{productionChecks.filter(c => c.status === 'fail').length}</span> failing
+            <div className="muted">
+              <span className="font-semibold text-danger">{productionChecks.filter(c => c.status === 'fail').length}</span> failing
             </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="border-b border-gray-200">
+        <div className="bg-surface-1 shadow rounded-lg">
+          <div className="border-b border-border">
             <nav className="-mb-px flex space-x-8 px-6">
               {[
                 { id: 'checks', label: 'Diagnostic Checks', count: productionChecks.length },
@@ -242,13 +242,13 @@ export default function PageDetail() {
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm ${
                     activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-brand text-brand'
+                      : 'border-transparent subtle hover:muted hover:border-border'
                   }`}
                 >
                   {tab.label}
                   {tab.count !== undefined && (
-                    <span className="ml-2 bg-gray-100 text-gray-600 py-0.5 px-2 rounded-full text-xs">
+                    <span className="ml-2 bg-surface-2 muted py-0.5 px-2 rounded-full text-xs">
                       {tab.count}
                     </span>
                   )}
@@ -272,37 +272,37 @@ export default function PageDetail() {
                   const okCount = categoryChecks.filter(c => c.status === 'ok').length;
 
                   return (
-                    <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div key={category} className="border border-border rounded-lg overflow-hidden">
                       {/* Category Header */}
                       <button
                         onClick={() => toggleCategory(category)}
-                        className="w-full px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+                        className="w-full px-6 py-4 bg-surface-2 hover:bg-surface-2 transition-colors flex items-center justify-between"
                       >
                         <div className="flex items-center gap-4">
-                          <span className="text-base font-medium text-gray-900">{category}</span>
+                          <span className="text-base font-medium ">{category}</span>
                           <span className={`text-2xl font-bold ${getScoreColor(categoryAvg)}`}>
                             {categoryAvg}
                           </span>
                           <div className="flex gap-2 text-xs">
                             {okCount > 0 && (
-                              <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                              <span className="bg-success-soft text-success px-2 py-0.5 rounded-full text-xs font-semibold">
                                 {okCount} passing
                               </span>
                             )}
                             {warnCount > 0 && (
-                              <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                              <span className="bg-warn-soft text-warn px-2 py-0.5 rounded-full text-xs font-semibold">
                                 {warnCount} warnings
                               </span>
                             )}
                             {failCount > 0 && (
-                              <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                              <span className="bg-danger-soft text-danger px-2 py-0.5 rounded-full text-xs font-semibold">
                                 {failCount} failing
                               </span>
                             )}
                           </div>
                         </div>
                         <svg
-                          className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          className={`w-5 h-5 subtle transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -313,21 +313,21 @@ export default function PageDetail() {
 
                       {/* Category Checks */}
                       {isExpanded && (
-                        <div className="p-6 space-y-4 bg-white">
+                        <div className="p-6 space-y-4 bg-surface-1">
                           {categoryChecks.map((check) => (
                             <div
                               key={check.id}
-                              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
+                              className="border border-border rounded-lg p-4 hover:shadow-md transition-all"
                             >
                               {/* Check header */}
                               <div className="flex items-start justify-between mb-3">
                                 <div className="flex-1">
                                   {/* Title first - user-friendly */}
-                                  <h4 className="text-lg font-bold text-gray-900 mb-2 leading-tight">
+                                  <h4 className="text-lg font-bold  mb-2 leading-tight">
                                     {check.criteria?.title || check.id}
                                   </h4>
                                   {check.criteria?.description && (
-                                    <p className="text-base text-gray-700 mb-3 leading-relaxed">
+                                    <p className="text-base muted mb-3 leading-relaxed">
                                       {check.criteria.description}
                                     </p>
                                   )}
@@ -347,7 +347,7 @@ export default function PageDetail() {
                                   <div className={`text-4xl font-bold ${getScoreColor(check.score)}`}>
                                     {check.score}
                                   </div>
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs subtle">
                                     out of 100
                                   </div>
                                 </div>
@@ -355,9 +355,9 @@ export default function PageDetail() {
 
                               {/* Check details */}
                               {check.details && Object.keys(check.details).length > 0 && (
-                                <div className="bg-gray-50 rounded p-3 mb-3">
-                                  <div className="text-xs font-medium text-gray-700 mb-1">Details:</div>
-                                  <div className="text-xs text-gray-600 space-y-1">
+                                <div className="bg-surface-2 rounded p-3 mb-3">
+                                  <div className="text-xs font-medium muted mb-1">Details:</div>
+                                  <div className="text-xs muted space-y-1">
                                     {Object.entries(check.details).map(([key, value]) => (
                                       <div key={key} className="flex gap-2">
                                         <span className="font-medium">{key}:</span>
@@ -372,9 +372,9 @@ export default function PageDetail() {
 
                               {/* Evidence */}
                               {check.evidence && check.evidence.length > 0 && (
-                                <div className="bg-blue-50 rounded p-3">
-                                  <div className="text-xs font-medium text-blue-900 mb-1">Evidence:</div>
-                                  <div className="text-xs text-blue-800 space-y-1">
+                                <div className="bg-brand-soft rounded p-3">
+                                  <div className="text-xs font-medium text-brand mb-1">Evidence:</div>
+                                  <div className="text-xs text-brand space-y-1">
                                     {check.evidence.map((ev, idx) => (
                                       <div key={idx} className="break-all">{ev}</div>
                                     ))}
@@ -384,17 +384,17 @@ export default function PageDetail() {
 
                               {/* Why it matters & how to fix */}
                               {(check.criteria?.why_it_matters || check.criteria?.how_to_fix) && (
-                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                <div className="mt-3 pt-3 border-t border-border">
                                   {check.criteria.why_it_matters && (
                                     <div className="mb-2">
-                                      <span className="text-xs font-medium text-gray-700">Why it matters:</span>
-                                      <p className="text-xs text-gray-600 mt-1">{check.criteria.why_it_matters}</p>
+                                      <span className="text-xs font-medium muted">Why it matters:</span>
+                                      <p className="text-xs muted mt-1">{check.criteria.why_it_matters}</p>
                                     </div>
                                   )}
                                   {check.criteria.how_to_fix && check.status !== 'ok' && (
                                     <div>
-                                      <span className="text-xs font-medium text-gray-700">How to fix:</span>
-                                      <p className="text-xs text-gray-600 mt-1">{check.criteria.how_to_fix}</p>
+                                      <span className="text-xs font-medium muted">How to fix:</span>
+                                      <p className="text-xs muted mt-1">{check.criteria.how_to_fix}</p>
                                     </div>
                                   )}
                                 </div>
@@ -408,7 +408,7 @@ export default function PageDetail() {
                 })}
                 
                 {productionChecks.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 subtle">
                     <p>No diagnostic checks available for this page.</p>
                     <p className="text-sm mt-2">Checks may still be processing.</p>
                   </div>
@@ -421,24 +421,24 @@ export default function PageDetail() {
               <div>
                 {/* Basic Metadata */}
                 <div className="mb-8">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Basic Metadata</h3>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-medium  mb-4">Basic Metadata</h3>
+                  <div className="bg-surface-2 rounded-lg p-4">
                     <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">Title</dt>
-                        <dd className="text-sm text-gray-900 mt-1">{page.title || 'Not found'}</dd>
+                        <dt className="text-sm font-medium subtle">Title</dt>
+                        <dd className="text-sm  mt-1">{page.title || 'Not found'}</dd>
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">H1</dt>
-                        <dd className="text-sm text-gray-900 mt-1">{page.h1 || 'Not found'}</dd>
+                        <dt className="text-sm font-medium subtle">H1</dt>
+                        <dd className="text-sm  mt-1">{page.h1 || 'Not found'}</dd>
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">Canonical</dt>
-                        <dd className="text-sm text-gray-900 mt-1 break-all">{page.canonical || 'Not found'}</dd>
+                        <dt className="text-sm font-medium subtle">Canonical</dt>
+                        <dd className="text-sm  mt-1 break-all">{page.canonical || 'Not found'}</dd>
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-gray-500">Content Type</dt>
-                        <dd className="text-sm text-gray-900 mt-1">{page.content_type || 'Not found'}</dd>
+                        <dt className="text-sm font-medium subtle">Content Type</dt>
+                        <dd className="text-sm  mt-1">{page.content_type || 'Not found'}</dd>
                       </div>
                     </dl>
                   </div>
@@ -447,10 +447,10 @@ export default function PageDetail() {
                 {/* Schema Types */}
                 {schemaTypes.length > 0 && (
                   <div className="mb-8">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Schema Types</h3>
+                    <h3 className="text-lg font-medium  mb-4">Schema Types</h3>
                     <div className="flex flex-wrap gap-2">
                       {schemaTypes.map((type, index) => (
-                        <span key={index} className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
+                        <span key={index} className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-brand-soft text-brand">
                           {type}
                         </span>
                       ))}
@@ -461,9 +461,9 @@ export default function PageDetail() {
                 {/* JSON-LD */}
                 {jsonld.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">JSON-LD Schema</h3>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <pre className="text-xs text-gray-600 overflow-x-auto">
+                    <h3 className="text-lg font-medium  mb-4">JSON-LD Schema</h3>
+                    <div className="bg-surface-2 rounded-lg p-4">
+                      <pre className="text-xs muted overflow-x-auto">
                         {JSON.stringify(jsonld, null, 2)}
                       </pre>
                     </div>
@@ -477,27 +477,27 @@ export default function PageDetail() {
               <div>
                 {/* HTML Preview */}
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">HTML Preview</h3>
-                  <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-medium  mb-4">HTML Preview</h3>
+                  <div className="bg-surface-2 rounded-lg p-4">
                     <div className="mb-4">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm muted">
                         Static HTML (first 1000 characters)
                       </span>
                     </div>
-                    <pre className="text-xs text-gray-600 overflow-x-auto whitespace-pre-wrap">
+                    <pre className="text-xs muted overflow-x-auto whitespace-pre-wrap">
                       {page.html_static?.slice(0, 1000) || 'No HTML content'}
                       {page.html_static && page.html_static.length > 1000 && '\n\n... (truncated)'}
                     </pre>
                   </div>
                   
                   {page.html_rendered && (
-                    <div className="mt-4 bg-gray-50 rounded-lg p-4">
+                    <div className="mt-4 bg-surface-2 rounded-lg p-4">
                       <div className="mb-4">
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm muted">
                           Rendered HTML (first 1000 characters)
                         </span>
                       </div>
-                      <pre className="text-xs text-gray-600 overflow-x-auto whitespace-pre-wrap">
+                      <pre className="text-xs muted overflow-x-auto whitespace-pre-wrap">
                         {page.html_rendered.slice(0, 1000)}
                         {page.html_rendered.length > 1000 && '\n\n... (truncated)'}
                       </pre>
