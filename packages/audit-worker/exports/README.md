@@ -1,5 +1,10 @@
 # Scoring Criteria Export
 
+## Overview
+
+**V1 Checks (Implemented):** 13 deterministic HTML-based checks  
+**Total Categories:** 6
+
 ## Files
 
 - `scoring_criteria_latest.json` - Most recent export of all enabled criteria
@@ -13,7 +18,7 @@ Each criterion includes:
 {
   "id": "C1_title_quality",
   "label": "Title tag quality",
-  "description": "Your page title should be clear and descriptive",
+  "description": "Clear, descriptive title with sensible length and brand signal.",
   "category": "Technical Foundations",
   "scope": "page",
   "weight": 12,
@@ -26,29 +31,40 @@ Each criterion includes:
   "enabled": 1,
   "preview": 0,
   "scoring_approach": "Automated HTML analysis",
-  "examples": "...",
-  "view_in_ui": "...",
-  "common_issues": "...",
-  "quick_fixes": "...",
-  "why_it_matters": "...",
-  "how_to_fix": "...",
-  "learn_more_links": "[...]",
-  "official_docs": "[...]",
+  "examples": null,
+  "view_in_ui": 1,
+  "common_issues": "Missing title; overly long; keyword stuffing; no brand on home.",
+  "quick_fixes": "Rewrite to lead with primary topic; trim to <65 chars.",
+  "why_it_matters": "Titles drive ranking, snippets, and assistant citations.",
+  "how_to_fix": "Keep 15–65 chars; lead with topic; include brand on homepage.",
+  "learn_more_links": null,
+  "official_docs": null,
   "references_json": null,
   "display_order": 1,
-  "created_at": "...",
-  "updated_at": "..."
+  "created_at": "2025-10-22 23:40:14",
+  "updated_at": "2025-10-22 23:40:14"
 }
 ```
 
-## Categories
+## Category Breakdown
 
-1. Technical Foundations
-2. Content & Clarity
-3. Structure & Organization
-4. Authority & Trust
-5. Crawl & Discoverability
-6. Experience & Performance
+1. **Technical Foundations** (5 checks)
+   - C1_title_quality, C2_meta_description, A4_schema_faqpage, G10_canonical, T2_lang_region
+
+2. **Structure & Organization** (3 checks)
+   - C3_h1_presence, A2_headings_semantic, A9_internal_linking
+
+3. **Content & Clarity** (2 checks)
+   - A1_answer_first, A3_faq_presence
+
+4. **Authority & Trust** (1 check)
+   - A12_entity_graph
+
+5. **Crawl & Discoverability** (1 check)
+   - T3_noindex_robots
+
+6. **Experience & Performance** (1 check)
+   - T1_mobile_viewport
 
 ## Generating New Export
 
