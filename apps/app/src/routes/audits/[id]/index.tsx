@@ -365,7 +365,12 @@ export default function AuditDetail() {
               <Link to="/audits" className="text-brand hover:underline mb-2 inline-block">
                 ← Back to Audits
               </Link>
-              <h1 className="text-3xl font-bold">Audit Details</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold">Audit Details</h1>
+                <span className={`pill ${getStatusColor(audit.status)}`}>
+                  {audit.status.toUpperCase()}
+                </span>
+              </div>
               <p className="mt-2 muted">
                 {audit.project_id} • {audit.root_url}
                 {audit.started_at && (
@@ -402,9 +407,6 @@ export default function AuditDetail() {
                   </>
                 )}
               </button>
-              <span className={`pill ${getStatusColor(audit.status)}`}>
-                {audit.status.toUpperCase()}
-              </span>
             </div>
           </div>
         </div>
