@@ -131,7 +131,7 @@ li a:hover,
 
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium border border-transparent shadow-sm;
-    @apply bg-brand text-brand-foreground hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring;
+    @apply bg-brand text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring;
     transition: all 0.2s cubic-bezier(.2,.8,.2,1);
   }
 
