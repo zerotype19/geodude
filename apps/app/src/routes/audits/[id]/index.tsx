@@ -532,7 +532,7 @@ export default function AuditDetail() {
             {/* Actions Tab - Fix First Priority Queue */}
             {audit.scorecard_v2 && audit.fix_first && audit.fix_first.length > 0 ? (
               <div className="mb-8">
-                <FixFirst fixes={audit.fix_first} />
+                <FixFirst fixes={audit.fix_first} auditId={audit.id} />
               </div>
             ) : (
               <div className="bg-surface-1 rounded-lg border border-border p-8 text-center">

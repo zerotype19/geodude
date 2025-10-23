@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiGet } from '../lib/api';
 import { Link } from 'react-router-dom';
+import AICitedBadge from './AICitedBadge';
+import { useCitedPages } from '../hooks/useCitedPages';
 
 interface PageCheck {
   id: string;
@@ -34,6 +36,7 @@ export default function PagesTab({ auditId }: PagesTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'issues' | 'good'>('all');
   const [sortBy, setSortBy] = useState<'url' | 'score'>('url');
+  const { getCitationCount } = useCitedPages(auditId);
 
   useEffect(() => {
     fetchPages();
@@ -202,11 +205,16 @@ export default function PagesTab({ auditId }: PagesTabProps) {
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-medium  truncate">
-                      <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-brand">
-                        {new URL(page.url).pathname || '/'}
-                      </a>
-                    </h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-medium truncate">
+                        <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-brand">
+                          {new URL(page.url).pathname || '/'}
+                        </a>
+                      </h3>
+                      {getCitationCount(page.url) > 0 && (
+                        <AICitedBadge citationCount={getCitationCount(page.url)} />
+                      )}
+                    </div>
                     <p className="text-sm subtle truncate">{page.url}</p>
                   </div>
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ml-2 flex-shrink-0 ${

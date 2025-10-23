@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Card, CardBody } from './ui/Card';
 import { Badge } from './ui/Badge';
 import CheckPill from './CheckPill';
+import AICitedBadge from './AICitedBadge';
+import { useCitedPages } from '../hooks/useCitedPages';
 
 interface FixItem {
   id: string;
@@ -26,11 +28,13 @@ interface FixItem {
 
 interface FixFirstProps {
   fixes: FixItem[];
+  auditId: string;
 }
 
-export default function FixFirst({ fixes }: FixFirstProps) {
+export default function FixFirst({ fixes, auditId }: FixFirstProps) {
   const [expandedPages, setExpandedPages] = useState<Set<string>>(new Set());
   const [expandedFixes, setExpandedFixes] = useState<Set<string>>(new Set());
+  const { getCitationCount, isCited } = useCitedPages(auditId);
 
   if (!fixes || fixes.length === 0) {
     return (
@@ -59,11 +63,19 @@ export default function FixFirst({ fixes }: FixFirstProps) {
     return acc;
   }, {} as Record<string, { url?: string; title?: string; fixes: FixItem[] }>);
 
-  // Sort pages by number of high-impact issues, then by total issues
-  const sortedPages = Object.entries(fixesByPage).sort(([, aData], [, bData]) => {
+  // Sort pages: AI-cited pages first, then by high-impact issues, then by total issues
+  const sortedPages = Object.entries(fixesByPage).sort(([aUrl, aData], [bUrl, bData]) => {
+    // Priority 1: AI-cited pages come first
+    const aCited = aData.url ? isCited(aData.url) : false;
+    const bCited = bData.url ? isCited(bData.url) : false;
+    if (aCited !== bCited) return bCited ? 1 : -1;
+    
+    // Priority 2: High-impact issue count
     const aHighCount = aData.fixes.filter(f => f.impact_level === 'High').length;
     const bHighCount = bData.fixes.filter(f => f.impact_level === 'High').length;
     if (aHighCount !== bHighCount) return bHighCount - aHighCount;
+    
+    // Priority 3: Total issue count
     return bData.fixes.length - aData.fixes.length;
   });
 
@@ -112,7 +124,7 @@ export default function FixFirst({ fixes }: FixFirstProps) {
       <CardBody>
         <h2 className="section-title mb-2">Fix First</h2>
         <p className="text-sm muted mb-4">
-          Priority issues organized by page • Fix these to improve your score
+          Priority issues organized by page • AI-cited pages shown first • Fix these to improve your score and strengthen your AI visibility
         </p>
 
         <div className="space-y-3">
@@ -121,6 +133,7 @@ export default function FixFirst({ fixes }: FixFirstProps) {
             const highCount = pageData.fixes.filter(f => f.impact_level === 'High').length;
             const mediumCount = pageData.fixes.filter(f => f.impact_level === 'Medium').length;
             const lowCount = pageData.fixes.filter(f => f.impact_level === 'Low').length;
+            const citationCount = pageData.url ? getCitationCount(pageData.url) : 0;
 
             return (
               <div key={pageKey} className="card overflow-hidden">
@@ -133,8 +146,13 @@ export default function FixFirst({ fixes }: FixFirstProps) {
                     <div className="flex-1 min-w-0">
                       {pageData.url ? (
                         <>
-                          <div className="text-sm font-medium text-brand truncate mb-1">
-                            {pageData.url}
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="text-sm font-medium text-brand truncate">
+                              {pageData.url}
+                            </div>
+                            {citationCount > 0 && (
+                              <AICitedBadge citationCount={citationCount} />
+                            )}
                           </div>
                           {pageData.title && (
                             <div className="text-xs muted truncate">
