@@ -17,11 +17,16 @@ export interface Env {
   DB: D1Database;
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
-};
+// Helper to get CORS headers with proper origin (no wildcard when credentials are used)
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || 'https://app.optiview.ai';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true'
+  };
+}
 
 /**
  * GET /api/scoring/criteria
@@ -51,12 +56,14 @@ export async function handleGetCriteria(req: Request, env: Env): Promise<Respons
       criteria = await getAllCriteria(env.DB);
     }
     
+    const corsHeaders = getCorsHeaders(req);
     return new Response(JSON.stringify(criteria, null, 2), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
     console.error('[Criteria API] Error:', error);
+    const corsHeaders = getCorsHeaders(req);
     return new Response(JSON.stringify({
       error: 'Failed to fetch criteria',
       message: (error as Error).message
@@ -75,12 +82,14 @@ export async function handleGetCriteriaStats(req: Request, env: Env): Promise<Re
   try {
     const stats = await getCriteriaStats(env.DB);
     
+    const corsHeaders = getCorsHeaders(req);
     return new Response(JSON.stringify(stats, null, 2), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
     console.error('[Criteria Stats API] Error:', error);
+    const corsHeaders = getCorsHeaders(req);
     return new Response(JSON.stringify({
       error: 'Failed to fetch criteria stats',
       message: (error as Error).message
@@ -103,6 +112,7 @@ export async function handleGetCriterionById(
   try {
     const criterion = await getCriterionById(env.DB, id);
     
+    const corsHeaders = getCorsHeaders(req);
     if (!criterion) {
       return new Response(JSON.stringify({
         error: 'Criterion not found',
@@ -119,6 +129,7 @@ export async function handleGetCriterionById(
     });
   } catch (error) {
     console.error('[Criterion API] Error:', error);
+    const corsHeaders = getCorsHeaders(req);
     return new Response(JSON.stringify({
       error: 'Failed to fetch criterion',
       message: (error as Error).message
