@@ -400,11 +400,6 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
               </tbody>
             </table>
           </div>
-          <div className="card-footer">
-            <p className="text-sm">
-              <strong>These are high-priority content gaps.</strong> Create or optimize content targeting these queries to improve your AI visibility.
-            </p>
-          </div>
         </div>
       )}
 
