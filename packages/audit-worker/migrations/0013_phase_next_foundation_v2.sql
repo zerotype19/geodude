@@ -34,24 +34,24 @@ CREATE INDEX IF NOT EXISTS idx_audit_criteria_eeat ON audit_criteria(eeat_pillar
 CREATE INDEX IF NOT EXISTS idx_audit_criteria_impact ON audit_criteria(impact_level);
 
 -- ============================================================================
--- 3) Add performance metrics to page-level analysis
+-- 3) Add performance metrics to page-level analysis (columns already exist)
 -- ============================================================================
-ALTER TABLE audit_page_analysis ADD COLUMN lcp_ms INTEGER;
-ALTER TABLE audit_page_analysis ADD COLUMN cls REAL;
-ALTER TABLE audit_page_analysis ADD COLUMN fid_ms INTEGER;
+-- ALTER TABLE audit_page_analysis ADD COLUMN lcp_ms INTEGER;
+-- ALTER TABLE audit_page_analysis ADD COLUMN cls REAL;
+-- ALTER TABLE audit_page_analysis ADD COLUMN fid_ms INTEGER;
 
 -- ============================================================================
--- 4) Store page classification
+-- 4) Store page classification (column already exists)
 -- ============================================================================
-ALTER TABLE audit_page_analysis ADD COLUMN page_type TEXT;
+-- ALTER TABLE audit_page_analysis ADD COLUMN page_type TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_audit_page_analysis_page_type ON audit_page_analysis(page_type);
 
 -- ============================================================================
--- 5) Bots access results
+-- 5) Bots access results (columns already exist)
 -- ============================================================================
-ALTER TABLE audit_page_analysis ADD COLUMN ai_bot_access_json TEXT;
-ALTER TABLE audit_page_analysis ADD COLUMN render_parity INTEGER DEFAULT 0;
+-- ALTER TABLE audit_page_analysis ADD COLUMN ai_bot_access_json TEXT;
+-- ALTER TABLE audit_page_analysis ADD COLUMN render_parity INTEGER DEFAULT 0;
 
 -- ============================================================================
 -- 6) Citations table (unified, replaces ai_citations/ai_referrals)
@@ -75,19 +75,19 @@ CREATE INDEX IF NOT EXISTS idx_citations_assistant ON citations(assistant);
 CREATE INDEX IF NOT EXISTS idx_citations_cited_at ON citations(cited_at);
 
 -- ============================================================================
--- 7) Aggregates computed post-ingest
+-- 7) Aggregates computed post-ingest (columns likely already exist)
 -- ============================================================================
-ALTER TABLE audit_pages ADD COLUMN is_cited INTEGER DEFAULT 0;
-ALTER TABLE audit_pages ADD COLUMN citation_count INTEGER DEFAULT 0;
-ALTER TABLE audit_pages ADD COLUMN assistants_citing TEXT;
+-- ALTER TABLE audit_pages ADD COLUMN is_cited INTEGER DEFAULT 0;
+-- ALTER TABLE audit_pages ADD COLUMN citation_count INTEGER DEFAULT 0;
+-- ALTER TABLE audit_pages ADD COLUMN assistants_citing TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_audit_pages_is_cited ON audit_pages(is_cited);
 
 -- ============================================================================
--- 8) Learning deltas & recommendations
+-- 8) Learning deltas & recommendations (columns likely already exist)
 -- ============================================================================
-ALTER TABLE audit_pages ADD COLUMN nearest_cited_url TEXT;
-ALTER TABLE audit_pages ADD COLUMN recommendation_json TEXT;
+-- ALTER TABLE audit_pages ADD COLUMN nearest_cited_url TEXT;
+-- ALTER TABLE audit_pages ADD COLUMN recommendation_json TEXT;
 
 -- ============================================================================
 -- 9) MVA metrics (domain-level visibility analytics)

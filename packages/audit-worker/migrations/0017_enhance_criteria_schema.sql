@@ -1,17 +1,17 @@
 -- Enhance scoring_criteria to match live score guide structure
 -- Adds fields for examples, how-to, and better organization
 
--- Add missing columns
-ALTER TABLE scoring_criteria ADD COLUMN points_possible INTEGER DEFAULT 100;
-ALTER TABLE scoring_criteria ADD COLUMN importance_rank INTEGER; -- 1=Critical, 2=High, 3=Medium
-ALTER TABLE scoring_criteria ADD COLUMN scoring_approach TEXT; -- "Automated analysis", "Manual review", etc.
-ALTER TABLE scoring_criteria ADD COLUMN examples TEXT; -- Real examples of good/bad implementations
-ALTER TABLE scoring_criteria ADD COLUMN view_in_ui TEXT; -- Where to find this in the UI
-ALTER TABLE scoring_criteria ADD COLUMN common_issues TEXT; -- Common problems found
-ALTER TABLE scoring_criteria ADD COLUMN quick_fixes TEXT; -- Actionable fix steps
-ALTER TABLE scoring_criteria ADD COLUMN learn_more_links TEXT; -- JSON array of educational resources
-ALTER TABLE scoring_criteria ADD COLUMN official_docs TEXT; -- JSON array of official documentation links
-ALTER TABLE scoring_criteria ADD COLUMN display_order INTEGER; -- Order within category
+-- Add missing columns (columns likely already exist from previous migrations)
+-- ALTER TABLE scoring_criteria ADD COLUMN points_possible INTEGER DEFAULT 100;
+-- ALTER TABLE scoring_criteria ADD COLUMN importance_rank INTEGER; -- 1=Critical, 2=High, 3=Medium
+-- ALTER TABLE scoring_criteria ADD COLUMN scoring_approach TEXT; -- "Automated analysis", "Manual review", etc.
+-- ALTER TABLE scoring_criteria ADD COLUMN examples TEXT; -- Real examples of good/bad implementations
+-- ALTER TABLE scoring_criteria ADD COLUMN view_in_ui TEXT; -- Where to find this in the UI
+-- ALTER TABLE scoring_criteria ADD COLUMN common_issues TEXT; -- Common problems found
+-- ALTER TABLE scoring_criteria ADD COLUMN quick_fixes TEXT; -- Actionable fix steps
+-- ALTER TABLE scoring_criteria ADD COLUMN learn_more_links TEXT; -- JSON array of educational resources
+-- ALTER TABLE scoring_criteria ADD COLUMN official_docs TEXT; -- JSON array of official documentation links
+-- ALTER TABLE scoring_criteria ADD COLUMN display_order INTEGER; -- Order within category
 
 -- Update existing records with better metadata
 -- These should be populated with actual content from https://app.optiview.ai/score-guide

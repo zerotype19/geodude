@@ -1,7 +1,8 @@
--- Add is_admin column to users table
+-- Add is_admin column to users table (if it doesn't exist)
 -- This column determines if a user has admin privileges
 
-ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0;
+-- Column already exists, skipping ALTER TABLE
+-- ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0;
 
 -- Create index for efficient admin user queries
 CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin);
