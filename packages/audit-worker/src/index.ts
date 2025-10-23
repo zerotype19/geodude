@@ -1054,6 +1054,72 @@ export default {
           }
         }
 
+        // Compute site-level diagnostics for an audit
+        if (req.method === 'POST' && path.startsWith('/api/admin/audits/') && path.endsWith('/compute-site-diagnostics')) {
+          const auditId = path.split('/')[4];
+          if (!auditId) {
+            return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          try {
+            const { runDiagnosticsForSite } = await import('./diagnostics/runSite');
+            
+            // Fetch audit info
+            const audit = await env.DB.prepare("SELECT root_url FROM audits WHERE id = ?").bind(auditId).first();
+            if (!audit) {
+              return new Response(JSON.stringify({ error: 'Audit not found' }), {
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
+            }
+
+            const domain = new URL(audit.root_url as string).hostname;
+
+            // Fetch all pages with their checks_json
+            const pages = (await env.DB.prepare(`
+              SELECT p.id, p.url, p.html_rendered, p.html_static, apa.checks_json
+              FROM audit_pages p
+              LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+              WHERE p.audit_id = ?1
+            `).bind(auditId).all()).results || [];
+
+            const ctx = {
+              auditId,
+              domain,
+              pages: pages.map((r: any) => ({
+                id: r.id,
+                url: r.url,
+                html_rendered: r.html_rendered,
+                html_static: r.html_static,
+                checks: r.checks_json ? JSON.parse(r.checks_json) : []
+              }))
+            };
+
+            const results = await runDiagnosticsForSite(env.DB, ctx);
+
+            return new Response(JSON.stringify({
+              audit_id: auditId,
+              site_checks_count: results.length,
+              results
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (error) {
+            console.error(`[SITE_DIAGNOSTICS] Error for audit ${auditId}:`, error);
+            return new Response(JSON.stringify({
+              error: 'Failed to compute site diagnostics',
+              message: (error as Error).message
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
         // Admin classifier comparison endpoint
         if (req.method === 'GET' && path === '/api/admin/classifier-compare') {
         const host = url.searchParams.get('host');
@@ -1302,6 +1368,73 @@ export default {
       if (req.method === 'GET' && path === '/api/scoring/criteria') {
         const { handleGetCriteria } = await import('./routes/criteria');
         return handleGetCriteria(req, env);
+      }
+
+      // Composite scoring for an audit
+      if (req.method === 'GET' && path.match(/^\/api\/audits\/[^/]+\/composite$/)) {
+        const auditId = path.split('/')[3];
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const { computeComposite } = await import('./diagnostics/composite');
+          const { loadCriteriaMap } = await import('./diagnostics/persist');
+
+          // Fetch site_checks_json from audits table
+          const audit = await env.DB.prepare("SELECT site_checks_json FROM audits WHERE id = ?").bind(auditId).first();
+          if (!audit) {
+            return new Response(JSON.stringify({ error: 'Audit not found' }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          const siteChecks = audit.site_checks_json ? JSON.parse(audit.site_checks_json as string) : [];
+
+          // Aggregate page checks from all pages in the audit
+          const pages = (await env.DB.prepare(`
+            SELECT apa.checks_json
+            FROM audit_pages p
+            LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+            WHERE p.audit_id = ?1 AND apa.checks_json IS NOT NULL
+          `).bind(auditId).all()).results || [];
+
+          const allPageChecks = pages.flatMap((p: any) => {
+            try {
+              return p.checks_json ? JSON.parse(p.checks_json) : [];
+            } catch {
+              return [];
+            }
+          });
+
+          // Load criteria metadata
+          const criteriaMap = await loadCriteriaMap(env.DB);
+          const criteriaArray = Array.from(criteriaMap.values());
+
+          // Compute composite scores
+          const composite = computeComposite(allPageChecks, siteChecks, criteriaArray);
+
+          return new Response(JSON.stringify({
+            audit_id: auditId,
+            ...composite
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error(`[COMPOSITE] Error for audit ${auditId}:`, error);
+          return new Response(JSON.stringify({
+            error: 'Failed to compute composite score',
+            message: (error as Error).message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
       }
 
       if (req.method === 'GET' && path.startsWith('/api/insights')) {
@@ -2773,28 +2906,25 @@ async function runCrawl({ audit_id, root_url, site_description, max_pages }: any
             )
         ]);
 
-        // Run new HTML-based scoring checks if enabled
+        // Run diagnostics for all 36 criteria if enabled
         if (env.SCORING_V1_ENABLED === "true") {
           try {
-            const { scoreAndPersistPage } = await import('./services/scorePage');
+            const { runDiagnosticsForPage } = await import('./diagnostics/runPage');
             const hostname = new URL(url).hostname;
-            await scoreAndPersistPage(
-              env.DB,
-              {
-                id: ids.page_id,
-                url,
-                html_rendered: rendered?.html?.slice(0, 200000) || null,
-                html_static: page.html?.slice(0, 200000)
-              },
-              {
+            await runDiagnosticsForPage(env.DB, {
+              pageId: ids.page_id,
+              url,
+              html_rendered: rendered?.html?.slice(0, 200000) || null,
+              html_static: page.html?.slice(0, 200000) || null,
+              site: {
                 domain: hostname,
                 homepageUrl: root_url,
                 targetLocale: "en-US"
               }
-            );
-            console.log(`[SCORING_V1] Scored page: ${url}`);
+            });
+            console.log(`[DIAGNOSTICS] Scored page: ${url}`);
           } catch (scoreError) {
-            console.error(`[SCORING_V1] Failed to score ${url}:`, scoreError);
+            console.error(`[DIAGNOSTICS] Failed to score ${url}:`, scoreError);
           }
         }
 
