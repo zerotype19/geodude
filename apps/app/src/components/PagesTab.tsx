@@ -77,11 +77,11 @@ export default function PagesTab({ auditId }: PagesTabProps) {
     return 'text-danger';
   };
 
-  const getScoreBorderColor = (score: number): string => {
-    if (!Number.isFinite(score)) return 'border-border';
-    if (score >= 85) return 'border-success';
-    if (score >= 60) return 'border-warn';
-    return 'border-danger';
+  const getScoreGlow = (score: number): string => {
+    if (!Number.isFinite(score)) return '';
+    if (score >= 85) return 'shadow-[0_0_0_3px_rgba(34,197,94,0.15)] border-success/30';
+    if (score >= 60) return 'shadow-[0_0_0_3px_rgba(251,191,36,0.15)] border-warn/30';
+    return 'shadow-[0_0_0_3px_rgba(239,68,68,0.15)] border-danger/30';
   };
 
   const getScoreBadgeColor = (score: number): string => {
@@ -197,7 +197,7 @@ export default function PagesTab({ auditId }: PagesTabProps) {
           const warningChecks = page.checks.filter((c) => !c.preview && c.status === 'warn');
           
           return (
-            <div key={page.id} className={`bg-surface-1 shadow rounded-lg hover:shadow-md transition-shadow border-2 ${getScoreBorderColor(page.diagnosticScore)}`}>
+            <div key={page.id} className={`bg-surface-1 rounded-lg hover:shadow-md transition-shadow border ${getScoreGlow(page.diagnosticScore)}`}>
               <div className="p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
