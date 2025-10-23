@@ -663,9 +663,19 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
         const allBranded = [...v4.branded, ...v3.branded];
         const allNonBranded = [...v4.nonBranded, ...v3.nonBranded];
         
+        // ✅ QUALITY FILTER: Remove garbage queries
+        const { filterQueriesByQuality } = await import('./prompts/qualityFilter');
+        const brandedFiltered = filterQueriesByQuality(allBranded);
+        const nonBrandedFiltered = filterQueriesByQuality(allNonBranded);
+        
+        if (brandedFiltered.rejected.length > 0 || nonBrandedFiltered.rejected.length > 0) {
+          console.log(`[PROMPTS] Quality filter rejected ${brandedFiltered.rejected.length + nonBrandedFiltered.rejected.length} low-quality queries`);
+          brandedFiltered.rejected.slice(0, 3).forEach(r => console.log(`  ❌ ${r.query} (${r.reason})`));
+        }
+        
         prompts = {
-          branded: Array.from(new Set(allBranded)).slice(0, PROMPTS_BRANDED_MAX),
-          nonBranded: Array.from(new Set(allNonBranded)).slice(0, PROMPTS_NONBRANDED_MAX)
+          branded: Array.from(new Set(brandedFiltered.valid)).slice(0, PROMPTS_BRANDED_MAX),
+          nonBranded: Array.from(new Set(nonBrandedFiltered.valid)).slice(0, PROMPTS_NONBRANDED_MAX)
         };
         version = 'v4-llm-augmented';
         console.log(`[PROMPTS] Augmented to ${prompts.branded.length} branded, ${prompts.nonBranded.length} non-branded`);
@@ -674,7 +684,17 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
       console.error(`[PROMPTS] V4 failed for ${domain}, falling back to V3:`, error);
       // Fall back to V3
       const v3 = await generateContextualPromptsV3(env, domain, brand, classification, schemaTypes, industry);
-      prompts = { branded: v3.branded, nonBranded: v3.nonBranded };
+      
+      // ✅ QUALITY FILTER: Remove garbage queries from V3 fallback too
+      const { filterQueriesByQuality } = await import('./prompts/qualityFilter');
+      const brandedFiltered = filterQueriesByQuality(v3.branded);
+      const nonBrandedFiltered = filterQueriesByQuality(v3.nonBranded);
+      
+      if (brandedFiltered.rejected.length > 0 || nonBrandedFiltered.rejected.length > 0) {
+        console.log(`[PROMPTS] Quality filter rejected ${brandedFiltered.rejected.length + nonBrandedFiltered.rejected.length} low-quality queries from V3 fallback`);
+      }
+      
+      prompts = { branded: brandedFiltered.valid, nonBranded: nonBrandedFiltered.valid };
       realismAvg = v3.realismScoreAvg ?? 0.85;
       version = 'v3-archetypes-fallback';
     }

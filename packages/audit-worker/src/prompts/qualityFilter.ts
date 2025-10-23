@@ -1,0 +1,116 @@
+/**
+ * Query Quality Filter
+ * 
+ * Rejects queries that are unnatural, nonsensical, or clearly template-generated garbage.
+ * This prevents showing customers queries like "Are orlandos safe for getting started?"
+ */
+
+interface QualityCheckResult {
+  isValid: boolean;
+  reason?: string;
+}
+
+/**
+ * Check if a query sounds natural and human-like
+ */
+export function isNaturalQuery(query: string): QualityCheckResult {
+  const lower = query.toLowerCase().trim();
+  
+  // 1. Reject queries with obvious template artifacts
+  const templateArtifacts = [
+    /availability and limits for \w+s in/i,  // "Availability and limits for orlandos in..."
+    /are \w+s safe for getting started/i,     // "Are orlandos safe for getting started?"
+    /do \w+s support \w+ and \w+/i,          // "Do orlandos support USD and EUR?"
+    /when should someone choose \w+s for/i,   // "When should someone choose orlandos for..."
+  ];
+  
+  for (const pattern of templateArtifacts) {
+    if (pattern.test(lower)) {
+      return { 
+        isValid: false, 
+        reason: `Template artifact detected: ${pattern}` 
+      };
+    }
+  }
+  
+  // 2. Reject queries with nonsensical brand pluralization
+  // E.g., "orlandos", "visit orlandos", "nike.coms"
+  const nonsensePlurals = [
+    /\b\w+s\.com/i,                          // "stripes.com", "nikes.com"
+    /\b(visit|see|explore|go to)\s+\w+s\b/i, // "visit orlandos", "explore nikes"
+    /\borlandos?\b/i,                        // "orlando" or "orlandos" as standalone word (not in "orlando hotels")
+  ];
+  
+  for (const pattern of nonsensePlurals) {
+    if (pattern.test(lower)) {
+      return { 
+        isValid: false, 
+        reason: `Nonsensical pluralization: ${pattern}` 
+      };
+    }
+  }
+  
+  // 3. Reject queries that are too generic or vague
+  if (lower.length < 10) {
+    return { 
+      isValid: false, 
+      reason: 'Query too short/generic' 
+    };
+  }
+  
+  // 4. Reject queries with excessive repetition
+  const words = lower.split(/\s+/);
+  const uniqueWords = new Set(words);
+  if (words.length > 5 && uniqueWords.size / words.length < 0.5) {
+    return { 
+      isValid: false, 
+      reason: 'Excessive word repetition' 
+    };
+  }
+  
+  // 5. Reject queries that don't sound like questions people would actually ask
+  const unnaturalPhrases = [
+    /\bhow does.*work for.*and/i,           // "How does X work for Y and Z" (too formal)
+    /\bexplain how.*works for/i,            // "Explain how X works for Y" (too instructional)
+    /\bwhen should someone/i,                // "When should someone..." (too formal)
+    /\bsteps to (use|set up)/i,              // "Steps to use X" (not a natural search)
+  ];
+  
+  for (const pattern of unnaturalPhrases) {
+    if (pattern.test(lower)) {
+      return { 
+        isValid: false, 
+        reason: `Unnatural phrasing: ${pattern}` 
+      };
+    }
+  }
+  
+  // Passed all checks
+  return { isValid: true };
+}
+
+/**
+ * Filter an array of queries, removing low-quality ones
+ */
+export function filterQueriesByQuality(queries: string[]): {
+  valid: string[];
+  rejected: Array<{ query: string; reason: string }>;
+} {
+  const valid: string[] = [];
+  const rejected: Array<{ query: string; reason: string }> = [];
+  
+  for (const query of queries) {
+    const check = isNaturalQuery(query);
+    if (check.isValid) {
+      valid.push(query);
+    } else {
+      rejected.push({ 
+        query, 
+        reason: check.reason || 'Unknown quality issue' 
+      });
+    }
+  }
+  
+  return { valid, rejected };
+}
+
