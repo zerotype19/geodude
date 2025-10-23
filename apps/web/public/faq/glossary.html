@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Visibility Glossary | AEO, GEO, LLM Terms Defined</title>
+  <meta name="description" content="Clear definitions of AI Visibility, AEO, GEO, answerability, citation coverage, schema markup, and other key terms used in LLM optimization and generative engine ranking.">
+  <link rel="canonical" href="https://optiview.ai/faq/glossary.html" />
+  
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 900px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .breadcrumb {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .breadcrumb a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    .term {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .term dt {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--purple);
+      margin-bottom: 0.5rem;
+    }
+    .term dd {
+      color: #4b5563;
+      line-height: 1.8;
+      margin: 0;
+    }
+    .term strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+    .alphabet-nav {
+      background: #f8fafc;
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    .alphabet-nav a {
+      display: inline-block;
+      padding: 0.5rem 0.75rem;
+      color: var(--purple);
+      text-decoration: none;
+      font-weight: 600;
+      margin: 0.25rem;
+    }
+    .alphabet-nav a:hover {
+      text-decoration: underline;
+    }
+    .related-links {
+      background: #f8fafc;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-top: 3rem;
+    }
+    .related-links h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .related-links a {
+      display: block;
+      color: var(--purple);
+      text-decoration: none;
+      padding: 0.5rem 0;
+      font-weight: 500;
+    }
+    .related-links a:hover { text-decoration: underline; }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/faq/">Knowledge Base</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/faq/">← Knowledge Base</a>
+    </div>
+
+    <h1>AI Visibility Glossary</h1>
+    <p class="subtitle">
+      Clear definitions of key terms used in AI visibility, answer engine optimization, and 
+      generative search ranking.
+    </p>
+
+    <div class="alphabet-nav">
+      <a href="#A">A</a>
+      <a href="#C">C</a>
+      <a href="#E">E</a>
+      <a href="#F">F</a>
+      <a href="#G">G</a>
+      <a href="#L">L</a>
+      <a href="#R">R</a>
+      <a href="#S">S</a>
+    </div>
+
+    <dl>
+      <div class="term" id="A">
+        <dt>AEO (Answer Engine Optimization)</dt>
+        <dd>
+          The practice of optimizing content to be discovered, understood, and cited by <strong>pure AI answer engines</strong> 
+          like ChatGPT, Claude, and Perplexity. Unlike traditional SEO which targets search result rankings, AEO focuses 
+          on becoming a preferred source for AI-generated answers. Key factors include structured data, answerability, 
+          and crawler access.
+        </dd>
+      </div>
+
+      <div class="term">
+        <dt>AI Visibility</dt>
+        <dd>
+          A metric measuring <strong>how often and how accurately AI systems reference your brand, products, or content</strong> 
+          when generating answers. High AI Visibility means LLMs frequently cite you; low visibility means you're absent 
+          from AI-generated responses. Analogous to "SEO visibility" but for generative engines.
+        </dd>
+      </div>
+
+      <div class="term">
+        <dt>Answerability</dt>
+        <dd>
+          The degree to which your content <strong>directly answers user questions</strong> in a clear, structured format. 
+          Highly answerable content uses question-based headings, FAQ structures, and "answer first" formatting. AI models 
+          strongly favor answerable content for citations.
+        </dd>
+      </div>
+
+      <div class="term" id="C">
+        <dt>Citation Coverage</dt>
+        <dd>
+          The percentage of relevant queries where AI systems cite your domain. Calculated as: <strong>(queries where you're cited) ÷ (total relevant queries tested)</strong>. 
+          Higher coverage indicates stronger AI visibility across your topic space.
+        </dd>
+      </div>
+
+      <div class="term">
+        <dt>Crawlability</dt>
+        <dd>
+          The technical accessibility of your site to AI training crawlers (GPTBot, Claude-Web, etc.). Factors include 
+          robots.txt permissions, XML sitemaps, internal linking structure, and server response times. Poor crawlability 
+          = zero AI visibility.
+        </dd>
+      </div>
+
+      <div class="term" id="E">
+        <dt>Entity Graph</dt>
+        <dd>
+          A network of <strong>structured relationships between entities</strong> (people, organizations, products, places) 
+          expressed via schema markup. Example: Your Organization connects to your Products, which connect to Reviews. 
+          Complete entity graphs help AI models understand your brand's full context.
+        </dd>
+      </div>
+
+      <div class="term" id="F">
+        <dt>FAQPage Schema</dt>
+        <dd>
+          A specific type of JSON-LD structured data that marks up frequently asked questions and their answers. Considered 
+          <strong>the highest-impact schema for AI visibility</strong> because it directly maps to how users query AI assistants. 
+          Format: Question → Answer pairs with explicit markup.
+        </dd>
+      </div>
+
+      <div class="term" id="G">
+        <dt>GEO (Generative Engine Optimization)</dt>
+        <dd>
+          Optimizing for <strong>traditional search engines with AI features</strong>, primarily Google AI Overviews and 
+          Bing Copilot. GEO sits between classic SEO and pure AEO—targeting hybrid systems that combine web search with 
+          generative AI answers.
+        </dd>
+      </div>
+
+      <div class="term">
+        <dt>Grounding</dt>
+        <dd>
+          The process where AI models <strong>connect generated answers to real web sources</strong> to verify accuracy and 
+          provide attribution. Models that use grounding (like Perplexity) are more likely to cite specific domains. Non-grounded 
+          models (early ChatGPT) generate from training data without real-time web access.
+        </dd>
+      </div>
+
+      <div class="term">
+        <dt>GPTBot</dt>
+        <dd>
+          OpenAI's web crawler used to <strong>train GPT models and ground ChatGPT responses</strong>. Identified by User-Agent: 
+          <code>GPTBot</code>. Blocking it in robots.txt prevents your content from being used in training or cited in answers.
+        </dd>
+      </div>
+
+      <div class="term" id="L">
+        <dt>LLM (Large Language Model)</dt>
+        <dd>
+          AI systems trained on vast amounts of text to understand and generate human-like language. Examples: GPT-4, Claude, 
+          Llama. LLMs power modern AI assistants and are increasingly used as search interfaces, making <strong>LLM visibility 
+          critical for discovery</strong>.
+        </dd>
+      </div>
+
+      <div class="term" id="R">
+        <dt>Render Gap</dt>
+        <dd>
+          The difference between <strong>static HTML and JavaScript-rendered content</strong>. If critical information only 
+          appears after JavaScript executes, some AI crawlers will miss it. Measured as: content visible to JS-disabled 
+          crawlers vs. full rendered page. Large render gaps hurt AI visibility.
+        </dd>
+      </div>
+
+      <div class="term" id="S">
+        <dt>Schema Markup</dt>
+        <dd>
+          Structured data vocabulary (schema.org) embedded in pages to help machines understand content relationships. 
+          Implemented via JSON-LD, Microdata, or RDFa. <strong>Critical for AI visibility</strong> because it eliminates 
+          ambiguity in entity identification, content type, and factual claims.
+        </dd>
+      </div>
+
+      <div class="term">
+        <dt>Semantic Search</dt>
+        <dd>
+          Search that understands <strong>query intent and meaning</strong> rather than just keyword matching. AI assistants 
+          use semantic understanding to connect user questions with relevant content, even when exact keywords don't match. 
+          Requires clear, conceptual content over keyword-optimized text.
+        </dd>
+      </div>
+
+      <div class="term">
+        <dt>Source Attribution</dt>
+        <dd>
+          When AI-generated answers include <strong>explicit citations or links</strong> to the sources used. High-quality 
+          attribution names your domain and provides a clickable link. Poor attribution mentions generic "sources" without 
+          specifics. Optiview tracks both types.
+        </dd>
+      </div>
+
+      <div class="term">
+        <dt>Structured Data</dt>
+        <dd>
+          Information organized in a <strong>machine-readable format</strong> using standardized vocabularies (schema.org). 
+          Contrasts with unstructured data (plain text). Structured data enables AI models to parse facts, relationships, 
+          and entities with high confidence, dramatically improving citation likelihood.
+        </dd>
+      </div>
+    </dl>
+
+    <div class="related-links">
+      <h3>Related Topics</h3>
+      <a href="/faq/about.html">→ What is AI Visibility?</a>
+      <a href="/faq/audit-process.html">→ How We Measure These Concepts</a>
+      <a href="/faq/structured-data.html">→ Understanding Schema Markup</a>
+      <a href="/faq/citations.html">→ How Citations Work</a>
+      <a href="https://app.optiview.ai">→ Test Your AI Visibility</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/faq/">Knowledge Base</a> • 
+      <a href="/methodology">Methodology</a> • 
+      <a href="/privacy">Privacy</a>
+    </p>
+  </footer>
+</body>
+</html>
+

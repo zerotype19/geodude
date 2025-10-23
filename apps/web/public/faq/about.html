@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>About Optiview & AI Visibility | How We Measure LLM Discovery</title>
+  <meta name="description" content="Learn what AI Visibility means, how Optiview measures it, and why being discovered and cited by large language models is critical for your brand's future.">
+  <link rel="canonical" href="https://optiview.ai/faq/about.html" />
+  
+  <!-- FAQPage Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is Optiview.ai?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Optiview.ai is a visibility intelligence platform that helps brands understand how their content appears, is cited, and is interpreted by large language models (LLMs) and AI assistants like ChatGPT, Perplexity, and Claude. We monitor how these systems use your content and identify actions to make your site more discoverable, answerable, and trusted."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What does AI Visibility mean?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "AI Visibility refers to how often and how accurately AI systems reference your brand, products, or content when generating answers for users. Just as SEO measures ranking in Google, AI Visibility measures recognition in LLMs."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How is Optiview different from traditional SEO tools?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "SEO focuses on search engine ranking pages; Optiview measures whether your content is being used or cited in AI responses. We audit for answerability, structured data, and citation coverage across AI models."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Why does AI Visibility matter now?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Generative engines are becoming the default way people get information. If you're not part of their training or citation graph, your content may never be seen, even if you rank #1 in Google."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Who uses Optiview?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Marketing teams, publishers, ecommerce sites, agencies, and SEO professionals who want to future-proof their visibility."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 900px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .breadcrumb {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .breadcrumb a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    .faq-item {
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .faq-item h2 {
+      font-size: 1.5rem;
+      line-height: 1.3;
+      margin-bottom: 1rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+    .faq-item p {
+      color: #4b5563;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    .faq-item ul, .faq-item ol {
+      margin: 1rem 0 1rem 1.5rem;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+    .faq-item li {
+      margin-bottom: 0.5rem;
+    }
+    .faq-item strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-left: 4px solid var(--purple);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    .related-links {
+      background: #f8fafc;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-top: 3rem;
+    }
+    .related-links h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .related-links a {
+      display: block;
+      color: var(--purple);
+      text-decoration: none;
+      padding: 0.5rem 0;
+      font-weight: 500;
+    }
+    .related-links a:hover { text-decoration: underline; }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/faq/">Knowledge Base</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/faq/">← Knowledge Base</a>
+    </div>
+
+    <h1>About Optiview & AI Visibility</h1>
+    <p class="subtitle">
+      Understand the concept of AI Visibility and how Optiview helps your brand get discovered, 
+      cited, and trusted by large language models and AI assistants.
+    </p>
+
+    <div class="faq-item">
+      <h2>What is Optiview.ai?</h2>
+      <p>
+        <strong>Optiview.ai is a visibility intelligence platform</strong> that helps brands understand 
+        how their content appears, is cited, and is interpreted by large language models (LLMs) and AI 
+        assistants like ChatGPT, Perplexity, and Claude.
+      </p>
+      <p>
+        We monitor how these systems use your content and identify specific actions to make your site 
+        more <strong>discoverable</strong>, <strong>answerable</strong>, and <strong>trusted</strong>.
+      </p>
+      <div class="highlight-box">
+        <p>
+          <strong>Think of us as the bridge between traditional SEO and the AI-powered future of search.</strong> 
+          While SEO tools help you rank in Google, Optiview helps you get cited by AI systems that are 
+          rapidly becoming how people find information.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>What does "AI Visibility" mean?</h2>
+      <p>
+        <strong>AI Visibility</strong> refers to how often and how accurately AI systems reference your 
+        brand, products, or content when generating answers for users.
+      </p>
+      <p>
+        Just as SEO measures ranking in Google search results, AI Visibility measures <strong>recognition 
+        in LLMs</strong>—whether your content is:
+      </p>
+      <ul>
+        <li><strong>Discovered</strong> by AI training crawlers (GPTBot, Claude-Web, etc.)</li>
+        <li><strong>Understood</strong> correctly (through structure, clarity, and schema)</li>
+        <li><strong>Cited</strong> when relevant (appearing in AI-generated answers)</li>
+        <li><strong>Trusted</strong> as authoritative (competing with established sources)</li>
+      </ul>
+      <div class="highlight-box">
+        <p>
+          <strong>Example:</strong> If a user asks ChatGPT "What are the best project management tools?" 
+          and your product is cited in the answer with a link to your site, you have AI Visibility.
+        </p>
+        <p>
+          If your product isn't mentioned—even though you rank #1 in Google—you have <strong>zero AI Visibility</strong>.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>How is Optiview different from traditional SEO tools?</h2>
+      <p>
+        Traditional SEO tools focus on <strong>search engine ranking pages</strong> (SERPs) and keyword positions. 
+        Optiview measures whether your content is being <strong>used or cited in AI responses</strong>.
+      </p>
+      <p>Here's the key difference:</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5rem 0;">
+        <thead style="background: #f8fafc;">
+          <tr>
+            <th style="padding: 12px; border: 1px solid var(--border); text-align: left;">Dimension</th>
+            <th style="padding: 12px; border: 1px solid var(--border); text-align: left;">Traditional SEO</th>
+            <th style="padding: 12px; border: 1px solid var(--border); text-align: left;">Optiview (AI Visibility)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border);"><strong>Primary Goal</strong></td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Rank higher in search results</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Get cited in AI answers</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border);"><strong>What We Measure</strong></td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Keywords, backlinks, page speed</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Citations, answerability, structured data</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border);"><strong>Bot Tracking</strong></td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Googlebot, Bingbot</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">GPTBot, Claude-Web, PerplexityBot, etc.</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border);"><strong>Content Format</strong></td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Optimized for search engines</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Optimized for AI comprehension</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; border: 1px solid var(--border);"><strong>Success Metric</strong></td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Ranking position (1-10)</td>
+            <td style="padding: 12px; border: 1px solid var(--border);">Citation frequency & accuracy</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        We audit for <strong>answerability</strong> (how well you address user questions), 
+        <strong>structured data</strong> (schema markup AI can parse), and <strong>citation coverage</strong> 
+        across multiple AI models.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Why does AI Visibility matter now?</h2>
+      <p>
+        <strong>Generative engines are becoming the default way people get information.</strong> Consider:
+      </p>
+      <ul>
+        <li>ChatGPT reached 100M users faster than any product in history</li>
+        <li>Perplexity processes millions of queries daily as an AI-first search engine</li>
+        <li>Google is rolling out AI Overviews that answer questions directly (reducing click-through)</li>
+        <li>43% of searches now get zero-click answers (Sparktoro, 2024)</li>
+      </ul>
+      <p>
+        <strong>If you're not part of their training or citation graph, your content may never be seen</strong>—even 
+        if you rank #1 in traditional Google search.
+      </p>
+      <div class="highlight-box">
+        <p>
+          <strong>The shift is happening now.</strong> Brands that optimize for AI Visibility today will have 
+          a massive advantage as LLMs become the primary discovery layer for products, services, and information.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>Who uses Optiview?</h2>
+      <p>
+        Optiview is built for anyone who needs to be discovered online in the AI era:
+      </p>
+      <ul>
+        <li><strong>Marketing teams</strong> at B2B and B2C brands who want to future-proof visibility</li>
+        <li><strong>Publishers</strong> and content sites that need AI citations to drive traffic</li>
+        <li><strong>E-commerce brands</strong> competing for product recommendations in AI answers</li>
+        <li><strong>Agencies</strong> offering AI-optimized SEO services (AEO/GEO) to clients</li>
+        <li><strong>SEO professionals</strong> expanding beyond traditional search engines</li>
+      </ul>
+      <p>
+        If your business depends on being found when people search—whether through Google, ChatGPT, or 
+        Perplexity—you need AI Visibility.
+      </p>
+    </div>
+
+    <div class="related-links">
+      <h3>Related Topics</h3>
+      <a href="/faq/audit-process.html">→ How the Audit Process Works</a>
+      <a href="/faq/citations.html">→ Understanding AI Citations</a>
+      <a href="/faq/improving-score.html">→ How to Improve Your AI Visibility</a>
+      <a href="/faq/glossary.html">→ Key Terms & Definitions</a>
+      <a href="https://app.optiview.ai">→ Run a Free Audit</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/faq/">Knowledge Base</a> • 
+      <a href="/methodology">Methodology</a> • 
+      <a href="/privacy">Privacy</a>
+    </p>
+  </footer>
+</body>
+</html>
+

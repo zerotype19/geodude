@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Citations & Crawlers Explained | Optiview</title>
+  <meta name="description" content="Learn how AI assistants source and reference web content, which AI crawlers Optiview tracks, and what citations mean for your brand's visibility in LLM-powered search.">
+  <link rel="canonical" href="https://optiview.ai/faq/citations.html" />
+  
+  <!-- FAQPage Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Which AI assistants does Optiview track?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Optiview currently tracks ChatGPT (via OpenAI integration), Claude (Anthropic), Perplexity, and Brave AI. We're continuously adding new AI sources as they expose citation data."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do AI crawlers differ from search crawlers?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Search engine crawlers index to rank pages; AI crawlers process content to train models or ground real-time answers. They prioritize clarity, structure, and factual density over keyword repetition."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is a citation in this context?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "When an AI assistant attributes an answer, snippet, or recommendation to your domain (directly or indirectly). Optiview detects and logs these references across multiple AI sources."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I increase my citations?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes—improve content clarity, provide question-answer formats, implement FAQ schema, build authoritative references, and ensure AI crawlers can access your site."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 900px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .breadcrumb {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .breadcrumb a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    .faq-item {
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .faq-item h2 {
+      font-size: 1.5rem;
+      line-height: 1.3;
+      margin-bottom: 1rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+    .faq-item p {
+      color: #4b5563;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    .faq-item ul, .faq-item ol {
+      margin: 1rem 0 1rem 1.5rem;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+    .faq-item li {
+      margin-bottom: 0.5rem;
+    }
+    .faq-item strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+    .faq-item code {
+      background: #f1f5f9;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--purple);
+    }
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-left: 4px solid var(--purple);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    .bot-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .bot-card {
+      background: #f8fafc;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .bot-card strong {
+      display: block;
+      margin-bottom: 0.25rem;
+      color: var(--dark);
+    }
+    .bot-card span {
+      font-size: 0.875rem;
+      color: var(--gray);
+    }
+    .related-links {
+      background: #f8fafc;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-top: 3rem;
+    }
+    .related-links h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .related-links a {
+      display: block;
+      color: var(--purple);
+      text-decoration: none;
+      padding: 0.5rem 0;
+      font-weight: 500;
+    }
+    .related-links a:hover { text-decoration: underline; }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/faq/">Knowledge Base</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/faq/">← Knowledge Base</a>
+    </div>
+
+    <h1>AI Citations & Crawlers</h1>
+    <p class="subtitle">
+      Understand how AI assistants source and reference web content, which crawlers we track, 
+      and what citations mean for your brand's visibility.
+    </p>
+
+    <div class="faq-item">
+      <h2>Which AI assistants does Optiview track?</h2>
+      <p>
+        Optiview monitors citation behavior across the major AI assistants that people use for search and discovery:
+      </p>
+      <div class="bot-list">
+        <div class="bot-card">
+          <strong>ChatGPT</strong>
+          <span>OpenAI's conversational AI (via web search integration)</span>
+        </div>
+        <div class="bot-card">
+          <strong>Claude</strong>
+          <span>Anthropic's AI assistant with web browsing capabilities</span>
+        </div>
+        <div class="bot-card">
+          <strong>Perplexity</strong>
+          <span>AI-first search engine with real-time web citations</span>
+        </div>
+        <div class="bot-card">
+          <strong>Brave AI</strong>
+          <span>Privacy-focused AI search with transparent sourcing</span>
+        </div>
+      </div>
+      <p>
+        <strong>Coming soon:</strong> Google AI Overviews, Microsoft Copilot, and other emerging AI search platforms 
+        as they expose citation metadata.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>How do AI crawlers differ from search crawlers?</h2>
+      <p>
+        While both visit your site, their purposes and priorities are fundamentally different:
+      </p>
+      
+      <h3 style="font-size: 1.125rem; margin-top: 1.5rem; margin-bottom: 0.75rem;">Search Engine Crawlers (Googlebot, Bingbot)</h3>
+      <ul>
+        <li><strong>Goal:</strong> Index content to rank it in search results</li>
+        <li><strong>What they value:</strong> Keywords, backlinks, page authority</li>
+        <li><strong>Output:</strong> Ranking position (1-10 on SERPs)</li>
+        <li><strong>Frequency:</strong> Regular, predictable crawl schedules</li>
+      </ul>
+
+      <h3 style="font-size: 1.125rem; margin-top: 1.5rem; margin-bottom: 0.75rem;">AI Training Crawlers (GPTBot, Claude-Web, etc.)</h3>
+      <ul>
+        <li><strong>Goal:</strong> Extract knowledge to train language models OR ground real-time answers</li>
+        <li><strong>What they value:</strong> Clarity, structure, factual density, answerability</li>
+        <li><strong>Output:</strong> Whether you get cited in AI-generated answers</li>
+        <li><strong>Frequency:</strong> Less predictable; depends on model refresh cycles</li>
+      </ul>
+
+      <div class="highlight-box">
+        <p>
+          <strong>Key insight:</strong> AI crawlers prioritize <em>machine comprehension</em> over keyword matching. 
+          Content optimized for humans and structured for machines performs best.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>What is a "citation" in this context?</h2>
+      <p>
+        A <strong>citation</strong> occurs when an AI assistant attributes an answer, snippet, or recommendation 
+        to your domain—either directly or indirectly.
+      </p>
+      <p>
+        <strong>Direct citations</strong> explicitly mention your URL or brand:
+      </p>
+      <blockquote style="border-left: 4px solid var(--border); padding-left: 1rem; margin: 1rem 0; font-style: italic; color: var(--gray);">
+        "According to <strong>example.com</strong>, the best practice for X is..."
+      </blockquote>
+      <p>
+        <strong>Indirect citations</strong> use your content without explicit attribution (but still reflect your information):
+      </p>
+      <blockquote style="border-left: 4px solid var(--border); padding-left: 1rem; margin: 1rem 0; font-style: italic; color: var(--gray);">
+        "The process involves three steps: A, B, and C..." 
+        <span style="font-size: 0.875rem; display: block; margin-top: 0.5rem; color: #9ca3af;">
+          (where your page is the only source describing these specific steps)
+        </span>
+      </blockquote>
+      <p>
+        Optiview tracks both types by running targeted queries and analyzing which sources AI models cite.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Which AI crawlers does Optiview track?</h2>
+      <p>
+        We monitor visits from all major AI training and grounding bots:
+      </p>
+      <div class="bot-list">
+        <div class="bot-card">
+          <strong>GPTBot</strong>
+          <span>OpenAI / ChatGPT training crawler</span>
+        </div>
+        <div class="bot-card">
+          <strong>Claude-Web</strong>
+          <span>Anthropic Claude's web browsing agent</span>
+        </div>
+        <div class="bot-card">
+          <strong>PerplexityBot</strong>
+          <span>Perplexity AI search indexer</span>
+        </div>
+        <div class="bot-card">
+          <strong>CCBot</strong>
+          <span>Common Crawl (used by many AI companies for training)</span>
+        </div>
+        <div class="bot-card">
+          <strong>Google-Extended</strong>
+          <span>Google Gemini / Bard training</span>
+        </div>
+        <div class="bot-card">
+          <strong>Bytespider</strong>
+          <span>ByteDance / TikTok AI crawler</span>
+        </div>
+      </div>
+      <p style="margin-top: 1.5rem;">
+        <strong>Note:</strong> We respect your robots.txt. If you've blocked these bots, we'll detect that and 
+        alert you to potential visibility loss.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Can I increase my citations?</h2>
+      <p>
+        <strong>Yes! Citation frequency is largely controllable.</strong> Focus on these levers:
+      </p>
+      <ol>
+        <li>
+          <strong>Improve content clarity:</strong> AI models favor concise, factual answers over marketing fluff. 
+          Lead with clear statements, not vague value propositions.
+        </li>
+        <li>
+          <strong>Use question-answer formats:</strong> Structure content as Q&A pairs. This directly maps to 
+          how users query AI assistants.
+        </li>
+        <li>
+          <strong>Implement FAQ schema:</strong> <code>FAQPage</code> and <code>QAPage</code> JSON-LD markup 
+          signals to AI that your content is authoritative and structured.
+        </li>
+        <li>
+          <strong>Build authoritative references:</strong> Get cited by trusted sources (news, academic sites, 
+          industry publications). AI models weight citations from high-authority domains.
+        </li>
+        <li>
+          <strong>Ensure crawler access:</strong> Verify AI bots can crawl your site (check robots.txt and firewall rules).
+        </li>
+        <li>
+          <strong>Optimize for answerability:</strong> Every page should clearly answer at least one specific question.
+        </li>
+      </ol>
+      <div class="highlight-box">
+        <p>
+          <strong>Timeline:</strong> Citation changes lag by 2-8 weeks as AI models refresh their grounding data. 
+          Be patient and track improvements over time.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>Should I block AI crawlers?</h2>
+      <p>
+        <strong>Generally, no.</strong> Blocking AI crawlers prevents your content from appearing in AI search results—effectively 
+        making you invisible to a rapidly growing user base.
+      </p>
+      <p>
+        <strong>However, you might block them if:</strong>
+      </p>
+      <ul>
+        <li>You have proprietary content you don't want in AI training datasets</li>
+        <li>Your business model depends on users visiting your site (paywalls, ads)</li>
+        <li>Your server infrastructure can't handle the extra crawler traffic</li>
+        <li>You're in a highly regulated industry with strict data usage policies</li>
+      </ul>
+      <p>
+        <strong>How to block:</strong> Add to your <code>robots.txt</code>:
+      </p>
+      <pre style="background: #f1f5f9; padding: 1rem; border-radius: 8px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.875rem;">
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /</pre>
+      <div class="highlight-box">
+        <p>
+          <strong>Our recommendation:</strong> Allow AI crawlers unless you have a specific business reason not to. 
+          The visibility benefits typically outweigh the costs.
+        </p>
+      </div>
+    </div>
+
+    <div class="related-links">
+      <h3>Related Topics</h3>
+      <a href="/faq/about.html">→ What is AI Visibility?</a>
+      <a href="/faq/structured-data.html">→ Implementing FAQ Schema</a>
+      <a href="/faq/improving-score.html">→ Increase Your Citation Rate</a>
+      <a href="/faq/privacy.html">→ Data Collection & Privacy</a>
+      <a href="https://app.optiview.ai">→ Test Your Citations</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/faq/">Knowledge Base</a> • 
+      <a href="/methodology">Methodology</a> • 
+      <a href="/privacy">Privacy</a>
+    </p>
+  </footer>
+</body>
+</html>
+

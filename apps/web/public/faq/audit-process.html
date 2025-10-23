@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Audit Process & Scoring Methodology | Optiview</title>
+  <meta name="description" content="Understand how Optiview audits work, what the Visibility Score measures across 36 diagnostic criteria, and how to interpret your technical, authority, and citation scores.">
+  <link rel="canonical" href="https://optiview.ai/faq/audit-process.html" />
+  
+  <!-- FAQPage Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What happens when I run an audit?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We crawl your site's pages, analyze technical foundations (titles, structured data, schema, crawlability), answerability (clarity, authority, and question-based content), and citation signals from AI models including ChatGPT, Claude, Perplexity, and Brave AI."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What are the main components of the Visibility Score?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The score combines: Technical Foundations (30%) covering titles, metadata, canonical structure; Answerability (25%) for clear, factual, question-based copy; Authority Signals (20%) from domain mentions and trust sources; Citation Coverage (15%) measuring AI reference frequency; and Structured Data & Schema (10%) for JSON-LD and FAQ markup."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is a good Visibility Score?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "90-100 is Excellent (frequently cited and well-structured), 70-89 is Strong (well-optimized with room for depth), 50-69 is Average (needs clearer data or crawl structure), and below 50 indicates low visibility or limited AI crawl access."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 900px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .breadcrumb {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .breadcrumb a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    .faq-item {
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .faq-item h2 {
+      font-size: 1.5rem;
+      line-height: 1.3;
+      margin-bottom: 1rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+    .faq-item p {
+      color: #4b5563;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    .faq-item ul, .faq-item ol {
+      margin: 1rem 0 1rem 1.5rem;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+    .faq-item li {
+      margin-bottom: 0.5rem;
+    }
+    .faq-item strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-left: 4px solid var(--purple);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    .score-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-right: 0.5rem;
+    }
+    .score-excellent {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .score-strong {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .score-average {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .score-low {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .related-links {
+      background: #f8fafc;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-top: 3rem;
+    }
+    .related-links h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .related-links a {
+      display: block;
+      color: var(--purple);
+      text-decoration: none;
+      padding: 0.5rem 0;
+      font-weight: 500;
+    }
+    .related-links a:hover { text-decoration: underline; }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/faq/">Knowledge Base</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/faq/">← Knowledge Base</a>
+    </div>
+
+    <h1>Audit Process & Scoring</h1>
+    <p class="subtitle">
+      Understand how our audits work, what the Visibility Score measures, and how to interpret 
+      your results across 36 diagnostic criteria.
+    </p>
+
+    <div class="faq-item">
+      <h2>What happens when I run an audit?</h2>
+      <p>
+        When you run an audit, Optiview performs a comprehensive analysis of your site's AI readiness:
+      </p>
+      <ol>
+        <li><strong>Discovery:</strong> We crawl your site's key pages (up to 120 by default), prioritizing important content from your sitemap and internal links</li>
+        <li><strong>Technical Analysis:</strong> We examine titles, metadata, canonical tags, mobile optimization, language tags, and crawl policies</li>
+        <li><strong>Structural Assessment:</strong> We analyze heading hierarchy, internal linking, FAQ presence, and entity graph completeness</li>
+        <li><strong>Content Evaluation:</strong> We check answerability, clarity, and question-based content structure</li>
+        <li><strong>Authority Signals:</strong> We verify organization schema, logo presence, and trust indicators</li>
+        <li><strong>Citation Testing:</strong> We query AI models (ChatGPT, Claude, Perplexity, Brave AI) with industry-specific questions to see if your content gets cited</li>
+        <li><strong>Scoring & Recommendations:</strong> We calculate your composite score and prioritize fixes by impact</li>
+      </ol>
+      <p>
+        <strong>Typical completion time:</strong> 30-60 seconds
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>What are the main components of the Visibility Score?</h2>
+      <p>
+        Your <strong>Optiview Composite Score</strong> (0-100) combines 36 diagnostic criteria across 6 categories:
+      </p>
+      
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.75rem;">1. Technical Foundations (30%)</h3>
+      <ul>
+        <li>Title tag quality and brand presence</li>
+        <li>Meta description completeness</li>
+        <li>Canonical URL correctness</li>
+        <li>Mobile viewport configuration</li>
+        <li>Language and region tags</li>
+        <li>Open Graph tag coverage</li>
+      </ul>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.75rem;">2. Structure & Organization (25%)</h3>
+      <ul>
+        <li>H1 presence and uniqueness</li>
+        <li>Semantic heading hierarchy</li>
+        <li>Internal linking health</li>
+        <li>H2 coverage ratio</li>
+        <li>Entity graph completeness</li>
+      </ul>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.75rem;">3. Content & Clarity (20%)</h3>
+      <ul>
+        <li>Answer-first hero sections</li>
+        <li>FAQ presence and structure</li>
+        <li>Contact CTA placement</li>
+        <li>Related questions coverage</li>
+        <li>Topic depth and semantic richness</li>
+      </ul>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.75rem;">4. Authority & Trust (15%)</h3>
+      <ul>
+        <li>Organization entity graph (JSON-LD)</li>
+        <li>Logo and brand signals</li>
+        <li>Social profile linking (sameAs)</li>
+      </ul>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.75rem;">5. Crawl & Discoverability (10%)</h3>
+      <ul>
+        <li>Noindex/robots configuration</li>
+        <li>Sitemap availability and quality</li>
+        <li>AI bot access policies</li>
+      </ul>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.75rem;">6. Performance & Experience (10%)</h3>
+      <ul>
+        <li>Core Web Vitals optimization hints</li>
+        <li>Mobile responsiveness</li>
+        <li>Page speed (LCP)</li>
+      </ul>
+
+      <div class="highlight-box">
+        <p>
+          <strong>How it's calculated:</strong> Each of the 36 criteria is scored 0-100 based on detected 
+          attributes. Criteria are then weighted by category importance and impact level (High/Medium/Low) 
+          to produce your composite score.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>What is a good Visibility Score?</h2>
+      <p>
+        Scores are calibrated across thousands of audits. Here's how to interpret yours:
+      </p>
+      
+      <p style="margin-top: 1.5rem;">
+        <span class="score-badge score-excellent">90–100</span>
+        <strong>Excellent</strong>
+      </p>
+      <p style="margin-left: 2rem; margin-bottom: 1.5rem;">
+        Frequently cited and well-structured. Your content is highly discoverable by AI models. 
+        Focus on maintaining quality and expanding coverage to new topics.
+      </p>
+
+      <p>
+        <span class="score-badge score-strong">70–89</span>
+        <strong>Strong</strong>
+      </p>
+      <p style="margin-left: 2rem; margin-bottom: 1.5rem;">
+        Well-optimized with room for depth or authority improvements. You're competitive but may lose 
+        citations to sites with better structure or more comprehensive answers.
+      </p>
+
+      <p>
+        <span class="score-badge score-average">50–69</span>
+        <strong>Average</strong>
+      </p>
+      <p style="margin-left: 2rem; margin-bottom: 1.5rem;">
+        Needs clearer data or improved crawl structure. AI models can find your content but may struggle 
+        to interpret or trust it. Focus on structured data, schema, and answerability.
+      </p>
+
+      <p>
+        <span class="score-badge score-low">Below 50</span>
+        <strong>Low Visibility</strong>
+      </p>
+      <p style="margin-left: 2rem; margin-bottom: 1.5rem;">
+        Limited AI crawl access or significant technical issues. Your content is largely invisible to 
+        LLMs. Address critical technical foundations first.
+      </p>
+
+      <div class="highlight-box">
+        <p>
+          <strong>Context matters:</strong> A 75 score for a new startup is excellent. The same score 
+          for an established publisher might indicate missed opportunities. Compare against competitors 
+          in your industry and track improvement over time.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>How often should I re-audit?</h2>
+      <p>
+        <strong>Recommended frequency:</strong> Monthly, or after major content updates.
+      </p>
+      <p>
+        Visibility scores can shift as:
+      </p>
+      <ul>
+        <li>AI models refresh their training data (typically monthly or quarterly)</li>
+        <li>New AI assistants emerge with different citation preferences</li>
+        <li>Competitors improve their own AI optimization</li>
+        <li>You publish new content or update existing pages</li>
+      </ul>
+      <p>
+        <strong>Pro tip:</strong> Run an audit before and after implementing fixes to measure the impact 
+        of your optimizations.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>How do I interpret "Preview" vs "Production" checks?</h2>
+      <p>
+        Our scoring system includes two types of criteria:
+      </p>
+      <p>
+        <strong>Production Checks:</strong> Fully validated criteria that directly impact your composite 
+        score. These are stable, well-tested diagnostics.
+      </p>
+      <p>
+        <strong>Preview Checks:</strong> Experimental criteria being validated but not yet affecting your 
+        score. We show you the results to help you prepare for future scoring changes.
+      </p>
+      <div class="highlight-box">
+        <p>
+          <strong>Why we do this:</strong> AI visibility is an evolving field. Preview checks let you see 
+          emerging best practices before they become industry standard—giving you a competitive advantage.
+        </p>
+      </div>
+    </div>
+
+    <div class="related-links">
+      <h3>Related Topics</h3>
+      <a href="/faq/about.html">→ What is AI Visibility?</a>
+      <a href="/faq/structured-data.html">→ Understanding Structured Data</a>
+      <a href="/faq/improving-score.html">→ How to Improve Your Score</a>
+      <a href="https://app.optiview.ai/score-guide">→ View Complete Score Guide</a>
+      <a href="https://app.optiview.ai">→ Run an Audit</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/faq/">Knowledge Base</a> • 
+      <a href="/methodology">Methodology</a> • 
+      <a href="/privacy">Privacy</a>
+    </p>
+  </footer>
+</body>
+</html>
+

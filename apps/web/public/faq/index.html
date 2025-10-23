@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Frequently Asked Questions | Optiview AI Visibility Platform</title>
+  <meta name="description" content="Complete guide to AI Visibility, AEO, GEO, and how Optiview helps your brand get discovered, cited, and trusted by large language models and AI assistants.">
+  <link rel="canonical" href="https://optiview.ai/faq/" />
+  
+  <!-- FAQPage Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is AI Visibility?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "AI Visibility measures how often and how accurately AI systems reference your brand, products, or content when generating answers for users. Just as SEO measures ranking in Google, AI Visibility measures recognition in LLMs like ChatGPT, Claude, Perplexity, and Brave AI."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How is Optiview different from traditional SEO tools?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Traditional SEO tools focus on search engine ranking pages and keywords. Optiview measures whether your content is being used or cited in AI responses. We audit for answerability, structured data, and citation coverage across AI models."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What is the difference between AEO and GEO?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "AEO (Answer Engine Optimization) focuses on optimizing for pure AI answer engines like ChatGPT and Perplexity. GEO (Generative Engine Optimization) targets traditional search engines with AI features like Google AI Overviews."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 1200px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .menu-toggle {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+    }
+    .menu-toggle span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: var(--gray);
+      transition: all 0.3s;
+    }
+    @media (max-width: 768px) {
+      nav {
+        position: fixed;
+        top: 65px;
+        right: -100%;
+        width: 250px;
+        height: calc(100vh - 65px);
+        background: #fff;
+        flex-direction: column;
+        gap: 0;
+        padding: 1rem 0;
+        box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        transition: right 0.3s;
+        align-items: stretch;
+      }
+      nav.active { right: 0; }
+      nav a {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .menu-toggle { display: flex; }
+    }
+    .hero {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 4rem 1.5rem 2rem;
+      text-align: center;
+    }
+    h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      max-width: 800px;
+      margin: 0 auto 3rem;
+    }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 1.5rem 4rem;
+    }
+    .faq-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+    .faq-card {
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: 16px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+      position: relative;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .faq-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 16px;
+      padding: 2px;
+      background: var(--gradient);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .faq-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15);
+    }
+    .faq-card:hover::before {
+      opacity: 1;
+    }
+    .faq-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    .faq-card h2 {
+      font-size: 1.5rem;
+      line-height: 1.3;
+      margin-bottom: 0.75rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+    .faq-card p {
+      color: #4b5563;
+      line-height: 1.7;
+      font-size: 0.9375rem;
+      margin-bottom: 1rem;
+    }
+    .faq-card .link-arrow {
+      color: var(--purple);
+      font-weight: 600;
+      font-size: 0.9375rem;
+    }
+    .intro-box {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-radius: 16px;
+      padding: 2.5rem;
+      margin-bottom: 3rem;
+      border: 2px solid rgba(102, 126, 234, 0.1);
+    }
+    .intro-box h2 {
+      font-size: 1.75rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .intro-box p {
+      color: #4b5563;
+      line-height: 1.8;
+      font-size: 1rem;
+    }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+    footer nav {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <button class="menu-toggle" onclick="document.querySelector('nav').classList.toggle('active')" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="https://app.optiview.ai/score-guide">Score Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/docs/citations.html">Citations Guide</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>AI Visibility Knowledge Base</h1>
+      <p class="subtitle">
+        Everything you need to understand, measure, and improve your visibility to large language models, 
+        AI crawlers, and answer engines. From foundational concepts to advanced optimization strategies.
+      </p>
+    </section>
+
+    <div class="container">
+      <div class="intro-box">
+        <h2>Welcome to the Optiview Knowledge Base</h2>
+        <p>
+          As generative AI becomes the default way people find information, understanding how LLMs discover, 
+          interpret, and cite your content is critical. This knowledge base provides deep, actionable guidance 
+          on AI Visibility—helping you future-proof your brand's discoverability in the age of ChatGPT, 
+          Perplexity, Claude, and beyond.
+        </p>
+      </div>
+
+      <div class="faq-grid">
+        <a href="/faq/about.html" class="faq-card">
+          <span class="faq-icon">🧭</span>
+          <h2>About Optiview & AI Visibility</h2>
+          <p>
+            Understand what AI Visibility means, how Optiview measures it, and why it matters for your brand's 
+            future in the generative AI era.
+          </p>
+          <span class="link-arrow">Learn the fundamentals →</span>
+        </a>
+
+        <a href="/faq/audit-process.html" class="faq-card">
+          <span class="faq-icon">🧩</span>
+          <h2>Audit Process & Scoring</h2>
+          <p>
+            Deep dive into how our audits work, what the Visibility Score measures, and how to interpret 
+            your results across technical, authority, and citation dimensions.
+          </p>
+          <span class="link-arrow">See how we score →</span>
+        </a>
+
+        <a href="/faq/citations.html" class="faq-card">
+          <span class="faq-icon">🔍</span>
+          <h2>AI Citations & Crawlers</h2>
+          <p>
+            Learn how AI assistants source and reference web content, which crawlers we track, and what 
+            citations mean for your visibility.
+          </p>
+          <span class="link-arrow">Understand citations →</span>
+        </a>
+
+        <a href="/faq/structured-data.html" class="faq-card">
+          <span class="faq-icon">⚙️</span>
+          <h2>Structured Data & Schema</h2>
+          <p>
+            Master the schema markup that makes your content machine-readable. Learn which types matter 
+            most and how to implement them correctly.
+          </p>
+          <span class="link-arrow">Implement schema →</span>
+        </a>
+
+        <a href="/faq/improving-score.html" class="faq-card">
+          <span class="faq-icon">📈</span>
+          <h2>Improving Your Score</h2>
+          <p>
+            Convert audit findings into action. Discover which fixes have the biggest impact and how 
+            long it takes to see changes in AI visibility.
+          </p>
+          <span class="link-arrow">Get optimization tips →</span>
+        </a>
+
+        <a href="/faq/use-cases.html" class="faq-card">
+          <span class="faq-icon">🧪</span>
+          <h2>Use Cases & Examples</h2>
+          <p>
+            See real-world applications across e-commerce, healthcare, publishing, and B2B SaaS. 
+            Learn what works for sites like yours.
+          </p>
+          <span class="link-arrow">See examples →</span>
+        </a>
+
+        <a href="/faq/privacy.html" class="faq-card">
+          <span class="faq-icon">🔒</span>
+          <h2>Privacy & Data Handling</h2>
+          <p>
+            Understand our data sources, accuracy standards, and privacy practices. GDPR compliance, 
+            data storage, and transparency.
+          </p>
+          <span class="link-arrow">Review our practices →</span>
+        </a>
+
+        <a href="/faq/glossary.html" class="faq-card">
+          <span class="faq-icon">📚</span>
+          <h2>Glossary</h2>
+          <p>
+            Clear definitions of AI Visibility, AEO, GEO, answerability, citation coverage, and other 
+            key terms used throughout our platform.
+          </p>
+          <span class="link-arrow">Browse definitions →</span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <nav>
+      <a href="https://app.optiview.ai">Run Audit</a>
+      <a href="https://app.optiview.ai/score-guide">Score Guide</a>
+      <a href="/faq/">Knowledge Base</a>
+      <a href="/methodology">Methodology</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/bot">Bot Info</a>
+    </nav>
+  </footer>
+</body>
+</html>
+

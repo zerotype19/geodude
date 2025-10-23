@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy, Data Sources & Accuracy | Optiview</title>
+  <meta name="description" content="Understand Optiview's data sources, accuracy standards, and privacy practices. GDPR compliance, data storage policies, and transparency in AI visibility measurement.">
+  <link rel="canonical" href="https://optiview.ai/faq/privacy.html" />
+  
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 900px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .breadcrumb {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .breadcrumb a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    .faq-item {
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .faq-item h2 {
+      font-size: 1.5rem;
+      line-height: 1.3;
+      margin-bottom: 1rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+    .faq-item p {
+      color: #4b5563;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    .faq-item ul {
+      margin: 1rem 0 1rem 1.5rem;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+    .faq-item strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-left: 4px solid var(--purple);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    .related-links {
+      background: #f8fafc;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-top: 3rem;
+    }
+    .related-links h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .related-links a {
+      display: block;
+      color: var(--purple);
+      text-decoration: none;
+      padding: 0.5rem 0;
+      font-weight: 500;
+    }
+    .related-links a:hover { text-decoration: underline; }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/faq/">Knowledge Base</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/faq/">← Knowledge Base</a>
+    </div>
+
+    <h1>Privacy & Data Handling</h1>
+    <p class="subtitle">
+      Understand our data sources, accuracy standards, and privacy practices. We're transparent 
+      about what we collect, how we use it, and how we protect it.
+    </p>
+
+    <div class="faq-item">
+      <h2>How does Optiview collect citation data?</h2>
+      <p>
+        We use multiple methods to measure AI visibility:
+      </p>
+      <ul>
+        <li><strong>Direct API integrations:</strong> Brave AI, Perplexity (where available)</li>
+        <li><strong>Public query sampling:</strong> We run targeted queries against AI assistants and analyze which sources they cite</li>
+        <li><strong>Structured output parsing:</strong> Extracting citation metadata from AI-generated responses</li>
+        <li><strong>Crawl log analysis:</strong> Monitoring which AI training bots visit your site</li>
+      </ul>
+      <p>
+        <strong>Important:</strong> We never scrape or violate terms of service. All data collection 
+        respects rate limits and API guidelines.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Do you store my site data?</h2>
+      <p>
+        <strong>We store audit results, not private content.</strong>
+      </p>
+      <p>
+        <strong>What we store:</strong>
+      </p>
+      <ul>
+        <li>Page URLs and titles (publicly accessible information)</li>
+        <li>Audit scores and diagnostic results</li>
+        <li>Citation counts and sources</li>
+        <li>Structured data presence (yes/no, not the actual schema)</li>
+        <li>Technical check results (H1 count, meta tags present, etc.)</li>
+      </ul>
+      <p>
+        <strong>What we DON'T store:</strong>
+      </p>
+      <ul>
+        <li>Full page HTML or content</li>
+        <li>User personal information (PII)</li>
+        <li>Proprietary business data</li>
+        <li>Analytics or behavioral data beyond audit requests</li>
+      </ul>
+      <div class="highlight-box">
+        <p>
+          <strong>Data retention:</strong> Audit results are stored for 90 days. You can delete them 
+          anytime from your dashboard. After 90 days, they're automatically purged.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>Is Optiview GDPR compliant?</h2>
+      <p>
+        <strong>Yes.</strong> Our privacy-first design ensures compliance:
+      </p>
+      <ul>
+        <li><strong>Minimal data collection:</strong> We only collect what's necessary for audits</li>
+        <li><strong>No tracking cookies:</strong> We don't use third-party analytics or tracking pixels</li>
+        <li><strong>EU data residency:</strong> Infrastructure runs on Cloudflare's global edge network with EU data centers</li>
+        <li><strong>Right to deletion:</strong> Users can delete all audit data via dashboard</li>
+        <li><strong>Transparent processing:</strong> Full disclosure of data collection in our <a href="/privacy" style="color: var(--purple);">Privacy Policy</a></li>
+      </ul>
+      <p>
+        <strong>For site owners:</strong> Running an Optiview audit on your site doesn't require consent 
+        banners, as we only analyze publicly available data.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Are visibility scores 100% accurate?</h2>
+      <p>
+        <strong>No measurement is perfect, but we're highly accurate within known constraints.</strong>
+      </p>
+      <p>
+        <strong>What we measure reliably:</strong>
+      </p>
+      <ul>
+        <li>Technical foundations (titles, schema, canonicals): 99%+ accuracy</li>
+        <li>Structural analysis (headings, links): 98%+ accuracy</li>
+        <li>Citation detection for queries we test: 95%+ accuracy</li>
+      </ul>
+      <p>
+        <strong>Known limitations:</strong>
+      </p>
+      <ul>
+        <li>We sample a subset of possible queries (not exhaustive coverage)</li>
+        <li>AI models evolve; scores reflect current behavior, not future changes</li>
+        <li>Citation attribution can be ambiguous (indirect vs. direct)</li>
+        <li>Some AI models don't expose citation metadata publicly</li>
+      </ul>
+      <div class="highlight-box">
+        <p>
+          <strong>Accuracy improves over time:</strong> As AI models expose more metadata, our measurements 
+          become more precise. We continuously update our methods.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>How does Optiview respect robots.txt?</h2>
+      <p>
+        <strong>We strictly follow robots.txt rules.</strong>
+      </p>
+      <p>
+        Our audit bot (<code>OptiviewAuditBot/1.0</code>):
+      </p>
+      <ul>
+        <li>Checks robots.txt before crawling any page</li>
+        <li>Obeys all <code>Disallow</code> directives</li>
+        <li>Respects <code>Crawl-delay</code> settings</li>
+        <li>Rate-limited to 1 request per second (maximum)</li>
+        <li>Clearly identifies itself via User-Agent</li>
+      </ul>
+      <p>
+        <strong>To block our bot:</strong> Add to robots.txt:
+      </p>
+      <pre style="background: #f1f5f9; padding: 1rem; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.875rem; margin: 1.5rem 0;">
+User-agent: OptiviewAuditBot
+Disallow: /</pre>
+      <p>
+        <strong>Note:</strong> Blocking our bot prevents audits but doesn't affect your AI visibility to 
+        other crawlers (GPTBot, Claude-Web, etc.).
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Do you share data with third parties?</h2>
+      <p>
+        <strong>No.</strong> We never sell or share user data with third parties.
+      </p>
+      <p>
+        <strong>The only exceptions:</strong>
+      </p>
+      <ul>
+        <li><strong>Cloudflare (infrastructure provider):</strong> Handles data storage and delivery. They're GDPR-compliant and don't access user data.</li>
+        <li><strong>AI model APIs:</strong> We send queries to Brave AI, Perplexity, etc., but only generic test queries, never your proprietary information.</li>
+        <li><strong>Legal requirements:</strong> If required by law (e.g., valid subpoena), though this has never happened.</li>
+      </ul>
+      <div class="highlight-box">
+        <p>
+          <strong>Your data is yours.</strong> We're a tool for measuring AI visibility, not a data broker.
+        </p>
+      </div>
+    </div>
+
+    <div class="related-links">
+      <h3>Related Topics</h3>
+      <a href="/faq/about.html">→ What is Optiview?</a>
+      <a href="/faq/citations.html">→ How We Track Citations</a>
+      <a href="/faq/audit-process.html">→ What We Measure</a>
+      <a href="/privacy">→ Full Privacy Policy</a>
+      <a href="/terms">→ Terms of Service</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/faq/">Knowledge Base</a> • 
+      <a href="/methodology">Methodology</a> • 
+      <a href="/privacy">Privacy</a>
+    </p>
+  </footer>
+</body>
+</html>
+

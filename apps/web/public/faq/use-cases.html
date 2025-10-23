@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Use Cases & Real-World Examples | Optiview AI Visibility</title>
+  <meta name="description" content="See how e-commerce, healthcare, publishing, and B2B SaaS companies use Optiview to improve AI visibility, increase citations, and drive discovery in ChatGPT, Claude, and Perplexity.">
+  <link rel="canonical" href="https://optiview.ai/faq/use-cases.html" />
+  
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 900px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .breadcrumb {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .breadcrumb a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    .use-case {
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .use-case h2 {
+      font-size: 1.5rem;
+      line-height: 1.3;
+      margin-bottom: 0.5rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+    .use-case .industry {
+      color: var(--purple);
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    .use-case p {
+      color: #4b5563;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    .use-case ul {
+      margin: 1rem 0 1rem 1.5rem;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+    .use-case strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-left: 4px solid var(--purple);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .result-card {
+      background: #f8fafc;
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .result-card .number {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--purple);
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+    .result-card .label {
+      font-size: 0.875rem;
+      color: var(--gray);
+    }
+    .related-links {
+      background: #f8fafc;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-top: 3rem;
+    }
+    .related-links h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .related-links a {
+      display: block;
+      color: var(--purple);
+      text-decoration: none;
+      padding: 0.5rem 0;
+      font-weight: 500;
+    }
+    .related-links a:hover { text-decoration: underline; }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/faq/">Knowledge Base</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/faq/">← Knowledge Base</a>
+    </div>
+
+    <h1>Use Cases & Examples</h1>
+    <p class="subtitle">
+      See how real companies across industries use Optiview to improve AI visibility, 
+      increase citations, and drive discovery.
+    </p>
+
+    <div class="use-case">
+      <span class="industry">E-Commerce</span>
+      <h2>Product FAQs Drive Perplexity Citations</h2>
+      <p>
+        <strong>Challenge:</strong> A mid-sized e-commerce brand was getting organic traffic but zero 
+        citations in AI-powered shopping queries.
+      </p>
+      <p>
+        <strong>Solution:</strong> Added FAQ schema to product pages, implemented HowTo structured data 
+        for usage guides, and rewrote product descriptions to answer common questions upfront.
+      </p>
+      <div class="results-grid">
+        <div class="result-card">
+          <span class="number">3.2x</span>
+          <span class="label">Citation increase</span>
+        </div>
+        <div class="result-card">
+          <span class="number">18%</span>
+          <span class="label">Traffic from AI referrals</span>
+        </div>
+        <div class="result-card">
+          <span class="number">42</span>
+          <span class="label">Days to see impact</span>
+        </div>
+      </div>
+      <div class="highlight-box">
+        <p>
+          <strong>Key insight:</strong> Comparison pages ("X vs Y") with structured data got cited most 
+          frequently. AI models favor head-to-head analysis for shopping queries.
+        </p>
+      </div>
+    </div>
+
+    <div class="use-case">
+      <span class="industry">Healthcare</span>
+      <h2>Authoritative Content Earns Model Trust</h2>
+      <p>
+        <strong>Challenge:</strong> A healthcare provider had comprehensive content but AI models cited 
+        WebMD and Mayo Clinic instead.
+      </p>
+      <p>
+        <strong>Solution:</strong> Added Organization schema with medical credentials, implemented 
+        MedicalWebPage schema, cited peer-reviewed sources, and restructured content as Q&A with 
+        expert attribution.
+      </p>
+      <div class="results-grid">
+        <div class="result-card">
+          <span class="number">5x</span>
+          <span class="label">More AI citations</span>
+        </div>
+        <div class="result-card">
+          <span class="number">67%</span>
+          <span class="label">Visibility score increase</span>
+        </div>
+        <div class="result-card">
+          <span class="number">8</span>
+          <span class="label">Weeks to authority gains</span>
+        </div>
+      </div>
+      <div class="highlight-box">
+        <p>
+          <strong>Key insight:</strong> Medical credentials in Organization schema and clear expert 
+          attribution dramatically improved trust signals.
+        </p>
+      </div>
+    </div>
+
+    <div class="use-case">
+      <span class="industry">Publishing</span>
+      <h2>FAQ and HowTo Formats Drive ChatGPT Inclusion</h2>
+      <p>
+        <strong>Challenge:</strong> A B2B publisher had high-quality content but inconsistent AI citations.
+      </p>
+      <p>
+        <strong>Solution:</strong> Converted 50+ articles to FAQ format, added HowTo schema for tutorials, 
+        implemented Article schema with author attribution, and created "Quick Answer" sections at the 
+        top of each post.
+      </p>
+      <div class="results-grid">
+        <div class="result-card">
+          <span class="number">89%</span>
+          <span class="label">Of articles now cited</span>
+        </div>
+        <div class="result-card">
+          <span class="number">2.1x</span>
+          <span class="label">AI-referred traffic</span>
+        </div>
+        <div class="result-card">
+          <span class="number">30</span>
+          <span class="label">Days to see results</span>
+        </div>
+      </div>
+      <div class="highlight-box">
+        <p>
+          <strong>Key insight:</strong> "Answer first" formatting (leading with conclusion before 
+          context) matched how AI models extract information.
+        </p>
+      </div>
+    </div>
+
+    <div class="use-case">
+      <span class="industry">B2B SaaS</span>
+      <h2>Technical Documentation Boosts "Answer Coverage"</h2>
+      <p>
+        <strong>Challenge:</strong> A SaaS company had comprehensive docs but AI models cited competitors 
+        when users asked "how to" questions.
+      </p>
+      <p>
+        <strong>Solution:</strong> Restructured documentation with HowTo schema, added code examples in 
+        FAQPage format, implemented SoftwareApplication schema for the product, and created integration 
+        guides as Q&A.
+      </p>
+      <div class="results-grid">
+        <div class="result-card">
+          <span class="number">4.5x</span>
+          <span class="label">Developer query citations</span>
+        </div>
+        <div class="result-card">
+          <span class="number">34%</span>
+          <span class="label">Docs traffic from AI</span>
+        </div>
+        <div class="result-card">
+          <span class="number">21</span>
+          <span class="label">Days to see gains</span>
+        </div>
+      </div>
+      <div class="highlight-box">
+        <p>
+          <strong>Key insight:</strong> Code examples with clear explanations got cited most. AI models 
+          favor concrete implementation guidance over abstract concepts.
+        </p>
+      </div>
+    </div>
+
+    <div class="use-case">
+      <h2>Common Patterns Across Industries</h2>
+      <p>
+        While implementation varies by industry, successful companies share these traits:
+      </p>
+      <ul>
+        <li><strong>Question-based content structure:</strong> Every page answers at least one specific question</li>
+        <li><strong>Schema markup adoption:</strong> 80%+ of pages have relevant structured data</li>
+        <li><strong>Answer-first formatting:</strong> Clear conclusions before supporting details</li>
+        <li><strong>AI crawler access:</strong> No robots.txt blocks on training bots</li>
+        <li><strong>Entity graph completeness:</strong> Organization schema with logos and social profiles</li>
+        <li><strong>Internal content clusters:</strong> Related pages linked together with clear hierarchy</li>
+      </ul>
+    </div>
+
+    <div class="related-links">
+      <h3>Related Topics</h3>
+      <a href="/faq/about.html">→ What is AI Visibility?</a>
+      <a href="/faq/improving-score.html">→ How to Improve Your Score</a>
+      <a href="/faq/structured-data.html">→ Implementing Schema Markup</a>
+      <a href="https://app.optiview.ai">→ Audit Your Site</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/faq/">Knowledge Base</a> • 
+      <a href="/methodology">Methodology</a> • 
+      <a href="/privacy">Privacy</a>
+    </p>
+  </footer>
+</body>
+</html>
+

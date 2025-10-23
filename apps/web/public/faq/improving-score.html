@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How to Improve Your AI Visibility Score | Optiview</title>
+  <meta name="description" content="Convert audit findings into action. Discover which fixes have the biggest impact on AI visibility and how long it takes to see changes in citations and rankings.">
+  <link rel="canonical" href="https://optiview.ai/faq/improving-score.html" />
+  
+  <!-- FAQPage Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Which fixes have the biggest impact on AI visibility?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The highest-impact fixes are: 1) Improve title clarity and brand presence, 2) Add FAQ or HowTo structured data, 3) Write concise question-based content, 4) Reduce duplicate H1s and canonical mismatches, 5) Secure domain mentions on authoritative sources."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How long until I see changes in AI citations?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "AI models refresh irregularly, typically every 2-8 weeks. Expect lag before new citations appear. Site-level improvements compound over time."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 900px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .breadcrumb {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .breadcrumb a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    .faq-item {
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .faq-item h2 {
+      font-size: 1.5rem;
+      line-height: 1.3;
+      margin-bottom: 1rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+    .faq-item p {
+      color: #4b5563;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    .faq-item ul, .faq-item ol {
+      margin: 1rem 0 1rem 1.5rem;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+    .faq-item li {
+      margin-bottom: 0.75rem;
+    }
+    .faq-item strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-left: 4px solid var(--purple);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    .impact-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-left: 0.5rem;
+    }
+    .impact-high {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .impact-medium {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .impact-low {
+      background: #e0e7ff;
+      color: #3730a3;
+    }
+    .related-links {
+      background: #f8fafc;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-top: 3rem;
+    }
+    .related-links h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .related-links a {
+      display: block;
+      color: var(--purple);
+      text-decoration: none;
+      padding: 0.5rem 0;
+      font-weight: 500;
+    }
+    .related-links a:hover { text-decoration: underline; }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/faq/">Knowledge Base</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/faq/">← Knowledge Base</a>
+    </div>
+
+    <h1>Improving Your Score</h1>
+    <p class="subtitle">
+      Convert audit findings into action. Discover which fixes have the biggest impact and how 
+      to prioritize improvements for maximum AI visibility gains.
+    </p>
+
+    <div class="faq-item">
+      <h2>Which fixes have the biggest impact?</h2>
+      <p>
+        Not all optimizations are created equal. Focus on these <strong>high-leverage improvements</strong> 
+        first:
+      </p>
+      
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.5rem;">
+        1. Improve title clarity and brand presence
+        <span class="impact-badge impact-high">HIGH IMPACT</span>
+      </h3>
+      <p>
+        <strong>Why:</strong> Titles are the first thing AI models parse. Clear, descriptive titles with 
+        your brand name improve entity recognition by 40-60%.
+      </p>
+      <p>
+        <strong>Action:</strong> Ensure every page has a unique, descriptive title under 65 characters that 
+        includes your brand. Format: "Primary Topic | Brand Name"
+      </p>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.5rem;">
+        2. Add FAQ or HowTo structured data
+        <span class="impact-badge impact-high">HIGH IMPACT</span>
+      </h3>
+      <p>
+        <strong>Why:</strong> FAQPage schema directly maps to how users query AI assistants. Pages with 
+        FAQ markup get cited 2-3x more often.
+      </p>
+      <p>
+        <strong>Action:</strong> Convert your existing FAQ content to JSON-LD FAQPage schema. Even 3-5 
+        questions make a difference.
+      </p>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.5rem;">
+        3. Write concise, question-based content
+        <span class="impact-badge impact-high">HIGH IMPACT</span>
+      </h3>
+      <p>
+        <strong>Why:</strong> AI models favor content that directly answers questions. "Answer first" 
+        formatting dramatically improves citation likelihood.
+      </p>
+      <p>
+        <strong>Action:</strong> Lead every page/section with a clear answer or value proposition in the 
+        first 2-3 sentences. Avoid vague marketing copy.
+      </p>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.5rem;">
+        4. Fix duplicate H1s and canonical issues
+        <span class="impact-badge impact-medium">MEDIUM IMPACT</span>
+      </h3>
+      <p>
+        <strong>Why:</strong> Duplicate H1 tags confuse AI models about your page's primary topic. Correct 
+        canonicals prevent content dilution.
+      </p>
+      <p>
+        <strong>Action:</strong> Ensure every page has exactly one H1. Set canonical tags to point to the 
+        preferred URL version.
+      </p>
+
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.5rem;">
+        5. Build domain mentions on authoritative sources
+        <span class="impact-badge impact-medium">MEDIUM IMPACT</span>
+      </h3>
+      <p>
+        <strong>Why:</strong> AI models weight citations from high-authority domains (news, academic, 
+        government). Being mentioned alongside trusted sources boosts your credibility.
+      </p>
+      <p>
+        <strong>Action:</strong> Pursue press coverage, guest posts on industry publications, and partnerships 
+        that result in natural mentions.
+      </p>
+
+      <div class="highlight-box">
+        <p>
+          <strong>Pro tip:</strong> Address High impact issues first. A single high-impact fix can improve 
+          your score more than 10 low-impact ones. Use your audit's "Fix First" section to prioritize.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>How long until I see changes?</h2>
+      <p>
+        <strong>Realistic timeline:</strong> 2-8 weeks for most improvements.
+      </p>
+      <p>
+        AI models don't refresh instantly. Here's what affects timing:
+      </p>
+      <ul>
+        <li>
+          <strong>Immediate (within hours):</strong> Technical fixes like robots.txt, canonical tags, and 
+          schema markup are detected on next crawl
+        </li>
+        <li>
+          <strong>2-4 weeks:</strong> Content improvements, new FAQ pages, and answerability changes show up 
+          as models re-index
+        </li>
+        <li>
+          <strong>4-8 weeks:</strong> Citation frequency increases and authority signals compound. This is 
+          when you'll see material score improvements
+        </li>
+        <li>
+          <strong>3-6 months:</strong> Domain-level authority improvements (backlinks, press mentions) take 
+          longer to propagate
+        </li>
+      </ul>
+      <div class="highlight-box">
+        <p>
+          <strong>Key insight:</strong> AI visibility is a compounding metric. Early improvements create 
+          momentum—each citation makes the next one more likely.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>Does Optiview re-score automatically?</h2>
+      <p>
+        <strong>No</strong>—you need to trigger audits manually or set up recurring scans.
+      </p>
+      <p>
+        <strong>Why:</strong> Audits are computationally expensive (we crawl pages, render JavaScript, test 
+        AI citations). Automatic scoring would quickly exceed infrastructure limits.
+      </p>
+      <p>
+        <strong>Recommended schedule:</strong>
+      </p>
+      <ul>
+        <li><strong>Weekly:</strong> If actively fixing issues</li>
+        <li><strong>Monthly:</strong> For ongoing monitoring</li>
+        <li><strong>After major updates:</strong> Content launches, site redesigns, schema additions</li>
+      </ul>
+      <p>
+        <strong>Pro accounts:</strong> Get automated monthly audits and trend tracking over time.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Quick wins: What can I fix today?</h2>
+      <p>
+        These improvements take less than an hour and yield immediate benefits:
+      </p>
+      <ol>
+        <li>
+          <strong>Add Organization schema to your homepage</strong><br>
+          Copy a template, fill in your brand details, and add to <code>&lt;head&gt;</code>. 
+          <span style="display: inline-block; color: var(--gray); font-size: 0.875rem; margin-left: 0.5rem;">⏱ 10 minutes</span>
+        </li>
+        <li>
+          <strong>Fix duplicate H1 tags</strong><br>
+          Use browser DevTools to find pages with multiple H1s and consolidate to one primary heading. 
+          <span style="display: inline-block; color: var(--gray); font-size: 0.875rem; margin-left: 0.5rem;">⏱ 15 minutes</span>
+        </li>
+        <li>
+          <strong>Ensure AI crawlers can access your site</strong><br>
+          Check robots.txt and remove any <code>Disallow</code> rules blocking GPTBot, Claude-Web, etc. 
+          <span style="display: inline-block; color: var(--gray); font-size: 0.875rem; margin-left: 0.5rem;">⏱ 5 minutes</span>
+        </li>
+        <li>
+          <strong>Add FAQ schema to your help/support page</strong><br>
+          Convert 3-5 existing FAQs to JSON-LD format. 
+          <span style="display: inline-block; color: var(--gray); font-size: 0.875rem; margin-left: 0.5rem;">⏱ 20 minutes</span>
+        </li>
+        <li>
+          <strong>Rewrite vague hero sections</strong><br>
+          Replace "We're revolutionizing X" with "We help [audience] do [outcome] through [method]." 
+          <span style="display: inline-block; color: var(--gray); font-size: 0.875rem; margin-left: 0.5rem;">⏱ 10 minutes per page</span>
+        </li>
+      </ol>
+      <div class="highlight-box">
+        <p>
+          <strong>After implementing quick wins:</strong> Run another audit to measure impact. You should 
+          see 5-15 point improvements immediately.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>Common mistakes that hurt AI visibility</h2>
+      <p>
+        Avoid these pitfalls that actively damage your score:
+      </p>
+      <ol>
+        <li>
+          <strong>Blocking AI crawlers in robots.txt</strong><br>
+          If you've disallowed GPTBot, Claude-Web, or CCBot, you're invisible to those models. Only block 
+          if you have a specific business reason.
+        </li>
+        <li>
+          <strong>JavaScript-only content rendering</strong><br>
+          If critical content only appears after JavaScript executes, some AI crawlers will miss it. Ensure 
+          server-side rendering or static HTML fallbacks.
+        </li>
+        <li>
+          <strong>Keyword stuffing in titles and descriptions</strong><br>
+          AI models penalize unnatural repetition. Write for humans first, machines second.
+        </li>
+        <li>
+          <strong>Orphan pages with no internal links</strong><br>
+          Pages not linked from your sitemap or other pages are effectively invisible. Build a strong 
+          internal linking structure.
+        </li>
+        <li>
+          <strong>Ignoring mobile optimization</strong><br>
+          Many AI crawlers prioritize mobile-friendly content. Poor mobile experience = lower visibility.
+        </li>
+      </ol>
+    </div>
+
+    <div class="related-links">
+      <h3>Related Topics</h3>
+      <a href="/faq/audit-process.html">→ Understanding Your Score</a>
+      <a href="/faq/structured-data.html">→ Implementing Schema Markup</a>
+      <a href="/faq/citations.html">→ Increase Citation Frequency</a>
+      <a href="https://app.optiview.ai/score-guide">→ Complete Scoring Criteria</a>
+      <a href="https://app.optiview.ai">→ Run an Audit</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/faq/">Knowledge Base</a> • 
+      <a href="/methodology">Methodology</a> • 
+      <a href="/privacy">Privacy</a>
+    </p>
+  </footer>
+</body>
+</html>
+

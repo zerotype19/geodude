@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Structured Data & Schema for AI | Optiview</title>
+  <meta name="description" content="Master the schema markup that makes your content machine-readable. Learn which schema types matter most for AI visibility and how to implement them correctly.">
+  <link rel="canonical" href="https://optiview.ai/faq/structured-data.html" />
+  
+  <!-- FAQPage Schema -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Why does structured data matter for AI models?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Schema markup helps AI models parse relationships (who, what, where, when) with less ambiguity. It makes your content more machine-readable, allowing LLMs to accurately extract and cite your information."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which schema types are most valuable for AI visibility?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The most valuable schema types are FAQPage/QAPage, Article/NewsArticle, Product, Organization, and HowTo. These directly map to common user queries and AI answer formats."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I implement structured data?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Use JSON-LD format placed in your page's <head> or <body>. Validate with Google's Rich Results Test. Optiview automatically checks for syntax, completeness, and relevance to your core topics."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --purple: #667eea;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --max-w: 900px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-decoration: none;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--purple); }
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+    .breadcrumb {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .breadcrumb a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+    h1 {
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    .faq-item {
+      background: #fff;
+      padding: 2.5rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .faq-item h2 {
+      font-size: 1.5rem;
+      line-height: 1.3;
+      margin-bottom: 1rem;
+      color: var(--dark);
+      font-weight: 700;
+    }
+    .faq-item p {
+      color: #4b5563;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    .faq-item ul, .faq-item ol {
+      margin: 1rem 0 1rem 1.5rem;
+      color: #4b5563;
+      line-height: 1.8;
+    }
+    .faq-item li {
+      margin-bottom: 0.5rem;
+    }
+    .faq-item strong {
+      color: var(--dark);
+      font-weight: 600;
+    }
+    .faq-item code {
+      background: #f1f5f9;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      color: var(--purple);
+    }
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+      border-left: 4px solid var(--purple);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 1.5rem 0;
+    }
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1.5rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      margin: 1.5rem 0;
+    }
+    .schema-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+    }
+    .schema-card h3 {
+      font-size: 1.125rem;
+      margin-bottom: 0.5rem;
+      color: var(--dark);
+    }
+    .schema-card p {
+      color: #4b5563;
+      margin-bottom: 0.75rem;
+      font-size: 0.9375rem;
+    }
+    .schema-card strong {
+      color: var(--dark);
+    }
+    .related-links {
+      background: #f8fafc;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-top: 3rem;
+    }
+    .related-links h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--dark);
+    }
+    .related-links a {
+      display: block;
+      color: var(--purple);
+      text-decoration: none;
+      padding: 0.5rem 0;
+      font-weight: 500;
+    }
+    .related-links a:hover { text-decoration: underline; }
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+    footer a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/faq/">Knowledge Base</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/faq/">← Knowledge Base</a>
+    </div>
+
+    <h1>Structured Data & Schema</h1>
+    <p class="subtitle">
+      Master the schema markup that makes your content machine-readable for AI systems. Learn which 
+      types matter most and how to implement them correctly.
+    </p>
+
+    <div class="faq-item">
+      <h2>Why does structured data matter for AI models?</h2>
+      <p>
+        <strong>Structured data (schema markup) helps AI models parse relationships with precision.</strong>
+      </p>
+      <p>
+        When you add schema, you're explicitly telling machines:
+      </p>
+      <ul>
+        <li><strong>Who</strong> wrote or published the content (Organization, Person)</li>
+        <li><strong>What</strong> the content is about (Article, Product, FAQ)</li>
+        <li><strong>Where</strong> things are located (Place, LocalBusiness)</li>
+        <li><strong>When</strong> events occur or content was published (datePublished, Event)</li>
+        <li><strong>How</strong> to do something (HowTo steps)</li>
+      </ul>
+      <p>
+        Without schema, AI models must <em>guess</em> these relationships from unstructured HTML. With it, 
+        they can extract and cite your information with confidence.
+      </p>
+      <div class="highlight-box">
+        <p>
+          <strong>Real impact:</strong> Sites with comprehensive schema markup get cited 2-3x more frequently 
+          in our tests, particularly for factual queries where accuracy matters.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>Which schema types are most valuable for AI visibility?</h2>
+      <p>
+        Not all schema types are equally valuable. Focus on these high-impact types first:
+      </p>
+
+      <div class="schema-card">
+        <h3>1. FAQPage / QAPage</h3>
+        <p>
+          <strong>Impact: VERY HIGH</strong> — Directly maps to how users query AI assistants
+        </p>
+        <p>
+          Use when: Your page answers specific questions. AI models heavily favor Q&A formatted content 
+          for citation.
+        </p>
+      </div>
+
+      <div class="schema-card">
+        <h3>2. Organization</h3>
+        <p>
+          <strong>Impact: HIGH</strong> — Establishes brand authority and trust signals
+        </p>
+        <p>
+          Use when: Describing your company. Include logo, social profiles (sameAs), and official name. 
+          Essential for entity recognition.
+        </p>
+      </div>
+
+      <div class="schema-card">
+        <h3>3. Article / NewsArticle</h3>
+        <p>
+          <strong>Impact: HIGH</strong> — Helps AI identify authoritative content
+        </p>
+        <p>
+          Use when: Publishing blog posts, guides, or news. Include author, datePublished, and headline.
+        </p>
+      </div>
+
+      <div class="schema-card">
+        <h3>4. Product</h3>
+        <p>
+          <strong>Impact: HIGH</strong> — Critical for e-commerce and product recommendations
+        </p>
+        <p>
+          Use when: Selling products. Include offers, reviews, and aggregateRating for maximum visibility 
+          in AI shopping recommendations.
+        </p>
+      </div>
+
+      <div class="schema-card">
+        <h3>5. HowTo</h3>
+        <p>
+          <strong>Impact: MEDIUM-HIGH</strong> — Excellent for procedural content
+        </p>
+        <p>
+          Use when: Providing step-by-step instructions. AI models cite HowTo schema when users ask 
+          "how to" questions.
+        </p>
+      </div>
+
+      <div class="highlight-box">
+        <p>
+          <strong>Pro tip:</strong> Combine multiple schemas on the same page using <code>@graph</code>. 
+          Example: An article page can have both Article and Organization schema.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>How do I implement structured data?</h2>
+      <p>
+        <strong>Use JSON-LD format</strong> (not Microdata or RDFa). It's what AI models prefer and what 
+        Google recommends.
+      </p>
+      <p>
+        <strong>Where to place it:</strong> In your page's <code>&lt;head&gt;</code> or anywhere in the 
+        <code>&lt;body&gt;</code>:
+      </p>
+      <pre>{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is AI Visibility?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "AI Visibility refers to how often and how accurately AI systems reference your brand, products, or content when generating answers for users."
+      }
+    }
+  ]
+}</pre>
+      <p>
+        <strong>Validation:</strong> Use <a href="https://search.google.com/test/rich-results" target="_blank" style="color: var(--purple); text-decoration: underline;">Google's Rich Results Test</a> 
+        to check syntax and completeness.
+      </p>
+      <p>
+        <strong>What Optiview checks:</strong>
+      </p>
+      <ul>
+        <li>Presence of schema on each page</li>
+        <li>JSON-LD syntax validity</li>
+        <li>Schema completeness (all required fields)</li>
+        <li>Relevance to page content</li>
+        <li>Entity graph connections (Organization → Product → Review)</li>
+      </ul>
+    </div>
+
+    <div class="faq-item">
+      <h2>Can I use AI-generated schema?</h2>
+      <p>
+        <strong>Yes, but verify carefully.</strong> LLMs like ChatGPT can generate schema quickly, but they 
+        often make subtle errors:
+      </p>
+      <ul>
+        <li>Wrong property nesting (e.g., putting <code>author</code> at the wrong level)</li>
+        <li>Missing required fields</li>
+        <li>Using deprecated properties</li>
+        <li>Inconsistent URLs (mixing http/https or www/non-www)</li>
+      </ul>
+      <p>
+        <strong>Best practice:</strong> Generate with AI, then validate with Google's tool and test in 
+        Optiview before deploying site-wide.
+      </p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Example: Organization Schema</h2>
+      <p>
+        This is the <strong>single most important schema</strong> for establishing brand authority:
+      </p>
+      <pre>{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Optiview",
+  "url": "https://optiview.ai",
+  "logo": "https://optiview.ai/logo.png",
+  "description": "AI Visibility intelligence platform",
+  "sameAs": [
+    "https://twitter.com/optiview",
+    "https://linkedin.com/company/optiview"
+  ],
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "contactType": "customer support",
+    "url": "https://optiview.ai/contact"
+  }
+}</pre>
+      <div class="highlight-box">
+        <p>
+          <strong>Why this matters:</strong> The <code>sameAs</code> array links your brand across platforms, 
+          helping AI models understand you're the <em>same entity</em> mentioned in social media, news, etc.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>Common mistakes to avoid</h2>
+      <ol>
+        <li>
+          <strong>Mixing schema formats:</strong> Don't use JSON-LD, Microdata, and RDFa on the same page. 
+          Stick to JSON-LD only.
+        </li>
+        <li>
+          <strong>Duplicate schemas:</strong> Don't add the same schema type twice (e.g., two Organization 
+          schemas). Use <code>@graph</code> if you need multiple.
+        </li>
+        <li>
+          <strong>Missing required fields:</strong> Each schema type has required properties. Check 
+          <a href="https://schema.org" target="_blank" style="color: var(--purple); text-decoration: underline;">schema.org</a> 
+          for the official spec.
+        </li>
+        <li>
+          <strong>Schema-content mismatch:</strong> Don't add FAQ schema if there are no FAQs on the page. 
+          AI models penalize misleading markup.
+        </li>
+        <li>
+          <strong>Not updating schema:</strong> If you change a product name or company logo, update your 
+          schema too. Stale data confuses AI models.
+        </li>
+      </ol>
+    </div>
+
+    <div class="related-links">
+      <h3>Related Topics</h3>
+      <a href="/faq/about.html">→ What is AI Visibility?</a>
+      <a href="/faq/audit-process.html">→ How We Score Structured Data</a>
+      <a href="/faq/improving-score.html">→ Optimize Your Schema</a>
+      <a href="/faq/citations.html">→ How Schema Affects Citations</a>
+      <a href="https://app.optiview.ai/score-guide">→ View Schema Scoring Criteria</a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/faq/">Knowledge Base</a> • 
+      <a href="/methodology">Methodology</a> • 
+      <a href="/privacy">Privacy</a>
+    </p>
+  </footer>
+</body>
+</html>
+
