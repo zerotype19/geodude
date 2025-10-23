@@ -11,7 +11,11 @@ import CitationSummaryCard from '/src/components/CitationSummaryCard';
 import PagesTab from '/src/components/PagesTab';
 import RenderParityPanel from '/src/components/RenderParityPanel';
 import AuditTour from '/src/components/AuditTour';
+import CompositeBanner from '/src/components/CompositeBanner';
+import SiteOverview from '/src/components/SiteOverview';
+import PageChecksTable from '/src/components/PageChecksTable';
 import { apiGet, apiPost } from '/src/lib/api';
+import { useAuditDiagnostics } from '/src/hooks/useAuditDiagnostics';
 
 interface CategoryScore {
   category: string;
@@ -96,18 +100,21 @@ export default function AuditDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rerunLoading, setRerunLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'citations' | 'actions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'citations' | 'actions' | 'diagnostics'>('overview');
+  
+  // Load diagnostics data
+  const diagnostics = useAuditDiagnostics(id);
 
   // Handle tab from URL query parameter
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam === 'citations' || tabParam === 'pages' || tabParam === 'overview' || tabParam === 'actions') {
+    if (tabParam === 'citations' || tabParam === 'pages' || tabParam === 'overview' || tabParam === 'actions' || tabParam === 'diagnostics') {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
 
   // Handler to change tabs and update URL
-  const handleTabChange = (tab: 'overview' | 'pages' | 'citations' | 'actions') => {
+  const handleTabChange = (tab: 'overview' | 'pages' | 'citations' | 'actions' | 'diagnostics') => {
     setActiveTab(tab);
     navigate(`/audits/${id}?tab=${tab}`, { replace: true });
   };
@@ -452,6 +459,21 @@ export default function AuditDetail() {
             >
               Actions
             </button>
+            <button
+              onClick={() => handleTabChange('diagnostics')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'diagnostics'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Diagnostics
+              {diagnostics.composite && (
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {diagnostics.composite.total.toFixed(1)}
+                </span>
+              )}
+            </button>
           </nav>
         </div>
 
@@ -520,9 +542,69 @@ export default function AuditDetail() {
               </div>
             )}
           </>
+        ) : activeTab === 'diagnostics' ? (
+          <>
+            {/* Diagnostics Tab */}
+            {diagnostics.loading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading diagnostics...</p>
+              </div>
+            ) : diagnostics.error ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                <p className="text-red-700">{diagnostics.error}</p>
+              </div>
+            ) : (
+              <>
+                {/* Composite Scores Banner */}
+                {diagnostics.composite && (
+                  <CompositeBanner data={diagnostics.composite} />
+                )}
+
+                {/* Site-Level Diagnostics */}
+                {diagnostics.siteChecks.length > 0 && (
+                  <SiteOverview 
+                    siteChecks={diagnostics.siteChecks} 
+                    criteriaMap={diagnostics.criteriaMap} 
+                  />
+                )}
+
+                {/* Page-Level Diagnostics (Sample - First Page) */}
+                {pages.length > 0 && diagnostics.pageChecks[pages[0].id] && (
+                  <div className="mb-8">
+                    <div className="mb-4">
+                      <h2 className="text-xl font-semibold text-gray-900 mb-1">Sample Page Checks</h2>
+                      <p className="text-sm text-gray-600">
+                        Showing checks for: <span className="font-mono text-xs">{pages[0].url}</span>
+                      </p>
+                    </div>
+                    <PageChecksTable 
+                      rows={diagnostics.pageChecks[pages[0].id]} 
+                      criteriaMap={diagnostics.criteriaMap} 
+                    />
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {diagnostics.siteChecks.length === 0 && Object.keys(diagnostics.pageChecks).length === 0 && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
+                    <p className="text-yellow-800 mb-4">
+                      No diagnostics data available yet. The scoring system may still be processing this audit.
+                    </p>
+                    <p className="text-sm text-yellow-700">
+                      Try refreshing the page in a few moments, or re-run the audit to generate new scores.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         ) : (
           <>
-            {/* Overview Tab - Score Cards */}
+            {/* Overview Tab - Composite Banner & Score Cards */}
+            {diagnostics.composite && (
+              <CompositeBanner data={diagnostics.composite} />
+            )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <ScoreBadge
             score={audit.aeo_score}
