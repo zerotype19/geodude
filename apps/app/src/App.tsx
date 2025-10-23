@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import './index.css'
 import { useAuth } from './hooks/useAuth'
 import SignInModal from './components/SignInModal.tsx'
 import AuditsIndex from './routes/audits/index.tsx'
