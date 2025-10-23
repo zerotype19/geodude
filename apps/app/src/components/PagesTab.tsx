@@ -19,6 +19,7 @@ interface Page {
   url: string;
   status_code: number;
   content_type: string;
+  title?: string;
   aeo_score?: number;
   geo_score?: number;
   checks_json?: string;
@@ -196,8 +197,9 @@ export default function PagesTab({ auditId }: PagesTabProps) {
       {/* Pages Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {filteredAndSortedPages.map((page) => {
-          const failingChecks = page.checks.filter((c) => !c.preview && c.status === 'fail');
-          const warningChecks = page.checks.filter((c) => !c.preview && c.status === 'warn');
+          const productionChecks = page.checks.filter((c) => !c.preview);
+          const passingChecks = productionChecks.filter((c) => c.status === 'ok');
+          const failingChecks = productionChecks.filter((c) => c.status === 'fail');
           
           return (
             <Link
@@ -208,14 +210,18 @@ export default function PagesTab({ auditId }: PagesTabProps) {
               {/* Header */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold truncate group-hover:text-brand transition-colors">
-                      {new URL(page.url).pathname || '/'}
-                    </h3>
-                    {getCitationCount(page.url) > 0 && (
-                      <AICitedBadge citationCount={getCitationCount(page.url)} />
-                    )}
-                  </div>
+                  {/* Title (if available) */}
+                  {page.title && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold truncate group-hover:text-brand transition-colors text-sm">
+                        {page.title}
+                      </h3>
+                      {getCitationCount(page.url) > 0 && (
+                        <AICitedBadge citationCount={getCitationCount(page.url)} />
+                      )}
+                    </div>
+                  )}
+                  {/* URL */}
                   <p className="text-xs subtle truncate">{page.url}</p>
                 </div>
                 <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded ml-2 flex-shrink-0 ${
@@ -225,29 +231,23 @@ export default function PagesTab({ auditId }: PagesTabProps) {
                 </span>
               </div>
 
-              {/* Score & Checks Summary - Compact */}
+              {/* Score & Check Status - Compact */}
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs muted mb-1">Diagnostic Score</div>
-                  <div className={`text-2xl font-bold ${getScoreColor(page.diagnosticScore)}`}>
+                  <div className={`text-3xl font-bold ${getScoreColor(page.diagnosticScore)}`}>
                     {page.diagnosticScore}
                   </div>
                 </div>
                 
                 <div className="text-right">
-                  <div className="text-xs muted mb-1">Checks</div>
-                  <div className="text-sm">
-                    <span className="font-medium">{page.checks.filter(c => !c.preview).length}</span>
-                    {failingChecks.length > 0 && (
-                      <span className="text-danger font-semibold ml-2">
-                        {failingChecks.length} ✗
-                      </span>
-                    )}
-                    {failingChecks.length === 0 && warningChecks.length > 0 && (
-                      <span className="text-warn font-semibold ml-2">
-                        {warningChecks.length} ⚠
-                      </span>
-                    )}
+                  <div className="text-xs font-medium text-ink-muted uppercase tracking-wide mb-1">Check Status</div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="text-success font-semibold">
+                      {passingChecks.length} ✓
+                    </span>
+                    <span className="text-danger font-semibold">
+                      {failingChecks.length} ✗
+                    </span>
                   </div>
                 </div>
               </div>

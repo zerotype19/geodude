@@ -3284,7 +3284,7 @@ async function getAuditPages(auditId: string, searchParams: URLSearchParams, env
   // Use INNER JOIN to only return pages that have been analyzed
   // This excludes discovered URLs that were never processed
   const pages = await env.DB.prepare(`
-    SELECT ap.*, apa.aeo_score, apa.geo_score, apa.checks_json
+    SELECT ap.*, apa.title, apa.aeo_score, apa.geo_score, apa.checks_json
     FROM audit_pages ap
     INNER JOIN audit_page_analysis apa ON ap.id = apa.page_id
     WHERE ap.audit_id = ?
