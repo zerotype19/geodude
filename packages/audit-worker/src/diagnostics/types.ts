@@ -15,6 +15,14 @@ export interface CriterionRow {
   pass_threshold: number;
   warn_threshold: number;
   display_order?: number | null;
+  // Educational content for UI display
+  why_it_matters?: string | null;
+  how_to_fix?: string | null;
+  examples?: string | null;
+  quick_fixes?: string | null;
+  common_issues?: string | null;
+  official_docs?: string | null;
+  learn_more_links?: string | null;
 }
 
 export interface PageContext {

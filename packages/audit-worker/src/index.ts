@@ -3051,16 +3051,22 @@ async function getAudit(auditId: string, env: Env) {
           // Filter to production checks only (no preview)
           const productionChecks = allChecks.filter((c: any) => !c.preview);
           
-          // Enrich with D1 metadata
+          // Enrich with D1 metadata - include ALL fields for UI display
           enrichedChecks = productionChecks.map((check: any) => {
             const meta = criteriaMap.get(check.id);
             return {
               ...check,
               category: meta?.category || 'Uncategorized',
               impact_level: meta?.impact_level || 'Medium',
-              why_it_matters: meta?.why_it_matters,
               name: meta?.label || check.id,
-              weight: meta?.weight || 10
+              weight: meta?.weight || 10,
+              why_it_matters: meta?.why_it_matters,
+              how_to_fix: meta?.how_to_fix,
+              examples: meta?.examples,
+              quick_fixes: meta?.quick_fixes,
+              common_issues: meta?.common_issues,
+              official_docs: meta?.official_docs,
+              learn_more_links: meta?.learn_more_links
             };
           });
           

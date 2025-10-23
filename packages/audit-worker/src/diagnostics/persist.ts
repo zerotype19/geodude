@@ -17,6 +17,14 @@ export async function loadCriteriaMap(db: D1Database): Promise<Map<string, Crite
       pass_threshold: r.pass_threshold,
       warn_threshold: r.warn_threshold,
       display_order: r.display_order,
+      // Educational content for UI display
+      why_it_matters: r.why_it_matters,
+      how_to_fix: r.how_to_fix,
+      examples: r.examples,
+      quick_fixes: r.quick_fixes,
+      common_issues: r.common_issues,
+      official_docs: r.official_docs,
+      learn_more_links: r.learn_more_links,
     });
   });
   return map;
