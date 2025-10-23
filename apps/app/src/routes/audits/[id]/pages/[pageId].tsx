@@ -63,7 +63,7 @@ export default function PageDetail() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'checks' | 'metadata' | 'html'>('checks');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(CATEGORY_ORDER)
+    new Set() // Start with all categories collapsed
   );
   
   // Load diagnostics data
