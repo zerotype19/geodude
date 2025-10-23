@@ -1256,6 +1256,92 @@ export default {
         }
       }
 
+      // TEMP: Backfill composite scores for existing audits (NO AUTH - remove after use)
+      if (req.method === 'GET' && path === '/api/admin/backfill-composite-scores') {
+        try {
+          const { computeComposite } = await import('./diagnostics/composite');
+          const { loadCriteriaMap } = await import('./diagnostics/persist');
+          
+          // Get all completed audits without a composite score
+          const audits = await env.DB.prepare(`
+            SELECT id FROM audits 
+            WHERE status = 'completed' AND composite_score IS NULL
+            ORDER BY finished_at DESC
+            LIMIT 50
+          `).all();
+          
+          const results: any[] = [];
+          const criteriaMap = await loadCriteriaMap(env.DB);
+          const criteriaArray = Array.from(criteriaMap.values());
+          
+          for (const audit of (audits.results || [])) {
+            const auditId = (audit as any).id;
+            
+            try {
+              // Fetch site checks
+              const auditData: any = await env.DB.prepare("SELECT site_checks_json FROM audits WHERE id = ?").bind(auditId).first();
+              const siteChecks = auditData?.site_checks_json ? JSON.parse(auditData.site_checks_json as string) : [];
+              
+              // Aggregate page checks
+              const pages = (await env.DB.prepare(`
+                SELECT apa.checks_json
+                FROM audit_pages p
+                LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+                WHERE p.audit_id = ?1 AND apa.checks_json IS NOT NULL
+              `).bind(auditId).all()).results || [];
+              
+              const allPageChecks = pages.flatMap((p: any) => {
+                try {
+                  return p.checks_json ? JSON.parse(p.checks_json) : [];
+                } catch {
+                  return [];
+                }
+              });
+              
+              // Compute composite score
+              const composite = computeComposite(allPageChecks, siteChecks, criteriaArray);
+              
+              // Save to database
+              await env.DB.prepare(
+                `UPDATE audits SET composite_score = ? WHERE id = ?`
+              ).bind(composite.total, auditId).run();
+              
+              results.push({ 
+                audit_id: auditId, 
+                composite_score: composite.total,
+                status: 'success' 
+              });
+              
+              console.log(`[COMPOSITE_BACKFILL] Updated ${auditId}: ${composite.total}`);
+            } catch (error) {
+              console.error(`[COMPOSITE_BACKFILL] Failed for ${auditId}:`, error);
+              results.push({ 
+                audit_id: auditId, 
+                error: (error as Error).message,
+                status: 'failed' 
+              });
+            }
+          }
+          
+          return new Response(JSON.stringify({ 
+            total_processed: results.length,
+            results 
+          }, null, 2), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('[COMPOSITE_BACKFILL] Error:', error);
+          return new Response(JSON.stringify({ 
+            error: 'Backfill failed', 
+            message: (error as Error).message 
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Admin routes - require admin authentication
       if (path.startsWith('/api/admin/')) {
         // SECURITY: Verify user is authenticated and is an admin
