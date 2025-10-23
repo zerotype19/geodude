@@ -68,109 +68,126 @@ a {
   @apply text-brand underline-offset-2 hover:underline;
 }
 
-/* Component utilities - Defined with @utility in v4 */
-@utility card {
-  @apply bg-surface-1 rounded-2xl border border-border;
-  box-shadow: 0 1px 1px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.06);
+/* Component utilities */
+@layer utilities {
+  .card {
+    @apply bg-surface-1 rounded-2xl border border-border;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.06);
+  }
+
+  .card-muted {
+    @apply bg-surface-2;
+  }
+
+  .card-header {
+    @apply px-5 py-4 border-b border-border;
+  }
+
+  .card-body {
+    @apply p-5;
+  }
+
+  .card-footer {
+    @apply px-5 py-4 border-t border-border;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-medium bg-surface-2 text-ink-muted;
+  }
+
+  .pill-brand {
+    @apply bg-brand-soft text-brand border-transparent;
+  }
+
+  .pill-success {
+    @apply bg-success-soft text-success border-transparent;
+  }
+
+  .pill-warn {
+    @apply bg-warn-soft text-warn border-transparent;
+  }
+
+  .pill-danger {
+    @apply bg-danger-soft text-danger border-transparent;
+  }
+
+  .tag {
+    @apply inline-flex items-center rounded-md bg-surface-2 px-2 py-1 text-xs text-ink-subtle;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium border border-transparent shadow-sm;
+    transition: all 0.2s cubic-bezier(.2,.8,.2,1);
+  }
+
+  .btn-primary {
+    @apply bg-brand text-brand-foreground hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring;
+  }
+
+  .btn-soft {
+    @apply bg-brand-soft text-brand hover:bg-brand/10;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-ink hover:bg-surface-2 border-border;
+  }
+
+  .field {
+    @apply block w-full rounded-xl border border-border bg-surface-1 px-3 py-2 text-sm text-ink placeholder:text-ink-subtle;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .field-label {
+    @apply block text-sm font-medium text-ink mb-2;
+  }
+
+  .stat {
+    @apply bg-surface-1 rounded-2xl border border-border p-5 text-center;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.06);
+  }
+
+  .stat-value {
+    @apply text-3xl font-semibold text-ink;
+  }
+
+  .stat-label {
+    @apply mt-1 text-sm text-ink-subtle;
+  }
+
+  .stat-meta {
+    @apply mt-2 text-xs text-ink-muted;
+  }
+
+  .kpi-grid {
+    @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-ink;
+  }
+
+  .muted {
+    @apply text-ink-muted;
+  }
+
+  .subtle {
+    @apply text-ink-subtle;
+  }
+
+  .table-wrap {
+    @apply relative w-full overflow-x-auto rounded-xl border border-border bg-surface-1;
+  }
+
+  .page-max {
+    @apply max-w-7xl mx-auto;
+  }
+
+  .container-px {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
 }
 
-@utility card-muted {
-  @apply bg-surface-2;
-}
-
-@utility card-header {
-  @apply px-5 py-4 border-b border-border;
-}
-
-@utility card-body {
-  @apply p-5;
-}
-
-@utility card-footer {
-  @apply px-5 py-4 border-t border-border;
-}
-
-@utility pill {
-  @apply inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-medium bg-surface-2 text-ink-muted;
-}
-
-@utility pill-brand {
-  @apply bg-brand-soft text-brand border-transparent;
-}
-
-@utility pill-success {
-  @apply bg-success-soft text-success border-transparent;
-}
-
-@utility pill-warn {
-  @apply bg-warn-soft text-warn border-transparent;
-}
-
-@utility pill-danger {
-  @apply bg-danger-soft text-danger border-transparent;
-}
-
-@utility tag {
-  @apply inline-flex items-center rounded-md bg-surface-2 px-2 py-1 text-xs text-ink-subtle;
-}
-
-@utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium border border-transparent shadow-sm;
-  transition: all 0.2s cubic-bezier(.2,.8,.2,1);
-}
-
-@utility btn-primary {
-  @apply bg-brand text-brand-foreground hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring;
-}
-
-@utility btn-soft {
-  @apply bg-brand-soft text-brand hover:bg-brand/10;
-}
-
-@utility btn-ghost {
-  @apply bg-transparent text-ink hover:bg-surface-2 border-border;
-}
-
-@utility field {
-  @apply block w-full rounded-xl border border-border bg-surface-1 px-3 py-2 text-sm text-ink placeholder:text-ink-subtle;
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
-}
-
-@utility stat {
-  @apply card p-5 text-center;
-}
-
-@utility stat-value {
-  @apply text-3xl font-semibold text-ink;
-}
-
-@utility stat-label {
-  @apply mt-1 text-sm text-ink-subtle;
-}
-
-@utility stat-meta {
-  @apply mt-2 text-xs text-ink-muted;
-}
-
-@utility kpi-grid {
-  @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
-}
-
-@utility section-title {
-  @apply text-lg font-semibold text-ink;
-}
-
-@utility muted {
-  @apply text-ink-muted;
-}
-
-@utility subtle {
-  @apply text-ink-subtle;
-}
-
-@utility table-wrap {
-  @apply relative w-full overflow-x-auto rounded-xl border border-border bg-surface-1;
-}
+/* Close utilities layer */
 
 /* Table styles - regular CSS since they use complex selectors */
 table.ui {
