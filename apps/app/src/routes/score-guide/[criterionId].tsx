@@ -15,7 +15,7 @@ export default function CriterionDetail() {
   
   if (!criterion) {
     return (
-      <div className="min-h-screen bg-surface-1 py-8">
+      <div className="min-h-screen bg-surface-2 py-8">
         <div className="page-max container-px">
           <div className="card card-body text-center">
             <h2 className="text-2xl font-bold mb-2">Criterion Not Found</h2>
@@ -48,7 +48,7 @@ export default function CriterionDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-1 py-12">
+    <div className="min-h-screen bg-surface-2 py-12">
       <div className="page-max container-px">
         {/* Back button */}
         <button

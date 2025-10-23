@@ -111,7 +111,7 @@ export default function AuditsIndex() {
 
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen bg-surface-1 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-2 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto"></div>
           <p className="mt-4 muted">Loading...</p>
@@ -121,7 +121,7 @@ export default function AuditsIndex() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-1">
+    <div className="min-h-screen bg-surface-2">
       <div className="page-max container-px py-8">
         {/* Header */}
         <div className="mb-8">

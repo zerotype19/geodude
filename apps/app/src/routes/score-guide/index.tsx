@@ -33,7 +33,7 @@ export default function ScoreGuide() {
   const { mode } = useViewMode();
 
   return (
-    <div className="min-h-screen bg-surface-1">
+    <div className="min-h-screen bg-surface-2">
       <div className="page-max container-px py-8">
         {/* Header */}
         <header className="mb-12">

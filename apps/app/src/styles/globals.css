@@ -45,7 +45,7 @@
 }
 
 body {
-  @apply bg-surface-1 text-ink;
+  @apply bg-surface-2 text-ink;
 }
 
 h1 {

@@ -355,7 +355,7 @@ export default function AuditDetail() {
   const quickWins = getQuickWins();
 
   return (
-    <div className="min-h-screen bg-surface-1">
+    <div className="min-h-screen bg-surface-2">
       <AuditTour />
       <div className="page-max container-px py-8">
         {/* Header */}
