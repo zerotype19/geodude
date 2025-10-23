@@ -111,22 +111,22 @@ export default function AuditsIndex() {
 
   if (loading || authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-1 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto"></div>
+          <p className="mt-4 muted">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-surface-1">
+      <div className="page-max container-px py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Audit Dashboard</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-3xl font-bold">Audit Dashboard</h1>
+          <p className="mt-2 muted">
             Monitor and analyze your website's AI discoverability and optimization
           </p>
         </div>
@@ -135,7 +135,7 @@ export default function AuditsIndex() {
         <div className="mb-6">
           <button
             onClick={() => setShowCreateForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            className="btn-primary"
           >
             Start New Audit
           </button>
@@ -144,33 +144,33 @@ export default function AuditsIndex() {
         {/* Create Audit Modal - Step 1: Audit Details */}
         {showCreateForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4">Start New Audit</h2>
+            <div className="card p-6 w-full max-w-md">
+              <h2 className="section-title mb-4">Start New Audit</h2>
               
               <form onSubmit={(e) => {
                 e.preventDefault();
                 handleStartAuditClick();
               }}>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="field-label">
                     Project ID
                   </label>
                   <input
                     type="text"
                     value={createForm.project_id}
                     onChange={(e) => setCreateForm({ ...createForm, project_id: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="field"
                     placeholder="e.g., prj_demo"
                     required
                   />
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="field-label">
                     Root URL
                   </label>
-                  <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500">
-                    <span className="px-3 py-2 bg-gray-50 text-gray-500 border-r border-gray-300 select-none">
+                  <div className="flex items-center field p-0 overflow-hidden">
+                    <span className="px-3 py-2 bg-surface-2 subtle border-r border-border select-none">
                       https://
                     </span>
                     <input
@@ -180,7 +180,7 @@ export default function AuditsIndex() {
                         const cleanValue = e.target.value.replace(/^https?:\/\//, '');
                         setCreateForm({ ...createForm, root_url: `https://${cleanValue}` });
                       }}
-                      className="flex-1 px-3 py-2 focus:outline-none rounded-r-md"
+                      className="flex-1 px-3 py-2 focus:outline-none border-0"
                       placeholder="example.com"
                       required
                     />
@@ -188,18 +188,18 @@ export default function AuditsIndex() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="field-label">
                     Site Description
                   </label>
                   <textarea
                     value={createForm.site_description}
                     onChange={(e) => setCreateForm({ ...createForm, site_description: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="field"
                     placeholder="Describe what this site is about, what it offers, and what makes it unique..."
                     rows={4}
                     required
                   />
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm subtle">
                     This description will be used to generate relevant citation queries across AI sources.
                   </p>
                 </div>
@@ -208,13 +208,13 @@ export default function AuditsIndex() {
                   <button
                     type="button"
                     onClick={() => setShowCreateForm(false)}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    className="btn-ghost"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+                    className="btn-primary"
                   >
                     Continue →
                   </button>
@@ -227,11 +227,11 @@ export default function AuditsIndex() {
         {/* Magic Link Modal - Step 2: Email for Authentication */}
         {showMagicLinkForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-semibold mb-4">Secure Your Audit</h2>
+            <div className="card p-6 w-full max-w-md">
+              <h2 className="section-title mb-4">Secure Your Audit</h2>
               
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-blue-900">
+              <div className="card-muted p-4 mb-4">
+                <p className="text-sm">
                   🔐 <strong>Magic link authentication</strong>
                 </p>
                 <p className="text-sm text-blue-800 mt-1">
@@ -241,29 +241,29 @@ export default function AuditsIndex() {
 
               <form onSubmit={sendMagicLink}>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="field-label">
                     Your Email
                   </label>
                   <input
                     type="email"
                     value={magicLinkEmail}
                     onChange={(e) => setMagicLinkEmail(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="field"
                     placeholder="you@company.com"
                     required
                     autoComplete="email"
                   />
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm subtle">
                     We'll send you a secure sign-in link (expires in 20 minutes)
                   </p>
                 </div>
 
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-                  <p className="text-xs text-gray-700 font-medium">Audit Summary:</p>
-                  <p className="text-xs text-gray-600 mt-1">
+                <div className="card-muted p-3 mb-4">
+                  <p className="text-xs font-medium">Audit Summary:</p>
+                  <p className="text-xs muted mt-1">
                     <strong>URL:</strong> {createForm.root_url || 'Not specified'}
                   </p>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-xs muted">
                     <strong>Project:</strong> {createForm.project_id || 'Not specified'}
                   </p>
                 </div>
@@ -275,14 +275,14 @@ export default function AuditsIndex() {
                       setShowMagicLinkForm(false);
                       setShowCreateForm(true);
                     }}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    className="btn-ghost"
                   >
                     ← Back
                   </button>
                   <button
                     type="submit"
                     disabled={magicLinkSending}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors disabled:opacity-60"
+                    className="btn-primary disabled:opacity-60"
                   >
                     {magicLinkSending ? 'Sending...' : 'Send Magic Link'}
                   </button>
@@ -293,94 +293,80 @@ export default function AuditsIndex() {
         )}
 
         {/* Audits Table */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">Recent Audits</h2>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="section-title">Recent Audits</h2>
           </div>
 
           {audits.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <div className="text-gray-400 mb-4">
+              <div className="subtle mb-4">
                 <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No audits yet</h3>
-              <p className="text-gray-600 mb-4">Get started by creating your first audit</p>
+              <h3 className="text-lg font-medium mb-2">No audits yet</h3>
+              <p className="muted mb-4">Get started by creating your first audit</p>
               <button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                className="btn-primary"
               >
                 Start Your First Audit
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="table-wrap">
+              <table>
+                <thead>
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Project
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      URL
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Optiview Score
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pages
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Started
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th>Project</th>
+                    <th>URL</th>
+                    <th>Status</th>
+                    <th>Optiview Score</th>
+                    <th>Pages</th>
+                    <th>Started</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody>
                   {audits.map((audit) => (
-                    <tr key={audit.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {audit.project_id}
+                    <tr key={audit.id}>
+                      <td>
+                        <span className="font-medium">{audit.project_id}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        <a href={audit.root_url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
+                      <td>
+                        <a href={audit.root_url} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
                           {audit.root_url}
                         </a>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(audit.status)}`}>
+                      <td>
+                        <span className={`pill ${getStatusColor(audit.status)}`}>
                           {audit.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td>
                         <span className={`text-base font-semibold ${
                           audit.composite_score 
                             ? audit.composite_score >= 85 
-                              ? 'text-green-600' 
+                              ? 'text-success' 
                               : audit.composite_score >= 60 
-                                ? 'text-yellow-600' 
-                                : 'text-red-600'
-                            : 'text-gray-500'
+                                ? 'text-warn' 
+                                : 'text-danger'
+                            : 'subtle'
                         }`}>
                           {formatScore(audit.composite_score)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td>
                         {audit.pages_analyzed}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(audit.started_at).toLocaleDateString()}
+                      <td>
+                        <span className="subtle">{new Date(audit.started_at).toLocaleDateString()}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td>
                         <Link
                           to={`/audits/${audit.id}`}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-brand hover:underline"
                         >
                           View Details
                         </Link>
