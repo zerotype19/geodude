@@ -212,6 +212,12 @@ export function groupChecksByCategory() {
   console.log('💾 Writing checks.ts:', outputPath);
   fs.writeFileSync(outputPath, tsContent, 'utf8');
   
+  // Also copy JSON to app/src/data for criteriaV3.ts
+  const appDataPath = path.join(__dirname, '../apps/app/src/data/scoring_criteria.json');
+  console.log('📋 Copying JSON to app:', appDataPath);
+  fs.mkdirSync(path.dirname(appDataPath), { recursive: true });
+  fs.copyFileSync(exportPath, appDataPath);
+  
   console.log('✨ Done! Score guide updated with', checks.length, 'checks');
   console.log('\nCategories:');
   const byCategory = checks.reduce((acc, c) => {

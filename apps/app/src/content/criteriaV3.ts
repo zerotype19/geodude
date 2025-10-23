@@ -8,7 +8,7 @@
  * Last synced: ${new Date().toISOString()}
  */
 
-import scoringCriteriaExport from '../../../../../../packages/audit-worker/exports/scoring_criteria_latest.json';
+import scoringCriteriaExport from '../data/scoring_criteria.json';
 
 export type Impact = 'High' | 'Medium' | 'Low';
 
