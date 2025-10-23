@@ -824,8 +824,8 @@ export default {
       await runWeeklyCitations(env);
     }
     
-    if (event.cron === '0 */6 * * *') {
-      // Every 6 hours: Process queued citations
+    if (event.cron === '*/10 * * * *') {
+      // Every 10 minutes: Process queued citations
       await processQueuedCitations(env);
     }
     
@@ -2590,6 +2590,19 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
       console.error(`[PROMPT_CACHE] Failed to build cache after audit:`, err);
     }
   })();
+  
+  // Automatically queue citations for async processing
+  try {
+    await env.DB.prepare(`
+      UPDATE audits 
+      SET citations_status = 'queued',
+          citations_queued_at = datetime('now')
+      WHERE id = ?
+    `).bind(auditId).run();
+    console.log(`[AUTO_CITATIONS] Queued citations for audit ${auditId}`);
+  } catch (err) {
+    console.error(`[AUTO_CITATIONS] Failed to queue citations for ${auditId}:`, err);
+  }
 }
 
 // API Route Handlers
