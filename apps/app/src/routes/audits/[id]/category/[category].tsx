@@ -35,15 +35,7 @@ interface Audit {
   category_scores?: CategoryScore[];
 }
 
-// Category emoji map
-const CATEGORY_EMOJIS: Record<string, string> = {
-  'Content & Clarity': '📝',
-  'Structure & Organization': '🏗️',
-  'Authority & Trust': '🛡️',
-  'Technical Foundations': '⚙️',
-  'Crawl & Discoverability': '🔍',
-  'Experience & Performance': '⚡'
-};
+// Category descriptions (no emojis for professional look)
 
 // Category descriptions (from D1 scoring guide)
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
@@ -74,7 +66,6 @@ export default function CategoryDetail() {
   const categoryName = (SLUG_TO_CATEGORY[category || ''] || '') as Category;
   const categorySlug = category || '';
 
-  const emoji = CATEGORY_EMOJIS[categoryName] || '📊';
   const description = CATEGORY_DESCRIPTIONS[categoryName] || '';
 
   // Get checks for this category from D1 criteria
@@ -206,20 +197,20 @@ export default function CategoryDetail() {
   const getStatusBadge = (score: number) => {
     if (score >= 85) {
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          ✓ Excellent
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+          Excellent
         </span>
       );
     } else if (score >= 60) {
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-          ⚠ Good
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+          Good
         </span>
       );
     } else {
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-          ✗ Needs Work
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+          Needs Work
         </span>
       );
     }
@@ -241,30 +232,24 @@ export default function CategoryDetail() {
         {/* Category Header */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
           <div className="flex items-start justify-between mb-4">
-            <div className="flex items-start gap-4 flex-1">
-              <span className="text-4xl">{emoji}</span>
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">{categoryName}</h1>
-                <p className="text-gray-600 mb-3">{description}</p>
-                <div className="text-sm text-gray-500 mb-4">
-                  {audit?.root_url && (
-                    <span>
-                      Analyzing: <span className="font-medium text-gray-700">{audit.root_url}</span>
-                    </span>
-                  )}
-                </div>
-                
-                {/* Learn More Link */}
-                <Link
-                  to={`/score-guide#${categorySlug}`}
-                  className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  📖 Learn how to fix these issues
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </Link>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{categoryName}</h1>
+              <p className="text-gray-600 mb-3">{description}</p>
+              <div className="text-sm text-gray-500 mb-4">
+                {audit?.root_url && (
+                  <span>
+                    Analyzing: <span className="font-medium text-gray-700">{audit.root_url}</span>
+                  </span>
+                )}
               </div>
+              
+              {/* Learn More Link */}
+              <Link
+                to={`/score-guide#${categorySlug}`}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Learn how to fix these issues →
+              </Link>
             </div>
             {categoryScore && (
               <div className={`px-6 py-3 rounded-lg border ${getScoreColor(categoryScore.score)} font-bold text-3xl`}>
@@ -276,9 +261,9 @@ export default function CategoryDetail() {
 
         {/* How to Improve - Show quick guidance from failing checks */}
         {pagesWithIssues.length > 0 && checksInCategory.some(c => c.how_to_fix) && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200 p-6 mb-8">
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span>🎯</span> How to Improve This Category
+          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              How to Improve This Category
             </h2>
             <div className="space-y-4">
               {checksInCategory
@@ -296,8 +281,8 @@ export default function CategoryDetail() {
                           <p className="whitespace-pre-line">{check.how_to_fix}</p>
                         </div>
                         {check.quick_fixes && (
-                          <div className="mt-2 bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-900">
-                            <strong className="block mb-1">⚡ Quick fixes:</strong>
+                          <div className="mt-2 bg-gray-50 border border-gray-200 rounded p-3 text-sm text-gray-700">
+                            <strong className="block mb-1 text-gray-900">Quick fixes:</strong>
                             <p>{check.quick_fixes}</p>
                           </div>
                         )}
@@ -306,9 +291,9 @@ export default function CategoryDetail() {
                             href={check.official_docs}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                            className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
                           >
-                            📖 Official Docs ↗
+                            Official Docs →
                           </a>
                         )}
                       </div>
@@ -345,12 +330,12 @@ export default function CategoryDetail() {
                       {getStatusBadge(avgScore)}
                     </div>
                     <p className="text-sm text-gray-600 mb-2">{check.description}</p>
-                    <div className="flex items-center gap-4 text-xs">
-                      <span className="text-green-600">
-                        ✓ {passingPages} passing
+                    <div className="flex items-center gap-4 text-xs text-gray-600">
+                      <span>
+                        <span className="font-semibold text-green-700">{passingPages}</span> passing
                       </span>
-                      <span className="text-red-600">
-                        ✗ {failingPages} failing
+                      <span>
+                        <span className="font-semibold text-red-700">{failingPages}</span> failing
                       </span>
                       <span className="text-gray-500">
                         of {totalPages} pages

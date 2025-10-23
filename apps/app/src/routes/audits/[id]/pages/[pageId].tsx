@@ -43,11 +43,11 @@ const STATUS_COLORS = {
 };
 
 const STATUS_ICONS = {
-  ok: '✓',
-  warn: '⚠',
-  fail: '✗',
-  error: '!',
-  not_applicable: '—'
+  ok: '',
+  warn: '',
+  fail: '',
+  error: '',
+  not_applicable: ''
 };
 
 const IMPACT_COLORS = {
@@ -216,23 +216,14 @@ export default function PageDetail() {
           
           {/* Quick status summary */}
           <div className="mt-4 pt-4 border-t border-gray-200 flex gap-4 text-sm">
-            <div className="flex items-center gap-1">
-              <span className="text-green-600">✓</span>
-              <span className="text-gray-600">
-                {productionChecks.filter(c => c.status === 'ok').length} passing
-              </span>
+            <div className="text-gray-600">
+              <span className="font-semibold text-green-700">{productionChecks.filter(c => c.status === 'ok').length}</span> passing
             </div>
-            <div className="flex items-center gap-1">
-              <span className="text-yellow-600">⚠</span>
-              <span className="text-gray-600">
-                {productionChecks.filter(c => c.status === 'warn').length} warnings
-              </span>
+            <div className="text-gray-600">
+              <span className="font-semibold text-yellow-700">{productionChecks.filter(c => c.status === 'warn').length}</span> warnings
             </div>
-            <div className="flex items-center gap-1">
-              <span className="text-red-600">✗</span>
-              <span className="text-gray-600">
-                {productionChecks.filter(c => c.status === 'fail').length} failing
-              </span>
+            <div className="text-gray-600">
+              <span className="font-semibold text-red-700">{productionChecks.filter(c => c.status === 'fail').length}</span> failing
             </div>
           </div>
         </div>
@@ -294,18 +285,18 @@ export default function PageDetail() {
                           </span>
                           <div className="flex gap-2 text-xs">
                             {okCount > 0 && (
-                              <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                ✓ {okCount}
+                              <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                {okCount} passing
                               </span>
                             )}
                             {warnCount > 0 && (
-                              <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
-                                ⚠ {warnCount}
+                              <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                {warnCount} warnings
                               </span>
                             )}
                             {failCount > 0 && (
-                              <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
-                                ✗ {failCount}
+                              <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                {failCount} failing
                               </span>
                             )}
                           </div>

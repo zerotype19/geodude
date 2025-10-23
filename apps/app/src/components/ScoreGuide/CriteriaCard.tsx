@@ -56,7 +56,7 @@ export default function CriteriaCard({ criterion }: CriteriaCardProps) {
       {criterion.why_it_matters && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
           <p className="text-sm text-blue-900 leading-relaxed">
-            <span className="font-semibold">💡 Why it matters:</span> {criterion.why_it_matters}
+            <span className="font-semibold">Why it matters:</span> {criterion.why_it_matters}
           </p>
         </div>
       )}

@@ -111,11 +111,11 @@ export default function CriterionDetail() {
         <div className="space-y-6">
           {/* Why it matters */}
           {criterion.why_it_matters && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-200 p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-3">
-                <span className="text-3xl">💡</span> Why This Matters
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-3">
+                Why This Matters
               </h2>
-              <p className="text-lg text-blue-900/90 leading-relaxed">
+              <p className="text-base text-gray-700 leading-relaxed">
                 {criterion.why_it_matters}
               </p>
             </div>
@@ -123,11 +123,11 @@ export default function CriterionDetail() {
 
           {/* How to fix */}
           {criterion.how_to_fix && (
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border-2 border-green-200 p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-green-900 mb-4 flex items-center gap-3">
-                <span className="text-3xl">🔧</span> How to Fix
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-3">
+                How to Fix
               </h2>
-              <p className="text-lg text-green-900/90 leading-relaxed whitespace-pre-line">
+              <p className="text-base text-gray-700 leading-relaxed whitespace-pre-line">
                 {criterion.how_to_fix}
               </p>
             </div>
@@ -135,11 +135,11 @@ export default function CriterionDetail() {
 
           {/* Examples */}
           {criterion.examples && (
-            <div className="bg-white rounded-2xl border-2 border-purple-200 p-8 shadow-lg">
-              <h2 className="text-2xl font-bold text-purple-900 mb-4 flex items-center gap-3">
-                <span className="text-3xl">📝</span> Example
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-3">
+                Example
               </h2>
-              <pre className="text-base text-gray-900 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-gray-300 font-mono leading-relaxed whitespace-pre-wrap break-words shadow-inner">
+              <pre className="text-sm text-gray-900 bg-gray-50 rounded p-4 border border-gray-200 font-mono leading-relaxed whitespace-pre-wrap break-words">
 {criterion.examples}
               </pre>
             </div>
@@ -147,11 +147,11 @@ export default function CriterionDetail() {
 
           {/* Quick fixes */}
           {criterion.quick_fixes && (
-            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-2xl border-2 border-amber-200 p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-amber-900 mb-4 flex items-center gap-3">
-                <span className="text-3xl">⚡</span> Quick Fixes
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-3">
+                Quick Fixes
               </h2>
-              <p className="text-lg text-amber-900/90 leading-relaxed">
+              <p className="text-base text-gray-700 leading-relaxed">
                 {criterion.quick_fixes}
               </p>
             </div>
@@ -159,57 +159,49 @@ export default function CriterionDetail() {
 
           {/* Common issues */}
           {criterion.common_issues && (
-            <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl border-2 border-red-200 p-8 shadow-sm">
-              <h2 className="text-2xl font-bold text-red-900 mb-4 flex items-center gap-3">
-                <span className="text-3xl">⚠️</span> Common Issues
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-3">
+                Common Issues
               </h2>
-              <p className="text-lg text-red-900/90 leading-relaxed">
+              <p className="text-base text-gray-700 leading-relaxed">
                 {criterion.common_issues}
               </p>
             </div>
           )}
 
           {/* Resources */}
-          <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-2xl border-2 border-slate-200 p-8 shadow-sm">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
-              <span className="text-3xl">📚</span> Resources
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              Resources
             </h2>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {criterion.official_docs && (
                 <a
                   href={criterion.official_docs}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 text-lg text-blue-600 hover:text-blue-800 hover:underline font-medium transition-colors group"
+                  className="block text-base text-blue-600 hover:text-blue-800 hover:underline"
                 >
-                  <span className="text-2xl group-hover:scale-110 transition-transform">📖</span>
-                  <span>Official Documentation</span>
-                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
+                  Official Documentation →
                 </a>
               )}
               {criterion.references && criterion.references.length > 0 && (
-                <div className="space-y-3 pt-2">
+                <div className="space-y-2">
                   {criterion.references.map((ref, idx) => (
                     <a
                       key={idx}
                       href={ref}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 text-base text-blue-600 hover:text-blue-800 hover:underline transition-colors group"
+                      className="block text-sm text-blue-600 hover:text-blue-800 hover:underline"
                     >
-                      <span className="text-xl group-hover:scale-110 transition-transform">🔗</span>
-                      <span>{new URL(ref).hostname}</span>
-                      <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
+                      {new URL(ref).hostname} →
                     </a>
                   ))}
                 </div>
               )}
               {criterion.learn_more_links && (
-                <p className="text-base text-slate-700 pt-4 border-t-2 border-slate-200 leading-relaxed">
+                <p className="text-base text-gray-700 pt-3 border-t border-gray-200 leading-relaxed mt-3">
                   {criterion.learn_more_links}
                 </p>
               )}
@@ -217,9 +209,9 @@ export default function CriterionDetail() {
           </div>
 
           {/* Technical Details */}
-          <div className="bg-white rounded-2xl border-2 border-gray-300 p-8 shadow-sm">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-              <span className="text-3xl">⚙️</span> Technical Details
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              Technical Details
             </h2>
             <dl className="grid grid-cols-2 gap-6 text-base">
               <div className="bg-gray-50 rounded-xl p-4">

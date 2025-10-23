@@ -40,10 +40,7 @@ export default function FixFirst({ fixes }: FixFirstProps) {
   if (!fixes || fixes.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-2xl">🎯</span>
-          <h2 className="text-lg font-semibold text-gray-900">Fix First</h2>
-        </div>
+        <h2 className="text-lg font-bold text-gray-900 mb-4">Fix First</h2>
         <p className="text-sm text-gray-600">
           Great news! All checks are passing well. No critical fixes needed.
         </p>
@@ -90,10 +87,7 @@ export default function FixFirst({ fixes }: FixFirstProps) {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-2xl">🎯</span>
-        <h2 className="text-lg font-semibold text-gray-900">Fix First</h2>
-      </div>
+      <h2 className="text-lg font-bold text-gray-900 mb-2">Fix First</h2>
       <p className="text-sm text-gray-600 mb-4">
         Top priority improvements organized by category
       </p>
@@ -184,7 +178,7 @@ export default function FixFirst({ fixes }: FixFirstProps) {
                               {/* Why it matters - preview */}
                               {fix.why_it_matters && !isFixExpanded && (
                                 <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">
-                                  💡 {fix.why_it_matters}
+                                  {fix.why_it_matters}
                                 </p>
                               )}
                             </div>

@@ -63,12 +63,6 @@ export default function CheckPill({
       >
         {/* Plain English label first - user-friendly */}
         <span className="font-medium">{meta.label}</span>
-        {/* Score indicator if present */}
-        {typeof score === "number" && (
-          <span className="opacity-80 text-xs">
-            {score === 3 ? '✓' : score === 0 ? '✗' : '⚠'}
-          </span>
-        )}
       </span>
       
       {/* Hover tooltip - positioned above to avoid card clipping */}
