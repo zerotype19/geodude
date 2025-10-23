@@ -3839,15 +3839,32 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: 
     const links = Array.from(html.matchAll(/<a\s+[^>]*href=['"]([^'"]+)['"]/gi))
       .map(m => m[1]).slice(0, 100); // Reduced from 500 to 100 for focused crawls
 
+    // Separate FAQ links for prioritization
+    const faqLinks: string[] = [];
+    const regularLinks: string[] = [];
+
     for (const href of links) {
       try {
         const u = new URL(href, finalUrl);       // resolve relative URLs
         if (!sameSite(finalOrigin, u)) continue; // stay on same site
         if (!shouldCrawlUrl(u.toString(), rootHost, rootPath)) continue; // apply crawl policy with locale
         const abs = u.toString().split("#")[0];
-        if (!visited.has(abs)) queue.push(abs);
+        if (!visited.has(abs)) {
+          // Prioritize FAQ pages
+          if (isFaqUrl(abs)) {
+            faqLinks.push(abs);
+          } else {
+            regularLinks.push(abs);
+          }
+        }
       } catch { /* ignore bad URLs */ }
     }
+
+    // Add FAQ links to queue first, then regular links
+    if (faqLinks.length > 0) {
+      console.log(`[BFS] Found ${faqLinks.length} FAQ link(s) from ${next}: ${faqLinks.join(', ')}`);
+    }
+    queue.push(...faqLinks, ...regularLinks);
   }
   return pages;
 }
@@ -4005,13 +4022,42 @@ function shouldCrawlUrl(url: string, rootHost: string, rootPath?: string): boole
 /**
  * Sorts URLs to prioritize FAQ pages and shorter paths
  */
+/**
+ * Check if a URL is likely an FAQ page
+ * Covers all common variations: FAQ, FAQs, F.A.Q., Frequently Asked Questions, Q&A, etc.
+ */
+function isFaqUrl(url: string): boolean {
+  const urlLower = url.toLowerCase();
+  
+  // Common FAQ URL patterns
+  const faqPatterns = [
+    /\bfaqs?\b/i,                    // faq, faqs
+    /\bf\.?a\.?q\.?s?\b/i,           // f.a.q, f.a.q.s, FAQ, FAQS
+    /frequently[-\s]asked/i,         // frequently-asked, frequently asked
+    /\bq[-&]a\b/i,                   // q-a, q&a
+    /\bq[-\s]and[-\s]a\b/i,          // q and a, q-and-a
+    /questions[-\s]and[-\s]answers/i, // questions and answers
+    /\bhelp[-\s]center\b/i,          // help-center, help center (often contains FAQs)
+    /\bsupport\b.*\bfaq/i,           // support/faq
+    /\bfaq\b.*\bsupport/i            // faq/support
+  ];
+  
+  return faqPatterns.some(pattern => pattern.test(urlLower));
+}
+
+/**
+ * Sort URLs by priority: FAQ pages first, then by path depth
+ */
 function sortUrlsByPriority(urls: string[]): string[] {
   return urls.sort((a, b) => {
-    const faqA = /faq/i.test(a);
-    const faqB = /faq/i.test(b);
+    const faqA = isFaqUrl(a);
+    const faqB = isFaqUrl(b);
+    
+    // FAQ pages always come first
     if (faqA && !faqB) return -1;
     if (faqB && !faqA) return 1;
-    // Shorter paths first
+    
+    // For non-FAQ pages, shorter paths first (closer to homepage)
     return a.length - b.length;
   });
 }
@@ -4054,8 +4100,9 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   }
   
   // Step 5: Apply priority sorting (FAQ first)
+  const faqCount = urls.filter(url => isFaqUrl(url)).length;
   urls = sortUrlsByPriority(urls);
-  console.log(`[CRAWL] URLs sorted by priority (FAQ first, shorter paths first)`);
+  console.log(`[CRAWL] URLs sorted by priority - Found ${faqCount} FAQ pages, prioritizing them first`);
   
   // Step 6: Cap at reasonable limit for focused audits (tight cap for fast discovery)
   const MAX_URLS = 30;
