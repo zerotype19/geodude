@@ -77,6 +77,13 @@ export default function PagesTab({ auditId }: PagesTabProps) {
     return 'text-danger';
   };
 
+  const getScoreBorderColor = (score: number): string => {
+    if (!Number.isFinite(score)) return 'border-border';
+    if (score >= 85) return 'border-success';
+    if (score >= 60) return 'border-warn';
+    return 'border-danger';
+  };
+
   const getScoreBadgeColor = (score: number): string => {
     if (score >= 85) return 'bg-success-soft text-success';
     if (score >= 60) return 'bg-warn-soft text-warn';
@@ -190,7 +197,7 @@ export default function PagesTab({ auditId }: PagesTabProps) {
           const warningChecks = page.checks.filter((c) => !c.preview && c.status === 'warn');
           
           return (
-            <div key={page.id} className="bg-surface-1 shadow rounded-lg hover:shadow-md transition-shadow">
+            <div key={page.id} className={`bg-surface-1 shadow rounded-lg hover:shadow-md transition-shadow border-l-4 ${getScoreBorderColor(page.diagnosticScore)}`}>
               <div className="p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">

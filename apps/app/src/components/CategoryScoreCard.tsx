@@ -38,12 +38,19 @@ export default function CategoryScoreCard({ categoryScore }: CategoryScoreCardPr
     return 'danger';
   };
 
+  const getScoreBorderColor = (score: number): string => {
+    if (!Number.isFinite(score)) return 'border-border';
+    if (score >= 85) return 'border-success';
+    if (score >= 60) return 'border-warn';
+    return 'border-danger';
+  };
+
   const badgeVariant = getScoreBadge(score);
 
   return (
     <Link 
       to={`/audits/${id}/category/${categorySlug}`}
-      className="card card-body hover:shadow-lg hover:border-brand transition-all cursor-pointer"
+      className={`card card-body hover:shadow-lg hover:border-brand transition-all cursor-pointer border-l-4 ${getScoreBorderColor(score)}`}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
