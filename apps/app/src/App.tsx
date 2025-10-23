@@ -31,39 +31,32 @@ function Navigation() {
   const isAdmin = me?.isAdmin === true
   
   return (
-    <nav className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="card border-0 rounded-none shadow-sm">
+      <div className="page-max container-px">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link 
               to="/" 
-              className="text-xl font-black tracking-tight"
-              style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text'
-              }}
+              className="text-xl font-black tracking-tight text-brand"
             >
               OPTIVIEW.AI
             </Link>
           </div>
           
-          {/* Hamburger menu button (all screen sizes) */}
+          {/* Hamburger menu button */}
           <div className="flex items-center">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              className="btn-ghost p-2"
               aria-expanded={menuOpen}
             >
               <span className="sr-only">Open menu</span>
-              {/* Hamburger icon */}
               {!menuOpen ? (
-                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               ) : (
-                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <svg className="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               )}
@@ -72,51 +65,51 @@ function Navigation() {
         </div>
       </div>
 
-      {/* Slide-out menu (all screen sizes) */}
-              {menuOpen && (
-                <div className="border-t border-gray-200">
-                  <div className="pt-2 pb-3 space-y-1">
-                    <Link
-                      to="/audits"
-                      onClick={() => setMenuOpen(false)}
-                      className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                        location.pathname === '/' || location.pathname === '/audits'
-                          ? 'bg-blue-50 border-blue-500 text-blue-700'
-                          : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                      }`}
-                    >
-                      My Audits
-                    </Link>
-                    <Link
-                      to="/score-guide"
-                      onClick={() => setMenuOpen(false)}
-                      className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                        location.pathname.startsWith('/score-guide')
-                          ? 'bg-blue-50 border-blue-500 text-blue-700'
-                          : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                      }`}
-                    >
-                      Score Guide
-                    </Link>
-                    {isAdmin && (
-                      <Link
-                        to="/admin"
-                        onClick={() => setMenuOpen(false)}
-                        className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
-                          location.pathname.startsWith('/admin')
-                            ? 'bg-blue-50 border-blue-500 text-blue-700'
-                            : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                        }`}
-                      >
-                        Admin
-                      </Link>
-                    )}
-                  </div>
+      {/* Slide-out menu */}
+      {menuOpen && (
+        <div className="border-t border-border">
+          <div className="pt-2 pb-3 space-y-1">
+            <Link
+              to="/audits"
+              onClick={() => setMenuOpen(false)}
+              className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                location.pathname === '/' || location.pathname === '/audits'
+                  ? 'bg-brand-soft border-brand text-brand'
+                  : 'border-transparent muted hover:bg-surface-2 hover:border-border'
+              }`}
+            >
+              My Audits
+            </Link>
+            <Link
+              to="/score-guide"
+              onClick={() => setMenuOpen(false)}
+              className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                location.pathname.startsWith('/score-guide')
+                  ? 'bg-brand-soft border-brand text-brand'
+                  : 'border-transparent muted hover:bg-surface-2 hover:border-border'
+              }`}
+            >
+              Score Guide
+            </Link>
+            {isAdmin && (
+              <Link
+                to="/admin"
+                onClick={() => setMenuOpen(false)}
+                className={`block pl-3 pr-4 py-2 border-l-4 text-base font-medium ${
+                  location.pathname.startsWith('/admin')
+                    ? 'bg-brand-soft border-brand text-brand'
+                    : 'border-transparent muted hover:bg-surface-2 hover:border-border'
+                }`}
+              >
+                Admin
+              </Link>
+            )}
+          </div>
           {/* Auth section */}
-          <div className="pt-4 pb-3 border-t border-gray-200">
+          <div className="pt-4 pb-3 border-t border-border">
             {isAuthed && me ? (
               <div className="space-y-1">
-                <div className="px-4 text-sm text-gray-600">
+                <div className="px-4 text-sm subtle">
                   {me.email}
                 </div>
                 <button
@@ -124,7 +117,7 @@ function Navigation() {
                     logout();
                     setMenuOpen(false);
                   }}
-                  className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                  className="block w-full text-left px-4 py-2 text-base font-medium muted hover:bg-surface-2"
                 >
                   Sign out
                 </button>
@@ -135,7 +128,7 @@ function Navigation() {
                   setMenuOpen(false);
                   setSignInModalOpen(true);
                 }}
-                className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50"
+                className="block w-full text-left px-4 py-2 text-base font-medium muted hover:bg-surface-2"
               >
                 Sign In
               </button>
@@ -153,7 +146,7 @@ function Navigation() {
 function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="min-h-screen bg-surface-1 flex flex-col">
         <Navigation />
         <main className="flex-grow">
           <Routes>

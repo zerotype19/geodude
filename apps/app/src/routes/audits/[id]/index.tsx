@@ -355,18 +355,18 @@ export default function AuditDetail() {
   const quickWins = getQuickWins();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-1">
       <AuditTour />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="page-max container-px py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <Link to="/audits" className="text-blue-600 hover:text-blue-800 mb-2 inline-block">
+              <Link to="/audits" className="text-brand hover:underline mb-2 inline-block">
                 ← Back to Audits
               </Link>
-              <h1 className="text-3xl font-bold text-gray-900">Audit Details</h1>
-              <p className="mt-2 text-gray-600">
+              <h1 className="text-3xl font-bold">Audit Details</h1>
+              <p className="mt-2 muted">
                 {audit.project_id} • {audit.root_url}
                 {audit.started_at && (
                   <span className="ml-2">
@@ -385,16 +385,12 @@ export default function AuditDetail() {
               <button
                 onClick={handleRerun}
                 disabled={rerunLoading}
-                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  rerunLoading
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                }`}
+                className={rerunLoading ? 'btn-secondary opacity-50 cursor-not-allowed' : 'btn-primary'}
                 title="Re-crawl the site and generate fresh analysis"
               >
                 {rerunLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
                     Starting...
                   </>
                 ) : (
@@ -406,7 +402,7 @@ export default function AuditDetail() {
                   </>
                 )}
               </button>
-              <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(audit.status)}`}>
+              <span className={`pill ${getStatusColor(audit.status)}`}>
                 {audit.status.toUpperCase()}
               </span>
             </div>
@@ -415,14 +411,14 @@ export default function AuditDetail() {
 
         {/* Tab Navigation */}
         <div className="mb-8">
-          <nav className="flex space-x-8 border-b border-gray-200">
+          <nav className="flex space-x-8 border-b border-border">
             <button
               data-tour="overview-tab"
               onClick={() => handleTabChange('overview')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'overview'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent muted hover:border-border'
               }`}
             >
               Overview
@@ -432,8 +428,8 @@ export default function AuditDetail() {
               onClick={() => handleTabChange('pages')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'pages'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent muted hover:border-border'
               }`}
             >
               Pages
@@ -443,8 +439,8 @@ export default function AuditDetail() {
               onClick={() => handleTabChange('citations')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'citations'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent muted hover:border-border'
               }`}
             >
               Citations
@@ -453,8 +449,8 @@ export default function AuditDetail() {
               onClick={() => handleTabChange('actions')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'actions'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent muted hover:border-border'
               }`}
             >
               Actions
@@ -463,13 +459,13 @@ export default function AuditDetail() {
               onClick={() => handleTabChange('diagnostics')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'diagnostics'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-brand text-brand'
+                  : 'border-transparent muted hover:border-border'
               }`}
             >
               Diagnostics
               {diagnostics.composite && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <span className="ml-2 pill pill-brand">
                   {diagnostics.composite.total.toFixed(1)}
                 </span>
               )}
@@ -479,18 +475,18 @@ export default function AuditDetail() {
 
         {/* Failure Banner */}
         {audit.status === 'failed' && (
-          <div className="mb-8 bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg">
-            <div className="flex">
+          <div className="mb-8 card bg-danger-soft border-l-4 border-danger">
+            <div className="flex p-4">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-5 w-5 text-danger" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3 flex-1">
-                <h3 className="text-sm font-medium text-red-800">
+                <h3 className="text-sm font-medium">
                   Audit Failed
                 </h3>
-                <div className="mt-2 text-sm text-red-700">
+                <div className="mt-2 text-sm">
                   <p>
                     {audit.fail_reason === 'non_content_platform' && 
                       'This platform requires login or is a web application (not a content site). Try a different domain.'}
