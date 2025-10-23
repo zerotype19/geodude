@@ -178,9 +178,9 @@ function Status({ status }: StatusProps) {
     warn: 'bg-warn-soft0',
     fail: 'bg-danger-soft0',
     error: 'bg-rose-500',
-    not_applicable: 'bg-gray-400',
+    not_applicable: 'bg-surface-3',
     preview: 'bg-brand',
-  }[status] || 'bg-gray-400';
+  }[status] || 'bg-surface-3';
 
   const label =
     status === 'not_applicable'

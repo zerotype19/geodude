@@ -240,7 +240,7 @@ export default function ClassifierCompare() {
                     <h3 className="text-lg font-semibold mb-4">Category Terms</h3>
                     <div className="flex flex-wrap gap-2">
                       {data.v2.category_terms.map((term: string, i: number) => (
-                        <span key={i} className="px-3 py-1 bg-purple-100 text-brand rounded-full text-sm">
+                        <span key={i} className="px-3 py-1 bg-brand-soft text-brand rounded-full text-sm">
                           {term}
                         </span>
                       ))}

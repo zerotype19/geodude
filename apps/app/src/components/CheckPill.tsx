@@ -28,7 +28,7 @@ export default function CheckPill({
   const color =
     score === 3 ? "bg-success-soft text-success border-success"
   : score === 2 ? "bg-warn-soft text-warn border-warn"
-  : score === 1 ? "bg-orange-100 text-orange-800 border-orange-200"
+  : score === 1 ? "bg-warn-soft text-warn border-warn"
   : score === 0 ? "bg-danger-soft text-danger border-danger"
   : "bg-surface-2 muted border-border"; // no score provided
 

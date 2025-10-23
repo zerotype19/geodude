@@ -20,7 +20,7 @@ export default function CriteriaCard({ criterion }: CriteriaCardProps) {
 
   const scopeColors = {
     page: 'bg-success-soft text-success',
-    site: 'bg-purple-100 text-brand'
+    site: 'bg-brand-soft text-brand'
   };
 
   const checkTypeColors = {

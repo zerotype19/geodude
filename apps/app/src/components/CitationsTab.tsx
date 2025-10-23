@@ -197,7 +197,7 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
                     {type.query_type.replace('-', ' ')} Queries
                   </h4>
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    type.query_type === 'branded' ? 'bg-purple-100 text-brand' : 'bg-success-soft text-success'
+                    type.query_type === 'branded' ? 'bg-brand-soft text-brand' : 'bg-success-soft text-success'
                   }`}>
                     {type.query_type === 'branded' ? '🏷️ Brand' : '🌐 Topic'}
                   </span>
@@ -221,7 +221,7 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
                   <div className="w-full bg-surface-3 rounded-full h-2">
                     <div 
                       className={`h-2 rounded-full ${
-                        type.query_type === 'branded' ? 'bg-brand' : 'bg-green-600'
+                        type.query_type === 'branded' ? 'bg-brand' : 'bg-success'
                       }`}
                       style={{ width: `${type.cited_percentage}%` }}
                     ></div>
@@ -346,14 +346,14 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
 
       {/* Queries That DID NOT Cite Your Domain (Missing Opportunities) */}
       {summary?.missingQueries && summary.missingQueries.length > 0 && (
-        <div className="bg-surface-1 shadow rounded-lg border-2 border-orange-200">
-          <div className="px-6 py-4 border-b border-orange-200 bg-orange-50">
+        <div className="bg-surface-1 shadow rounded-lg border-2 border-warn">
+          <div className="px-6 py-4 border-b border-warn bg-warn-soft">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-medium ">⚠️ Missing Opportunities</h3>
                 <p className="text-sm muted">Queries where you're NOT appearing (but should be)</p>
               </div>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-warn-soft text-warn">
                 {summary.missingQueries.length} queries
               </span>
             </div>
@@ -370,7 +370,7 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
               </thead>
               <tbody>
                 {summary.missingQueries.map((query, index) => (
-                  <tr key={index} className="hover:bg-orange-50">
+                  <tr key={index} className="hover:bg-warn-soft">
                     <td className="px-6 py-4">
                       <div className="text-sm  max-w-md">
                         {query.query}
@@ -379,7 +379,7 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         query.query_type === 'branded' 
-                          ? 'bg-purple-100 text-brand' 
+                          ? 'bg-brand-soft text-brand' 
                           : 'bg-brand-soft text-brand'
                       }`}>
                         {query.query_type || 'unknown'}
@@ -411,7 +411,7 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
                           });
                           setShowDrawer(true);
                         }}
-                        className="text-orange-600 hover:text-orange-800 underline"
+                        className="text-orange-600 hover:text-warn underline"
                       >
                         Why Not?
                       </button>
@@ -421,7 +421,7 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
               </tbody>
             </table>
           </div>
-          <div className="px-6 py-4 bg-orange-50 border-t border-orange-200">
+          <div className="px-6 py-4 bg-warn-soft border-t border-warn">
             <p className="text-sm muted">
               💡 <strong>These are high-priority content gaps.</strong> Create or optimize content targeting these queries to improve your AI visibility.
             </p>

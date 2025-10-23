@@ -11,9 +11,9 @@ interface AssistantChipsProps {
 
 const ASSISTANT_COLORS: Record<string, string> = {
   chatgpt: 'bg-success-soft text-success dark:bg-green-900/30 dark:text-green-400',
-  claude: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  claude: 'bg-warn-soft text-warn dark:bg-orange-900/30 dark:text-orange-400',
   perplexity: 'bg-brand-soft text-brand dark:bg-blue-900/30 dark:text-blue-400',
-  brave: 'bg-purple-100 text-brand dark:bg-purple-900/30 dark:text-purple-400'
+  brave: 'bg-brand-soft text-brand dark:bg-purple-900/30 dark:text-purple-400'
 };
 
 const ASSISTANT_LABELS: Record<string, string> = {

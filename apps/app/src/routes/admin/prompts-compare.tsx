@@ -67,10 +67,10 @@ export default function PromptsComparePage() {
           {/* Metadata Chips */}
           <div className="mb-4 flex flex-wrap gap-2">
             {renderChip('Industry', prompts.meta?.industry, 'bg-brand-soft text-brand')}
-            {renderChip('Version', prompts.meta?.prompt_gen_version || prompts.meta?.template_version, 'bg-purple-100 text-brand')}
+            {renderChip('Version', prompts.meta?.prompt_gen_version || prompts.meta?.template_version, 'bg-brand-soft text-brand')}
             {renderChip('Source', prompts.meta?.source, 'bg-success-soft text-success')}
             {renderChip('Branded', prompts.branded?.length, 'bg-warn-soft text-warn')}
-            {renderChip('Non-Branded', prompts.nonBranded?.length, 'bg-orange-100 text-orange-800')}
+            {renderChip('Non-Branded', prompts.nonBranded?.length, 'bg-warn-soft text-warn')}
             {prompts.meta?.realism_avg && renderChip('Realism', prompts.meta.realism_avg.toFixed(3), 'bg-pink-100 text-pink-800')}
             {prompts.meta?.realism_target && renderChip('Target', prompts.meta.realism_target.toFixed(2), 'bg-indigo-100 text-indigo-800')}
           </div>

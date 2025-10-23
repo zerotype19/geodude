@@ -183,7 +183,7 @@ export default function CategoryDetail() {
   const getScoreColor = (score: number) => {
     if (score >= 85) return 'text-success bg-success-soft border-success';
     if (score >= 60) return 'text-warn bg-warn-soft border-warn';
-    if (score >= 40) return 'text-orange-600 bg-orange-50 border-orange-200';
+    if (score >= 40) return 'text-orange-600 bg-warn-soft border-warn';
     return 'text-danger bg-danger-soft border-danger';
   };
 

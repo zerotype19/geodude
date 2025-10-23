@@ -121,15 +121,27 @@ a {
   }
 
   .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium border border-transparent shadow-sm;
     @apply bg-brand text-brand-foreground hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-ring;
+    transition: all 0.2s cubic-bezier(.2,.8,.2,1);
   }
 
   .btn-soft {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium border border-transparent shadow-sm;
     @apply bg-brand-soft text-brand hover:bg-brand/10;
+    transition: all 0.2s cubic-bezier(.2,.8,.2,1);
   }
 
   .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium shadow-sm;
     @apply bg-transparent text-ink hover:bg-surface-2 border-border;
+    transition: all 0.2s cubic-bezier(.2,.8,.2,1);
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium border shadow-sm;
+    @apply bg-surface-2 text-ink border-border hover:bg-surface-3;
+    transition: all 0.2s cubic-bezier(.2,.8,.2,1);
   }
 
   .field {

@@ -22,7 +22,7 @@ export default function ScoreLegend() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-orange-100 text-orange-800 text-xs font-bold">
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-warn-soft text-warn text-xs font-bold">
             1
           </span>
           <div className="text-xs">

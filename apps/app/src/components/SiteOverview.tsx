@@ -118,7 +118,7 @@ function StatusChip({ status }: StatusChipProps) {
       : status === 'fail'
       ? 'bg-danger-soft text-danger'
       : status === 'preview'
-      ? 'bg-purple-100 text-brand'
+      ? 'bg-brand-soft text-brand'
       : status === 'not_applicable'
       ? 'bg-surface-2 muted'
       : 'bg-surface-2 muted';

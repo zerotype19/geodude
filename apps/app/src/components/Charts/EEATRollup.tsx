@@ -23,7 +23,7 @@ export default function EEATRollup({ data }: EEATRollupProps) {
   const getColor = (score: number) => {
     if (score >= 80) return 'bg-brand';
     if (score >= 60) return 'bg-brand';
-    if (score >= 40) return 'bg-indigo-500';
+    if (score >= 40) return 'bg-brand';
     return 'bg-gray-500';
   };
 

@@ -23,7 +23,7 @@ export default function CategoryRollup({ data }: CategoryRollupProps) {
   const getColor = (score: number) => {
     if (score >= 80) return 'bg-success-soft0';
     if (score >= 60) return 'bg-warn-soft0';
-    if (score >= 40) return 'bg-orange-500';
+    if (score >= 40) return 'bg-warn-soft0';
     return 'bg-danger-soft0';
   };
 
