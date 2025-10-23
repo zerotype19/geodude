@@ -140,13 +140,14 @@ export default function FixFirst({ fixes, auditId }: FixFirstProps) {
                 {/* Page Header */}
                 <button
                   onClick={() => togglePage(pageKey)}
-                  className="w-full px-4 py-3 bg-surface-2 hover:bg-surface-3 transition-colors text-left"
+                  className="w-full px-4 py-3 bg-surface-1 hover:bg-surface-2 transition-colors text-left border-b border-border"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       {pageData.url ? (
                         <>
                           <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium subtle uppercase tracking-wide">URL:</span>
                             <div className="text-sm font-medium text-brand truncate">
                               {pageData.url}
                             </div>
@@ -155,8 +156,11 @@ export default function FixFirst({ fixes, auditId }: FixFirstProps) {
                             )}
                           </div>
                           {pageData.title && (
-                            <div className="text-xs muted truncate">
-                              {pageData.title}
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium subtle uppercase tracking-wide flex-shrink-0">Title:</span>
+                              <div className="text-xs muted truncate">
+                                {pageData.title}
+                              </div>
                             </div>
                           )}
                         </>
