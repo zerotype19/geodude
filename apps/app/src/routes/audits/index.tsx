@@ -97,10 +97,13 @@ export default function AuditsIndex() {
     switch (status) {
       case 'completed':
       case 'complete': // Legacy support
-        return 'bg-success-soft text-success';
-      case 'running': return 'bg-brand-soft text-brand';
-      case 'failed': return 'bg-danger-soft text-danger';
-      default: return 'bg-surface-2 text-gray-800';
+        return 'pill-success';
+      case 'running': 
+        return 'pill-brand';
+      case 'failed': 
+        return 'pill-danger';
+      default: 
+        return '';
     }
   };
 

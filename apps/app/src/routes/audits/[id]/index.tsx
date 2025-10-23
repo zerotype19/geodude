@@ -190,10 +190,15 @@ export default function AuditDetail() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'complete': return 'bg-success-soft text-success';
-      case 'running': return 'bg-brand-soft text-brand';
-      case 'failed': return 'bg-danger-soft text-danger';
-      default: return 'bg-surface-2 text-gray-800';
+      case 'completed':
+      case 'complete': // Legacy support
+        return 'pill-success';
+      case 'running': 
+        return 'pill-brand';
+      case 'failed': 
+        return 'pill-danger';
+      default: 
+        return '';
     }
   };
 
