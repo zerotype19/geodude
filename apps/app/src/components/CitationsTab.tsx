@@ -329,8 +329,8 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
 
       {/* Queries That DID NOT Cite Your Domain (Missing Opportunities) */}
       {summary?.missingQueries && summary.missingQueries.length > 0 && (
-        <div className="card border-2 border-warn">
-          <div className="card-header bg-warn-soft border-b border-warn">
+        <div className="card">
+          <div className="card-header">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="section-title">Missing Opportunities</h3>
@@ -400,7 +400,7 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
               </tbody>
             </table>
           </div>
-          <div className="card-footer bg-warn-soft border-t border-warn">
+          <div className="card-footer">
             <p className="text-sm">
               <strong>These are high-priority content gaps.</strong> Create or optimize content targeting these queries to improve your AI visibility.
             </p>
