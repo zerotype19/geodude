@@ -259,121 +259,149 @@ export default function CategoryDetail() {
           </div>
         </div>
 
-        {/* How to Improve - Show quick guidance from failing checks */}
-        {pagesWithIssues.length > 0 && checksInCategory.some(c => c.how_to_fix) && (
-          <div className="bg-surface-1 rounded-lg border border-border p-6 mb-8">
-            <h2 className="text-lg font-bold  mb-4">
-              How to Improve This Category
-            </h2>
-            <div className="space-y-4">
-              {checksInCategory
-                .filter(check => check.scope === 'page' && check.how_to_fix)
-                .slice(0, 3)
-                .map(check => (
-                  <div key={check.id} className="bg-surface-1 rounded-lg border border-blue-200 p-4">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">🔧</span>
-                      <div className="flex-1">
-                        <h3 className="font-bold  mb-1">{check.title}</h3>
-                        <p className="text-sm muted mb-2">{check.why_it_matters}</p>
-                        <div className="bg-success-soft border border-success rounded p-3 text-sm text-green-900">
-                          <strong className="block mb-1">How to fix:</strong>
-                          <p className="whitespace-pre-line">{check.how_to_fix}</p>
-                        </div>
-                        {check.quick_fixes && (
-                          <div className="mt-2 bg-surface-2 border border-border rounded p-3 text-sm muted">
-                            <strong className="block mb-1 ">Quick fixes:</strong>
-                            <p>{check.quick_fixes}</p>
-                          </div>
-                        )}
-                        {check.official_docs && (
-                          <a
-                            href={check.official_docs}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-2 text-sm text-brand hover:text-brand font-medium"
-                          >
-                            Official Docs →
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {/* Check Breakdown */}
-        <div className="bg-surface-1 rounded-lg border border-border p-6 mb-8">
-          <h2 className="text-lg font-semibold  mb-4">
-            Category Score Breakdown
+        {/* Criteria in this Category */}
+        <div className="card card-body mb-8">
+          <h2 className="section-title mb-2">
+            Criteria in This Category
           </h2>
           <p className="text-sm muted mb-4">
-            Performance on each check within this category (0-100 scale)
+            Click any criterion to learn more about it and how to optimize
           </p>
-          <div className="space-y-3">
-            {checkBreakdown.length === 0 ? (
-              <p className="subtle text-sm">No page-level checks defined for this category.</p>
-            ) : (
-              checkBreakdown.map(({ check, avgScore, passingPages, failingPages, totalPages }) => (
-                <div 
-                  key={check.id} 
-                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-surface-2"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {checksInCategory.map(check => {
+              const breakdown = checkBreakdown.find(b => b.check.id === check.id);
+              const avgScore = breakdown?.avgScore || 0;
+              
+              return (
+                <Link
+                  key={check.id}
+                  to={`/score-guide/${check.id}`}
+                  className="card card-body hover:shadow-xl transition-all group flex flex-col"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-xs font-mono subtle bg-surface-2 px-2 py-1 rounded">
-                        {check.id}
-                      </span>
-                      <h3 className="font-medium ">{check.title}</h3>
-                      {getStatusBadge(avgScore)}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-sm mb-1 group-hover:text-brand transition-colors">
+                        {check.title}
+                      </h3>
+                      <p className="text-xs muted line-clamp-2">
+                        {check.why_it_matters}
+                      </p>
                     </div>
-                    <p className="text-sm muted mb-2">{check.description}</p>
-                    <div className="flex items-center gap-4 text-xs muted">
-                      <span>
-                        <span className="font-semibold text-success">{passingPages}</span> passing
-                      </span>
-                      <span>
-                        <span className="font-semibold text-danger">{failingPages}</span> failing
-                      </span>
-                      <span className="subtle">
-                        of {totalPages} pages
-                      </span>
-                    </div>
-                    {check.why_it_matters && (
-                      <div className="mt-2 text-xs subtle border-l-2 border-blue-200 pl-3">
-                        <strong>Why it matters:</strong> {check.why_it_matters}
+                    {breakdown && (
+                      <div className="ml-3 text-right flex-shrink-0">
+                        <div className={`text-xl font-bold ${getCheckScoreColor(avgScore)}`}>
+                          {Math.round(avgScore)}
+                        </div>
                       </div>
                     )}
                   </div>
-                  <div className="ml-4 text-right">
-                    <div className={`text-2xl font-bold ${getCheckScoreColor(avgScore)}`}>
-                      {Math.round(avgScore)}
-                    </div>
-                    <div className="text-xs subtle">avg score</div>
+                  <div className="flex items-center gap-2 text-xs flex-wrap mt-auto">
+                    <span className="tag">{check.id}</span>
+                    {check.scope === 'page' ? (
+                      <span className="pill pill-brand">Page-Level</span>
+                    ) : (
+                      <span className="pill pill-success">Site-Level</span>
+                    )}
+                    {check.impact_level && (
+                      <span className={`pill ${
+                        check.impact_level === 'High' ? 'pill-danger' : 
+                        check.impact_level === 'Medium' ? 'pill-warn' : 
+                        'pill-success'
+                      }`}>
+                        {check.impact_level}
+                      </span>
+                    )}
                   </div>
-                </div>
-              ))
-            )}
+                </Link>
+              );
+            })}
           </div>
         </div>
 
-        {/* Pages with Issues */}
-        <div className="bg-surface-1 rounded-lg border border-border">
-          <div className="px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold ">
+        {/* Score Breakdown Table */}
+        <div className="card card-body mb-8">
+          <h2 className="section-title mb-2">
+            Score Breakdown by Criterion
+          </h2>
+          <p className="text-sm muted mb-4">
+            Average performance across all pages for each criterion (0-100 scale)
+          </p>
+          {checkBreakdown.length === 0 ? (
+            <p className="subtle text-sm">No page-level checks defined for this category.</p>
+          ) : (
+            <div className="table-wrap">
+              <table className="ui">
+                <thead>
+                  <tr>
+                    <th>Criterion</th>
+                    <th className="text-center">Avg Score</th>
+                    <th className="text-center">Passing</th>
+                    <th className="text-center">Failing</th>
+                    <th className="text-right">Impact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {checkBreakdown
+                    .sort((a, b) => a.avgScore - b.avgScore) // Worst first
+                    .map(({ check, avgScore, passingPages, failingPages, totalPages }) => (
+                      <tr key={check.id}>
+                        <td>
+                          <Link 
+                            to={`/score-guide/${check.id}`}
+                            className="flex flex-col hover:text-brand"
+                          >
+                            <span className="font-medium">{check.title}</span>
+                            <span className="tag">{check.id}</span>
+                          </Link>
+                        </td>
+                        <td className="text-center">
+                          <div className="flex flex-col items-center">
+                            <span className={`text-2xl font-bold ${getCheckScoreColor(avgScore)}`}>
+                              {Math.round(avgScore)}
+                            </span>
+                            {getStatusBadge(avgScore)}
+                          </div>
+                        </td>
+                        <td className="text-center">
+                          <span className="text-success font-semibold">{passingPages}</span>
+                          <span className="text-xs subtle ml-1">pages</span>
+                        </td>
+                        <td className="text-center">
+                          <span className="text-danger font-semibold">{failingPages}</span>
+                          <span className="text-xs subtle ml-1">pages</span>
+                        </td>
+                        <td className="text-right">
+                          <span className={`pill ${
+                            check.impact_level === 'High' ? 'pill-danger' : 
+                            check.impact_level === 'Medium' ? 'pill-warn' : 
+                            'pill-success'
+                          }`}>
+                            {check.impact_level || 'Medium'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Impacted Pages */}
+        <div className="card">
+          <div className="card-header">
+            <h2 className="section-title">
               Impacted Pages ({pagesWithIssues.length})
             </h2>
-            <p className="text-sm muted">
-              Pages scoring below 60 on checks in this category
+            <p className="text-sm muted mt-1">
+              Pages with at least one criterion scoring below 60
             </p>
           </div>
           
           {pagesWithIssues.length === 0 ? (
-            <div className="px-6 py-12 text-center">
+            <div className="card-body text-center py-12">
               <div className="text-4xl mb-2">🎉</div>
-              <p className=" font-medium mb-1">All pages passing!</p>
+              <p className="font-medium mb-1">All pages passing!</p>
               <p className="subtle text-sm">No issues found in this category</p>
             </div>
           ) : (
@@ -381,10 +409,10 @@ export default function CategoryDetail() {
               <table className="ui">
                 <thead>
                   <tr>
-                    <th>URL</th>
-                    <th>Failing Checks</th>
-                    <th>Avg Score</th>
-                    <th>Actions</th>
+                    <th>Page URL</th>
+                    <th className="text-center">Issues</th>
+                    <th className="text-center">Avg Score</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -394,49 +422,34 @@ export default function CategoryDetail() {
                       : 0;
                     
                     return (
-                      <tr key={page.id} className="hover:bg-surface-2">
-                        <td className="px-6 py-4 text-sm  max-w-md">
+                      <tr key={page.id}>
+                        <td className="max-w-md">
                           <a 
                             href={page.url} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="hover:text-brand break-all"
+                            className="text-brand hover:underline break-all text-sm"
                           >
                             {page.url}
                           </a>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            {page.failingChecks.slice(0, 5).map((check) => (
-                              <span 
-                                key={check.id}
-                                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-danger-soft text-danger"
-                                title={CRITERIA_BY_ID.get(check.id)?.title || check.id}
-                              >
-                                {check.id}
-                              </span>
-                            ))}
-                            {page.failingChecks.length > 5 && (
-                              <span className="text-xs subtle">
-                                +{page.failingChecks.length - 5} more
-                              </span>
-                            )}
-                          </div>
+                        <td className="text-center">
+                          <span className="text-danger font-semibold text-lg">
+                            {page.failingChecks.length}
+                          </span>
+                          <span className="text-xs subtle ml-1">failing</span>
                         </td>
-                        <td className="px-6 py-4 text-sm">
-                          <span className={`font-semibold ${getCheckScoreColor(avgPageScore)}`}>
+                        <td className="text-center">
+                          <span className={`text-lg font-bold ${getCheckScoreColor(avgPageScore)}`}>
                             {avgPageScore}
                           </span>
-                          <span className="subtle text-xs ml-1">
-                            ({page.failingChecks.length} issue{page.failingChecks.length !== 1 ? 's' : ''})
-                          </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="text-right">
                           <Link
                             to={`/audits/${id}/pages/${page.id}`}
-                            className="text-brand hover:text-brand"
+                            className="btn-ghost"
                           >
-                            View Details →
+                            View Page Details →
                           </Link>
                         </td>
                       </tr>
