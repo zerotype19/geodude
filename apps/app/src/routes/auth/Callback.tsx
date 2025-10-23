@@ -7,6 +7,7 @@ export default function Callback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [isStartingAudit, setIsStartingAudit] = useState(false);
 
   useEffect(() => {
     const verifyToken = async () => {
@@ -34,6 +35,11 @@ export default function Callback() {
         const data = await response.json();
         
         if (data.ok && data.redirectTo) {
+          // Check if this is a new audit flow
+          if (data.redirectTo.includes('/audits/new?')) {
+            setIsStartingAudit(true);
+          }
+          
           // Session cookie is set, navigate to the intended page
           window.location.href = data.redirectTo;
         } else {
@@ -59,10 +65,10 @@ export default function Callback() {
           </svg>
         </div>
         <h1 className="text-xl font-semibold  mb-2">
-          {error ? 'Verification Failed' : 'Signing you in…'}
+          {error ? 'Verification Failed' : isStartingAudit ? 'Starting Your Audit' : 'Signing you in…'}
         </h1>
         <p className="text-sm muted">
-          {error || 'Please wait while we verify your link.'}
+          {error || (isStartingAudit ? 'Setting up your audit...' : 'Please wait while we verify your link.')}
         </p>
         
         {!error && (

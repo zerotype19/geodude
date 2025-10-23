@@ -47,9 +47,10 @@ export default function NewAudit() {
         const result = await response.json();
         console.log('[NEW AUDIT] Audit created:', result);
 
-        // Redirect to the audit page
+        // Redirect to the audits dashboard (not the empty audit detail page)
+        // User can click into the audit once it has data
         if (result.audit_id) {
-          navigate(`/audits/${result.audit_id}`);
+          navigate('/audits');
         } else {
           setError('Audit created but no ID returned');
         }
