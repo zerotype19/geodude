@@ -774,6 +774,82 @@ export default {
         }
       }
 
+      // Composite scoring for an audit (before general /api/audits/ route)
+      if (req.method === 'GET' && path.match(/^\/api\/audits\/[^/]+\/composite$/)) {
+        const auditId = path.split('/')[3];
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        try {
+          const { computeComposite } = await import('./diagnostics/composite');
+          const { loadCriteriaMap } = await import('./diagnostics/persist');
+
+          // Fetch site_checks_json from audits table
+          const audit = await env.DB.prepare("SELECT site_checks_json, user_id FROM audits WHERE id = ?").bind(auditId).first();
+          if (!audit) {
+            return new Response(JSON.stringify({ error: 'Audit not found' }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // SECURITY: Check ownership
+          const userId = await getUserIdFromRequest(req, env);
+          if (!userId || audit.user_id !== userId) {
+            return new Response(JSON.stringify({ error: 'Access denied' }), {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          const siteChecks = audit.site_checks_json ? JSON.parse(audit.site_checks_json as string) : [];
+
+          // Aggregate page checks from all pages in the audit
+          const pages = (await env.DB.prepare(`
+            SELECT apa.checks_json
+            FROM audit_pages p
+            LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+            WHERE p.audit_id = ?1 AND apa.checks_json IS NOT NULL
+          `).bind(auditId).all()).results || [];
+
+          const allPageChecks = pages.flatMap((p: any) => {
+            try {
+              return p.checks_json ? JSON.parse(p.checks_json) : [];
+            } catch {
+              return [];
+            }
+          });
+
+          // Load criteria metadata
+          const criteriaMap = await loadCriteriaMap(env.DB);
+          const criteriaArray = Array.from(criteriaMap.values());
+
+          // Compute composite scores
+          const composite = computeComposite(allPageChecks, siteChecks, criteriaArray);
+
+          return new Response(JSON.stringify({
+            audit_id: auditId,
+            ...composite
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error(`[COMPOSITE] Error for audit ${auditId}:`, error);
+          return new Response(JSON.stringify({
+            error: 'Failed to compute composite score',
+            message: (error as Error).message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       if (req.method === 'GET' && path === '/api/audits') {
         // Extract user_id from session cookie - REQUIRED for security
         const userId = await getUserIdFromRequest(req, env);
@@ -1368,73 +1444,6 @@ export default {
       if (req.method === 'GET' && path === '/api/scoring/criteria') {
         const { handleGetCriteria } = await import('./routes/criteria');
         return handleGetCriteria(req, env);
-      }
-
-      // Composite scoring for an audit
-      if (req.method === 'GET' && path.match(/^\/api\/audits\/[^/]+\/composite$/)) {
-        const auditId = path.split('/')[3];
-        if (!auditId) {
-          return new Response(JSON.stringify({ error: 'Audit ID required' }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-
-        try {
-          const { computeComposite } = await import('./diagnostics/composite');
-          const { loadCriteriaMap } = await import('./diagnostics/persist');
-
-          // Fetch site_checks_json from audits table
-          const audit = await env.DB.prepare("SELECT site_checks_json FROM audits WHERE id = ?").bind(auditId).first();
-          if (!audit) {
-            return new Response(JSON.stringify({ error: 'Audit not found' }), {
-              status: 404,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-          }
-
-          const siteChecks = audit.site_checks_json ? JSON.parse(audit.site_checks_json as string) : [];
-
-          // Aggregate page checks from all pages in the audit
-          const pages = (await env.DB.prepare(`
-            SELECT apa.checks_json
-            FROM audit_pages p
-            LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
-            WHERE p.audit_id = ?1 AND apa.checks_json IS NOT NULL
-          `).bind(auditId).all()).results || [];
-
-          const allPageChecks = pages.flatMap((p: any) => {
-            try {
-              return p.checks_json ? JSON.parse(p.checks_json) : [];
-            } catch {
-              return [];
-            }
-          });
-
-          // Load criteria metadata
-          const criteriaMap = await loadCriteriaMap(env.DB);
-          const criteriaArray = Array.from(criteriaMap.values());
-
-          // Compute composite scores
-          const composite = computeComposite(allPageChecks, siteChecks, criteriaArray);
-
-          return new Response(JSON.stringify({
-            audit_id: auditId,
-            ...composite
-          }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        } catch (error) {
-          console.error(`[COMPOSITE] Error for audit ${auditId}:`, error);
-          return new Response(JSON.stringify({
-            error: 'Failed to compute composite score',
-            message: (error as Error).message
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
       }
 
       if (req.method === 'GET' && path.startsWith('/api/insights')) {
