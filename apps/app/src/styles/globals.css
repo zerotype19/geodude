@@ -197,6 +197,21 @@ a {
   .container-px {
     @apply px-4 sm:px-6 lg:px-8;
   }
+
+  .score-glow-success {
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+  }
+
+  .score-glow-warn {
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.15);
+  }
+
+  .score-glow-danger {
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+  }
 }
 
 /* Close utilities layer */

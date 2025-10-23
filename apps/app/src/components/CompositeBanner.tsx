@@ -18,9 +18,9 @@ interface Props {
 
 const getScoreGlow = (score: number): string => {
   if (!Number.isFinite(score)) return '';
-  if (score >= 85) return 'shadow-[0_0_0_3px_rgba(34,197,94,0.15)] border border-success/30';
-  if (score >= 60) return 'shadow-[0_0_0_3px_rgba(251,191,36,0.15)] border border-warn/30';
-  return 'shadow-[0_0_0_3px_rgba(239,68,68,0.15)] border border-danger/30';
+  if (score >= 85) return 'score-glow-success';
+  if (score >= 60) return 'score-glow-warn';
+  return 'score-glow-danger';
 };
 
 export default function CompositeBanner({ data }: Props) {
