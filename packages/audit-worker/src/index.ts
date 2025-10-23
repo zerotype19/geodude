@@ -1363,8 +1363,10 @@ export default {
         // Re-score recent audits with new preview=0 criteria
         if (req.method === 'POST' && path === '/api/admin/rescore-recent') {
           try {
+            console.log('[RESCORE] Starting batch re-score...');
             const body = await req.json() as { limit?: number };
             const limit = body.limit || 10;
+            console.log(`[RESCORE] Limit: ${limit}`);
             
             // Get recent completed audits
             const audits = await env.DB.prepare(`
@@ -1375,6 +1377,8 @@ export default {
               LIMIT ?
             `).bind(limit).all();
             
+            console.log(`[RESCORE] Found ${audits.results?.length || 0} audits to re-score`);
+            
             const results = [];
             for (const audit of (audits.results || [])) {
               try {
@@ -1382,12 +1386,14 @@ export default {
                 await recomputeAudit(audit.id as string, env);
                 results.push({ id: audit.id, status: 'success' });
                 console.log(`[RESCORE] ✅ ${audit.id}`);
-              } catch (err) {
+              } catch (err: any) {
                 console.error(`[RESCORE] ❌ ${audit.id}:`, err);
-                results.push({ id: audit.id, status: 'error', error: String(err) });
+                console.error(`[RESCORE] Error stack:`, err.stack);
+                results.push({ id: audit.id, status: 'error', error: String(err), stack: err.stack });
               }
             }
             
+            console.log(`[RESCORE] Batch complete: ${results.length} audits processed`);
             return new Response(JSON.stringify({
               ok: true,
               rescored: results.length,
@@ -1396,10 +1402,12 @@ export default {
               status: 200,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
-          } catch (error) {
+          } catch (error: any) {
             console.error('[RESCORE] Batch failed:', error);
+            console.error('[RESCORE] Error stack:', error.stack);
             return new Response(JSON.stringify({ 
-              error: error instanceof Error ? error.message : 'Unknown error' 
+              error: error instanceof Error ? error.message : 'Unknown error',
+              stack: error instanceof Error ? error.stack : undefined
             }), {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
