@@ -132,23 +132,6 @@ export default function ScoreGuide() {
               <span className="text-green-600">Low</span> {' '}
               indicate priority for fixing failures.
             </p>
-            {STATS.preview > 0 && (
-              <p>
-                <strong>Preview Mode:</strong> {STATS.preview} checks are in preview mode - 
-                they're being computed but don't yet affect composite scores.
-              </p>
-            )}
-            <p className="text-xs pt-4">
-              <strong>Data Source:</strong> D1 scoring_criteria table · Last synced from database · {' '}
-              <a 
-                href="https://github.com/zerotype19/geodude/blob/main/packages/audit-worker/exports/ID_RESOLUTION.md"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                ID Resolution Guide
-              </a>
-            </p>
           </div>
         </footer>
       </div>
