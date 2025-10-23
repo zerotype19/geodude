@@ -25,6 +25,7 @@ export interface CheckResult {
 }
 
 import { q, qa, txt, attr, isInternal } from "./dom";
+import { getETLD1, normalizeBrandText, brandFromHost, tokenBoundaryIncludes, hostsEquivalent } from "./brand";
 
 const clamp = (n: number, lo=0, hi=100) => Math.max(lo, Math.min(hi, n));
 const lenScore = (n: number, min: number, max: number) => {
@@ -35,25 +36,68 @@ const lenScore = (n: number, min: number, max: number) => {
 };
 const statusFromScore = (s: number): CheckStatus => (s>=85?"ok": s>=60?"warn":"fail");
 
+function firstMeaningfulText(doc: Document): string {
+  const main = q(doc, "main") || doc.body;
+  if (!main) return "";
+  const selector = "p, .lead, article p, section p";
+  const blocks = qa(main, selector).map(e => txt(e as Element).trim()).filter(Boolean);
+  return (blocks[0] || txt(main).trim()).slice(0, 800);
+}
+
 export const Checks = {
   C1_title_quality(input: CheckInput): CheckResult {
     const doc = input.__doc!;
-    const title = txt(q(doc, "title"));
-    if (!title) return { id:"C1_title_quality", scope:"page", score:0, status:"fail", details:{reason:"missing"} };
-    const length = title.length;
+    const titleEl = q(doc, "title");
+    const rawTitle = txt(titleEl);
+    if (!rawTitle) {
+      return { id:"C1_title_quality", scope:"page", score:0, status:"fail", details:{reason:"missing"} };
+    }
+    const normalizedTitle = normalizeBrandText(rawTitle);
+
+    // Gather multiple brand candidates: host, ld+json Organization/WebSite.name, og:site_name, twitter:site, nav/logo alt
+    const host = input.site?.domain || "";
+    const hostBrand = brandFromHost(host);
+
+    const ogSite = normalizeBrandText(attr(q(doc, 'meta[property="og:site_name"]'), "content") || "");
+    const twitterSite = normalizeBrandText((attr(q(doc, 'meta[name="twitter:site"]'), "content") || "").replace(/^@/, ""));
+    const logoAlt = normalizeBrandText(attr(q(doc, 'img[alt*="logo" i]'), "alt") || "");
+    const homeLink = normalizeBrandText(txt(q(doc, 'a[rel="home"], a[href="/"]')) || "");
+
+    let schemaBrand = "";
+    qa(doc, 'script[type="application/ld+json"]').forEach(s=>{
+      try {
+        const json = JSON.parse(txt(s as Element));
+        const items = Array.isArray(json) ? json : (json['@graph'] || [json]);
+        for (const j of items) {
+          const types = Array.isArray(j['@type']) ? j['@type'] : [j['@type']];
+          if (types?.some((t:string)=>/Organization|LocalBusiness|WebSite/i.test(t))) {
+            schemaBrand ||= normalizeBrandText(j.name || j.alternateName || "");
+          }
+        }
+      } catch {}
+    });
+
+    const candidates = [schemaBrand, ogSite, twitterSite, logoAlt, homeLink, hostBrand]
+      .map(normalizeBrandText)
+      .filter(Boolean);
+
+    // Choose best candidate: prefer schema/og over host if length>2
+    const bestBrand = candidates.find(c => c.length >= 3) || hostBrand;
+
+    const hasBrand = bestBrand ? tokenBoundaryIncludes(normalizedTitle, bestBrand) : false;
+
+    const length = rawTitle.length;
     const base = clamp(lenScore(length, 15, 65));
-    
-    // Extract brand from domain, skipping common subdomains
-    const domain = input.site?.domain ?? "";
-    const parts = domain.split(".");
-    const brand = (parts[0] === "www" && parts.length > 2 ? parts[1] : parts[0]).toLowerCase();
-    
-    // Normalize title for comparison (remove trademark symbols, convert to lowercase)
-    const normalizedTitle = title.toLowerCase().replace(/[®™©℠]/g, "");
-    const hasBrand = brand.length > 0 && normalizedTitle.includes(brand);
-    
-    const score = clamp(base*0.6 + (hasBrand?40:0));
-    return { id:"C1_title_quality", scope:"page", score, status:statusFromScore(score), details:{title,length,hasBrand}, evidence:[title] };
+    const score = clamp(base*0.6 + (hasBrand ? 40 : 0));
+
+    return {
+      id:"C1_title_quality",
+      scope:"page",
+      score,
+      status:statusFromScore(score),
+      details:{ title: rawTitle, length, hasBrand, brandCandidate: bestBrand, allCandidates: candidates },
+      evidence:[rawTitle]
+    };
   },
 
   C2_meta_description(input: CheckInput): CheckResult {
@@ -70,17 +114,18 @@ export const Checks = {
     const doc = input.__doc!;
     const h1s = qa(doc, "h1");
     const count = h1s.length;
+    const firstText = count ? txt(h1s[0] as Element) : "";
     const score = count===1?100: count===0?0:30;
-    return { id:"C3_h1_presence", scope:"page", score, status:statusFromScore(score), details:{count, text: txt(h1s[0] as Element)}, evidence:[txt(h1s[0] as Element) || ""] };
+    return { id:"C3_h1_presence", scope:"page", score, status:statusFromScore(score),
+      details:{count, text:firstText}, evidence: firstText ? [firstText] : [] };
   },
 
   A1_answer_first(input: CheckInput): CheckResult {
     const doc = input.__doc!;
-    const main = q(doc, "main") || q(doc, "body")!;
-    const snippet = txt(main).slice(0, 1200);
-    const ctaLike = qa(doc, "a,button").some(a => /get started|book|contact|pricing|try|schedule/i.test(txt(a as Element)));
-    const conciseClaim = /what|how|why|we\s(help|provide|offer)|\b(best|top|simple|fast)\b/i.test(snippet) && snippet.length > 80;
-    const score = (ctaLike && conciseClaim)?100 : (ctaLike||conciseClaim)?60:20;
+    const snippet = firstMeaningfulText(doc);
+    const ctaLike = qa(doc, "a,button").some(a => /get started|book|contact|pricing|try|schedule|demo/i.test(txt(a as Element)));
+    const conciseClaim = /\b(what is|how to|we (help|provide|offer)|in summary|overview|definition)\b/i.test(snippet) && snippet.length > 80;
+    const score = (ctaLike && conciseClaim)?100 : (ctaLike||conciseClaim)?70:35;
     return { id:"A1_answer_first", scope:"page", score, status:statusFromScore(score), details:{ctaLike, conciseClaim}, evidence:[snippet] };
   },
 
@@ -111,41 +156,81 @@ export const Checks = {
     let valid=false, qas=0, errors: string[]=[];
     scripts.forEach(s=>{
       try{
-        const json = JSON.parse(txt(s as Element));
-        const items = Array.isArray(json)?json:[json];
-        items.forEach(j=>{
-          const t = Array.isArray(j["@type"])? j["@type"] : [j["@type"]];
-          if (t?.includes("FAQPage")) { const me=j.mainEntity; if (Array.isArray(me)) { valid=true; qas=Math.max(qas, me.length);} }
-        });
+        const raw = txt(s as Element);
+        if (!raw.trim()) return;
+        const json = JSON.parse(raw);
+        const items: any[] = Array.isArray(json) ? json : (json['@graph'] || [json]);
+        for (const j of items) {
+          const types = Array.isArray(j['@type']) ? j['@type'] : [j['@type']];
+          if (types?.includes("FAQPage")) {
+            let me = j.mainEntity;
+            if (!Array.isArray(me)) me = me ? [me] : [];
+            const count = me.filter((q:any)=> (q['@type']==='Question' && q.acceptedAnswer)).length;
+            qas = Math.max(qas, count);
+            valid = valid || count>0;
+          }
+        }
       } catch(e:any){ errors.push(String(e)); }
     });
-    const score = !valid?0 : qas>=3?100 : 70;
+    const score = !valid?0 : qas>=3?100 : qas>=1?70:40;
     return { id:"A4_schema_faqpage", scope:"page", score, status:statusFromScore(score), details:{valid,qas,errors} };
   },
 
   A9_internal_linking(input: CheckInput): CheckResult {
     const doc = input.__doc!;
     const host = input.site?.domain ?? "";
-    const links = qa(doc, "a[href]") as Element[];
-    const internals = links.map(a => (a as HTMLAnchorElement).getAttribute("href") || "").filter(h => isInternal(h, host));
+    const anchors = qa(doc, "a[href]") as Element[];
+
+    const internals: { href: string; text: string }[] = [];
+    for (const a of anchors) {
+      const href = (a as HTMLAnchorElement).getAttribute("href") || "";
+      if (isInternal(href, host)) {
+        const text = (txt(a) || attr(a,"aria-label") || attr(a,"title") || "").trim();
+        internals.push({ href, text });
+      }
+    }
+
     const count = internals.length;
-    const anchors = internals.map((_, i) => txt(links[i] as Element)).filter(Boolean);
-    const unique = new Set(anchors.map(a => a.toLowerCase())).size;
-    const diversity = count ? unique / count : 0;
-    const score = count>=10 && diversity>=0.4 ? 100 : count>=3 ? 60 : 20;
-    return { id:"A9_internal_linking", scope:"page", score, status:statusFromScore(score), details:{count,unique,diversity}, evidence: anchors.slice(0,10) };
+    const uniqueTargets = new Set(internals.map(l => l.href));
+    const uniqueTexts = new Set(internals.map(l => l.text.toLowerCase()).filter(Boolean));
+
+    const diversity = count ? uniqueTexts.size / count : 0;
+    const targetVariety = count ? uniqueTargets.size / count : 0;
+
+    // Require both enough links and reasonable variety of targets/text
+    const score =
+      count >= 10 && diversity >= 0.4 && targetVariety >= 0.5 ? 100 :
+      count >= 5  && (diversity >= 0.3 || targetVariety >= 0.4) ? 70 :
+      count >= 3  ? 50 : 20;
+
+    return {
+      id:"A9_internal_linking", scope:"page", score, status:statusFromScore(score),
+      details:{ count, uniqueText: uniqueTexts.size, uniqueTargets: uniqueTargets.size, diversity, targetVariety },
+      evidence: internals.slice(0,10).map(l => `${l.text} -> ${l.href}`)
+    };
   },
 
   G10_canonical(input: CheckInput): CheckResult {
     const doc = input.__doc!;
     const el = q(doc, 'link[rel="canonical"]');
     if (!el) return { id:"G10_canonical", scope:"page", score:0, status:"fail", details:{reason:"missing"} };
-    const href = attr(el,"href") || "";
-    const host = input.site?.domain ?? "";
-    let ok=false, sameHost=false;
-    try{ const u=new URL(href); ok=!!(u.protocol&&u.hostname); sameHost = host? (u.hostname===host) : true; } catch {}
-    const score = ok && sameHost ? 100 : ok ? 50 : 0;
-    return { id:"G10_canonical", scope:"page", score, status:statusFromScore(score), details:{href,ok,sameHost} };
+
+    const rawHref = attr(el,"href") || "";
+    let href = rawHref;
+    try { href = new URL(rawHref, input.url).toString(); } catch {}
+
+    let ok=false, sameSite=false, host="", canonicalHost="";
+    try {
+      const pageUrl = new URL(input.url);
+      const canUrl  = new URL(href);
+      host = pageUrl.hostname;
+      canonicalHost = canUrl.hostname;
+      ok = !!(canUrl.protocol && canonicalHost);
+      sameSite = hostsEquivalent(host, canonicalHost);
+    } catch {}
+
+    const score = ok && sameSite ? 100 : ok ? 70 : 0;
+    return { id:"G10_canonical", scope:"page", score, status:statusFromScore(score), details:{href, ok, sameSite, host, canonicalHost} };
   },
 
   T1_mobile_viewport(input: CheckInput): CheckResult {
@@ -169,32 +254,48 @@ export const Checks = {
   T3_noindex_robots(input: CheckInput): CheckResult {
     const doc = input.__doc!;
     const robots = q(doc, 'meta[name="robots"]');
-    const content = (robots && robots.getAttribute("content")) || "";
-    const noindex = /noindex/i.test(content);
-    const score = noindex?0:100;
-    return { id:"T3_noindex_robots", scope:"page", score, status:statusFromScore(score), details:{robots:content} };
+    const content = (robots && robots.getAttribute("content") || "").toLowerCase();
+    const tokens = content.split(/[,;\s]+/).filter(Boolean);
+    const hasNoindex = tokens.includes("noindex");
+    const hasIndex = tokens.includes("index");
+    // If both present, treat noindex as authoritative (conservative)
+    const score = hasNoindex ? 0 : 100;
+    return { id:"T3_noindex_robots", scope:"page", score, status:statusFromScore(score), details:{robots:content, resolved: hasNoindex ? "noindex" : (hasIndex ? "index" : "unspecified")} };
   },
 
   A12_entity_graph(input: CheckInput): CheckResult {
     const doc = input.__doc!;
     const scripts = qa(doc, 'script[type="application/ld+json"]');
     let org=false, logo=false, sameAs=0, nameMatch=false, name="";
-    const title = txt(q(doc,"title")).toLowerCase();
+    const titleNorm = normalizeBrandText(txt(q(doc,"title")) || "");
+
+    let candidates: string[] = [];
     scripts.forEach(s=>{
       try{
         const json = JSON.parse(txt(s as Element));
-        const items = Array.isArray(json)?json:[json];
-        items.forEach(j=>{
-          const t = Array.isArray(j["@type"])? j["@type"] : [j["@type"]];
-          if (t?.includes("Organization") || t?.includes("LocalBusiness")) {
-            org = true; name = j.name || name; logo = !!j.logo; sameAs = Math.max(sameAs, Array.isArray(j.sameAs)? j.sameAs.length : 0);
+        const items = Array.isArray(json) ? json : (json['@graph'] || [json]);
+        for (const j of items) {
+          const types = Array.isArray(j['@type']) ? j['@type'] : [j['@type']];
+          if (types?.some((t:string)=>/Organization|LocalBusiness|WebSite|Brand/i.test(t))) {
+            const n = normalizeBrandText(j.name || j.alternateName || "");
+            if (n) candidates.push(n);
+            if (/Organization|LocalBusiness/i.test(types.join(','))) {
+              org = true;
+              logo = logo || !!j.logo;
+              sameAs = Math.max(sameAs, Array.isArray(j.sameAs) ? j.sameAs.length : 0);
+            }
           }
-        });
+        }
       } catch {}
     });
-    nameMatch = !!(name && title.includes(String(name).toLowerCase()));
-    const score = org ? ((logo?30:0) + (sameAs>=2?40: sameAs?20:0) + (nameMatch?30:10)) : 0;
-    return { id:"A12_entity_graph", scope:"page", score, status:statusFromScore(score), details:{org,logo,sameAs,name,nameMatch} };
+
+    name = candidates.find(c => c.length >= 3) || "";
+    nameMatch = !!(name && tokenBoundaryIncludes(titleNorm, name));
+
+    const score = org ? ((logo?30:0) + (sameAs>=2?40: sameAs?25:10) + (nameMatch?30:10)) : 0;
+    return { id:"A12_entity_graph", scope:"page", score, status:statusFromScore(score),
+      details:{org,logo,sameAs,name,nameMatch, candidates}
+    };
   },
 };
 
