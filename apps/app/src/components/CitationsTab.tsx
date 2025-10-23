@@ -404,94 +404,155 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
       )}
 
       {/* Answer Modal */}
-      {showDrawer && selectedQuery && (
-        <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowDrawer(false)}></div>
-          <div className="relative card shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="card-body">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold">Query Details</h3>
-                <button
-                  onClick={() => setShowDrawer(false)}
-                  className="subtle hover:text-ink transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="space-y-6">
-                <div>
-                  <label className="field-label">Query</label>
-                  <p className="text-base card-muted rounded-xl p-3">{selectedQuery.query}</p>
+      {showDrawer && selectedQuery && (() => {
+        // Filter out sources with no citations
+        const sourcesWithCitations = selectedQuery.source_answers?.filter(
+          (sourceAnswer: any) => sourceAnswer.cited_match_count > 0
+        ) || [];
+
+        // Aggregate all cited URLs across all sources
+        const citedUrlsBySources: Record<string, string[]> = {};
+        sourcesWithCitations.forEach((sourceAnswer: any) => {
+          if (sourceAnswer.cited_urls) {
+            try {
+              const urls = JSON.parse(sourceAnswer.cited_urls);
+              urls.forEach((url: string) => {
+                if (!citedUrlsBySources[url]) {
+                  citedUrlsBySources[url] = [];
+                }
+                citedUrlsBySources[url].push(sourceAnswer.ai_source);
+              });
+            } catch (e) {
+              // Ignore parsing errors
+            }
+          }
+        });
+
+        return (
+          <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowDrawer(false)}></div>
+            <div className="relative card shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="card-body">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold">Query Details</h3>
+                  <button
+                    onClick={() => setShowDrawer(false)}
+                    className="text-ink-muted hover:text-ink transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                <div>
-                  <label className="field-label">Sources</label>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedQuery.ai_sources.split(', ').map((source: string, idx: number) => (
-                      <span key={idx} className="pill pill-brand">
-                        {source}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="field-label">Total Citations</label>
-                  <p className="text-base">{selectedQuery.total_citations} matches found across all sources</p>
-                </div>
-                {selectedQuery.source_answers && selectedQuery.source_answers.length > 0 && (
+
+                <div className="space-y-6">
+                  {/* Query */}
                   <div>
-                    <label className="field-label">Answers by Source</label>
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {selectedQuery.source_answers.map((sourceAnswer: any, idx: number) => (
-                        <div key={idx} className="card-muted rounded-xl p-4 border border-border">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="pill pill-brand">
-                              From {sourceAnswer.ai_source}
-                            </span>
-                            <span className="text-xs muted">
-                              {sourceAnswer.cited_match_count} citation{sourceAnswer.cited_match_count !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                            {sourceAnswer.answer_excerpt}
-                          </p>
-                          {sourceAnswer.cited_urls && JSON.parse(sourceAnswer.cited_urls).length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-border">
-                              <p className="text-xs font-semibold muted mb-2">Cited URLs:</p>
-                              <ul className="space-y-1">
-                                {JSON.parse(sourceAnswer.cited_urls).slice(0, 5).map((url: string, urlIdx: number) => (
-                                  <li key={urlIdx}>
-                                    <a
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs text-brand hover:underline break-all"
-                                    >
-                                      {url}
-                                    </a>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
+                    <label className="field-label">Query</label>
+                    <div className="card-muted rounded-xl p-4 border border-border">
+                      <p className="text-base leading-relaxed">{selectedQuery.query}</p>
+                    </div>
+                  </div>
+
+                  {/* Sources */}
+                  <div>
+                    <label className="field-label">AI Sources Tested</label>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedQuery.ai_sources.split(', ').map((source: string, idx: number) => (
+                        <span key={idx} className="pill pill-brand">
+                          {source}
+                        </span>
                       ))}
                     </div>
-                    <p className="mt-2 text-xs subtle">
-                      Scroll to see all source responses. Citations extracted from AI source responses.
+                  </div>
+
+                  {/* Total Citations */}
+                  <div>
+                    <label className="field-label">Total Citations</label>
+                    <p className="text-base">
+                      <span className="font-bold text-success">{selectedQuery.total_citations}</span> matches found across all sources
                     </p>
                   </div>
-                )}
-                <div>
-                  <label className="field-label">Last Tested</label>
-                  <p className="text-sm muted">{new Date(selectedQuery.last_occurred).toLocaleString()}</p>
+
+                  {/* Cited URLs from Your Domain */}
+                  {Object.keys(citedUrlsBySources).length > 0 && (
+                    <div className="card-muted rounded-xl p-4 border border-border">
+                      <h4 className="font-bold text-base mb-3">
+                        Your Pages Cited by AI
+                      </h4>
+                      <div className="space-y-3">
+                        {Object.entries(citedUrlsBySources).map(([url, sources], idx) => (
+                          <div key={idx} className="bg-surface-1 rounded-lg p-3 border border-border">
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-brand hover:underline break-all block mb-2 font-medium"
+                            >
+                              {url}
+                            </a>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-ink-muted">Found in:</span>
+                              {sources.map((source, sourceIdx) => (
+                                <span key={sourceIdx} className="pill pill-success text-xs">
+                                  {source}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-xs text-ink-muted italic">
+                        These are pages from your domain that AI assistants referenced when answering this query.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Answers by Source */}
+                  {sourcesWithCitations.length > 0 && (
+                    <div>
+                      <label className="field-label">Answers by Source</label>
+                      <div className="space-y-4">
+                        {sourcesWithCitations.map((sourceAnswer: any, idx: number) => (
+                          <div key={idx} className="card-muted rounded-xl p-4 border border-border">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="pill pill-brand">
+                                {sourceAnswer.ai_source}
+                              </span>
+                              <span className="text-sm font-semibold text-success">
+                                {sourceAnswer.cited_match_count} citation{sourceAnswer.cited_match_count !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-muted">
+                              {sourceAnswer.answer_excerpt}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Citations Message */}
+                  {sourcesWithCitations.length === 0 && (
+                    <div className="card-muted rounded-xl p-6 text-center border border-border">
+                      <p className="text-base text-ink-muted">
+                        No citations found from any AI source for this query.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Last Tested */}
+                  <div className="pt-4 border-t border-border">
+                    <label className="field-label">Last Tested</label>
+                    <p className="text-sm text-ink-muted">{new Date(selectedQuery.last_occurred).toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
