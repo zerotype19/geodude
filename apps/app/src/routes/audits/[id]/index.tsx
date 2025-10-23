@@ -377,6 +377,11 @@ export default function AuditDetail() {
                 <span className={`pill ${getStatusColor(audit.status)}`}>
                   {audit.status.toUpperCase()}
                 </span>
+                <PublicShareToggle 
+                  auditId={audit.id} 
+                  initialIsPublic={audit.is_public || false}
+                  compact={true}
+                />
               </div>
               <p className="mt-2 muted">
                 {audit.project_id} • {audit.root_url}
@@ -610,14 +615,6 @@ export default function AuditDetail() {
             {diagnostics.composite && (
               <CompositeBanner data={diagnostics.composite} />
             )}
-
-            {/* Public Sharing Toggle */}
-            <div className="mb-8">
-              <PublicShareToggle 
-                auditId={audit.id} 
-                initialIsPublic={audit.is_public || false} 
-              />
-            </div>
 
         {/* Category Scores (Scorecard V2) */}
         {audit.scorecard_v2 && audit.category_scores && audit.category_scores.length > 0 && (

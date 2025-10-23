@@ -1034,6 +1034,150 @@ export default {
         }
       }
 
+      // Public pages endpoint (no auth required for public audits)
+      if (req.method === 'GET' && path.startsWith('/api/public/audits/') && path.includes('/pages')) {
+        const pathParts = path.split('/');
+        const auditId = pathParts[4];
+        const pageId = pathParts[6]; // If accessing specific page
+        
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Check if audit is public
+        const audit: any = await env.DB.prepare(
+          "SELECT is_public FROM audits WHERE id = ?"
+        ).bind(auditId).first();
+        
+        if (!audit || !audit.is_public) {
+          return new Response(JSON.stringify({ error: 'This audit is not public' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        try {
+          if (pageId) {
+            // Get specific page
+            const result = await getAuditPage(pageId, env);
+            return new Response(JSON.stringify(result), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } else {
+            // Get all pages
+            const result = await getAuditPages(auditId, url.searchParams, env);
+            return new Response(JSON.stringify(result), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        } catch (error: any) {
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // Public composite score endpoint
+      if (req.method === 'GET' && path.match(/^\/api\/public\/audits\/[^/]+\/composite$/)) {
+        const auditId = path.split('/')[4];
+        
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Check if audit is public
+        const audit: any = await env.DB.prepare(
+          "SELECT is_public FROM audits WHERE id = ?"
+        ).bind(auditId).first();
+        
+        if (!audit || !audit.is_public) {
+          return new Response(JSON.stringify({ error: 'This audit is not public' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        try {
+          const { computeComposite } = await import('./diagnostics/composite');
+          const { loadCriteriaMap } = await import('./diagnostics/persist');
+          
+          const siteChecksRow: any = await env.DB.prepare(
+            "SELECT site_checks_json FROM audits WHERE id = ?"
+          ).bind(auditId).first();
+          
+          const siteChecks = siteChecksRow?.site_checks_json 
+            ? JSON.parse(siteChecksRow.site_checks_json) 
+            : [];
+          
+          const pagesRows = await env.DB.prepare(
+            "SELECT checks_json FROM audit_page_analysis WHERE audit_id = ?"
+          ).bind(auditId).all();
+          
+          const pageChecks = (pagesRows.results || [])
+            .map((r: any) => r.checks_json ? JSON.parse(r.checks_json) : [])
+            .flat();
+          
+          const criteriaMap = await loadCriteriaMap(env.DB);
+          const composite = computeComposite(siteChecks, pageChecks, criteriaMap);
+          
+          return new Response(JSON.stringify(composite), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // Public citations summary endpoint
+      if (req.method === 'GET' && path.startsWith('/api/public/citations/summary')) {
+        const auditId = url.searchParams.get('audit_id');
+        
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Check if audit is public
+        const audit: any = await env.DB.prepare(
+          "SELECT is_public FROM audits WHERE id = ?"
+        ).bind(auditId).first();
+        
+        if (!audit || !audit.is_public) {
+          return new Response(JSON.stringify({ error: 'This audit is not public' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        try {
+          const result = await getCitationsSummary(url.searchParams, env);
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Route handlers
       if (req.method === 'POST' && path === '/api/audits') {
         try {

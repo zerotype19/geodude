@@ -57,7 +57,7 @@ export interface AuditDiagnostics {
   error: string | null;
 }
 
-export function useAuditDiagnostics(auditId: string | undefined): AuditDiagnostics {
+export function useAuditDiagnostics(auditId: string | undefined, isPublic: boolean = false): AuditDiagnostics {
   const [criteriaMap, setCriteriaMap] = useState<Map<string, Criterion>>(new Map());
   const [composite, setComposite] = useState<CompositeData | null>(null);
   const [siteChecks, setSiteChecks] = useState<SiteCheck[]>([]);
@@ -78,7 +78,12 @@ export function useAuditDiagnostics(auditId: string | undefined): AuditDiagnosti
         setLoading(true);
         setError(null);
 
-        // Fetch criteria (all, including preview)
+        // Build API paths based on public/private access
+        const auditPath = isPublic ? `/api/public/audits/${auditId}` : `/api/audits/${auditId}`;
+        const compositePath = isPublic ? `/api/public/audits/${auditId}/composite` : `/api/audits/${auditId}/composite`;
+        const pagesPath = isPublic ? `/api/public/audits/${auditId}/pages?limit=100` : `/api/audits/${auditId}/pages?limit=100`;
+
+        // Fetch criteria (all, including preview) - always public endpoint
         const criteria = await apiGet<Criterion[]>('/api/scoring/criteria?productionOnly=false');
         if (mounted) {
           const map = new Map(criteria.map((c) => [c.id, c]));
@@ -87,7 +92,7 @@ export function useAuditDiagnostics(auditId: string | undefined): AuditDiagnosti
 
         // Fetch composite scores
         try {
-          const compositeData = await apiGet<CompositeData>(`/api/audits/${auditId}/composite`);
+          const compositeData = await apiGet<CompositeData>(compositePath);
           if (mounted) {
             setComposite(compositeData);
           }
@@ -97,7 +102,7 @@ export function useAuditDiagnostics(auditId: string | undefined): AuditDiagnosti
         }
 
         // Fetch audit detail (includes site_checks_json)
-        const audit = await apiGet<any>(`/api/audits/${auditId}`);
+        const audit = await apiGet<any>(auditPath);
         if (mounted) {
           // Parse site checks
           if (audit.site_checks_json) {
@@ -115,7 +120,7 @@ export function useAuditDiagnostics(auditId: string | undefined): AuditDiagnosti
         }
 
         // Fetch pages (includes checks_json per page)
-        const pagesData = await apiGet<{ pages: any[] }>(`/api/audits/${auditId}/pages?limit=100`);
+        const pagesData = await apiGet<{ pages: any[] }>(pagesPath);
         if (mounted && pagesData.pages) {
           const checksMap: Record<string, PageCheck[]> = {};
           pagesData.pages.forEach((page) => {
@@ -152,7 +157,7 @@ export function useAuditDiagnostics(auditId: string | undefined): AuditDiagnosti
     return () => {
       mounted = false;
     };
-  }, [auditId]);
+  }, [auditId, isPublic]);
 
   return {
     criteriaMap,

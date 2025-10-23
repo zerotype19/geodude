@@ -38,7 +38,7 @@ export default function PublicAudit() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'pages' | 'citations'>('overview');
   
-  const diagnostics = useAuditDiagnostics(id || '');
+  const diagnostics = useAuditDiagnostics(id || '', true); // true = public access
 
   useEffect(() => {
     if (!id) return;
@@ -51,9 +51,9 @@ export default function PublicAudit() {
         const auditData = await apiGet(`/api/public/audits/${id}`);
         setAudit(auditData.audit || auditData);
         
-        // Fetch pages
+        // Fetch pages via public endpoint
         try {
-          const pagesData = await apiGet(`/api/audits/${id}/pages`);
+          const pagesData = await apiGet(`/api/public/audits/${id}/pages`);
           setPages(pagesData.pages || []);
         } catch (pagesError) {
           console.warn('Failed to load pages:', pagesError);
