@@ -2682,43 +2682,138 @@ async function getAudit(auditId: string, env: Env) {
     const scorecardEnabled = env.SCORECARD_V2_ENABLED === 'true';
     
     if (scorecardEnabled) {
-      const { CHECKS_METADATA } = await import('./lib/checksMetadata');
-      const { computeCategoryScores, computeTopFixes } = await import('./lib/categoryScoring');
-      
-      // Get a representative page's checks (use homepage or first page)
-      const samplePage = await env.DB.prepare(`
-        SELECT apa.checks_json
-        FROM audit_page_analysis apa
-        JOIN audit_pages ap ON apa.page_id = ap.id
-        WHERE ap.audit_id = ?
-        ORDER BY ap.url ASC
-        LIMIT 1
-      `).bind(auditId).first();
-
-      if (samplePage && samplePage.checks_json) {
-        const checks = JSON.parse(samplePage.checks_json as string);
+      // Use new D1-based diagnostics system if enabled
+      if (env.SCORING_V1_ENABLED === 'true') {
+        const { loadCriteriaMap } = await import('./diagnostics/persist');
         
-        // Enrich checks with V2 metadata
-        enrichedChecks = checks.map((check: any) => {
-          const meta = CHECKS_METADATA[check.id];
-          return {
-            ...check,
-            category: meta?.category || 'Uncategorized',
-            impact_level: meta?.impact_level || 'Medium',
-            why_it_matters: meta?.why_it_matters,
-            refs: meta?.refs,
-            name: meta?.label || check.id,
-            weight: meta?.weight || 10
-          };
-        });
-
-        // Compute category roll-ups
-        categoryScores = computeCategoryScores(enrichedChecks);
-
-        // Compute top fixes
-        fixFirst = computeTopFixes(enrichedChecks, 5);
+        // Load D1 criteria metadata
+        const criteriaMap = await loadCriteriaMap(env.DB);
         
-        scorecardV2 = true;
+        // Get all page checks from the audit
+        const pages = (await env.DB.prepare(`
+          SELECT apa.checks_json
+          FROM audit_page_analysis apa
+          JOIN audit_pages ap ON apa.page_id = ap.id
+          WHERE ap.audit_id = ?
+        `).bind(auditId).all()).results || [];
+        
+        // Aggregate all page-level checks
+        const allPageChecks: any[] = [];
+        for (const page of pages as any[]) {
+          if (page.checks_json) {
+            try {
+              const checks = JSON.parse(page.checks_json);
+              allPageChecks.push(...checks);
+            } catch {}
+          }
+        }
+        
+        // Get site-level checks
+        const auditData = await env.DB.prepare(`SELECT site_checks_json FROM audits WHERE id = ?`).bind(auditId).first();
+        const siteChecks = auditData?.site_checks_json ? JSON.parse(auditData.site_checks_json as string) : [];
+        
+        // Combine all checks (both page and site level)
+        const allChecks = [...allPageChecks, ...siteChecks];
+        
+        if (allChecks.length > 0) {
+          // Filter to production checks only (no preview)
+          const productionChecks = allChecks.filter((c: any) => !c.preview);
+          
+          // Enrich with D1 metadata
+          enrichedChecks = productionChecks.map((check: any) => {
+            const meta = criteriaMap.get(check.id);
+            return {
+              ...check,
+              category: meta?.category || 'Uncategorized',
+              impact_level: meta?.impact_level || 'Medium',
+              why_it_matters: meta?.why_it_matters,
+              name: meta?.label || check.id,
+              weight: meta?.weight || 10
+            };
+          });
+          
+          // Compute category roll-ups (new 0-100 scale)
+          const categoryMap = new Map<string, { sum: number; count: number; weightSum: number }>();
+          for (const check of enrichedChecks) {
+            const cat = check.category;
+            if (!categoryMap.has(cat)) {
+              categoryMap.set(cat, { sum: 0, count: 0, weightSum: 0 });
+            }
+            const bucket = categoryMap.get(cat)!;
+            bucket.sum += check.score * check.weight;
+            bucket.weightSum += check.weight;
+            bucket.count += 1;
+          }
+          
+          categoryScores = Array.from(categoryMap.entries()).map(([category, data]) => ({
+            category,
+            score: Math.round(data.sum / data.weightSum),
+            weight_total: data.weightSum,
+            checks_count: data.count
+          }));
+          
+          // Compute top fixes (failing checks: score < 60)
+          const impactWeight = { High: 3, Medium: 2, Low: 1 };
+          fixFirst = enrichedChecks
+            .filter((c: any) => c.score < 60) // Failing threshold
+            .map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              category: c.category,
+              impact_level: c.impact_level,
+              weight: c.weight,
+              score: c.score,
+              why_it_matters: c.why_it_matters
+            }))
+            .sort((a: any, b: any) => {
+              const impactDiff = impactWeight[b.impact_level] - impactWeight[a.impact_level];
+              if (impactDiff !== 0) return impactDiff;
+              return b.weight - a.weight;
+            })
+            .slice(0, 8); // Top 8 fixes
+          
+          scorecardV2 = true;
+        }
+      } else {
+        // Fall back to old system if diagnostics not enabled
+        const { CHECKS_METADATA } = await import('./lib/checksMetadata');
+        const { computeCategoryScores, computeTopFixes } = await import('./lib/categoryScoring');
+        
+        // Get a representative page's checks (use homepage or first page)
+        const samplePage = await env.DB.prepare(`
+          SELECT apa.checks_json
+          FROM audit_page_analysis apa
+          JOIN audit_pages ap ON apa.page_id = ap.id
+          WHERE ap.audit_id = ?
+          ORDER BY ap.url ASC
+          LIMIT 1
+        `).bind(auditId).first();
+
+        if (samplePage && samplePage.checks_json) {
+          const checks = JSON.parse(samplePage.checks_json as string);
+          
+          // Enrich checks with V2 metadata
+          enrichedChecks = checks.map((check: any) => {
+            const meta = CHECKS_METADATA[check.id];
+            return {
+              ...check,
+              category: meta?.category || 'Uncategorized',
+              impact_level: meta?.impact_level || 'Medium',
+              why_it_matters: meta?.why_it_matters,
+              refs: meta?.refs,
+              name: meta?.label || check.id,
+              weight: meta?.weight || 10
+            };
+          });
+
+          // Compute category roll-ups
+          categoryScores = computeCategoryScores(enrichedChecks);
+
+          // Compute top fixes
+          fixFirst = computeTopFixes(enrichedChecks, 5);
+          
+          scorecardV2 = true;
+        }
       }
     }
   } catch (err) {
