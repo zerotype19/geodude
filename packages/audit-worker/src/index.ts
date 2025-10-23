@@ -2513,43 +2513,57 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
   console.log(`[FINALIZED] ${auditId}: ${reason} (AEO: ${aeo}, GEO: ${geo}, Gap: ${avgRenderGap ? Math.round(avgRenderGap * 100) + '%' : 'N/A'})`);
   
   // Run site-level diagnostics if enabled
+  console.log(`[SITE_DIAGNOSTICS] Flag check: SCORING_V1_ENABLED=${env.SCORING_V1_ENABLED}`);
   if (env.SCORING_V1_ENABLED === "true") {
+    console.log(`[SITE_DIAGNOSTICS] Starting site-level checks for ${auditId}`);
     try {
       const { runDiagnosticsForSite } = await import('./diagnostics/runSite');
+      console.log(`[SITE_DIAGNOSTICS] Module imported successfully`);
       
       const audit: any = await env.DB.prepare(
         'SELECT root_url FROM audits WHERE id = ?'
       ).bind(auditId).first();
       
-      if (audit) {
-        const domain = new URL(audit.root_url).hostname;
-        
-        // Fetch all pages with their checks
-        const pages = (await env.DB.prepare(`
-          SELECT p.id, p.url, p.html_rendered, p.html_static, apa.checks_json
-          FROM audit_pages p
-          LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
-          WHERE p.audit_id = ?1
-        `).bind(auditId).all()).results || [];
-        
-        const ctx = {
-          auditId,
-          domain,
-          pages: pages.map((r: any) => ({
-            id: r.id,
-            url: r.url,
-            html_rendered: r.html_rendered,
-            html_static: r.html_static,
-            checks: r.checks_json ? JSON.parse(r.checks_json) : []
-          }))
-        };
-        
-        await runDiagnosticsForSite(env.DB, ctx);
-        console.log(`[SITE_DIAGNOSTICS] Computed for ${auditId}: ${ctx.pages.length} pages analyzed`);
+      if (!audit) {
+        console.error(`[SITE_DIAGNOSTICS] No audit found for ${auditId}`);
+        return;
       }
+      
+      console.log(`[SITE_DIAGNOSTICS] Audit found: ${audit.root_url}`);
+      const domain = new URL(audit.root_url).hostname;
+      
+      // Fetch all pages with their checks
+      const pagesResult = await env.DB.prepare(`
+        SELECT p.id, p.url, p.html_rendered, p.html_static, apa.checks_json
+        FROM audit_pages p
+        LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+        WHERE p.audit_id = ?1
+      `).bind(auditId).all();
+      
+      const pages = pagesResult.results || [];
+      console.log(`[SITE_DIAGNOSTICS] Fetched ${pages.length} pages with checks`);
+      
+      const ctx = {
+        auditId,
+        domain,
+        pages: pages.map((r: any) => ({
+          id: r.id,
+          url: r.url,
+          html_rendered: r.html_rendered,
+          html_static: r.html_static,
+          checks: r.checks_json ? JSON.parse(r.checks_json) : []
+        }))
+      };
+      
+      console.log(`[SITE_DIAGNOSTICS] Running diagnostics for ${domain} with ${ctx.pages.length} pages`);
+      const siteResults = await runDiagnosticsForSite(env.DB, ctx);
+      console.log(`[SITE_DIAGNOSTICS] Completed for ${auditId}: ${siteResults.length} site checks, ${ctx.pages.length} pages analyzed`);
     } catch (err) {
       console.error(`[SITE_DIAGNOSTICS] Failed for ${auditId}:`, err);
+      console.error(`[SITE_DIAGNOSTICS] Error stack:`, (err as Error).stack);
     }
+  } else {
+    console.log(`[SITE_DIAGNOSTICS] Skipped - feature flag not enabled`);
   }
   
   // Async: Build and cache LLM prompts for this domain (non-blocking)
