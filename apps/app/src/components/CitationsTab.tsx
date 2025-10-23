@@ -159,20 +159,13 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {summary.bySource.map((source) => (
             <div key={source.ai_source} className="card card-body">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium muted capitalize">{source.ai_source}</p>
-                  <p className="text-2xl font-bold">{source.cited_percentage.toFixed(1)}%</p>
-                </div>
-                <div className="w-12 h-12 bg-brand-soft rounded-full flex items-center justify-center">
-                  <span className="text-brand font-bold text-sm">
-                    {source.ai_source.charAt(0).toUpperCase()}
-                  </span>
-                </div>
+              <div>
+                <p className="text-sm font-medium muted capitalize mb-2">{source.ai_source}</p>
+                <p className="text-3xl font-bold mb-1">{source.cited_percentage.toFixed(1)}%</p>
+                <p className="text-xs subtle">
+                  {source.cited_queries}/{source.total_queries} queries cited
+                </p>
               </div>
-              <p className="text-xs subtle mt-1">
-                {source.cited_queries}/{source.total_queries} queries cited
-              </p>
             </div>
           ))}
         </div>
