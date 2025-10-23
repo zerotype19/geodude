@@ -14,6 +14,7 @@ import AuditTour from '/src/components/AuditTour';
 import CompositeBanner from '/src/components/CompositeBanner';
 import SiteOverview from '/src/components/SiteOverview';
 import PageChecksTable from '/src/components/PageChecksTable';
+import PublicShareToggle from '/src/components/PublicShareToggle';
 import { apiGet, apiPost } from '/src/lib/api';
 import { useAuditDiagnostics } from '/src/hooks/useAuditDiagnostics';
 
@@ -63,6 +64,7 @@ interface Audit {
   fail_reason?: string;
   fail_at?: string;
   render_gap_ratio?: number; // Average render visibility across all pages (0-1)
+  is_public?: boolean; // Public sharing status
   // Scorecard V2 fields
   category_scores?: CategoryScore[];
   fix_first?: FixItem[];
@@ -608,6 +610,14 @@ export default function AuditDetail() {
             {diagnostics.composite && (
               <CompositeBanner data={diagnostics.composite} />
             )}
+
+            {/* Public Sharing Toggle */}
+            <div className="mb-8">
+              <PublicShareToggle 
+                auditId={audit.id} 
+                initialIsPublic={audit.is_public || false} 
+              />
+            </div>
 
         {/* Category Scores (Scorecard V2) */}
         {audit.scorecard_v2 && audit.category_scores && audit.category_scores.length > 0 && (

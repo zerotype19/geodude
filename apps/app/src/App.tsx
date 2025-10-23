@@ -8,6 +8,7 @@ import AuditDetail from './routes/audits/[id]/index.tsx'
 import AuditPages from './routes/audits/[id]/pages/index.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
 import CategoryDetail from './routes/audits/[id]/category/[category].tsx'
+import PublicAudit from './routes/public/[id].tsx'
 import ScoreGuideIndex from './routes/score-guide/index.tsx'
 import CriterionDetail from './routes/score-guide/[criterionId].tsx'
 import AdminPage from './routes/admin.tsx'
@@ -156,6 +157,7 @@ function App() {
             <Route path="/audits/:id/category/:category" element={<CategoryDetail />} />
             <Route path="/audits/:id/pages" element={<AuditPages />} />
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
+            <Route path="/public/:id" element={<PublicAudit />} />
             <Route path="/score-guide" element={<ScoreGuideIndex />} />
             <Route path="/score-guide/:criterionId" element={<CriterionDetail />} />
             <Route path="/admin" element={<AdminPage />} />

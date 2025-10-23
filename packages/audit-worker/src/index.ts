@@ -990,6 +990,50 @@ export default {
         return handleIndustryClassify(req, env);
       }
 
+      // Public audit access (no authentication required)
+      if (req.method === 'GET' && path.startsWith('/api/public/audits/')) {
+        const auditId = path.split('/')[4];
+        if (!auditId) {
+          return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Check if audit is public
+        const audit: any = await env.DB.prepare(
+          "SELECT is_public FROM audits WHERE id = ?"
+        ).bind(auditId).first();
+        
+        if (!audit) {
+          return new Response(JSON.stringify({ error: 'Audit not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        if (!audit.is_public) {
+          return new Response(JSON.stringify({ error: 'This audit is not public' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Return full audit data (reuse existing getAudit function)
+        try {
+          const result = await getAudit(auditId, env);
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error: any) {
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Route handlers
       if (req.method === 'POST' && path === '/api/audits') {
         try {
@@ -1196,6 +1240,52 @@ export default {
         if (path === `/api/audits/${auditId}/recompute`) {
           const result = await recomputeAudit(auditId, env);
           return new Response(JSON.stringify(result), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        if (path === `/api/audits/${auditId}/public`) {
+          // Toggle public/private status
+          const body = await req.json() as { is_public: boolean };
+          
+          // Security: Verify user owns this audit
+          const userId = await getUserIdFromRequest(req, env);
+          if (!userId) {
+            return new Response(JSON.stringify({ error: 'Authentication required' }), {
+              status: 401,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          
+          const audit: any = await env.DB.prepare(
+            "SELECT user_id FROM audits WHERE id = ?"
+          ).bind(auditId).first();
+          
+          if (!audit) {
+            return new Response(JSON.stringify({ error: 'Audit not found' }), {
+              status: 404,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          
+          if (audit.user_id !== userId) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          
+          // Update public status
+          await env.DB.prepare(
+            "UPDATE audits SET is_public = ? WHERE id = ?"
+          ).bind(body.is_public ? 1 : 0, auditId).run();
+          
+          return new Response(JSON.stringify({ 
+            success: true, 
+            is_public: body.is_public,
+            public_url: body.is_public ? `https://app.optiview.ai/public/${auditId}` : null
+          }), { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           });
@@ -3040,7 +3130,8 @@ async function getAuditsList(searchParams: URLSearchParams, env: Env, userId: st
       geo_score,
       composite_score,
       config_json,
-      user_id
+      user_id,
+      is_public
     FROM audits 
     WHERE user_id = ?
     ORDER BY started_at DESC 
