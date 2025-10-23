@@ -234,15 +234,24 @@ table.ui {
 table.ui thead th {
   @apply text-left font-medium text-ink-subtle uppercase tracking-wide text-xs bg-surface-2;
   @apply sticky top-0 z-10 px-3 py-2.5 align-middle border-b border-border;
+  /* Ensure straight top edge on all table headers */
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-radius: 0 !important;
 }
 
-/* Remove rounded corners from thead - keep top edge straight */
+/* Explicit rules to prevent any rounding on header row */
+table.ui thead tr:first-child th {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
 table.ui thead tr:first-child th:first-child {
-  border-top-left-radius: 0;
+  border-top-left-radius: 0 !important;
 }
 
 table.ui thead tr:first-child th:last-child {
-  border-top-right-radius: 0;
+  border-top-right-radius: 0 !important;
 }
 
 table.ui td {
