@@ -294,7 +294,7 @@ export default function AuditsIndex() {
 
         {/* Audits Table */}
         <div className="card">
-          <div className="card-header">
+          <div className="px-6 py-4">
             <h2 className="section-title">Recent Audits</h2>
           </div>
 

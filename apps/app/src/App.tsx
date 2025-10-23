@@ -30,7 +30,7 @@ function Navigation() {
   const isAdmin = me?.isAdmin === true
   
   return (
-    <nav className="card border-0 rounded-none shadow-sm">
+    <nav className="card border-0 rounded-none shadow-sm relative">
       <div className="page-max container-px">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
@@ -43,7 +43,7 @@ function Navigation() {
           </div>
           
           {/* Hamburger menu button */}
-          <div className="flex items-center">
+          <div className="flex items-center relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="btn-ghost p-2"
@@ -60,13 +60,10 @@ function Navigation() {
                 </svg>
               )}
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Slide-out menu */}
-      {menuOpen && (
-        <div className="border-t border-border">
+            
+            {/* Dropdown menu - positioned below hamburger */}
+            {menuOpen && (
+              <div className="absolute top-full right-0 mt-2 w-72 card shadow-lg z-50">
           <div className="pt-2 pb-3 space-y-1">
             <Link
               to="/audits"
@@ -133,8 +130,11 @@ function Navigation() {
               </button>
             )}
           </div>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
       
       {/* Sign In Modal */}
       <SignInModal isOpen={signInModalOpen} onClose={() => setSignInModalOpen(false)} />
