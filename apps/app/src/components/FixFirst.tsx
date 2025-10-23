@@ -105,18 +105,79 @@ export default function FixFirst({ fixes, auditId }: FixFirstProps) {
     // Extract meaningful current state from details
     const parts: string[] = [];
     if (details) {
+      // Standard fields
       if (details.current_title) parts.push(`Current: "${details.current_title}"`);
       if (details.current_h1) parts.push(`H1: "${details.current_h1}"`);
       if (details.current_value) parts.push(`Current: "${details.current_value}"`);
       if (details.message) parts.push(details.message);
       if (details.found !== undefined) parts.push(`Found: ${details.found}`);
       if (details.expected !== undefined) parts.push(`Expected: ${details.expected}`);
+      
+      // Title quality fields
+      if (details.title) parts.push(`"${details.title}"`);
+      if (details.length) parts.push(`${details.length} chars`);
+      
+      // Entity graph fields
+      if (details.org !== undefined) {
+        if (!details.org) {
+          parts.push('No Organization schema found');
+        } else {
+          const graphParts: string[] = ['Organization schema present'];
+          if (details.logo) graphParts.push('logo included');
+          if (details.sameAs) graphParts.push(`${details.sameAs} social links`);
+          if (details.nameMatch === false) graphParts.push('name mismatch with title');
+          parts.push(graphParts.join(', '));
+        }
+      }
     }
-    if (evidence && evidence.length > 0) {
-      parts.push(...evidence.slice(0, 2));
+    if (evidence && evidence.length > 0 && parts.length === 0) {
+      parts.push(...evidence.slice(0, 1).map(e => e.length > 100 ? e.substring(0, 100) + '...' : e));
     }
     
     return parts.length > 0 ? parts.join(' | ') : null;
+  };
+
+  const formatScoringLogic = (fix: FixItem) => {
+    const details = fix.details;
+    if (!details) return null;
+
+    // Title quality (C1_title_quality)
+    if (fix.id === 'C1_title_quality' && details.title) {
+      const lengthScore = details.length >= 15 && details.length <= 65 ? 'PASS' : 'FAIL';
+      const brandBonus = details.hasBrand ? '+40 points' : '+0 points';
+      return `Length: ${details.length} chars (${lengthScore}) • Brand present: ${details.hasBrand ? 'Yes' : 'No'} (${brandBonus}) • Formula: (length_score × 60%) + brand_bonus = ${Math.round(fix.score)}`;
+    }
+
+    // Entity graph (A12_entity_graph)
+    if (fix.id === 'A12_entity_graph' && details.org !== undefined) {
+      if (!details.org) {
+        return 'Missing Organization or LocalBusiness JSON-LD schema → 0 points';
+      }
+      const parts: string[] = [];
+      parts.push(`Schema found: +10 base points`);
+      if (details.logo) parts.push(`Logo present: +30 points`);
+      if (details.sameAs >= 2) parts.push(`${details.sameAs} social links: +40 points`);
+      else if (details.sameAs === 1) parts.push(`1 social link: +20 points`);
+      if (details.nameMatch) parts.push(`Name matches title: +30 points`);
+      else parts.push(`Name mismatch: +10 points only`);
+      return parts.join(' • ');
+    }
+
+    // Meta description (C2_meta_description)
+    if (fix.id === 'C2_meta_description' && details.length !== undefined) {
+      const lengthScore = details.length >= 50 && details.length <= 160 ? 'PASS' : 'FAIL';
+      return `Length: ${details.length} chars (optimal: 50-160) • Status: ${lengthScore}`;
+    }
+
+    // H1 presence (C3_h1_presence)
+    if (fix.id === 'C3_h1_presence' && details.count !== undefined) {
+      if (details.count === 1) return 'Exactly 1 H1 found (PERFECT) → 100 points';
+      if (details.count === 0) return 'No H1 found → 0 points';
+      return `${details.count} H1 tags found (should be 1) → 30 points`;
+    }
+
+    // Generic details display
+    return null;
   };
 
   return (
@@ -248,6 +309,30 @@ export default function FixFirst({ fixes, auditId }: FixFirstProps) {
                           {/* Expanded Fix Details */}
                           {isFixExpanded && (
                             <div className="px-4 pb-4 space-y-3 border-t border-border bg-surface-2">
+                              {/* Scoring Breakdown */}
+                              {formatScoringLogic(fix) && (
+                                <div className="bg-brand-soft border-l-4 border-brand rounded-r-xl p-3">
+                                  <h4 className="font-bold text-xs mb-1 text-brand">Score Calculation</h4>
+                                  <p className="text-xs leading-relaxed font-mono text-ink">
+                                    {formatScoringLogic(fix)}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Raw Details for Transparency */}
+                              {fix.details && Object.keys(fix.details).length > 0 && (
+                                <details className="text-xs">
+                                  <summary className="cursor-pointer font-semibold text-ink-muted hover:text-ink">
+                                    Technical Details ({Object.keys(fix.details).length} fields)
+                                  </summary>
+                                  <div className="mt-2 bg-surface-1 rounded-lg p-2 border border-border">
+                                    <pre className="text-xs overflow-x-auto font-mono">
+                                      {JSON.stringify(fix.details, null, 2)}
+                                    </pre>
+                                  </div>
+                                </details>
+                              )}
+
                               {/* Why it matters */}
                               {fix.why_it_matters && (
                                 <div className="card-muted rounded-xl p-3">
