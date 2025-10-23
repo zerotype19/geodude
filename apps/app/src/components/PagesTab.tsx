@@ -197,7 +197,7 @@ export default function PagesTab({ auditId }: PagesTabProps) {
           const warningChecks = page.checks.filter((c) => !c.preview && c.status === 'warn');
           
           return (
-            <div key={page.id} className={`bg-surface-1 shadow rounded-lg hover:shadow-md transition-shadow border-l-4 ${getScoreBorderColor(page.diagnosticScore)}`}>
+            <div key={page.id} className={`bg-surface-1 shadow rounded-lg hover:shadow-md transition-shadow border-2 ${getScoreBorderColor(page.diagnosticScore)}`}>
               <div className="p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">

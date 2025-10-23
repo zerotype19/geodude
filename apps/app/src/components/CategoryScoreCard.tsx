@@ -50,7 +50,7 @@ export default function CategoryScoreCard({ categoryScore }: CategoryScoreCardPr
   return (
     <Link 
       to={`/audits/${id}/category/${categorySlug}`}
-      className={`card card-body hover:shadow-lg hover:border-brand transition-all cursor-pointer border-l-4 ${getScoreBorderColor(score)}`}
+      className={`card card-body hover:shadow-lg transition-all cursor-pointer border-2 ${getScoreBorderColor(score)}`}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">

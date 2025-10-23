@@ -77,8 +77,15 @@ interface MetricTileProps {
 function MetricTile({ row, meta }: MetricTileProps) {
   const badge = row.preview ? 'preview' : row.status;
 
+  const getScoreBorderColor = (score: number): string => {
+    if (!Number.isFinite(score)) return 'border-border';
+    if (score >= 85) return 'border-success';
+    if (score >= 60) return 'border-warn';
+    return 'border-danger';
+  };
+
   return (
-    <div className="rounded-xl border-2 border-border p-4 bg-surface-1 hover:shadow-md transition-shadow">
+    <div className={`rounded-xl border-2 p-4 bg-surface-1 hover:shadow-md transition-shadow ${getScoreBorderColor(row.score)}`}>
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
           <div className="font-semibold  text-sm">
