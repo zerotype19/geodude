@@ -2,8 +2,10 @@
 
 ## Overview
 
-**V1 Checks (Implemented):** 13 deterministic HTML-based checks  
-**Total Categories:** 6
+**Total Checks:** 29 (18 page-level + 11 site-level)  
+**Page-level checks:** Deterministic HTML-based analysis  
+**Site-level checks:** Aggregates of page-level results  
+**Categories:** 6
 
 ## Files
 
@@ -48,23 +50,28 @@ Each criterion includes:
 
 ## Category Breakdown
 
-1. **Technical Foundations** (5 checks)
-   - C1_title_quality, C2_meta_description, A4_schema_faqpage, G10_canonical, T2_lang_region
+### 1. Technical Foundations (11 total: 6 page + 5 site)
+**Page:** C1_title_quality, C2_meta_description, A4_schema_faqpage, G10_canonical, T2_lang_region, G2_og_tags_completeness  
+**Site:** S2_faq_schema_adoption_pct, S3_canonical_correct_pct, S5_lang_correct_pct, S7_dup_title_pct, S9_og_tags_coverage_pct
 
-2. **Structure & Organization** (3 checks)
-   - C3_h1_presence, A2_headings_semantic, A9_internal_linking
+### 2. Structure & Organization (6 total: 4 page + 2 site)
+**Page:** C3_h1_presence, A2_headings_semantic, A9_internal_linking, C5_h2_coverage_ratio  
+**Site:** S8_avg_h2_coverage, S11_internal_link_health_pct
 
-3. **Content & Clarity** (2 checks)
-   - A1_answer_first, A3_faq_presence
+### 3. Content & Clarity (6 total: 4 page + 2 site)
+**Page:** A1_answer_first, A3_faq_presence, A6_contact_cta_presence, A5_related_questions_block  
+**Site:** S1_faq_coverage_pct, S10_cta_above_fold_pct
 
-4. **Authority & Trust** (1 check)
-   - A12_entity_graph
+### 4. Experience & Performance (3 total: 2 page + 1 site)
+**Page:** T1_mobile_viewport, T4_core_web_vitals_hints  
+**Site:** S4_mobile_ready_pct
 
-5. **Crawl & Discoverability** (1 check)
-   - T3_noindex_robots
+### 5. Authority & Trust (2 total: 1 page + 1 site)
+**Page:** A12_entity_graph  
+**Site:** S6_entity_graph_adoption_pct
 
-6. **Experience & Performance** (1 check)
-   - T1_mobile_viewport
+### 6. Crawl & Discoverability (1 total: 1 page + 0 site)
+**Page:** T3_noindex_robots
 
 ## Generating New Export
 
