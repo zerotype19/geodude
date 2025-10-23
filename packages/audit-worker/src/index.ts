@@ -82,8 +82,9 @@ async function runInBatches<T, R>(
 }
 
 // Crawl/scoring budget for one run
-const HARD_TIME_MS = 120_000;          // 2 minutes total budget per audit
-const PER_REQUEST_BUDGET_MS = 25_000;  // keep each call under CF 30s
+// NOTE: CF Workers HTTP requests timeout at ~30s, so we must finalize before that
+const HARD_TIME_MS = 25_000;           // 25 seconds - must finalize before CF HTTP timeout (~30s)
+const PER_REQUEST_BUDGET_MS = 22_000;  // 22 seconds per batch to leave time for finalization
 const CONCURRENCY = 8;                 // parallel page fetch/analyze
 const PER_PAGE_TIMEOUT_MS = 4_000;     // each page gets 4s max
 
@@ -2412,14 +2413,19 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
   // Finalization conditions:
   // 1. Hit target pages (40+) - success
   // 2. Hit max pages (60) - success
-  // 3. Hit hard time limit (2min) - finalize what we have if >20 pages
+  // 3. Hit hard time limit (25s) - finalize what we have if >20 pages
   // 4. Queue empty - finalize if we have any pages
-  if (hitTarget || hitMaxPages || queueEmpty || (hitHardTime && totals.pages_analyzed >= 20)) {
+  // 5. SAFETY: >20s elapsed with any pages - must finalize before HTTP timeout
+  const mustFinalizeNow = elapsed >= 20_000 && totals.pages_analyzed >= 15;
+  
+  if (hitTarget || hitMaxPages || queueEmpty || (hitHardTime && totals.pages_analyzed >= 20) || mustFinalizeNow) {
     const reason = hitHardTime ? 'time_budget_reached'
                  : hitMaxPages ? 'max_pages_reached'
                  : hitTarget ? 'target_min_pages_met'
+                 : mustFinalizeNow ? 'http_timeout_safety'
                  : 'queue_empty';
     
+    console.log(`[FINALIZE_TRIGGER] ${auditId}: ${reason} (elapsed=${elapsed}ms, pages=${totals.pages_analyzed})`);
     await finalizeAudit(env, auditId, reason);
     return { ok: true, finalized: true, reason, totals };
   }
