@@ -672,7 +672,7 @@ async function queueCitations(req: Request, env: Env): Promise<Response> {
       message: 'Citations analysis queued for background processing'
     }), { 
       status: 202, // Accepted
-      headers: { 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
     
   } catch (error) {
@@ -681,7 +681,7 @@ async function queueCitations(req: Request, env: Env): Promise<Response> {
       error: error instanceof Error ? error.message : 'Unknown error'
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 }
