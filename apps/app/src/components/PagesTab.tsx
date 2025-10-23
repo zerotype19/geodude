@@ -194,99 +194,64 @@ export default function PagesTab({ auditId }: PagesTabProps) {
       </div>
 
       {/* Pages Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {filteredAndSortedPages.map((page) => {
           const failingChecks = page.checks.filter((c) => !c.preview && c.status === 'fail');
           const warningChecks = page.checks.filter((c) => !c.preview && c.status === 'warn');
           
           return (
-            <div key={page.id} className={`bg-surface-1 rounded-lg hover:shadow-md transition-shadow border ${getScoreGlow(page.diagnosticScore)}`}>
-              <div className="p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-medium truncate">
-                        <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-brand">
-                          {new URL(page.url).pathname || '/'}
-                        </a>
-                      </h3>
-                      {getCitationCount(page.url) > 0 && (
-                        <AICitedBadge citationCount={getCitationCount(page.url)} />
-                      )}
-                    </div>
-                    <p className="text-sm subtle truncate">{page.url}</p>
+            <Link
+              key={page.id}
+              to={`/audits/${auditId}/pages/${page.id}`}
+              className={`block bg-surface-1 rounded-lg hover:shadow-xl transition-all border p-4 group ${getScoreGlow(page.diagnosticScore)}`}
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold truncate group-hover:text-brand transition-colors">
+                      {new URL(page.url).pathname || '/'}
+                    </h3>
+                    {getCitationCount(page.url) > 0 && (
+                      <AICitedBadge citationCount={getCitationCount(page.url)} />
+                    )}
                   </div>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ml-2 flex-shrink-0 ${
-                    page.status_code >= 200 && page.status_code < 300 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
-                  }`}>
-                    {page.status_code}
-                  </span>
+                  <p className="text-xs subtle truncate">{page.url}</p>
                 </div>
+                <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded ml-2 flex-shrink-0 ${
+                  page.status_code >= 200 && page.status_code < 300 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
+                }`}>
+                  {page.status_code}
+                </span>
+              </div>
 
-                {/* Diagnostic Score */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs font-medium muted">Diagnostic Score</div>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded ${getScoreBadgeColor(page.diagnosticScore)}`}>
-                      {page.diagnosticScore >= 85 ? 'Good' : page.diagnosticScore >= 60 ? 'Fair' : 'Needs Work'}
-                    </span>
-                  </div>
-                  <div className={`text-3xl font-bold ${getScoreColor(page.diagnosticScore)} mb-2`}>
+              {/* Score & Checks Summary - Compact */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs muted mb-1">Diagnostic Score</div>
+                  <div className={`text-2xl font-bold ${getScoreColor(page.diagnosticScore)}`}>
                     {page.diagnosticScore}
                   </div>
-                  <div className="w-full bg-surface-3 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${
-                        page.diagnosticScore >= 85 ? 'bg-success-soft0' : page.diagnosticScore >= 60 ? 'bg-warn-soft0' : 'bg-danger-soft0'
-                      }`}
-                      style={{ width: `${Math.min(100, page.diagnosticScore)}%` }}
-                    />
-                  </div>
                 </div>
-
-                {/* Check Summary */}
-                <div className="mb-4 text-sm muted">
-                  <div className="flex items-center justify-between">
-                    <span>{page.checks.filter(c => !c.preview).length} active checks</span>
+                
+                <div className="text-right">
+                  <div className="text-xs muted mb-1">Checks</div>
+                  <div className="text-sm">
+                    <span className="font-medium">{page.checks.filter(c => !c.preview).length}</span>
                     {failingChecks.length > 0 && (
-                      <span className="text-danger font-semibold">{failingChecks.length} failing</span>
+                      <span className="text-danger font-semibold ml-2">
+                        {failingChecks.length} ✗
+                      </span>
                     )}
                     {failingChecks.length === 0 && warningChecks.length > 0 && (
-                      <span className="text-warn font-semibold">{warningChecks.length} warnings</span>
+                      <span className="text-warn font-semibold ml-2">
+                        {warningChecks.length} ⚠
+                      </span>
                     )}
                   </div>
                 </div>
-
-                {/* Top Issues */}
-                {failingChecks.length > 0 && (
-                  <div className="mb-4">
-                    <div className="text-xs font-medium muted mb-2">Top Issues</div>
-                    <div className="space-y-1">
-                      {failingChecks.slice(0, 3).map((check) => (
-                        <div key={check.id} className="flex items-center text-xs">
-                          <span className={`w-2 h-2 rounded-full ${getStatusChip(check.status)} mr-2`}></span>
-                          <span className="font-mono muted">{check.id}</span>
-                        </div>
-                      ))}
-                      {failingChecks.length > 3 && (
-                        <div className="text-xs subtle pl-4">+{failingChecks.length - 3} more</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex justify-end pt-4 border-t border-gray-100">
-                  <Link
-                    to={`/audits/${auditId}/pages/${page.id}`}
-                    className="text-brand hover:text-brand text-sm font-medium"
-                  >
-                    View Details →
-                  </Link>
-                </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
