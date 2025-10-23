@@ -1,106 +1,99 @@
-# Scoring Criteria Export
+# Scoring Criteria Exports
 
-## Overview
-
-**Total Checks:** 36 (23 page-level + 13 site-level)  
-**Implemented:** 31 checks ready for production  
-**Preview:** 5 checks (LLM, advanced features)  
-**Categories:** 6
-
-### Check Types
-- **html_dom:** 18 (deterministic HTML parsing)
-- **aggregate:** 11 (site-level rollups)
-- **llm:** 1 (AI-assisted)
-- **http:** 2 (robots/sitemap validation)
+This directory contains exports of the `scoring_criteria` D1 table for editing and re-importing.
 
 ## Files
 
-- `scoring_criteria_latest.json` - Most recent export of all enabled criteria
-- `scoring_criteria_YYYYMMDD.json` - Dated snapshots
+- `scoring_criteria_current_formatted.json` - **Latest export** - Use this for editing
+- `scoring_criteria_current_YYYYMMDD_HHMMSS.json` - Raw wrangler output (timestamped)
+- `scoring_criteria_latest.json` - Previous export (for reference)
 
-## Export Format
+## Export Process
 
-Each criterion includes:
-
-```json
-{
-  "id": "C1_title_quality",
-  "label": "Title tag quality",
-  "description": "Clear, descriptive title with sensible length and brand signal.",
-  "category": "Technical Foundations",
-  "scope": "page",
-  "weight": 12,
-  "impact_level": "High",
-  "importance_rank": 1,
-  "points_possible": 100,
-  "pass_threshold": 85,
-  "warn_threshold": 60,
-  "check_type": "html_dom",
-  "enabled": 1,
-  "preview": 0,
-  "scoring_approach": "Automated HTML analysis",
-  "examples": null,
-  "view_in_ui": 1,
-  "common_issues": "Missing title; overly long; keyword stuffing; no brand on home.",
-  "quick_fixes": "Rewrite to lead with primary topic; trim to <65 chars.",
-  "why_it_matters": "Titles drive ranking, snippets, and assistant citations.",
-  "how_to_fix": "Keep 15–65 chars; lead with topic; include brand on homepage.",
-  "learn_more_links": null,
-  "official_docs": null,
-  "references_json": null,
-  "display_order": 1,
-  "created_at": "2025-10-22 23:40:14",
-  "updated_at": "2025-10-22 23:40:14"
-}
-```
-
-## Category Breakdown
-
-### 1. Technical Foundations (11 total: 6 page + 5 site)
-**Page:** C1_title_quality, C2_meta_description, A4_schema_faqpage, G10_canonical, T2_lang_region, G2_og_tags_completeness  
-**Site:** S2_faq_schema_adoption_pct, S3_canonical_correct_pct, S5_lang_correct_pct, S7_dup_title_pct, S9_og_tags_coverage_pct
-
-### 2. Structure & Organization (8 total: 6 page + 2 site)
-**Page:** C3_h1_presence, A2_headings_semantic, A9_internal_linking, C5_h2_coverage_ratio, G11_entity_graph_completeness 🔄, G6_fact_url_stability 🔄  
-**Site:** S8_avg_h2_coverage, S11_internal_link_health_pct
-
-### 3. Content & Clarity (8 total: 6 page + 2 site)
-**Page:** A1_answer_first, A3_faq_presence, A6_contact_cta_presence, A5_related_questions_block, G12_topic_depth_semantic 🔄, A14_qna_scaffold 🔄  
-**Site:** S1_faq_coverage_pct, S10_cta_above_fold_pct
-
-### 4. Experience & Performance (4 total: 3 page + 1 site)
-**Page:** T1_mobile_viewport, T4_core_web_vitals_hints, A13_page_speed_lcp  
-**Site:** S4_mobile_ready_pct
-
-### 5. Authority & Trust (2 total: 1 page + 1 site)
-**Page:** A12_entity_graph  
-**Site:** S6_entity_graph_adoption_pct
-
-### 6. Crawl & Discoverability (3 total: 1 page + 2 site)
-**Page:** T3_noindex_robots  
-**Site:** A8_sitemap_discoverability, T5_ai_bot_access 🔄
-
-🔄 = Preview (requires additional implementation)
-
-## Generating New Export
-
+To export current D1 content:
 ```bash
 cd packages/audit-worker
-wrangler d1 execute optiview --remote --command "SELECT * FROM scoring_criteria WHERE enabled = 1 ORDER BY category, display_order NULLS LAST, id" --json | jq '.[0].results' > exports/scoring_criteria_latest.json
+wrangler d1 execute optiview --remote --json --command "SELECT * FROM scoring_criteria ORDER BY display_order, id" > exports/scoring_criteria_export.json
+jq '.[0].results' exports/scoring_criteria_export.json > exports/scoring_criteria_current_formatted.json
 ```
 
-## Importing to Frontend
+## Import Process
 
-```typescript
-import criteria from './scoring_criteria_latest.json';
-
-// Filter by category
-const technicalChecks = criteria.filter(c => c.category === 'Technical Foundations');
-
-// Get only V1 checks (deterministic HTML-based)
-const v1Checks = criteria.filter(c => c.check_type === 'html_dom' && c.id.includes('_'));
-
-// Sort by display order
-const sorted = criteria.sort((a, b) => (a.display_order || 999) - (b.display_order || 999));
+After editing `scoring_criteria_current_formatted.json`:
+```bash
+cd packages/audit-worker
+node scripts/import-enriched-criteria.js
 ```
 
+Or manually via SQL:
+```bash
+wrangler d1 execute optiview --remote --file=path/to/update.sql
+```
+
+## Schema
+
+Each criterion has these fields:
+
+### Core Fields
+- `id` - Unique identifier (e.g., "C1_title_quality")
+- `version` - Schema version (currently 1)
+- `label` - Display name
+- `description` - Brief description
+- `category` - One of: Technical Foundations, Structure & Organization, Content & Clarity, Authority & Trust, Crawl & Discoverability, Experience & Performance
+- `scope` - "page" or "site"
+- `weight` - Scoring weight (1-12)
+- `impact_level` - "High", "Medium", or "Low"
+- `pass_threshold` - Score threshold for passing (typically 85)
+- `warn_threshold` - Score threshold for warning (typically 60)
+- `check_type` - "html_dom", "llm", "aggregate", or "http"
+- `enabled` - 1 (enabled) or 0 (disabled)
+- `preview` - 0 (production) or 1 (preview mode)
+
+### Educational Fields
+- `why_it_matters` - Why this check is important (required)
+- `how_to_fix` - Step-by-step fix instructions (required)
+- `common_issues` - Typical problems found (required)
+- `quick_fixes` - Fast remediation steps (required)
+- `scoring_approach` - How the check is evaluated (e.g., "Automated HTML analysis")
+- `examples` - Real examples (optional, currently null)
+- `learn_more_links` - Educational resources (optional, currently null)
+- `official_docs` - Official documentation links (optional, currently null)
+- `references_json` - JSON array of reference URLs (optional, currently null)
+
+### Metadata Fields
+- `display_order` - Order within category for UI display
+- `view_in_ui` - Where to find in UI (legacy field)
+- `importance_rank` - 1 (Critical), 2 (High), 3 (Medium)
+- `points_possible` - Maximum points (always 100)
+- `created_at` - Timestamp
+- `updated_at` - Timestamp
+
+## Current Status (as of 2025-10-23)
+
+- **Total Criteria**: 36 (23 page-level, 13 site-level)
+- **All Enabled**: Yes (preview=0 for all)
+- **Populated Fields**: 
+  - ✅ why_it_matters: 36/36
+  - ✅ how_to_fix: 36/36
+  - ✅ common_issues: 36/36
+  - ✅ quick_fixes: 36/36
+  - ⚪ examples: 0/36 (null)
+  - ⚪ learn_more_links: 0/36 (null)
+  - ⚪ official_docs: 0/36 (null)
+
+## Tips for Editing
+
+1. **Keep IDs unchanged** - They're referenced throughout the codebase
+2. **Maintain JSON structure** - Use `jq` to validate before importing
+3. **Escape single quotes** - Use `''` in SQL strings or use the import script
+4. **Test in local D1 first** - Remove `--remote` flag when testing
+5. **Back up before importing** - Export current version first
+
+## Validation
+
+Before importing, validate the JSON:
+```bash
+jq empty scoring_criteria_current_formatted.json && echo "Valid JSON"
+jq 'length' scoring_criteria_current_formatted.json  # Should be 36
+jq 'map(select(.id == null or .label == null))' scoring_criteria_current_formatted.json  # Should be []
+```
