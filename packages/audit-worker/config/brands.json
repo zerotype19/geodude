@@ -1,0 +1,136 @@
+{
+  "adobe.com": {
+    "products": [
+      "Adobe Creative Cloud",
+      "Photoshop",
+      "Illustrator",
+      "InDesign",
+      "Acrobat",
+      "Adobe Express",
+      "Premiere Pro",
+      "After Effects",
+      "Lightroom",
+      "Adobe XD",
+      "Adobe Firefly"
+    ],
+    "avoid_terms": ["Adobe Makers", "Adobe Pro Plus", "Adobe Builder", "Adobe Creators"],
+    "common_comparisons": ["Figma", "Canva", "Sketch", "Affinity Designer", "CorelDRAW"],
+    "pricing_tiers": ["Individual", "Business", "Enterprise", "Student", "Team"],
+    "target_personas": ["designers", "photographers", "marketers", "video editors", "content creators"]
+  },
+  "salesforce.com": {
+    "products": [
+      "Sales Cloud",
+      "Service Cloud",
+      "Marketing Cloud",
+      "Commerce Cloud",
+      "Tableau",
+      "MuleSoft",
+      "Slack",
+      "Einstein Analytics"
+    ],
+    "avoid_terms": ["Salesforce Pro Plus", "Salesforce Builders", "Salesforce Makers"],
+    "common_comparisons": ["HubSpot", "Zoho CRM", "Microsoft Dynamics 365", "Oracle CRM"],
+    "pricing_tiers": ["Essentials", "Professional", "Enterprise", "Unlimited"],
+    "target_personas": ["sales teams", "marketers", "CRM admins", "executives", "service teams"]
+  },
+  "stripe.com": {
+    "products": [
+      "Stripe Payments",
+      "Stripe Billing",
+      "Stripe Connect",
+      "Stripe Terminal",
+      "Stripe Radar",
+      "Stripe Issuing"
+    ],
+    "avoid_terms": ["Stripe Merchants", "Stripe Pro", "Stripe Builders"],
+    "common_comparisons": ["PayPal", "Square", "Braintree", "Adyen"],
+    "pricing_tiers": ["Standard", "Custom"],
+    "target_personas": ["developers", "business owners", "finance teams", "e-commerce managers"]
+  },
+  "microsoft.com": {
+    "products": [
+      "Microsoft 365",
+      "Azure",
+      "Windows",
+      "Office",
+      "Teams",
+      "Dynamics 365",
+      "Power Platform",
+      "GitHub"
+    ],
+    "avoid_terms": ["Microsoft Makers", "Microsoft Pro Plus", "Microsoft Builders"],
+    "common_comparisons": ["Google Workspace", "AWS", "Salesforce", "Slack"],
+    "pricing_tiers": ["Home", "Business Basic", "Business Standard", "Business Premium", "Enterprise"],
+    "target_personas": ["business users", "IT admins", "developers", "enterprises"]
+  },
+  "google.com": {
+    "products": [
+      "Google Workspace",
+      "Google Cloud Platform",
+      "Google Ads",
+      "Google Analytics",
+      "Gmail",
+      "Google Drive",
+      "Google Meet"
+    ],
+    "avoid_terms": ["Google Makers", "Google Pro", "Google Builders"],
+    "common_comparisons": ["Microsoft 365", "AWS", "Azure", "Zoom"],
+    "pricing_tiers": ["Business Starter", "Business Standard", "Business Plus", "Enterprise"],
+    "target_personas": ["businesses", "marketers", "developers", "analysts"]
+  },
+  "amazon.com": {
+    "products": [
+      "Amazon Prime",
+      "AWS",
+      "Amazon Business",
+      "Kindle",
+      "Fire TV",
+      "Alexa",
+      "Amazon Fresh"
+    ],
+    "avoid_terms": ["Amazon Shoppers", "Amazon Buyers", "Amazon Members Plus"],
+    "common_comparisons": ["Walmart", "Target", "eBay", "Google Cloud", "Azure"],
+    "pricing_tiers": ["Standard", "Prime", "Business"],
+    "target_personas": ["consumers", "business buyers", "developers", "sellers"]
+  },
+  "apple.com": {
+    "products": [
+      "iPhone",
+      "iPad",
+      "Mac",
+      "Apple Watch",
+      "AirPods",
+      "Apple TV",
+      "iCloud",
+      "Apple Music",
+      "Apple One"
+    ],
+    "avoid_terms": ["Apple Pro Plus", "Apple Makers", "Apple Creators"],
+    "common_comparisons": ["Samsung", "Google Pixel", "Microsoft Surface", "Spotify"],
+    "pricing_tiers": ["Standard", "Pro", "Max"],
+    "target_personas": ["consumers", "creative professionals", "developers", "businesses"]
+  },
+  "walmart.com": {
+    "products": ["Walmart+", "Walmart Marketplace", "Walmart Pharmacy", "Walmart Money"],
+    "avoid_terms": ["Walmart Shoppers", "Walmart Members Pro"],
+    "common_comparisons": ["Target", "Amazon", "Costco", "Sam's Club"],
+    "pricing_tiers": ["Standard", "Walmart+"],
+    "target_personas": ["value shoppers", "families", "bulk buyers"]
+  },
+  "target.com": {
+    "products": ["Target Circle", "RedCard", "Target+", "Shipt"],
+    "avoid_terms": ["Target Shoppers", "Target Members"],
+    "common_comparisons": ["Walmart", "Amazon", "Costco"],
+    "pricing_tiers": ["Standard", "RedCard"],
+    "target_personas": ["shoppers", "families", "deal seekers"]
+  },
+  "mayoclinic.org": {
+    "products": ["Mayo Clinic Care Network", "Mayo Clinic Labs", "Mayo Clinic Health System"],
+    "avoid_terms": ["Mayo Pro", "Mayo Plus", "Mayo Members"],
+    "common_comparisons": ["Cleveland Clinic", "Johns Hopkins", "Stanford Health"],
+    "pricing_tiers": [],
+    "target_personas": ["patients", "caregivers", "healthcare providers"]
+  }
+}
+

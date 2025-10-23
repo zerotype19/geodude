@@ -1,13 +1,20 @@
 /**
  * Query Quality Filter
  * 
- * Rejects queries that are unnatural, nonsensical, or clearly template-generated garbage.
- * This prevents showing customers queries like "Are orlandos safe for getting started?"
+ * Comprehensive quality filtering system that:
+ * - Rejects unnatural, nonsensical, or template-generated queries
+ * - Detects brand hallucinations
+ * - Applies rewrite rules to fix common mistakes
+ * - Integrates with anti-patterns library
  */
+
+import { checkAntiPatterns } from './anti-patterns';
+import { applyRewrites } from './rewrites';
 
 interface QualityCheckResult {
   isValid: boolean;
   reason?: string;
+  severity?: string;
 }
 
 /**
@@ -160,7 +167,7 @@ export function averageHumanScore(queries: string[]): number {
 }
 
 /**
- * Filter an array of queries, removing low-quality ones
+ * Filter an array of queries, removing low-quality ones (legacy function)
  */
 export function filterQueriesByQuality(queries: string[]): {
   valid: string[];
@@ -182,5 +189,110 @@ export function filterQueriesByQuality(queries: string[]): {
   }
   
   return { valid, rejected };
+}
+
+/**
+ * Comprehensive quality filter with anti-patterns and rewrites
+ * This is the NEW recommended method for filtering queries
+ */
+export function filterAndRewriteQueries(
+  queries: string[],
+  options?: {
+    industry?: string;
+    domain?: string;
+    applyRewrites?: boolean;
+    minHumanScore?: number;
+  }
+): {
+  valid: string[];
+  rejected: Array<{ query: string; reason: string; severity?: string }>;
+  rewritten: Array<{ original: string; rewritten: string; rules: string[] }>;
+  stats: {
+    total: number;
+    passed: number;
+    rejected: number;
+    rewritten: number;
+    avg_human_score: number;
+  };
+} {
+  const opts = {
+    applyRewrites: true,
+    minHumanScore: 0.6,
+    ...options
+  };
+
+  const valid: string[] = [];
+  const rejected: Array<{ query: string; reason: string; severity?: string }> = [];
+  const rewritten: Array<{ original: string; rewritten: string; rules: string[] }> = [];
+  
+  let totalHumanScore = 0;
+  
+  for (let query of queries) {
+    const originalQuery = query;
+    
+    // Step 1: Check anti-patterns (most critical)
+    const antiPatternCheck = checkAntiPatterns(query, opts.industry);
+    if (!antiPatternCheck.isValid) {
+      rejected.push({
+        query,
+        reason: antiPatternCheck.reason || 'Anti-pattern detected',
+        severity: antiPatternCheck.severity
+      });
+      continue;
+    }
+    
+    // Step 2: Check legacy quality filters
+    const qualityCheck = isNaturalQuery(query);
+    if (!qualityCheck.isValid) {
+      rejected.push({
+        query,
+        reason: qualityCheck.reason || 'Quality check failed',
+        severity: 'warning'
+      });
+      continue;
+    }
+    
+    // Step 3: Apply rewrites if enabled
+    if (opts.applyRewrites) {
+      const { rewritten: newQuery, applied } = applyRewrites(query);
+      if (applied.length > 0) {
+        rewritten.push({
+          original: query,
+          rewritten: newQuery,
+          rules: applied
+        });
+        query = newQuery;
+      }
+    }
+    
+    // Step 4: Check human score
+    const hScore = humanScore(query);
+    totalHumanScore += hScore;
+    
+    if (hScore < opts.minHumanScore) {
+      rejected.push({
+        query,
+        reason: `Human score too low: ${hScore.toFixed(2)} < ${opts.minHumanScore}`,
+        severity: 'info'
+      });
+      continue;
+    }
+    
+    // Passed all checks
+    valid.push(query);
+  }
+  
+  return {
+    valid,
+    rejected,
+    rewritten,
+    stats: {
+      total: queries.length,
+      passed: valid.length,
+      rejected: rejected.length,
+      rewritten: rewritten.length,
+      avg_human_score: queries.length > 0 ? totalHumanScore / queries.length : 0
+    }
+  };
 }
 

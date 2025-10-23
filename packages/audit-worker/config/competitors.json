@@ -1,0 +1,94 @@
+{
+  "adobe.com": {
+    "direct_competitors": ["figma.com", "canva.com", "sketch.com", "affinity.serif.com"],
+    "category_alternatives": ["gimp.org", "inkscape.org", "krita.org"],
+    "by_product": {
+      "Photoshop": ["GIMP", "Affinity Photo", "Pixelmator Pro", "Corel PaintShop Pro"],
+      "Illustrator": ["Figma", "Sketch", "Affinity Designer", "Inkscape", "CorelDRAW"],
+      "Premiere Pro": ["DaVinci Resolve", "Final Cut Pro", "Filmora"],
+      "After Effects": ["Blender", "HitFilm"],
+      "Lightroom": ["Capture One", "Luminar", "DxO PhotoLab"],
+      "XD": ["Figma", "Sketch", "InVision"],
+      "Acrobat": ["Foxit", "Nitro PDF", "PDFelement"]
+    }
+  },
+  "salesforce.com": {
+    "direct_competitors": ["hubspot.com", "zoho.com", "dynamics.microsoft.com"],
+    "category_alternatives": ["pipedrive.com", "freshworks.com", "sugarcrm.com"],
+    "by_product": {
+      "Sales Cloud": ["HubSpot Sales Hub", "Zoho CRM", "Pipedrive"],
+      "Service Cloud": ["Zendesk", "Freshdesk", "Intercom"],
+      "Marketing Cloud": ["HubSpot Marketing Hub", "Marketo", "Pardot"],
+      "Tableau": ["Power BI", "Looker", "Qlik"]
+    }
+  },
+  "stripe.com": {
+    "direct_competitors": ["paypal.com", "square.com", "adyen.com"],
+    "category_alternatives": ["braintreepayments.com", "authorize.net", "2checkout.com"],
+    "by_product": {
+      "Payments": ["PayPal", "Square", "Braintree", "Authorize.net"],
+      "Billing": ["Chargebee", "Recurly", "Zuora"],
+      "Terminal": ["Square Terminal", "Clover"]
+    }
+  },
+  "microsoft.com": {
+    "direct_competitors": ["google.com", "salesforce.com", "aws.amazon.com", "apple.com"],
+    "category_alternatives": ["oracle.com", "ibm.com", "sap.com"],
+    "by_product": {
+      "Microsoft 365": ["Google Workspace", "Zoho Workplace"],
+      "Azure": ["AWS", "Google Cloud", "Oracle Cloud"],
+      "Teams": ["Slack", "Zoom", "Google Meet"],
+      "Dynamics 365": ["Salesforce", "Oracle CX", "SAP"]
+    }
+  },
+  "google.com": {
+    "direct_competitors": ["microsoft.com", "aws.amazon.com", "apple.com", "zoom.us"],
+    "category_alternatives": ["oracle.com", "ibm.com"],
+    "by_product": {
+      "Google Workspace": ["Microsoft 365", "Zoho Workplace"],
+      "Google Cloud": ["AWS", "Azure", "Oracle Cloud"],
+      "Google Meet": ["Zoom", "Microsoft Teams", "Webex"]
+    }
+  },
+  "amazon.com": {
+    "direct_competitors": ["walmart.com", "target.com", "ebay.com", "google.com", "microsoft.com"],
+    "category_alternatives": ["bestbuy.com", "costco.com", "alibaba.com"],
+    "by_product": {
+      "Amazon Prime": ["Walmart+", "Target Circle"],
+      "AWS": ["Azure", "Google Cloud", "Oracle Cloud"],
+      "Kindle": ["Apple Books", "Google Play Books", "Kobo"]
+    }
+  },
+  "apple.com": {
+    "direct_competitors": ["samsung.com", "google.com", "microsoft.com"],
+    "category_alternatives": ["dell.com", "lenovo.com", "sony.com"],
+    "by_product": {
+      "iPhone": ["Samsung Galaxy", "Google Pixel", "OnePlus"],
+      "iPad": ["Samsung Galaxy Tab", "Microsoft Surface"],
+      "Mac": ["Dell", "HP", "Lenovo ThinkPad", "Microsoft Surface"],
+      "Apple Watch": ["Samsung Galaxy Watch", "Fitbit", "Garmin"],
+      "Apple Music": ["Spotify", "YouTube Music", "Amazon Music"]
+    }
+  },
+  "walmart.com": {
+    "direct_competitors": ["target.com", "amazon.com", "costco.com"],
+    "category_alternatives": ["samsclub.com", "kroger.com", "albertsons.com"],
+    "by_product": {
+      "Walmart+": ["Amazon Prime", "Target Circle", "Instacart+"]
+    }
+  },
+  "target.com": {
+    "direct_competitors": ["walmart.com", "amazon.com", "costco.com"],
+    "category_alternatives": ["kohls.com", "macys.com", "jcpenney.com"],
+    "by_product": {
+      "Target Circle": ["Walmart+", "Amazon Prime"],
+      "Shipt": ["Instacart", "Amazon Fresh"]
+    }
+  },
+  "mayoclinic.org": {
+    "direct_competitors": ["clevelandclinic.org", "hopkinsmedicine.org", "med.stanford.edu"],
+    "category_alternatives": ["massgeneralbrigham.org", "cedars-sinai.org", "mountsinai.org"],
+    "by_product": {}
+  }
+}
+
