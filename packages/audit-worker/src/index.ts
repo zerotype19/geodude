@@ -638,6 +638,15 @@ async function warmDemoDomains(env: Env): Promise<void> {
 
 // Queue citations job for async processing
 async function queueCitations(req: Request, env: Env): Promise<Response> {
+  // Define CORS headers for this function
+  const origin = req.headers.get('Origin') || 'https://app.optiview.ai';
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+  
   try {
     const body: CitationsRequest = await req.json();
     const { audit_id } = body;
