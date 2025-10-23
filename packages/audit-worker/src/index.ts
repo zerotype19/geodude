@@ -2707,6 +2707,50 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
     console.log(`[SITE_DIAGNOSTICS] Skipped - feature flag not enabled`);
   }
   
+  // Compute and save composite score for dashboard display
+  if (env.SCORING_V1_ENABLED === "true") {
+    try {
+      const { computeComposite } = await import('./diagnostics/composite');
+      const { loadCriteriaMap } = await import('./diagnostics/persist');
+      
+      // Fetch site checks
+      const audit: any = await env.DB.prepare("SELECT site_checks_json FROM audits WHERE id = ?").bind(auditId).first();
+      const siteChecks = audit?.site_checks_json ? JSON.parse(audit.site_checks_json as string) : [];
+      
+      // Aggregate page checks from all pages in the audit
+      const pages = (await env.DB.prepare(`
+        SELECT apa.checks_json
+        FROM audit_pages p
+        LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+        WHERE p.audit_id = ?1 AND apa.checks_json IS NOT NULL
+      `).bind(auditId).all()).results || [];
+      
+      const allPageChecks = pages.flatMap((p: any) => {
+        try {
+          return p.checks_json ? JSON.parse(p.checks_json) : [];
+        } catch {
+          return [];
+        }
+      });
+      
+      // Load criteria metadata
+      const criteriaMap = await loadCriteriaMap(env.DB);
+      const criteriaArray = Array.from(criteriaMap.values());
+      
+      // Compute composite score
+      const composite = computeComposite(allPageChecks, siteChecks, criteriaArray);
+      
+      // Save to audits table
+      await env.DB.prepare(
+        `UPDATE audits SET composite_score = ? WHERE id = ?`
+      ).bind(composite.total, auditId).run();
+      
+      console.log(`[COMPOSITE_SCORE] Saved for ${auditId}: ${composite.total}`);
+    } catch (err) {
+      console.error(`[COMPOSITE_SCORE] Failed for ${auditId}:`, err);
+    }
+  }
+  
   // Async: Build and cache LLM prompts for this domain (non-blocking)
   // This runs after finalization so citation runs can use cached prompts
   (async () => {
@@ -2908,6 +2952,7 @@ async function getAuditsList(searchParams: URLSearchParams, env: Env, userId: st
       status,
       aeo_score,
       geo_score,
+      composite_score,
       config_json,
       user_id
     FROM audits 

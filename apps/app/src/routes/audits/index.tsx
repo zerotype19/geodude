@@ -41,25 +41,8 @@ export default function AuditsIndex() {
   const fetchAudits = async () => {
     try {
       const data = await apiGet<{ audits: Audit[] }>('/api/audits');
-      const auditsData = data.audits || [];
-      
-      // Fetch composite scores for completed audits
-      const auditsWithScores = await Promise.all(
-        auditsData.map(async (audit) => {
-          if (audit.status === 'complete') {
-            try {
-              const composite = await apiGet<{ total: number }>(`/api/audits/${audit.id}/composite`);
-              return { ...audit, composite_score: composite.total };
-            } catch (error) {
-              console.error(`Failed to fetch composite for ${audit.id}:`, error);
-              return audit;
-            }
-          }
-          return audit;
-        })
-      );
-      
-      setAudits(auditsWithScores);
+      // Composite score is now included in the audit object from the API
+      setAudits(data.audits || []);
     } catch (error) {
       console.error('Failed to fetch audits:', error);
     } finally {
