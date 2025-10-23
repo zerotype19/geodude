@@ -2356,6 +2356,46 @@ async function finalizeAudit(env: Env, auditId: string, reason: string): Promise
   
   console.log(`[FINALIZED] ${auditId}: ${reason} (AEO: ${aeo}, GEO: ${geo}, Gap: ${avgRenderGap ? Math.round(avgRenderGap * 100) + '%' : 'N/A'})`);
   
+  // Run site-level diagnostics if enabled
+  if (env.SCORING_V1_ENABLED === "true") {
+    try {
+      const { runDiagnosticsForSite } = await import('./diagnostics/runSite');
+      
+      const audit: any = await env.DB.prepare(
+        'SELECT root_url FROM audits WHERE id = ?'
+      ).bind(auditId).first();
+      
+      if (audit) {
+        const domain = new URL(audit.root_url).hostname;
+        
+        // Fetch all pages with their checks
+        const pages = (await env.DB.prepare(`
+          SELECT p.id, p.url, p.html_rendered, p.html_static, apa.checks_json
+          FROM audit_pages p
+          LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+          WHERE p.audit_id = ?1
+        `).bind(auditId).all()).results || [];
+        
+        const ctx = {
+          auditId,
+          domain,
+          pages: pages.map((r: any) => ({
+            id: r.id,
+            url: r.url,
+            html_rendered: r.html_rendered,
+            html_static: r.html_static,
+            checks: r.checks_json ? JSON.parse(r.checks_json) : []
+          }))
+        };
+        
+        await runDiagnosticsForSite(env.DB, ctx);
+        console.log(`[SITE_DIAGNOSTICS] Computed for ${auditId}: ${ctx.pages.length} pages analyzed`);
+      }
+    } catch (err) {
+      console.error(`[SITE_DIAGNOSTICS] Failed for ${auditId}:`, err);
+    }
+  }
+  
   // Async: Build and cache LLM prompts for this domain (non-blocking)
   // This runs after finalization so citation runs can use cached prompts
   (async () => {
