@@ -13,27 +13,15 @@ interface CriteriaCardProps {
 
 export default function CriteriaCard({ criterion }: CriteriaCardProps) {
   const impactColors = {
-    High: 'bg-danger-soft text-danger border-danger',
-    Medium: 'bg-warn-soft text-warn border-warn',
-    Low: 'bg-brand-soft text-brand border-blue-200'
-  };
-
-  const scopeColors = {
-    page: 'bg-success-soft text-success',
-    site: 'bg-brand-soft text-brand'
-  };
-
-  const checkTypeColors = {
-    html_dom: 'bg-brand-soft text-brand border-blue-200',
-    http: 'bg-warn-soft text-warn border-warn',
-    aggregate: 'bg-success-soft text-success border-success',
-    llm: 'bg-purple-50 text-brand border-purple-200'
+    High: 'pill pill-danger',
+    Medium: 'pill pill-warn',
+    Low: 'pill pill-success'
   };
 
   return (
     <Link 
       to={`/score-guide/${criterion.id}`}
-      className="block bg-surface-1 rounded-lg border-2 border-border hover:border-brand hover:shadow-lg transition-all p-6 group flex flex-col h-full"
+      className="card card-body hover:shadow-xl transition-all group flex flex-col h-full hover:border-brand"
     >
       {/* Title and description first - user-friendly */}
       <div className="flex items-start justify-between mb-3">
@@ -46,7 +34,7 @@ export default function CriteriaCard({ criterion }: CriteriaCardProps) {
           </p>
         </div>
         <div className="ml-4 flex-shrink-0">
-          <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-bold border-2 ${impactColors[criterion.impact]}`}>
+          <span className={impactColors[criterion.impact]}>
             {criterion.impact}
           </span>
         </div>
@@ -54,8 +42,8 @@ export default function CriteriaCard({ criterion }: CriteriaCardProps) {
       
       {/* Why it matters preview */}
       {criterion.why_it_matters && (
-        <div className="bg-brand-soft border border-blue-200 rounded-lg p-4 mb-4">
-          <p className="text-sm text-brand leading-relaxed">
+        <div className="card-muted rounded-xl p-4 mb-4 border border-border">
+          <p className="text-sm leading-relaxed">
             <span className="font-semibold">Why it matters:</span> {criterion.why_it_matters}
           </p>
         </div>

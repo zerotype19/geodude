@@ -15,12 +15,12 @@ export default function CriterionDetail() {
   
   if (!criterion) {
     return (
-      <div className="min-h-screen bg-surface-2 py-8">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-surface-1 rounded-lg border border-border p-8 text-center">
-            <h2 className="text-2xl font-bold  mb-2">Criterion Not Found</h2>
+      <div className="min-h-screen bg-surface-1 py-8">
+        <div className="page-max container-px">
+          <div className="card card-body text-center">
+            <h2 className="text-2xl font-bold mb-2">Criterion Not Found</h2>
             <p className="muted mb-4">The criterion "{criterionId}" doesn't exist.</p>
-            <Link to="/score-guide" className="text-brand hover:text-brand font-medium">
+            <Link to="/score-guide" className="text-brand hover:underline font-medium">
               ← Back to Score Guide
             </Link>
           </div>
@@ -30,30 +30,30 @@ export default function CriterionDetail() {
   }
 
   const impactColors = {
-    High: 'bg-danger-soft text-danger border-danger',
-    Medium: 'bg-warn-soft text-warn border-warn',
-    Low: 'bg-brand-soft text-brand border-blue-200'
+    High: 'pill pill-danger',
+    Medium: 'pill pill-warn',
+    Low: 'pill pill-success'
   };
 
   const scopeColors = {
-    page: 'bg-success-soft text-success',
-    site: 'bg-brand-soft text-brand'
+    page: 'pill pill-success',
+    site: 'pill pill-brand'
   };
 
   const checkTypeColors = {
-    html_dom: 'bg-brand-soft text-brand',
-    http: 'bg-warn-soft text-warn',
-    aggregate: 'bg-success-soft text-success',
-    llm: 'bg-purple-50 text-brand'
+    html_dom: 'pill pill-brand',
+    http: 'pill pill-warn',
+    aggregate: 'pill pill-success',
+    llm: 'pill pill-brand'
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-12">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-surface-1 py-12">
+      <div className="page-max container-px">
         {/* Back button */}
         <button
           onClick={() => navigate(-1)}
-          className="mb-8 flex items-center gap-2 text-brand hover:text-brand font-semibold transition-colors group"
+          className="mb-8 inline-flex items-center gap-2 text-brand hover:underline font-semibold transition-colors group"
         >
           <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
@@ -62,22 +62,22 @@ export default function CriterionDetail() {
         </button>
 
         {/* Header Card */}
-        <div className="bg-surface-1 rounded-2xl shadow-lg border border-border/50 p-10 mb-8">
+        <div className="card card-body mb-8">
           <div className="flex items-center gap-3 mb-6 flex-wrap">
-            <span className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-mono font-bold bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-md">
+            <span className="tag bg-gray-900 text-white font-mono font-bold">
               {criterion.id}
             </span>
-            <span className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-bold shadow-sm ${impactColors[criterion.impact]}`}>
+            <span className={impactColors[criterion.impact]}>
               {criterion.impact} Impact
             </span>
-            <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold ${scopeColors[criterion.scope]}`}>
+            <span className={scopeColors[criterion.scope]}>
               {criterion.scope}-level
             </span>
-            <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold ${checkTypeColors[criterion.check_type]}`}>
+            <span className={checkTypeColors[criterion.check_type]}>
               {criterion.check_type}
             </span>
             {criterion.preview && (
-              <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold bg-warn-soft text-warn">
+              <span className="pill pill-warn">
                 Preview
               </span>
             )}
@@ -91,9 +91,9 @@ export default function CriterionDetail() {
             {criterion.description}
           </p>
           
-          <div className="flex items-center gap-8 text-base font-medium muted bg-surface-2 rounded-xl p-4">
+          <div className="flex items-center gap-8 text-base font-medium muted card-muted rounded-xl p-4">
             <div>
-              <span className="subtle">Weight:</span> <span className=" font-bold">{criterion.weight}</span>
+              <span className="subtle">Weight:</span> <span className="font-bold">{criterion.weight}</span>
             </div>
             <div>
               <span className="subtle">Pass:</span> <span className="text-success font-bold">{criterion.pass_threshold}%</span>
@@ -102,7 +102,7 @@ export default function CriterionDetail() {
               <span className="subtle">Warn:</span> <span className="text-warn font-bold">{criterion.warn_threshold}%</span>
             </div>
             <div>
-              <span className="subtle">Points:</span> <span className=" font-bold">{criterion.points_possible || 100}</span>
+              <span className="subtle">Points:</span> <span className="font-bold">{criterion.points_possible || 100}</span>
             </div>
           </div>
         </div>
@@ -111,8 +111,8 @@ export default function CriterionDetail() {
         <div className="space-y-6">
           {/* Why it matters */}
           {criterion.why_it_matters && (
-            <div className="bg-surface-1 rounded-lg border border-border p-6">
-              <h2 className="text-xl font-bold  mb-3">
+            <div className="card card-body">
+              <h2 className="section-title mb-3">
                 Why This Matters
               </h2>
               <p className="text-base muted leading-relaxed">
@@ -123,8 +123,8 @@ export default function CriterionDetail() {
 
           {/* How to fix */}
           {criterion.how_to_fix && (
-            <div className="bg-surface-1 rounded-lg border border-border p-6">
-              <h2 className="text-xl font-bold  mb-3">
+            <div className="card card-body">
+              <h2 className="section-title mb-3">
                 How to Fix
               </h2>
               <p className="text-base muted leading-relaxed whitespace-pre-line">
@@ -135,11 +135,11 @@ export default function CriterionDetail() {
 
           {/* Examples */}
           {criterion.examples && (
-            <div className="bg-surface-1 rounded-lg border border-border p-6">
-              <h2 className="text-xl font-bold  mb-3">
+            <div className="card card-body">
+              <h2 className="section-title mb-3">
                 Example
               </h2>
-              <pre className="text-sm  bg-surface-2 rounded p-4 border border-border font-mono leading-relaxed whitespace-pre-wrap break-words">
+              <pre className="text-sm card-muted rounded-xl p-4 border border-border font-mono leading-relaxed whitespace-pre-wrap break-words">
 {criterion.examples}
               </pre>
             </div>
@@ -147,8 +147,8 @@ export default function CriterionDetail() {
 
           {/* Quick fixes */}
           {criterion.quick_fixes && (
-            <div className="bg-surface-1 rounded-lg border border-border p-6">
-              <h2 className="text-xl font-bold  mb-3">
+            <div className="card card-body">
+              <h2 className="section-title mb-3">
                 Quick Fixes
               </h2>
               <p className="text-base muted leading-relaxed">
@@ -159,8 +159,8 @@ export default function CriterionDetail() {
 
           {/* Common issues */}
           {criterion.common_issues && (
-            <div className="bg-surface-1 rounded-lg border border-border p-6">
-              <h2 className="text-xl font-bold  mb-3">
+            <div className="card card-body">
+              <h2 className="section-title mb-3">
                 Common Issues
               </h2>
               <p className="text-base muted leading-relaxed">
@@ -170,8 +170,8 @@ export default function CriterionDetail() {
           )}
 
           {/* Resources */}
-          <div className="bg-surface-1 rounded-lg border border-border p-6">
-            <h2 className="text-xl font-bold  mb-4">
+          <div className="card card-body">
+            <h2 className="section-title mb-4">
               Resources
             </h2>
             <div className="space-y-3">
@@ -180,7 +180,7 @@ export default function CriterionDetail() {
                   href={criterion.official_docs}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-base text-brand hover:text-brand hover:underline"
+                  className="block text-base text-brand hover:underline"
                 >
                   Official Documentation →
                 </a>
@@ -193,7 +193,7 @@ export default function CriterionDetail() {
                       href={ref}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block text-sm text-brand hover:text-brand hover:underline"
+                      className="block text-sm text-brand hover:underline"
                     >
                       {new URL(ref).hostname} →
                     </a>
@@ -209,46 +209,46 @@ export default function CriterionDetail() {
           </div>
 
           {/* Technical Details */}
-          <div className="bg-surface-1 rounded-lg border border-border p-6">
-            <h2 className="text-xl font-bold  mb-4">
+          <div className="card card-body">
+            <h2 className="section-title mb-4">
               Technical Details
             </h2>
             <dl className="grid grid-cols-2 gap-6 text-base">
-              <div className="bg-surface-2 rounded-xl p-4">
+              <div className="card-muted rounded-xl p-4">
                 <dt className="font-bold muted mb-1">Scoring Approach</dt>
-                <dd className="">{criterion.scoring_approach || 'Automated analysis'}</dd>
+                <dd>{criterion.scoring_approach || 'Automated analysis'}</dd>
               </div>
-              <div className="bg-surface-2 rounded-xl p-4">
+              <div className="card-muted rounded-xl p-4">
                 <dt className="font-bold muted mb-1">Check Type</dt>
-                <dd className="">{criterion.check_type}</dd>
+                <dd>{criterion.check_type}</dd>
               </div>
-              <div className="bg-surface-2 rounded-xl p-4">
+              <div className="card-muted rounded-xl p-4">
                 <dt className="font-bold muted mb-1">Scope</dt>
-                <dd className="">{criterion.scope}-level</dd>
+                <dd>{criterion.scope}-level</dd>
               </div>
               {criterion.importance_rank && (
-                <div className="bg-surface-2 rounded-xl p-4">
+                <div className="card-muted rounded-xl p-4">
                   <dt className="font-bold muted mb-1">Priority Rank</dt>
-                  <dd className="">#{criterion.importance_rank}</dd>
+                  <dd>#{criterion.importance_rank}</dd>
                 </div>
               )}
-              <div className="bg-surface-2 rounded-xl p-4">
+              <div className="card-muted rounded-xl p-4">
                 <dt className="font-bold muted mb-1">Category</dt>
-                <dd className="">{criterion.category}</dd>
+                <dd>{criterion.category}</dd>
               </div>
-              <div className="bg-surface-2 rounded-xl p-4">
+              <div className="card-muted rounded-xl p-4">
                 <dt className="font-bold muted mb-1">Weight</dt>
-                <dd className=" text-xl font-bold">{criterion.weight}</dd>
+                <dd className="text-xl font-bold">{criterion.weight}</dd>
               </div>
             </dl>
           </div>
         </div>
 
         {/* Back to top */}
-        <div className="mt-10 pt-8 border-t-2 border-border text-center">
+        <div className="mt-10 pt-8 border-t border-border text-center">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-3 px-6 py-3 bg-brand hover:bg-brand text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all group"
+            className="btn-primary"
           >
             <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
