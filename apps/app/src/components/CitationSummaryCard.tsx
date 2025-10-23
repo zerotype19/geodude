@@ -16,13 +16,6 @@ interface CitationSummaryCardProps {
   auditId: string;
 }
 
-const SOURCE_ICONS: Record<string, string> = {
-  perplexity: '🔍',
-  chatgpt: '🤖',
-  claude: '🧠',
-  brave: '🦁'
-};
-
 const SOURCE_NAMES: Record<string, string> = {
   perplexity: 'Perplexity',
   chatgpt: 'ChatGPT',
@@ -51,7 +44,7 @@ export default function CitationSummaryCard({ auditId }: CitationSummaryCardProp
 
   if (loading) {
     return (
-      <div className="bg-surface-1 rounded-lg border border-border p-6">
+      <div className="card card-body">
         <div className="animate-pulse">
           <div className="h-4 bg-surface-3 rounded w-1/2 mb-4"></div>
           <div className="space-y-3">
@@ -65,17 +58,14 @@ export default function CitationSummaryCard({ auditId }: CitationSummaryCardProp
 
   if (!summary || !summary.bySource || summary.bySource.length === 0) {
     return (
-      <div className="bg-surface-1 rounded-lg border border-border p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-2xl">📊</span>
-          <h3 className="text-lg font-semibold ">AI Citation Testing</h3>
-        </div>
+      <div className="card card-body">
+        <h3 className="section-title mb-2">AI Citation Testing</h3>
         <p className="text-sm muted mb-4">
           Test how often AI assistants cite your site when answering relevant queries.
         </p>
         <Link
           to={`/audits/${auditId}?tab=citations`}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+          className="btn-primary"
         >
           Run Citation Test →
         </Link>
@@ -88,64 +78,59 @@ export default function CitationSummaryCard({ auditId }: CitationSummaryCardProp
   const totalCited = summary.bySource.reduce((sum, s) => sum + s.cited_queries, 0);
   const overallPercentage = totalQueries > 0 ? Math.round((totalCited / totalQueries) * 100) : 0;
 
+  const getScoreColor = (percentage: number) => {
+    if (percentage >= 70) return 'text-success';
+    if (percentage >= 40) return 'text-warn';
+    return 'text-danger';
+  };
+
   return (
-    <div className="bg-surface-1 rounded-lg border border-border p-6">
+    <div className="card card-body">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">📊</span>
-          <h3 className="text-lg font-semibold ">Citation Performance</h3>
-        </div>
+        <h3 className="section-title">Citation Performance</h3>
         <Link
           to={`/audits/${auditId}?tab=citations`}
-          className="text-sm text-brand hover:text-brand font-medium"
+          className="text-sm text-brand hover:underline font-medium"
         >
           View Details →
         </Link>
       </div>
 
       {/* Overall Stats */}
-      <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+      <div className="mb-6 card-muted rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm muted mb-1">Overall Citation Rate</p>
-            <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
+            <p className="text-xs font-medium subtle uppercase tracking-wide mb-1">Overall Citation Rate</p>
+            <p className={`text-4xl font-bold ${getScoreColor(overallPercentage)}`}>
               {overallPercentage}%
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm muted">Cited</p>
-            <p className="text-2xl font-semibold ">
-              {totalCited}/{totalQueries}
+            <p className="text-xs font-medium subtle uppercase tracking-wide mb-1">Cited Queries</p>
+            <p className="text-2xl font-bold">
+              {totalCited}<span className="text-lg subtle">/{totalQueries}</span>
             </p>
           </div>
         </div>
       </div>
 
       {/* By Source */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {summary.bySource.map((source) => {
-          const icon = SOURCE_ICONS[source.ai_source] || '🤖';
           const name = SOURCE_NAMES[source.ai_source] || source.ai_source;
           const percentage = Math.round(source.cited_percentage);
           
           return (
-            <div key={source.ai_source} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{icon}</span>
-                <span className="text-sm font-medium muted">{name}</span>
-              </div>
+            <div key={source.ai_source} className="flex items-center justify-between py-3 px-4 card-muted rounded-lg">
               <div className="flex items-center gap-3">
+                <span className="font-medium">{name}</span>
                 <span className="text-xs subtle">
-                  {source.cited_queries}/{source.total_queries}
-                </span>
-                <span className={`text-sm font-semibold ${
-                  percentage >= 70 ? 'text-success' :
-                  percentage >= 40 ? 'text-warn' :
-                  'text-danger'
-                }`}>
-                  {percentage}%
+                  {source.cited_queries}/{source.total_queries} queries
                 </span>
               </div>
+              <span className={`text-lg font-bold ${getScoreColor(percentage)}`}>
+                {percentage}%
+              </span>
             </div>
           );
         })}
