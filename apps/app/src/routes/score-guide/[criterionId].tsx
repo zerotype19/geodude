@@ -91,18 +91,26 @@ export default function CriterionDetail() {
             {criterion.description}
           </p>
           
-          <div className="flex items-center gap-8 text-base font-medium muted card-muted rounded-xl p-4">
-            <div>
-              <span className="subtle">Weight:</span> <span className="font-bold">{criterion.weight}</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="card-muted rounded-xl p-4">
+              <div className="text-xs font-bold uppercase tracking-wide muted mb-1">Weight</div>
+              <div className="text-2xl font-bold">{criterion.weight}</div>
+              <div className="text-xs subtle mt-1">Importance in composite score</div>
             </div>
-            <div>
-              <span className="subtle">Pass:</span> <span className="text-success font-bold">{criterion.pass_threshold}%</span>
+            <div className="card-muted rounded-xl p-4">
+              <div className="text-xs font-bold uppercase tracking-wide muted mb-1">Points</div>
+              <div className="text-2xl font-bold text-brand">{criterion.points_possible || 100}</div>
+              <div className="text-xs subtle mt-1">Maximum score possible</div>
             </div>
-            <div>
-              <span className="subtle">Warn:</span> <span className="text-warn font-bold">{criterion.warn_threshold}%</span>
+            <div className="card-muted rounded-xl p-4">
+              <div className="text-xs font-bold uppercase tracking-wide muted mb-1">Pass</div>
+              <div className="text-2xl font-bold text-success">{criterion.pass_threshold}%</div>
+              <div className="text-xs subtle mt-1">Score to pass check</div>
             </div>
-            <div>
-              <span className="subtle">Points:</span> <span className="font-bold">{criterion.points_possible || 100}</span>
+            <div className="card-muted rounded-xl p-4">
+              <div className="text-xs font-bold uppercase tracking-wide muted mb-1">Warn</div>
+              <div className="text-2xl font-bold text-warn">{criterion.warn_threshold}%</div>
+              <div className="text-xs subtle mt-1">Warning threshold</div>
             </div>
           </div>
         </div>
@@ -208,39 +216,112 @@ export default function CriterionDetail() {
             </div>
           </div>
 
-          {/* Technical Details */}
+          {/* Scoring Methodology */}
           <div className="card card-body">
             <h2 className="section-title mb-4">
-              Technical Details
+              Scoring Methodology
             </h2>
             <dl className="grid grid-cols-2 gap-6 text-base">
               <div className="card-muted rounded-xl p-4">
                 <dt className="font-bold muted mb-1">Scoring Approach</dt>
-                <dd>{criterion.scoring_approach || 'Automated analysis'}</dd>
+                <dd className="leading-relaxed">{criterion.scoring_approach || 'Automated analysis'}</dd>
               </div>
               <div className="card-muted rounded-xl p-4">
                 <dt className="font-bold muted mb-1">Check Type</dt>
-                <dd>{criterion.check_type}</dd>
+                <dd className="leading-relaxed">{criterion.check_type}</dd>
               </div>
               <div className="card-muted rounded-xl p-4">
                 <dt className="font-bold muted mb-1">Scope</dt>
-                <dd>{criterion.scope}-level</dd>
+                <dd className="leading-relaxed capitalize">{criterion.scope}-level</dd>
+              </div>
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Category</dt>
+                <dd className="leading-relaxed">{criterion.category}</dd>
+              </div>
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Points Possible</dt>
+                <dd className="text-xl font-bold text-brand">{criterion.points_possible || 100}</dd>
+              </div>
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Pass Threshold</dt>
+                <dd className="text-xl font-bold text-success">{criterion.pass_threshold}%</dd>
+              </div>
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Warn Threshold</dt>
+                <dd className="text-xl font-bold text-warn">{criterion.warn_threshold}%</dd>
+              </div>
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Weight in Composite</dt>
+                <dd className="text-xl font-bold">{criterion.weight}</dd>
               </div>
               {criterion.importance_rank && (
                 <div className="card-muted rounded-xl p-4">
                   <dt className="font-bold muted mb-1">Priority Rank</dt>
-                  <dd>#{criterion.importance_rank}</dd>
+                  <dd className="text-xl font-bold">#{criterion.importance_rank}</dd>
+                </div>
+              )}
+              {criterion.display_order && (
+                <div className="card-muted rounded-xl p-4">
+                  <dt className="font-bold muted mb-1">Display Order</dt>
+                  <dd className="leading-relaxed">#{criterion.display_order}</dd>
                 </div>
               )}
               <div className="card-muted rounded-xl p-4">
-                <dt className="font-bold muted mb-1">Category</dt>
-                <dd>{criterion.category}</dd>
-              </div>
-              <div className="card-muted rounded-xl p-4">
-                <dt className="font-bold muted mb-1">Weight</dt>
-                <dd className="text-xl font-bold">{criterion.weight}</dd>
+                <dt className="font-bold muted mb-1">Impact Level</dt>
+                <dd className="leading-relaxed">
+                  <span className={impactColors[criterion.impact]}>
+                    {criterion.impact}
+                  </span>
+                </dd>
               </div>
             </dl>
+          </div>
+
+          {/* System Metadata */}
+          <div className="card card-body">
+            <h2 className="section-title mb-4">
+              System Metadata
+            </h2>
+            <dl className="grid grid-cols-2 gap-6 text-base">
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Criterion ID</dt>
+                <dd className="font-mono text-sm">{criterion.id}</dd>
+              </div>
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Version</dt>
+                <dd className="font-mono">v{criterion.version}</dd>
+              </div>
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Status</dt>
+                <dd>
+                  {criterion.enabled ? (
+                    <span className="pill pill-success">Enabled</span>
+                  ) : (
+                    <span className="pill pill-danger">Disabled</span>
+                  )}
+                  {criterion.preview && (
+                    <span className="pill pill-warn ml-2">Preview</span>
+                  )}
+                </dd>
+              </div>
+              <div className="card-muted rounded-xl p-4">
+                <dt className="font-bold muted mb-1">Visible in UI</dt>
+                <dd>
+                  {criterion.view_in_ui !== false ? (
+                    <span className="text-success font-semibold">✓ Yes</span>
+                  ) : (
+                    <span className="subtle">✗ No</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+            
+            <div className="mt-6 pt-6 border-t border-border">
+              <p className="text-sm subtle leading-relaxed">
+                <strong className="text-ink">Data Source:</strong> This criterion is sourced from the Optiview D1 <code className="bg-surface-3 px-1.5 py-0.5 rounded text-xs font-mono">scoring_criteria</code> table. 
+                All checks are version-controlled and auditable. Changes to scoring logic, thresholds, or weights are tracked and documented.
+              </p>
+            </div>
           </div>
         </div>
 
