@@ -232,7 +232,7 @@ table.ui {
 }
 
 table.ui thead th {
-  @apply text-left font-medium text-ink-subtle uppercase tracking-wide text-xs bg-surface-2;
+  @apply text-left font-medium text-ink-subtle uppercase tracking-wide text-xs bg-surface-1;
   @apply sticky top-0 z-10 px-3 py-2.5 align-middle border-b border-border;
   /* Ensure straight top edge on all table headers */
   border-top-left-radius: 0 !important;
