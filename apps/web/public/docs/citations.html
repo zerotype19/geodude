@@ -7,478 +7,289 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-CY45NV4CNE');
     </script>
     
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Citations Guide - Optiview AI SEO Platform</title>
+    <link rel="stylesheet" href="/styles.css">
     <style>
-        :root {
-          --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          --purple: #667eea;
-          --border: #e5e7eb;
-          --bg-light: #fafafa;
+        /* Additional page-specific styles */
+        .assistant-card {
+            background: var(--surface-1);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #111; background: var(--bg-light); }
-        
-        /* Marketing Site Header */
-        header {
-          background: #fff;
-          border-bottom: 1px solid var(--border);
-          position: sticky;
-          top: 0;
-          z-index: 100;
-        }
-        .header-inner {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 1rem 1.5rem;
-        }
-        .logo {
-          font-size: 1.25rem;
-          font-weight: 700;
-          background: var(--gradient);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-          text-decoration: none;
-        }
-        header nav { display: flex; gap: 2rem; align-items: center; }
-        header nav a {
-          text-decoration: none;
-          color: #666;
-          font-weight: 500;
-          transition: color 0.2s;
-        }
-        header nav a:hover { color: var(--purple); }
-        .menu-toggle {
-          display: none;
-          flex-direction: column;
-          gap: 4px;
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 8px;
-        }
-        .menu-toggle span {
-          width: 24px;
-          height: 2px;
-          background: #666;
-          transition: all 0.3s;
-        }
-        @media (max-width: 768px) {
-          header nav {
-            position: fixed;
-            top: 65px;
-            right: -100%;
-            width: 250px;
-            height: calc(100vh - 65px);
-            background: #fff;
-            flex-direction: column;
-            gap: 0;
-            padding: 1rem 0;
-            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-            transition: right 0.3s;
-            align-items: stretch;
-          }
-          header nav.active { right: 0; }
-          header nav a {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--border);
-          }
-          .menu-toggle { display: flex; }
-        }
-        
-        /* Page Content */
-        .content-wrapper { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
-        .page-header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #3b82f6; }
-        .page-header h1 { 
-          color: #1e40af; 
-          margin: 0;
-          font-size: 2.5rem;
-          background: var(--gradient);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .page-header p { color: #64748b; margin: 10px 0 0; font-size: 1.125rem; }
-        .section { 
-          margin-bottom: 30px; 
-          padding: 30px; 
-          background: #fff; 
-          border-radius: 12px; 
-          border-left: 4px solid #3b82f6;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        .section h2 { 
-          color: #1e40af; 
-          margin: 0 0 1.5rem 0;
-          font-size: 1.75rem;
-        }
-        .section h3 { 
-          color: #374151; 
-          margin: 2rem 0 1rem 0;
-          font-size: 1.25rem;
-          font-weight: 600;
-        }
-        .section p {
-          color: #4b5563;
-          margin: 0 0 1rem 0;
-          line-height: 1.7;
-        }
-        .section ul, .section ol {
-          margin: 1rem 0;
-          padding-left: 1.5rem;
-          color: #4b5563;
-        }
-        .section li {
-          margin: 0.75rem 0;
-          line-height: 1.6;
-          padding-left: 0.5rem;
-        }
-        .highlight { 
-          background: #f0f4ff; 
-          border-left: 3px solid var(--purple);
-          padding: 1.25rem 1.5rem; 
-          border-radius: 8px; 
-          margin: 1.5rem 0; 
-        }
-        .highlight h3 {
-          margin-top: 0;
-        }
-        .highlight ul {
-          margin: 1rem 0 0 0;
-        }
-        .code { 
-          background: #1f2937; 
-          color: #f9fafb; 
-          padding: 1.25rem 1.5rem; 
-          border-radius: 8px; 
-          font-family: 'Monaco', 'Consolas', monospace; 
-          margin: 1rem 0;
-          overflow-x: auto;
-        }
-        .assistant-card { 
-          background: #f9fafb; 
-          border: 1px solid #e5e7eb; 
-          border-radius: 8px; 
-          padding: 1.5rem; 
-          margin: 1rem 0; 
-        }
-        .assistant-card h4 { 
-          color: #1e40af; 
-          margin: 0 0 1rem 0;
-          font-size: 1.125rem;
+        .assistant-card h4 {
+            color: var(--ink);
+            margin: 0 0 1rem 0;
+            font-size: 1.125rem;
+            font-weight: 600;
         }
         .assistant-card p {
-          margin: 0.5rem 0;
-          color: #4b5563;
+            margin: 0.5rem 0;
+            color: var(--ink-muted);
         }
-        .metric { 
-          display: inline-block; 
-          background: #10b981; 
-          color: white; 
-          padding: 4px 10px; 
-          border-radius: 4px; 
-          font-size: 11px; 
-          font-weight: 700; 
-          letter-spacing: 0.5px;
-          margin-right: 8px; 
+        .metric-badge {
+            display: inline-block;
+            background: var(--brand);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-right: 8px;
         }
-        .back-link { 
-          display: inline-block; 
-          margin-top: 2rem; 
-          color: var(--purple); 
-          text-decoration: none;
-          font-weight: 500;
+        .success-box {
+            background: hsl(142 76% 96%);
+            border-left: 4px solid hsl(142 76% 36%);
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 8px;
         }
-        .back-link:hover { text-decoration: underline; }
-        footer {
-          text-align: center;
-          padding: 2rem 1.5rem;
-          color: #666;
-          font-size: 0.875rem;
-          border-top: 1px solid var(--border);
-          background: #fff;
+        .success-box h4 {
+            margin-top: 0;
+            color: hsl(142 76% 26%);
         }
-        footer a { color: var(--purple); text-decoration: none; }
-        footer a:hover { text-decoration: underline; }
     </style>
 </head>
-<body>
-    <header>
-      <div class="header-inner">
-        <a href="/" class="logo">OPTIVIEW.AI</a>
-        <button class="menu-toggle" onclick="document.querySelector('header nav').classList.toggle('active')" aria-label="Toggle menu">
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
-        <nav>
-          <a href="https://app.optiview.ai">Audits</a>
-          <a href="https://app.optiview.ai/score-guide">Score Guide</a>
-          <a href="/docs/citations.html">Citations Guide</a>
-        </nav>
-      </div>
+<body class="bg-surface-2">
+    <!-- Navigation -->
+    <header class="bg-surface-1 border-b border-border sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-semibold text-brand">Optiview</a>
+                </div>
+                
+                <nav class="hidden md:flex space-x-8">
+                    <a href="https://app.optiview.ai" class="text-ink-muted hover:text-brand transition-colors">Audits</a>
+                    <a href="https://app.optiview.ai/score-guide" class="text-ink-muted hover:text-brand transition-colors">Score Guide</a>
+                    <a href="/docs/citations.html" class="text-brand font-medium">Citations Guide</a>
+                    <a href="/methodology" class="text-ink-muted hover:text-brand transition-colors">Methodology</a>
+                </nav>
+                
+                <!-- Mobile menu button -->
+                <button class="md:hidden p-2" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" aria-label="Toggle menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-border">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="https://app.optiview.ai" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Audits</a>
+                <a href="https://app.optiview.ai/score-guide" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Score Guide</a>
+                <a href="/docs/citations.html" class="block px-3 py-2 text-brand font-medium bg-surface-2 rounded-md">Citations Guide</a>
+                <a href="/methodology" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Methodology</a>
+            </div>
+        </div>
     </header>
 
-    <div class="content-wrapper">
-      <div class="page-header">
-          <h1>AI Citations Guide</h1>
-          <p>Understanding how AI assistants reference your content and how Optiview tracks it</p>
-      </div>
-
-    <div class="section">
-        <h2>What are AI Citations?</h2>
-        <p>AI citations occur when AI assistants like Perplexity, ChatGPT Search, Claude, and Brave AI reference your website or specific pages in their responses to user queries. Unlike traditional search engine results, AI citations are integrated into conversational responses, making them highly valuable for brand visibility and traffic generation.</p>
-        
-        <div class="highlight">
-            <strong>🎯 Key Insight:</strong> AI citations are the new frontier of digital visibility. While traditional SEO focuses on search engine rankings, AI citations determine how discoverable your content is within AI-powered conversations.
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>How Optiview Tracks AI Citations</h2>
-        <p>Optiview uses live API integrations to capture real citations as they happen across four major AI platforms:</p>
-        
-        <div class="assistant-card">
-            <h4>🔍 Perplexity AI</h4>
-            <p><strong>Citation Style:</strong> Direct source links with context</p>
-            <p><strong>Our Tracking:</strong> Native API integration captures structured citations with titles, URLs, and snippets</p>
-            <p><strong>Source Type:</strong> <span class="metric">NATIVE</span> Direct from Perplexity's search results</p>
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 py-12">
+        <!-- Page Header -->
+        <div class="mb-12 text-center">
+            <h1 class="text-4xl font-bold text-ink mb-4">AI Citations Guide</h1>
+            <p class="text-xl text-ink-muted">Understanding how AI assistants reference your content and how Optiview tracks it</p>
         </div>
 
-        <div class="assistant-card">
-            <h4>🤖 ChatGPT Search</h4>
-            <p><strong>Citation Style:</strong> Contextual references in responses</p>
-            <p><strong>Our Tracking:</strong> Heuristic URL extraction from response text and tool calls</p>
-            <p><strong>Source Type:</strong> <span class="metric">HEURISTIC</span> Extracted from conversation responses</p>
+        <!-- What are AI Citations -->
+        <section class="card mb-8">
+            <div class="card-body">
+                <h2 class="text-2xl font-semibold text-ink mb-4">What are AI Citations?</h2>
+                <p class="text-ink-muted mb-6">AI citations occur when AI assistants like Perplexity, ChatGPT Search, Claude, and Brave AI reference your website or specific pages in their responses to user queries. Unlike traditional search engine results, AI citations are integrated into conversational responses, making them highly valuable for brand visibility and traffic generation.</p>
+                
+                <div class="bg-brand-soft border-l-4 border-brand p-4 rounded">
+                    <p class="text-ink"><strong>🎯 Key Insight:</strong> AI citations are the new frontier of digital visibility. While traditional SEO focuses on search engine rankings, AI citations determine how discoverable your content is within AI-powered conversations.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- How Optiview Tracks -->
+        <section class="card mb-8">
+            <div class="card-body">
+                <h2 class="text-2xl font-semibold text-ink mb-4">How Optiview Tracks AI Citations</h2>
+                <p class="text-ink-muted mb-6">Optiview uses live API integrations to capture real citations as they happen across four major AI platforms:</p>
+                
+                <div class="assistant-card">
+                    <h4>🔍 Perplexity AI</h4>
+                    <p><strong>Citation Style:</strong> Direct source links with context</p>
+                    <p><strong>Our Tracking:</strong> Native API integration captures structured citations with titles, URLs, and snippets</p>
+                    <p><strong>Source Type:</strong> <span class="metric-badge">NATIVE</span> Direct from Perplexity's search results</p>
+                </div>
+
+                <div class="assistant-card">
+                    <h4>🤖 ChatGPT Search</h4>
+                    <p><strong>Citation Style:</strong> Contextual references in responses</p>
+                    <p><strong>Our Tracking:</strong> Heuristic URL extraction from response text and tool calls</p>
+                    <p><strong>Source Type:</strong> <span class="metric-badge">HEURISTIC</span> Extracted from conversation responses</p>
+                </div>
+
+                <div class="assistant-card">
+                    <h4>🧠 Claude (Anthropic)</h4>
+                    <p><strong>Citation Style:</strong> Markdown-style links and references</p>
+                    <p><strong>Our Tracking:</strong> Enhanced parsing for both standard URLs and Markdown [text](url) format</p>
+                    <p><strong>Source Type:</strong> <span class="metric-badge">HEURISTIC</span> Parsed from response content</p>
+                </div>
+
+                <div class="assistant-card">
+                    <h4>🦁 Brave AI</h4>
+                    <p><strong>Citation Style:</strong> Inline source references with snippets</p>
+                    <p><strong>Our Tracking:</strong> Native API integration with search result citations</p>
+                    <p><strong>Source Type:</strong> <span class="metric-badge">NATIVE</span> Direct from Brave Search API</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Understanding Visibility Scores -->
+        <section class="card mb-8">
+            <div class="card-body">
+                <h2 class="text-2xl font-semibold text-ink mb-4">Understanding Visibility Scores</h2>
+                <p class="text-ink-muted mb-6">Optiview calculates 0-100 visibility scores based on multiple factors:</p>
+                
+                <h3 class="text-xl font-semibold text-ink mb-3">📊 Scoring Components</h3>
+                <ul class="list-disc list-inside space-y-2 text-ink-muted mb-6">
+                    <li><strong>Citation Frequency (50%):</strong> How often your domain appears in AI responses</li>
+                    <li><strong>Domain Diversity (30%):</strong> Number of unique domains cited (normalized against the assistant's total)</li>
+                    <li><strong>Recency (20%):</strong> How recently your content was cited (fresher = higher score)</li>
+                </ul>
+
+                <div class="bg-surface-2 p-4 rounded-lg font-mono text-sm mb-6">
+                    Visibility Score = (Frequency × 0.5) + (Diversity × 0.3) + (Recency × 0.2)
+                </div>
+
+                <h3 class="text-xl font-semibold text-ink mb-3">🏆 Weekly Rankings</h3>
+                <p class="text-ink-muted mb-3">We generate competitive rankings showing your position relative to other domains for each assistant:</p>
+                <ul class="list-disc list-inside space-y-2 text-ink-muted">
+                    <li><strong>Domain Rank:</strong> Your position (1-100) among all cited domains</li>
+                    <li><strong>Mentions Count:</strong> Total citations received during the week</li>
+                    <li><strong>Share Percentage:</strong> Your citations as a % of total citations for that assistant</li>
+                    <li><strong>Rank Change:</strong> Week-over-week position movement</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Recent Improvements -->
+        <section class="card mb-8">
+            <div class="card-body">
+                <h2 class="text-2xl font-semibold text-ink mb-4">🚀 Recent System Improvements</h2>
+                
+                <div class="success-box mb-6">
+                    <h4>Perplexity Success Rate: 22% → 80%</h4>
+                    <p class="text-ink-muted mb-0">We increased timeout thresholds to accommodate Perplexity's response times, resulting in a <strong>3.6x improvement</strong> in successful citation tracking.</p>
+                </div>
+
+                <h3 class="text-xl font-semibold text-ink mb-3">📊 System Enhancements</h3>
+                <ul class="list-disc list-inside space-y-2 text-ink-muted mb-6">
+                    <li><strong>Improved Query Generation:</strong> Industry-specific prompts now generate professional, contextually-appropriate queries across all business verticals</li>
+                    <li><strong>Better Error Handling:</strong> Enhanced HTTP response management prevents timeouts and improves reliability across all AI sources</li>
+                    <li><strong>Rate Limit Management:</strong> Exponential backoff retry logic for Brave AI improves success rates despite API rate limits</li>
+                    <li><strong>Resource Optimization:</strong> Proper response body handling eliminates deadlock warnings and improves system stability</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-ink mb-3">🎯 Citation Accuracy by Source</h3>
+                <p class="text-ink-muted mb-3">Current expected success rates for citation tracking:</p>
+                <ul class="list-disc list-inside space-y-2 text-ink-muted mb-6">
+                    <li><strong>Perplexity:</strong> ~80% (significantly improved)</li>
+                    <li><strong>ChatGPT Search:</strong> ~70-85%</li>
+                    <li><strong>Claude:</strong> ~80-100%</li>
+                    <li><strong>Brave AI:</strong> ~45% (limited by API rate quotas)</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-ink mb-3">🔍 Industry-Specific Query Generation</h3>
+                <p class="text-ink-muted mb-3">Our system now generates highly-targeted queries for 19+ industries, including:</p>
+                <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 text-ink-muted mb-4">
+                    <li>• Automotive (OEMs & Dealers)</li>
+                    <li>• Travel (Hotels, Airlines, Cruises)</li>
+                    <li>• Financial Services & Insurance</li>
+                    <li>• Healthcare & Pharmaceuticals</li>
+                    <li>• Real Estate</li>
+                    <li>• Food & Restaurants</li>
+                    <li>• Education & E-Learning</li>
+                    <li>• SaaS & B2B Technology</li>
+                    <li>• Manufacturing & Industrial</li>
+                    <li>• Media & Entertainment</li>
+                </ul>
+                
+                <p class="text-ink-muted"><strong>Result:</strong> Citations are now tested with queries that match real user search patterns in your industry, providing more accurate visibility metrics.</p>
+            </div>
+        </section>
+
+        <!-- Optimizing for Citations -->
+        <section class="card mb-8">
+            <div class="card-body">
+                <h2 class="text-2xl font-semibold text-ink mb-4">Optimizing for AI Citations</h2>
+                
+                <h3 class="text-xl font-semibold text-ink mb-3">🎯 Content Strategy</h3>
+                <ul class="list-disc list-inside space-y-2 text-ink-muted mb-6">
+                    <li><strong>Answer-Focused Content:</strong> Create content that directly answers common questions</li>
+                    <li><strong>Comprehensive Coverage:</strong> Provide thorough, authoritative information on topics</li>
+                    <li><strong>FAQ Optimization:</strong> Structure content with clear questions and detailed answers</li>
+                    <li><strong>Technical Accuracy:</strong> Ensure information is current and factually correct</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-ink mb-3">🔧 Technical Optimization</h3>
+                <ul class="list-disc list-inside space-y-2 text-ink-muted mb-6">
+                    <li><strong>Structured Data:</strong> Implement JSON-LD markup for better AI understanding</li>
+                    <li><strong>Clear Headings:</strong> Use descriptive H1, H2, H3 tags that AI can easily parse</li>
+                    <li><strong>Meta Descriptions:</strong> Write compelling descriptions that summarize key points</li>
+                    <li><strong>Internal Linking:</strong> Connect related content to help AI understand relationships</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-ink mb-3">📊 Monitoring & Analysis</h3>
+                <ul class="list-disc list-inside space-y-2 text-ink-muted">
+                    <li><strong>Track Performance:</strong> Monitor which content gets cited most frequently</li>
+                    <li><strong>Competitive Analysis:</strong> See what competitors are doing to earn citations</li>
+                    <li><strong>Trend Identification:</strong> Identify emerging topics and content gaps</li>
+                    <li><strong>ROI Measurement:</strong> Connect citations to traffic and conversion metrics</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Getting Started -->
+        <section class="card mb-8">
+            <div class="card-body">
+                <h2 class="text-2xl font-semibold text-ink mb-4">🚀 Getting Started</h2>
+                <p class="text-ink-muted mb-4">Ready to start tracking your AI citations?</p>
+                <ol class="list-decimal list-inside space-y-2 text-ink-muted">
+                    <li>Visit the <a href="https://app.optiview.ai" class="text-brand hover:underline">Optiview Dashboard</a></li>
+                    <li>Run an audit on your domain</li>
+                    <li>Check the Citations tab to see AI references to your content</li>
+                    <li>Review your current visibility scores and rankings</li>
+                    <li>Identify opportunities to improve your AI discoverability</li>
+                    <li>Set up regular monitoring and optimization routines</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- Back Link -->
+        <div class="mt-8">
+            <a href="https://app.optiview.ai" class="text-brand hover:underline">← Back to Optiview Dashboard</a>
         </div>
+    </main>
 
-        <div class="assistant-card">
-            <h4>🧠 Claude (Anthropic)</h4>
-            <p><strong>Citation Style:</strong> Markdown-style links and references</p>
-            <p><strong>Our Tracking:</strong> Enhanced parsing for both standard URLs and Markdown [text](url) format</p>
-            <p><strong>Source Type:</strong> <span class="metric">HEURISTIC</span> Parsed from response content</p>
+    <!-- Footer -->
+    <footer class="bg-surface-1 border-t border-border mt-16">
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <nav class="flex flex-wrap justify-center gap-6 mb-4">
+                <a href="https://app.optiview.ai" class="text-ink-muted hover:text-brand">Audits</a>
+                <a href="https://app.optiview.ai/score-guide" class="text-ink-muted hover:text-brand">Score Guide</a>
+                <a href="/docs/citations.html" class="text-ink-muted hover:text-brand">Citations Guide</a>
+                <a href="/methodology" class="text-ink-muted hover:text-brand">Methodology</a>
+                <a href="/terms" class="text-ink-muted hover:text-brand">Terms</a>
+                <a href="/privacy" class="text-ink-muted hover:text-brand">Privacy</a>
+                <a href="/bot" class="text-ink-muted hover:text-brand">Bot Info</a>
+            </nav>
+            <p class="text-center text-ink-muted text-sm">© 2025 Optiview.ai · AI visibility auditing for modern search</p>
         </div>
-
-        <div class="assistant-card">
-            <h4>🦁 Brave AI</h4>
-            <p><strong>Citation Style:</strong> Inline source references with snippets</p>
-            <p><strong>Our Tracking:</strong> Native API integration with search result citations</p>
-            <p><strong>Source Type:</strong> <span class="metric">NATIVE</span> Direct from Brave Search API</p>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>Understanding Visibility Scores</h2>
-        <p>Optiview calculates 0-100 visibility scores based on multiple factors:</p>
-        
-        <h3>📊 Scoring Components</h3>
-        <ul>
-            <li><strong>Citation Frequency (50%):</strong> How often your domain appears in AI responses</li>
-            <li><strong>Domain Diversity (30%):</strong> Number of unique domains cited (normalized against the assistant's total)</li>
-            <li><strong>Recency (20%):</strong> How recently your content was cited (fresher = higher score)</li>
-        </ul>
-
-        <div class="code">
-            Visibility Score = (Frequency × 0.5) + (Diversity × 0.3) + (Recency × 0.2)
-        </div>
-
-        <h3>🏆 Weekly Rankings</h3>
-        <p>We generate competitive rankings showing your position relative to other domains for each assistant:</p>
-        <ul>
-            <li><strong>Domain Rank:</strong> Your position (1-100) among all cited domains</li>
-            <li><strong>Mentions Count:</strong> Total citations received during the week</li>
-            <li><strong>Share Percentage:</strong> Your citations as a % of total citations for that assistant</li>
-            <li><strong>Rank Change:</strong> Week-over-week position movement</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>Citation Quality & Types</h2>
-        
-        <h3>🎯 High-Quality Citations</h3>
-        <p>These citations drive the most value:</p>
-        <ul>
-            <li><strong>Direct Page Links:</strong> Citations to specific, relevant pages</li>
-            <li><strong>Authoritative Content:</strong> References to well-structured, comprehensive content</li>
-            <li><strong>Recent Citations:</strong> Fresh content that AI assistants find current and relevant</li>
-            <li><strong>Contextual Relevance:</strong> Citations that directly answer user queries</li>
-        </ul>
-
-        <h3>📈 Citation Patterns</h3>
-        <p>Different AI assistants show distinct citation patterns:</p>
-        <ul>
-            <li><strong>Perplexity:</strong> Favors SEO-optimized content, marketing resources, and search-related sites</li>
-            <li><strong>ChatGPT Search:</strong> References AI/tech platforms, development tools, and educational content</li>
-            <li><strong>Claude:</strong> Cites programming resources, documentation, and technical guides</li>
-            <li><strong>Brave AI:</strong> Emphasizes privacy-focused content, open-source projects, and alternative perspectives</li>
-        </ul>
-    </div>
-
-    <div class="section highlight-box">
-        <h2>🚀 Recent System Improvements (October 2025)</h2>
-        
-        <h3>✅ Enhanced Citation Reliability</h3>
-        <p>We've significantly improved our citation tracking system with the following updates:</p>
-        
-        <div style="background: #f0fdf4; padding: 1.5rem; border-left: 4px solid #10b981; margin: 1rem 0; border-radius: 8px;">
-            <h4 style="margin-top: 0;">Perplexity Success Rate: 22% → 80%</h4>
-            <p style="margin-bottom: 0;">We increased timeout thresholds to accommodate Perplexity's response times, resulting in a <strong>3.6x improvement</strong> in successful citation tracking.</p>
-        </div>
-
-        <h3>📊 System Enhancements</h3>
-        <ul>
-            <li><strong>Improved Query Generation:</strong> Industry-specific prompts now generate professional, contextually-appropriate queries across all business verticals</li>
-            <li><strong>Better Error Handling:</strong> Enhanced HTTP response management prevents timeouts and improves reliability across all AI sources</li>
-            <li><strong>Rate Limit Management:</strong> Exponential backoff retry logic for Brave AI improves success rates despite API rate limits</li>
-            <li><strong>Resource Optimization:</strong> Proper response body handling eliminates deadlock warnings and improves system stability</li>
-        </ul>
-
-        <h3>🎯 Citation Accuracy by Source</h3>
-        <p>Current expected success rates for citation tracking:</p>
-        <ul>
-            <li><strong>Perplexity:</strong> ~80% (significantly improved)</li>
-            <li><strong>ChatGPT Search:</strong> ~70-85%</li>
-            <li><strong>Claude:</strong> ~80-100%</li>
-            <li><strong>Brave AI:</strong> ~45% (limited by API rate quotas)</li>
-        </ul>
-
-        <h3>🔍 Industry-Specific Query Generation</h3>
-        <p>Our system now generates highly-targeted queries for 19+ industries, including:</p>
-        <ul>
-            <li>Automotive (OEMs & Dealers)</li>
-            <li>Travel (Hotels, Airlines, Cruises)</li>
-            <li>Financial Services & Insurance</li>
-            <li>Healthcare & Pharmaceuticals</li>
-            <li>Real Estate</li>
-            <li>Food & Restaurants</li>
-            <li>Education & E-Learning</li>
-            <li>SaaS & B2B Technology</li>
-            <li>Manufacturing & Industrial</li>
-            <li>Media & Entertainment</li>
-            <li>And more...</li>
-        </ul>
-        
-        <p><strong>Result:</strong> Citations are now tested with queries that match real user search patterns in your industry, providing more accurate visibility metrics.</p>
-    </div>
-
-    <div class="section">
-        <h2>Optimizing for AI Citations</h2>
-        
-        <h3>🎯 Content Strategy</h3>
-        <ul>
-            <li><strong>Answer-Focused Content:</strong> Create content that directly answers common questions</li>
-            <li><strong>Comprehensive Coverage:</strong> Provide thorough, authoritative information on topics</li>
-            <li><strong>FAQ Optimization:</strong> Structure content with clear questions and detailed answers</li>
-            <li><strong>Technical Accuracy:</strong> Ensure information is current and factually correct</li>
-        </ul>
-
-        <h3>🔧 Technical Optimization</h3>
-        <ul>
-            <li><strong>Structured Data:</strong> Implement JSON-LD markup for better AI understanding</li>
-            <li><strong>Clear Headings:</strong> Use descriptive H1, H2, H3 tags that AI can easily parse</li>
-            <li><strong>Meta Descriptions:</strong> Write compelling descriptions that summarize key points</li>
-            <li><strong>Internal Linking:</strong> Connect related content to help AI understand relationships</li>
-        </ul>
-
-        <h3>📊 Monitoring & Analysis</h3>
-        <ul>
-            <li><strong>Track Performance:</strong> Monitor which content gets cited most frequently</li>
-            <li><strong>Competitive Analysis:</strong> See what competitors are doing to earn citations</li>
-            <li><strong>Trend Identification:</strong> Identify emerging topics and content gaps</li>
-            <li><strong>ROI Measurement:</strong> Connect citations to traffic and conversion metrics</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>Using Optiview's Citation Tools</h2>
-        
-        <h3>📊 Visibility Intelligence Dashboard</h3>
-        <p>Access real-time citation data through our dashboard:</p>
-        <ul>
-            <li><strong>Assistant Filtering:</strong> Switch between Perplexity, ChatGPT, Claude, and Brave AI views</li>
-            <li><strong>Recent Citations:</strong> See the latest citations with timestamps and context</li>
-            <li><strong>Domain Scores:</strong> View 0-100 visibility scores for your domains</li>
-            <li><strong>Competitive Rankings:</strong> See where you rank against competitors</li>
-        </ul>
-
-        <h3>📈 Export & Analysis</h3>
-        <ul>
-            <li><strong>CSV Export:</strong> Download filtered citation data for analysis</li>
-            <li><strong>API Access:</strong> Integrate citation data into your existing tools</li>
-            <li><strong>Automated Reports:</strong> Set up regular citation performance reports</li>
-            <li><strong>Alert System:</strong> Get notified of significant citation changes</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>Best Practices for AI Citation Success</h2>
-        
-        <div class="highlight">
-            <h3>🎯 Content Creation</h3>
-            <ul>
-                <li>Focus on comprehensive, authoritative content that answers specific questions</li>
-                <li>Use clear, descriptive headings and structure information logically</li>
-                <li>Include relevant examples, data, and practical applications</li>
-                <li>Keep content updated and factually accurate</li>
-            </ul>
-        </div>
-
-        <div class="highlight">
-            <h3>🔍 Technical Implementation</h3>
-            <ul>
-                <li>Implement proper schema markup and structured data</li>
-                <li>Optimize page load speeds and mobile responsiveness</li>
-                <li>Ensure proper internal linking and site architecture</li>
-                <li>Monitor and fix technical SEO issues that might impact AI crawling</li>
-            </ul>
-        </div>
-
-        <div class="highlight">
-            <h3>📊 Performance Tracking</h3>
-            <ul>
-                <li>Regularly review citation performance across all AI assistants</li>
-                <li>Identify content gaps and opportunities for improvement</li>
-                <li>Track competitive positioning and market share</li>
-                <li>Measure the impact of optimizations on citation frequency</li>
-            </ul>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>🚀 Getting Started</h2>
-        <p>Ready to start tracking your AI citations?</p>
-        <ol>
-            <li>Visit the <a href="https://app.optiview.ai/insights/visibility">Visibility Intelligence Dashboard</a></li>
-            <li>Explore citations from Perplexity, ChatGPT Search, Claude, and Brave AI</li>
-            <li>Review your current visibility scores and rankings</li>
-            <li>Identify opportunities to improve your AI discoverability</li>
-            <li>Set up regular monitoring and optimization routines</li>
-        </ol>
-    </div>
-
-    <a href="https://app.optiview.ai" class="back-link">← Back to Optiview Dashboard</a>
-  </div>
-
-  <footer>
-    <p>
-      <a href="https://app.optiview.ai">Audits</a> ·
-      <a href="https://app.optiview.ai/score-guide">Scoring Guide</a> ·
-      <a href="/docs/citations.html">Citations Guide</a> ·
-      <a href="/methodology">Methodology</a> ·
-      <a href="/terms">Terms</a> ·
-      <a href="/privacy">Privacy</a> ·
-      <a href="/bot">Bot Info</a>
-    </p>
-    <p style="margin-top: 0.5rem;">© 2025 Optiview.ai · AEO + GEO auditing for modern search.</p>
-  </footer>
+    </footer>
 </body>
 </html>
