@@ -30,7 +30,7 @@ function Navigation() {
   const isAdmin = me?.isAdmin === true
   
   return (
-    <nav className="card border-0 rounded-none shadow-sm relative">
+    <nav className="bg-surface-1 border-b border-border shadow-sm relative">
       <div className="page-max container-px">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
