@@ -38,8 +38,8 @@ const STATUS_COLORS = {
   ok: 'bg-success-soft text-success border-success',
   warn: 'bg-warn-soft text-warn border-warn',
   fail: 'bg-danger-soft text-danger border-danger',
-  error: 'bg-surface-2 text-gray-800 border-border',
-  not_applicable: 'bg-surface-2 muted border-border'
+  error: 'bg-surface-2 text-ink border-border',
+  not_applicable: 'bg-surface-2 text-ink-muted border-border'
 };
 
 const STATUS_ICONS = {

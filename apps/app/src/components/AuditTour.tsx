@@ -179,7 +179,7 @@ export default function AuditTour() {
             <div
               key={index}
               className={`h-1 flex-1 rounded-full ${
-                index === currentStep ? 'bg-brand' : index < currentStep ? 'bg-blue-300' : 'bg-surface-3'
+                index === currentStep ? 'bg-brand' : index < currentStep ? 'bg-brand-soft' : 'bg-surface-3'
               }`}
             />
           ))}

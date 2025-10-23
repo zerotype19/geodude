@@ -24,7 +24,7 @@ export default function EEATRollup({ data }: EEATRollupProps) {
     if (score >= 80) return 'bg-brand';
     if (score >= 60) return 'bg-brand';
     if (score >= 40) return 'bg-brand';
-    return 'bg-gray-500';
+    return 'bg-surface-3';
   };
 
   return (
@@ -32,14 +32,14 @@ export default function EEATRollup({ data }: EEATRollupProps) {
       {entries.map(([pillar, score]) => (
         <div key={pillar} className="space-y-1">
           <div className="flex justify-between items-center text-sm">
-            <span className="font-medium muted dark:text-gray-300">
+            <span className="font-medium muted">
               {pillar}
             </span>
             <span className="muted dark:subtle font-mono">
               {Math.round(score)}%
             </span>
           </div>
-          <div className="w-full h-3 bg-surface-3 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-surface-3 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-300 ${getColor(score)}`}
               style={{ width: `${Math.min(100, Math.max(0, score))}%` }}

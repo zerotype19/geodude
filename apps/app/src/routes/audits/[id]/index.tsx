@@ -215,7 +215,7 @@ export default function AuditDetail() {
       case 2: return 'bg-brand-soft text-brand';
       case 1: return 'bg-warn-soft text-warn';
       case 0: return 'bg-danger-soft text-danger';
-      default: return 'bg-surface-2 text-gray-800';
+      default: return 'bg-surface-2 text-ink';
     }
   };
 

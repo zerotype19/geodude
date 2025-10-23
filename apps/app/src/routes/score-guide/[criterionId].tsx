@@ -64,7 +64,7 @@ export default function CriterionDetail() {
         {/* Header Card */}
         <div className="card card-body mb-8">
           <div className="flex items-center gap-3 mb-6 flex-wrap">
-            <span className="tag bg-gray-900 text-white font-mono font-bold">
+            <span className="tag bg-ink text-ink-inverse font-mono font-bold">
               {criterion.id}
             </span>
             <span className={impactColors[criterion.impact]}>

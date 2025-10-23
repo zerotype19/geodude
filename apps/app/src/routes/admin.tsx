@@ -528,13 +528,13 @@ export default function AdminPage() {
           </button>
           <button
             onClick={deleteFailedAudits}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            className="btn-primary bg-danger hover:opacity-90"
           >
             🗑️ Delete All Failed Audits
           </button>
           <button
             onClick={fetchAudits}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+            className="btn-secondary"
           >
             ↻ Refresh List
           </button>
@@ -607,7 +607,7 @@ export default function AdminPage() {
                         <button
                           onClick={() => deleteAudit(audit.id)}
                           disabled={deletingIds.has(audit.id)}
-                          className="text-danger hover:text-red-900 disabled:opacity-50"
+                          className="text-danger hover:opacity-80 disabled:opacity-50"
                         >
                           {deletingIds.has(audit.id) ? 'Deleting...' : '🗑️ Delete'}
                         </button>

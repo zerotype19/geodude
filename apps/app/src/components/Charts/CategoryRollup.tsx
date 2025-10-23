@@ -32,14 +32,14 @@ export default function CategoryRollup({ data }: CategoryRollupProps) {
       {entries.map(([category, score]) => (
         <div key={category} className="space-y-1">
           <div className="flex justify-between items-center text-sm">
-            <span className="font-medium muted dark:text-gray-300">
+            <span className="font-medium muted">
               {category}
             </span>
             <span className="muted dark:subtle font-mono">
               {Math.round(score)}%
             </span>
           </div>
-          <div className="w-full h-3 bg-surface-3 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-surface-3 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-300 ${getColor(score)}`}
               style={{ width: `${Math.min(100, Math.max(0, score))}%` }}

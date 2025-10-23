@@ -89,7 +89,7 @@ export default function ClassifierCompare() {
                     href={`https://${data.host}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-brand-soft hover:bg-blue-200 text-brand rounded-md text-sm"
+                    className="btn-soft"
                   >
                     Open Site →
                   </a>
@@ -251,7 +251,7 @@ export default function ClassifierCompare() {
                 {/* Notes */}
                 {data.v2.notes?.length > 0 && (
                   <div className="bg-warn-soft border border-warn rounded-lg p-6">
-                    <h3 className="text-lg font-semibold mb-2 text-yellow-900">Notes</h3>
+                    <h3 className="text-lg font-semibold mb-2 text-warn">Notes</h3>
                     <ul className="list-disc pl-5 space-y-1 text-warn text-sm">
                       {data.v2.notes.map((note: string, i: number) => (
                         <li key={i}>{note}</li>

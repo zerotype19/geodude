@@ -71,8 +71,8 @@ export default function PromptsComparePage() {
             {renderChip('Source', prompts.meta?.source, 'bg-success-soft text-success')}
             {renderChip('Branded', prompts.branded?.length, 'bg-warn-soft text-warn')}
             {renderChip('Non-Branded', prompts.nonBranded?.length, 'bg-warn-soft text-warn')}
-            {prompts.meta?.realism_avg && renderChip('Realism', prompts.meta.realism_avg.toFixed(3), 'bg-pink-100 text-pink-800')}
-            {prompts.meta?.realism_target && renderChip('Target', prompts.meta.realism_target.toFixed(2), 'bg-indigo-100 text-indigo-800')}
+            {prompts.meta?.realism_avg && renderChip('Realism', prompts.meta.realism_avg.toFixed(3), 'bg-danger-soft text-danger')}
+            {prompts.meta?.realism_target && renderChip('Target', prompts.meta.realism_target.toFixed(2), 'bg-brand-soft text-brand')}
           </div>
 
           {/* Branded Queries */}

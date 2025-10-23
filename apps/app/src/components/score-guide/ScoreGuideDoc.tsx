@@ -38,21 +38,21 @@ export default function ScoreGuideDoc({ doc }: { doc: CheckDoc }) {
           <a href="#why" className="text-sm text-brand hover:text-brand hover:underline">
             → Why
           </a>
-          <span className="text-gray-300">·</span>
+          <span className="text-ink-subtle">·</span>
           <a href="#examples" className="text-sm text-brand hover:text-brand hover:underline">
             → Examples
           </a>
-          <span className="text-gray-300">·</span>
+          <span className="text-ink-subtle">·</span>
           <a href="#implementation" className="text-sm text-brand hover:text-brand hover:underline">
             → Implementation
           </a>
-          <span className="text-gray-300">·</span>
+          <span className="text-ink-subtle">·</span>
           <a href="#qa" className="text-sm text-brand hover:text-brand hover:underline">
             → QA
           </a>
           {doc.detectionNotes?.length && (
             <>
-              <span className="text-gray-300">·</span>
+              <span className="text-ink-subtle">·</span>
               <a href="#detection" className="text-sm text-brand hover:text-brand hover:underline">
                 → Detection
               </a>

@@ -102,7 +102,7 @@ export default function PagesTab({ auditId }: PagesTabProps) {
       case 'fail':
         return 'bg-danger-soft0';
       default:
-        return 'bg-gray-500';
+        return 'bg-surface-3';
     }
   };
 

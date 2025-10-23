@@ -223,8 +223,8 @@ export default function Methodology() {
           </div>
 
           {/* Summary Box */}
-          <div className="bg-success-soft border-l-4 border-green-500 p-4 rounded">
-            <p className="text-sm text-gray-800">
+          <div className="bg-success-soft border-l-4 border-success p-4 rounded">
+            <p className="text-sm text-ink">
               <strong>Summary:</strong> Optiview's data and scores are based on proprietary heuristics, public sources, and 
               experimental testing. They are informative, not authoritative.
             </p>

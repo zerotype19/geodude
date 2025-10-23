@@ -176,7 +176,7 @@ export default function UsersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.active_sessions > 0 ? 'bg-success-soft text-success' : 'bg-surface-2 text-gray-800'
+                        user.active_sessions > 0 ? 'bg-success-soft text-success' : 'bg-surface-2 text-ink'
                       }`}>
                         {user.active_sessions}
                       </span>

@@ -131,7 +131,7 @@ export default function Privacy() {
 
           {/* Summary Box */}
           <div className="bg-brand-soft border-l-4 border-brand p-4 rounded">
-            <p className="text-sm text-gray-800">
+            <p className="text-sm text-ink">
               <strong>Summary:</strong> Optiview.ai respects your privacy and only collects limited business-use data needed 
               to operate the platform. We do not sell or share user data.
             </p>

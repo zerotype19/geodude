@@ -448,7 +448,7 @@ export default function CitationsGuide() {
                   ),
                   // Style h3
                   h3: ({ node, ...props }) => (
-                    <h3 className="text-xl font-semibold text-gray-800 mb-3 mt-8" {...props} />
+                    <h3 className="text-xl font-semibold text-ink mb-3 mt-8" {...props} />
                   ),
                   // Style h4 (for numbered sections)
                   h4: ({ node, ...props }) => (
@@ -473,14 +473,14 @@ export default function CitationsGuide() {
                     const isInline = inline !== false;
                     return isInline ? (
                       <code 
-                        className="inline-block bg-gray-800 text-green-400 px-2 py-0.5 mx-0.5 rounded text-sm font-mono align-baseline"
+                        className="inline-block bg-ink text-success px-2 py-0.5 mx-0.5 rounded text-sm font-mono align-baseline"
                         {...props}
                       >
                         {children}
                       </code>
                     ) : (
                       <code 
-                        className="block bg-gray-800 text-green-400 p-4 rounded text-sm overflow-x-auto my-4 font-mono"
+                        className="block bg-ink text-success p-4 rounded text-sm overflow-x-auto my-4 font-mono"
                         {...props}
                       >
                         {children}
