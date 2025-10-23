@@ -91,6 +91,16 @@ function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
     });
   }
 
+  // Travel & Tourism (hotels, attractions, destinations) - ✅ NEW!
+  if (/\b(hotel|vacation|things to do|attractions|visit|tourism|travel guide|restaurants?|destination)\b/.test(text)) {
+    const score = (text.match(/\b(hotel|vacation|visit|tourism|attractions|things to do)/g) || []).length / 6;
+    votes.push({
+      key: 'travel_hotels',
+      score: Math.min(1, score + 0.35), // Higher base score for strong tourism signals
+      signals: ['hotels', 'vacation', 'attractions']
+    });
+  }
+
   return votes.sort((a, b) => b.score - a.score);
 }
 

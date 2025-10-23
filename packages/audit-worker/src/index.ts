@@ -2018,6 +2018,8 @@ async function precheckDomain(url: string, env: Env): Promise<{
   ok: boolean;
   finalUrl?: string;
   reason?: string;
+  html?: string;
+  title?: string;
 }> {
   try {
     // Check if blocked host
@@ -2140,10 +2142,15 @@ async function precheckDomain(url: string, env: Env): Promise<{
           };
         }
         
-        // Success!
+        // Success! Extract title for industry classification
+        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        const title = titleMatch ? titleMatch[1].replace(/&amp;/g, '&').trim() : undefined;
+        
         return {
           ok: true,
-          finalUrl: finalUrl !== url ? finalUrl : undefined
+          finalUrl: finalUrl !== url ? finalUrl : undefined,
+          html,
+          title
         };
         
       } catch (error: any) {
@@ -2721,8 +2728,7 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
       project: undefined, // Could read from project table if needed
       signals: {
         domain,
-        // These could be populated from precheck response if available
-        homepageTitle: undefined,
+        homepageTitle: precheck.title, // ✅ Use title from precheck!
         homepageH1: undefined,
         schemaTypes: undefined,
         keywords: site_description ? site_description.toLowerCase().split(/\s+/).slice(0, 20) : undefined,
