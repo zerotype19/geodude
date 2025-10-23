@@ -33,59 +33,51 @@ export default function CriteriaCard({ criterion }: CriteriaCardProps) {
   return (
     <Link 
       to={`/score-guide/${criterion.id}`}
-      className="block bg-white rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:shadow-lg transition-all p-6 group"
+      className="block bg-white rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:shadow-lg transition-all p-6 group flex flex-col h-full"
     >
+      {/* Title and description first - user-friendly */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="inline-flex items-center px-2.5 py-1 rounded text-xs font-mono font-bold bg-gray-900 text-white">
-              {criterion.id}
-            </span>
-            <span className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-bold border-2 ${impactColors[criterion.impact]}`}>
-              {criterion.impact} Impact
-            </span>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${scopeColors[criterion.scope]}`}>
-              {criterion.scope}
-            </span>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${checkTypeColors[criterion.check_type]}`}>
-              {criterion.check_type}
-            </span>
-            {criterion.preview && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                Preview
-              </span>
-            )}
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+          <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors leading-tight">
             {criterion.title}
           </h3>
-          <p className="text-sm text-gray-600 leading-relaxed mb-3">
+          <p className="text-base text-gray-700 leading-relaxed mb-4">
             {criterion.description}
           </p>
-          
-          {/* Why it matters preview */}
-          {criterion.why_it_matters && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-              <p className="text-sm text-blue-900">
-                <span className="font-semibold">💡 Why it matters:</span> {criterion.why_it_matters}
-              </p>
-            </div>
-          )}
-          
-          {/* View details CTA */}
-          <div className="flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700">
-            <span>View detailed guide</span>
-            <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
+        </div>
+        <div className="ml-4 flex-shrink-0">
+          <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-bold border-2 ${impactColors[criterion.impact]}`}>
+            {criterion.impact}
+          </span>
+        </div>
+      </div>
+      
+      {/* Why it matters preview */}
+      {criterion.why_it_matters && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <p className="text-sm text-blue-900 leading-relaxed">
+            <span className="font-semibold">💡 Why it matters:</span> {criterion.why_it_matters}
+          </p>
+        </div>
+      )}
+      
+      {/* Spacer to push technical details to bottom */}
+      <div className="flex-grow"></div>
+      
+      {/* Technical details at bottom - subtle and minimal */}
+      <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-200">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">
+            {criterion.scope === 'page' ? 'Checked on each page' : 'Checked once per site'}
+          </span>
         </div>
         
-        <div className="ml-4 text-right">
-          <div className="text-lg font-bold text-gray-900">
-            W{criterion.weight}
-          </div>
-          <div className="text-xs text-gray-500">weight</div>
+        {/* View details CTA */}
+        <div className="flex items-center gap-2 text-sm font-medium text-blue-600 group-hover:text-blue-700">
+          <span>Learn how to fix</span>
+          <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
         </div>
       </div>
     </Link>

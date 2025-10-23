@@ -58,16 +58,16 @@ export default function CheckPill({
   return (
     <div className="group relative inline-block">
       <span 
-        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs border cursor-pointer transition-all hover:shadow-sm ${color}`}
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm border cursor-pointer transition-all hover:shadow-md ${color}`}
         onClick={handleClick}
       >
-        <span className="font-semibold">{code}</span>
-        {!compact && <span className={labelClass}>{meta.label}</span>}
+        {/* Plain English label first - user-friendly */}
+        <span className="font-medium">{meta.label}</span>
+        {/* Score indicator if present */}
         {typeof score === "number" && (
-          <span className="opacity-70 ml-0.5">· {score}/3</span>
-        )}
-        {typeof weight === "number" && (
-          <span className="opacity-70 text-[10px]">w{weight}</span>
+          <span className="opacity-80 text-xs">
+            {score === 3 ? '✓' : score === 0 ? '✗' : '⚠'}
+          </span>
         )}
       </span>
       

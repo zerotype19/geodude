@@ -331,34 +331,33 @@ export default function PageDetail() {
                               {/* Check header */}
                               <div className="flex items-start justify-between mb-3">
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                      {check.id}
-                                    </span>
-                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${STATUS_COLORS[check.status]}`}>
-                                      {STATUS_ICONS[check.status]} {check.status.toUpperCase()}
-                                    </span>
-                                    {check.impact && (
-                                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${IMPACT_COLORS[check.impact]}`}>
-                                        {check.impact} Impact
-                                      </span>
-                                    )}
-                                  </div>
-                                  <h4 className="text-base font-medium text-gray-900 mb-1">
+                                  {/* Title first - user-friendly */}
+                                  <h4 className="text-lg font-bold text-gray-900 mb-2 leading-tight">
                                     {check.criteria?.title || check.id}
                                   </h4>
                                   {check.criteria?.description && (
-                                    <p className="text-sm text-gray-600 mb-2">
+                                    <p className="text-base text-gray-700 mb-3 leading-relaxed">
                                       {check.criteria.description}
                                     </p>
                                   )}
+                                  {/* Status and impact badges below description */}
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border-2 ${STATUS_COLORS[check.status]}`}>
+                                      {STATUS_ICONS[check.status]} {check.status === 'ok' ? 'Passing' : check.status === 'warn' ? 'Warning' : 'Needs Attention'}
+                                    </span>
+                                    {check.impact && (
+                                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${IMPACT_COLORS[check.impact]}`}>
+                                        {check.impact} Priority
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="text-right ml-4">
-                                  <div className={`text-3xl font-bold ${getScoreColor(check.score)}`}>
+                                <div className="text-right ml-4 flex-shrink-0">
+                                  <div className={`text-4xl font-bold ${getScoreColor(check.score)}`}>
                                     {check.score}
                                   </div>
                                   <div className="text-xs text-gray-500">
-                                    / 100
+                                    out of 100
                                   </div>
                                 </div>
                               </div>
