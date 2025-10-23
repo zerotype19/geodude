@@ -25,6 +25,42 @@ export interface IndustrySignals {
 }
 
 /**
+ * Calculate schema boost based on industry-specific schema.org types
+ * Returns a confidence boost (0-0.10) if schema matches industry
+ */
+function calculateSchemaBoost(industry: IndustryKey, schemaTypes: string[]): number {
+  if (!schemaTypes || schemaTypes.length === 0) return 0;
+  
+  const schemaLower = schemaTypes.map(s => s.toLowerCase());
+  
+  // Industry-specific schema mappings
+  const schemaMap: Record<string, string[]> = {
+    saas_b2b: ['softwareapplication', 'saasapplication', 'mobileapplication'],
+    automotive_oem: ['car', 'vehicle', 'automobiledealer', 'carmake'],
+    retail: ['store', 'product', 'onlinestore', 'department'],
+    financial_services: ['financialservice', 'bankaccount', 'insuranceagency'],
+    healthcare_provider: ['physician', 'hospital', 'clinic', 'medicalorganization'],
+    travel_air: ['airline', 'flight'],
+    travel_hotels: ['hotel', 'lodgingbusiness', 'resort'],
+    travel_cruise: ['touristattraction', 'travelagency'],
+    media_entertainment: ['newsarticle', 'newsmediaorganization', 'broadcastchannel'],
+    education: ['educationalorganization', 'collegeuniversity', 'school'],
+    food_restaurant: ['restaurant', 'foodestablishment'],
+    real_estate: ['realestate', 'realestateagent', 'apartment']
+  };
+  
+  const expectedTypes = schemaMap[industry];
+  if (!expectedTypes) return 0;
+  
+  // Check if any schema type matches expected types for this industry
+  const hasMatch = schemaLower.some(type => 
+    expectedTypes.some(expected => type.includes(expected) || expected.includes(type))
+  );
+  
+  return hasMatch ? 0.05 : 0;  // +5% boost if schema matches
+}
+
+/**
  * Heuristic voting based on signals
  */
 function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
@@ -193,13 +229,18 @@ export async function resolveIndustry(ctx: {
         if (result.primary.confidence >= 0.35) {
           const source = result.primary.confidence >= 0.70 ? 'ai_worker' : 'ai_worker_medium_conf';
           
+          // 🔥 SCHEMA BOOST: Increase confidence if schema types match industry
+          const schemaTypes = ctx.signals.schemaTypes || [];
+          const schemaBoost = calculateSchemaBoost(result.primary.industry_key, schemaTypes);
+          const boostedAI = Math.min(1.0, result.primary.confidence + schemaBoost);
+          
           // 🔥 FUSION: Boost confidence if heuristics agrees
           const heuristicsAgrees = heuristicsResult?.key === result.primary.industry_key;
           const finalConfidence = heuristicsAgrees 
-            ? Math.min(1.0, result.primary.confidence + 0.15)  // Boost by 15% if heuristics agrees
-            : result.primary.confidence;
+            ? Math.min(1.0, boostedAI + 0.15)  // +15% if heuristics agrees
+            : boostedAI;
           
-          console.log(`[INDUSTRY_AI] ${domain} → ${result.primary.industry_key} (conf: ${result.primary.confidence.toFixed(3)}, final: ${finalConfidence.toFixed(3)}, heuristics: ${heuristicsAgrees ? 'agrees' : 'differs'}, source: ${source})`);
+          console.log(`[INDUSTRY_AI] ${domain} → ${result.primary.industry_key} (conf: ${result.primary.confidence.toFixed(3)}, schema: +${schemaBoost.toFixed(2)}, final: ${finalConfidence.toFixed(3)}, heuristics: ${heuristicsAgrees ? 'agrees' : 'differs'}, source: ${source})`);
           
           // Cache high-confidence results to KV
           if (finalConfidence >= 0.70 && ctx.env?.DOMAIN_RULES_KV) {

@@ -1860,6 +1860,19 @@ export default {
           }
         }
 
+        // Admin canary test endpoint (test industry classification)
+        if (req.method === 'GET' && path === '/api/admin/canary-test') {
+          try {
+            const { handleCanaryTest } = await import('./routes/canary-test');
+            return handleCanaryTest(req, env);
+          } catch (error: any) {
+            return new Response(JSON.stringify({ error: error.message, stack: error.stack }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
         // Admin circuit breaker reset endpoint
         if (req.method === 'POST' && path === '/api/admin/circuit-breaker/reset') {
           try {
