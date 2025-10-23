@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiGet } from '../../../../lib/api';
 import { useParams, Link } from 'react-router-dom';
-import CheckPill from '/src/components/CheckPill';
-import { getCheckMeta } from '/src/content/checks';
-import PageChecksTable from '/src/components/PageChecksTable';
 import { useAuditDiagnostics } from '/src/hooks/useAuditDiagnostics';
+import { CRITERIA_BY_ID, CATEGORY_ORDER, CATEGORY_DESCRIPTIONS } from '/src/content/criteriaV3';
 
 interface PageDetails {
   id: string;
@@ -20,41 +18,53 @@ interface PageDetails {
   canonical?: string;
   schema_types?: string;
   jsonld?: string;
-  has_answer_box: number;
-  has_jump_links: number;
-  facts_block: number;
-  references_block: number;
-  tables_count: number;
-  outbound_links: number;
-  author_json?: string;
-  org_json?: string;
-  robots_ai_policy?: string;
-  parity_pass: number;
-  aeo_score?: number;
-  geo_score?: number;
-  checks_json?: string;
   analyzed_at: string;
 }
 
 interface CheckResult {
   id: string;
   score: number;
-  weight: number;
-  evidence: {
-    found: boolean;
-    details: string;
-    snippets?: string[];
-  };
+  status: 'ok' | 'warn' | 'fail' | 'error' | 'not_applicable';
+  details: Record<string, any>;
+  evidence?: string[];
+  scope: 'page' | 'site';
+  preview?: boolean;
+  impact?: 'High' | 'Medium' | 'Low';
 }
 
 const API_BASE = 'https://api.optiview.ai';
+
+const STATUS_COLORS = {
+  ok: 'bg-green-100 text-green-800 border-green-300',
+  warn: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  fail: 'bg-red-100 text-red-800 border-red-300',
+  error: 'bg-gray-100 text-gray-800 border-gray-300',
+  not_applicable: 'bg-gray-50 text-gray-600 border-gray-200'
+};
+
+const STATUS_ICONS = {
+  ok: '✓',
+  warn: '⚠',
+  fail: '✗',
+  error: '!',
+  not_applicable: '—'
+};
+
+const IMPACT_COLORS = {
+  High: 'bg-red-50 text-red-700',
+  Medium: 'bg-yellow-50 text-yellow-700',
+  Low: 'bg-blue-50 text-blue-700'
+};
 
 export default function PageDetail() {
   const { id, pageId } = useParams<{ id: string; pageId: string }>();
   const [page, setPage] = useState<PageDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'checks' | 'schema' | 'html'>('checks');
+  const [activeTab, setActiveTab] = useState<'checks' | 'metadata' | 'html'>('checks');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(CATEGORY_ORDER)
+  );
   
   // Load diagnostics data
   const diagnostics = useAuditDiagnostics(id);
@@ -76,93 +86,29 @@ export default function PageDetail() {
     }
   };
 
-  const getScoreColor = (score?: number) => {
-    if (!score) return 'text-gray-500';
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const getCheckScoreColor = (score: number) => {
-    switch (score) {
-      case 3: return 'bg-green-100 text-green-800';
-      case 2: return 'bg-blue-100 text-blue-800';
-      case 1: return 'bg-yellow-100 text-yellow-800';
-      case 0: return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category);
+    } else {
+      newExpanded.add(category);
     }
+    setExpandedCategories(newExpanded);
   };
 
-  const getCheckScoreText = (score: number) => {
-    switch (score) {
-      case 3: return 'Exceeds';
-      case 2: return 'Meets';
-      case 1: return 'Partial';
-      case 0: return 'Missing';
-      default: return 'Unknown';
-    }
-  };
-
-  const getCheckDescription = (id: string) => {
-    const meta = getCheckMeta(id);
-    return meta.description || meta.label || 'Unknown check';
-  };
-
-  const parseChecks = (): CheckResult[] => {
-    if (!page?.checks_json) return [];
-    
+  const parseSchemaTypes = () => {
+    if (!page?.schema_types) return [];
     try {
-      return JSON.parse(page.checks_json);
+      return JSON.parse(page.schema_types);
     } catch (e) {
       return [];
-    }
-  };
-
-  const parseRobotsPolicy = () => {
-    if (!page?.robots_ai_policy) return {};
-    
-    try {
-      return JSON.parse(page.robots_ai_policy);
-    } catch (e) {
-      return {};
-    }
-  };
-
-  const parseAuthor = () => {
-    if (!page?.author_json) return null;
-    
-    try {
-      return JSON.parse(page.author_json);
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const parseOrg = () => {
-    if (!page?.org_json) return null;
-    
-    try {
-      return JSON.parse(page.org_json);
-    } catch (e) {
-      return null;
     }
   };
 
   const parseJsonld = () => {
     if (!page?.jsonld) return [];
-    
     try {
       return JSON.parse(page.jsonld);
-    } catch (e) {
-      return [];
-    }
-  };
-
-  const parseSchemaTypes = () => {
-    if (!page?.schema_types) return [];
-    
-    try {
-      return JSON.parse(page.schema_types);
     } catch (e) {
       return [];
     }
@@ -201,15 +147,33 @@ export default function PageDetail() {
     );
   }
 
-  const checks = parseChecks();
-  const robotsPolicy = parseRobotsPolicy();
-  const author = parseAuthor();
-  const org = parseOrg();
-  const jsonld = parseJsonld();
-  const schemaTypes = parseSchemaTypes();
+  const pageChecks: CheckResult[] = pageId && diagnostics.pageChecks[pageId] ? diagnostics.pageChecks[pageId] : [];
+  const productionChecks = pageChecks.filter(c => !c.preview);
+  
+  // Group checks by category
+  const checksByCategory = productionChecks.reduce((acc, check) => {
+    const criteria = CRITERIA_BY_ID.get(check.id);
+    const category = criteria?.category || 'Uncategorized';
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push({ ...check, criteria });
+    return acc;
+  }, {} as Record<string, Array<CheckResult & { criteria?: any }>>);
 
-  const aeoChecks = checks.filter(c => c.id.startsWith('A'));
-  const geoChecks = checks.filter(c => c.id.startsWith('G'));
+  // Calculate average score
+  const avgScore = productionChecks.length > 0
+    ? Math.round(productionChecks.reduce((sum, c) => sum + c.score, 0) / productionChecks.length)
+    : 0;
+
+  const getScoreColor = (score: number) => {
+    if (score >= 85) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const schemaTypes = parseSchemaTypes();
+  const jsonld = parseJsonld();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -223,7 +187,7 @@ export default function PageDetail() {
               </Link>
               <h1 className="text-3xl font-bold text-gray-900">Page Analysis</h1>
               <p className="mt-2 text-gray-600">
-                <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
+                <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 break-all">
                   {page.url}
                 </a>
               </p>
@@ -238,88 +202,37 @@ export default function PageDetail() {
           </div>
         </div>
 
-        {/* Score Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Diagnostic Score */}
-          {pageId && diagnostics.pageChecks[pageId] && (
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">D</span>
-                    </div>
-                  </div>
-                  <div className="ml-5 w-0 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Diagnostic Score</dt>
-                      <dd className={`text-3xl font-semibold ${
-                        diagnostics.pageChecks[pageId]
-                          ? getScoreColor(
-                              Math.round(
-                                diagnostics.pageChecks[pageId]
-                                  .filter((c) => !c.preview)
-                                  .reduce((sum, c) => sum + c.score, 0) /
-                                  diagnostics.pageChecks[pageId].filter((c) => !c.preview).length
-                              )
-                            )
-                          : 'text-gray-500'
-                      }`}>
-                        {diagnostics.pageChecks[pageId]
-                          ? Math.round(
-                              diagnostics.pageChecks[pageId]
-                                .filter((c) => !c.preview)
-                                .reduce((sum, c) => sum + c.score, 0) /
-                                diagnostics.pageChecks[pageId].filter((c) => !c.preview).length
-                            )
-                          : 'N/A'}
-                      </dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
+        {/* Page Score Card */}
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-medium text-gray-900 mb-1">Page Diagnostic Score</h2>
+              <p className="text-sm text-gray-600">{productionChecks.length} checks analyzed</p>
             </div>
-          )}
-
-          {/* AEO Score (Legacy) */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-lg">A</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">AEO Score (Legacy)</dt>
-                    <dd className={`text-3xl font-semibold ${getScoreColor(page.aeo_score)}`}>
-                      {page.aeo_score ? Math.round(page.aeo_score) : 'N/A'}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
+            <div className={`text-5xl font-bold ${getScoreColor(avgScore)}`}>
+              {avgScore}
             </div>
           </div>
-
-          {/* GEO Score (Legacy) */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-lg">G</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">GEO Score (Legacy)</dt>
-                    <dd className={`text-3xl font-semibold ${getScoreColor(page.geo_score)}`}>
-                      {page.geo_score ? Math.round(page.geo_score) : 'N/A'}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
+          
+          {/* Quick status summary */}
+          <div className="mt-4 pt-4 border-t border-gray-200 flex gap-4 text-sm">
+            <div className="flex items-center gap-1">
+              <span className="text-green-600">✓</span>
+              <span className="text-gray-600">
+                {productionChecks.filter(c => c.status === 'ok').length} passing
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-yellow-600">⚠</span>
+              <span className="text-gray-600">
+                {productionChecks.filter(c => c.status === 'warn').length} warnings
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-red-600">✗</span>
+              <span className="text-gray-600">
+                {productionChecks.filter(c => c.status === 'fail').length} failing
+              </span>
             </div>
           </div>
         </div>
@@ -329,8 +242,8 @@ export default function PageDetail() {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8 px-6">
               {[
-                { id: 'checks', label: 'Check Results', count: checks.length },
-                { id: 'schema', label: 'Schema & Metadata', count: schemaTypes.length },
+                { id: 'checks', label: 'Diagnostic Checks', count: productionChecks.length },
+                { id: 'metadata', label: 'Schema & Metadata', count: schemaTypes.length },
                 { id: 'html', label: 'HTML Analysis' }
               ].map((tab) => (
                 <button
@@ -356,101 +269,165 @@ export default function PageDetail() {
           <div className="p-6">
             {/* Check Results Tab */}
             {activeTab === 'checks' && (
-              <div>
-                {/* AEO Checks */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">AEO (Answer Engine Optimization)</h3>
-                  <div className="overflow-visible">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evidence</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {aeoChecks.map((check) => (
-                          <tr key={check.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <CheckPill 
-                                code={check.id} 
-                                weight={check.weight} 
-                                score={check.score}
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCheckScoreColor(check.score)}`}>
-                                {check.score}/3 - {getCheckScoreText(check.score)}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {check.weight}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              {getCheckDescription(check.id)}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {check.evidence?.details || 'No evidence provided'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              <div className="space-y-4">
+                {CATEGORY_ORDER.filter(cat => checksByCategory[cat] && checksByCategory[cat].length > 0).map((category) => {
+                  const categoryChecks = checksByCategory[category] || [];
+                  const isExpanded = expandedCategories.has(category);
+                  const categoryAvg = Math.round(
+                    categoryChecks.reduce((sum, c) => sum + c.score, 0) / categoryChecks.length
+                  );
+                  const failCount = categoryChecks.filter(c => c.status === 'fail').length;
+                  const warnCount = categoryChecks.filter(c => c.status === 'warn').length;
+                  const okCount = categoryChecks.filter(c => c.status === 'ok').length;
 
-                {/* GEO Checks */}
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">GEO (Generative Engine Optimization)</h3>
-                  <div className="overflow-visible">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Evidence</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {geoChecks.map((check) => (
-                          <tr key={check.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <CheckPill 
-                                code={check.id} 
-                                weight={check.weight} 
-                                score={check.score}
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCheckScoreColor(check.score)}`}>
-                                {check.score}/3 - {getCheckScoreText(check.score)}
+                  return (
+                    <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+                      {/* Category Header */}
+                      <button
+                        onClick={() => toggleCategory(category)}
+                        className="w-full px-6 py-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-4">
+                          <span className="text-base font-medium text-gray-900">{category}</span>
+                          <span className={`text-2xl font-bold ${getScoreColor(categoryAvg)}`}>
+                            {categoryAvg}
+                          </span>
+                          <div className="flex gap-2 text-xs">
+                            {okCount > 0 && (
+                              <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                ✓ {okCount}
                               </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {check.weight}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              {getCheckDescription(check.id)}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {check.evidence?.details || 'No evidence provided'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            )}
+                            {warnCount > 0 && (
+                              <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                                ⚠ {warnCount}
+                              </span>
+                            )}
+                            {failCount > 0 && (
+                              <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
+                                ✗ {failCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <svg
+                          className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {/* Category Checks */}
+                      {isExpanded && (
+                        <div className="p-6 space-y-4 bg-white">
+                          {categoryChecks.map((check) => (
+                            <div
+                              key={check.id}
+                              className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
+                            >
+                              {/* Check header */}
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                      {check.id}
+                                    </span>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border ${STATUS_COLORS[check.status]}`}>
+                                      {STATUS_ICONS[check.status]} {check.status.toUpperCase()}
+                                    </span>
+                                    {check.impact && (
+                                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${IMPACT_COLORS[check.impact]}`}>
+                                        {check.impact} Impact
+                                      </span>
+                                    )}
+                                  </div>
+                                  <h4 className="text-base font-medium text-gray-900 mb-1">
+                                    {check.criteria?.title || check.id}
+                                  </h4>
+                                  {check.criteria?.description && (
+                                    <p className="text-sm text-gray-600 mb-2">
+                                      {check.criteria.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right ml-4">
+                                  <div className={`text-3xl font-bold ${getScoreColor(check.score)}`}>
+                                    {check.score}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    / 100
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Check details */}
+                              {check.details && Object.keys(check.details).length > 0 && (
+                                <div className="bg-gray-50 rounded p-3 mb-3">
+                                  <div className="text-xs font-medium text-gray-700 mb-1">Details:</div>
+                                  <div className="text-xs text-gray-600 space-y-1">
+                                    {Object.entries(check.details).map(([key, value]) => (
+                                      <div key={key} className="flex gap-2">
+                                        <span className="font-medium">{key}:</span>
+                                        <span className="break-all">
+                                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Evidence */}
+                              {check.evidence && check.evidence.length > 0 && (
+                                <div className="bg-blue-50 rounded p-3">
+                                  <div className="text-xs font-medium text-blue-900 mb-1">Evidence:</div>
+                                  <div className="text-xs text-blue-800 space-y-1">
+                                    {check.evidence.map((ev, idx) => (
+                                      <div key={idx} className="break-all">{ev}</div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Why it matters & how to fix */}
+                              {(check.criteria?.why_it_matters || check.criteria?.how_to_fix) && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  {check.criteria.why_it_matters && (
+                                    <div className="mb-2">
+                                      <span className="text-xs font-medium text-gray-700">Why it matters:</span>
+                                      <p className="text-xs text-gray-600 mt-1">{check.criteria.why_it_matters}</p>
+                                    </div>
+                                  )}
+                                  {check.criteria.how_to_fix && check.status !== 'ok' && (
+                                    <div>
+                                      <span className="text-xs font-medium text-gray-700">How to fix:</span>
+                                      <p className="text-xs text-gray-600 mt-1">{check.criteria.how_to_fix}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                
+                {productionChecks.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    <p>No diagnostic checks available for this page.</p>
+                    <p className="text-sm mt-2">Checks may still be processing.</p>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
-            {/* Schema & Metadata Tab */}
-            {activeTab === 'schema' && (
+            {/* Metadata Tab */}
+            {activeTab === 'metadata' && (
               <div>
                 {/* Basic Metadata */}
                 <div className="mb-8">
@@ -459,19 +436,19 @@ export default function PageDetail() {
                     <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Title</dt>
-                        <dd className="text-sm text-gray-900">{page.title || 'Not found'}</dd>
+                        <dd className="text-sm text-gray-900 mt-1">{page.title || 'Not found'}</dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">H1</dt>
-                        <dd className="text-sm text-gray-900">{page.h1 || 'Not found'}</dd>
+                        <dd className="text-sm text-gray-900 mt-1">{page.h1 || 'Not found'}</dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Canonical</dt>
-                        <dd className="text-sm text-gray-900">{page.canonical || 'Not found'}</dd>
+                        <dd className="text-sm text-gray-900 mt-1 break-all">{page.canonical || 'Not found'}</dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Content Type</dt>
-                        <dd className="text-sm text-gray-900">{page.content_type || 'Not found'}</dd>
+                        <dd className="text-sm text-gray-900 mt-1">{page.content_type || 'Not found'}</dd>
                       </div>
                     </dl>
                   </div>
@@ -487,43 +464,6 @@ export default function PageDetail() {
                           {type}
                         </span>
                       ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Author & Organization */}
-                {(author || org) && (
-                  <div className="mb-8">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Author & Organization</h3>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      {author && (
-                        <div className="mb-4">
-                          <h4 className="font-medium text-gray-900">Author</h4>
-                          <pre className="text-xs text-gray-600 mt-2 overflow-x-auto">
-                            {JSON.stringify(author, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                      {org && (
-                        <div>
-                          <h4 className="font-medium text-gray-900">Organization</h4>
-                          <pre className="text-xs text-gray-600 mt-2 overflow-x-auto">
-                            {JSON.stringify(org, null, 2)}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Robots Policy */}
-                {Object.keys(robotsPolicy).length > 0 && (
-                  <div className="mb-8">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">AI Crawler Policy</h3>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <pre className="text-xs text-gray-600 overflow-x-auto">
-                        {JSON.stringify(robotsPolicy, null, 2)}
-                      </pre>
                     </div>
                   </div>
                 )}
@@ -545,43 +485,6 @@ export default function PageDetail() {
             {/* HTML Analysis Tab */}
             {activeTab === 'html' && (
               <div>
-                {/* Content Analysis */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Content Analysis</h3>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Answer Box</dt>
-                        <dd className="text-sm text-gray-900">{page.has_answer_box ? '✓ Found' : '✗ Missing'}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Jump Links</dt>
-                        <dd className="text-sm text-gray-900">{page.has_jump_links ? '✓ Found' : '✗ Missing'}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Facts Block</dt>
-                        <dd className="text-sm text-gray-900">{page.facts_block ? '✓ Found' : '✗ Missing'}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">References Block</dt>
-                        <dd className="text-sm text-gray-900">{page.references_block ? '✓ Found' : '✗ Missing'}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Tables Count</dt>
-                        <dd className="text-sm text-gray-900">{page.tables_count}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Outbound Links</dt>
-                        <dd className="text-sm text-gray-900">{page.outbound_links}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Parity Pass</dt>
-                        <dd className="text-sm text-gray-900">{page.parity_pass ? '✓ Passed' : '✗ Failed'}</dd>
-                      </div>
-                    </dl>
-                  </div>
-                </div>
-
                 {/* HTML Preview */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-4">HTML Preview</h3>

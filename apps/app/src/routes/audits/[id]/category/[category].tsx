@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiGet } from '/src/lib/api';
-import CheckPill from '/src/components/CheckPill';
-import { CRITERIA_BY_CATEGORY } from '/src/content/criteriaV2';
+import { CRITERIA_BY_ID, CATEGORY_ORDER, getCriteriaForCategory } from '/src/content/criteriaV3';
+import type { Category } from '/src/content/criteriaV3';
 
 interface CategoryScore {
   category: string;
@@ -14,20 +14,18 @@ interface CategoryScore {
 interface CheckResult {
   id: string;
   score: number;
-  weight: number;
-  evidence: {
-    found: boolean;
-    details: string;
-    snippets?: string[];
-  };
+  status: 'ok' | 'warn' | 'fail' | 'error' | 'not_applicable';
+  details: Record<string, any>;
+  evidence?: string[];
+  scope: 'page' | 'site';
+  preview?: boolean;
+  impact?: 'High' | 'Medium' | 'Low';
 }
 
 interface Page {
   id: string;
   url: string;
   status_code: number;
-  aeo_score?: number;
-  geo_score?: number;
   checks_json?: string;
 }
 
@@ -47,7 +45,7 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   'Experience & Performance': '⚡'
 };
 
-// Category descriptions
+// Category descriptions (from D1 scoring guide)
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   'Content & Clarity': 'Clear, complete answers that assistants can quote.',
   'Structure & Organization': 'Pages and links arranged so people and parsers "get it."',
@@ -73,14 +71,16 @@ export default function CategoryDetail() {
     'experience-performance': 'Experience & Performance'
   };
 
-  const categoryName = SLUG_TO_CATEGORY[category || ''] || '';
+  const categoryName = (SLUG_TO_CATEGORY[category || ''] || '') as Category;
   const categorySlug = category || '';
 
   const emoji = CATEGORY_EMOJIS[categoryName] || '📊';
   const description = CATEGORY_DESCRIPTIONS[categoryName] || '';
 
-  // Get checks for this category
-  const checksInCategory = CRITERIA_BY_CATEGORY[categoryName as keyof typeof CRITERIA_BY_CATEGORY] || [];
+  // Get checks for this category from D1 criteria
+  const checksInCategory = getCriteriaForCategory(categoryName);
+  // Filter to only page-level checks for the breakdown
+  const pageChecksInCategory = checksInCategory.filter(c => c.scope === 'page');
 
   // Find the category score
   const categoryScore = audit?.category_scores?.find(cs => cs.category === categoryName);
@@ -95,7 +95,7 @@ export default function CategoryDetail() {
     try {
       const [auditData, pagesData] = await Promise.all([
         apiGet<Audit>(`/api/audits/${id}`),
-        apiGet<{ pages: Page[] }>(`/api/audits/${id}/pages`)
+        apiGet<{ pages: Page[] }>(`/api/audits/${id}/pages?limit=200`)
       ]);
       setAudit(auditData);
       setPages(pagesData.pages || []);
@@ -106,9 +106,9 @@ export default function CategoryDetail() {
     }
   };
 
-  // Calculate category breakdown by check
+  // Calculate category breakdown by check (using 0-100 scale)
   const getCheckBreakdown = () => {
-    return checksInCategory.map(check => {
+    return pageChecksInCategory.map(check => {
       let totalScore = 0;
       let count = 0;
       let passingPages = 0;
@@ -119,16 +119,19 @@ export default function CategoryDetail() {
           try {
             const checks = JSON.parse(page.checks_json) as CheckResult[];
             const checkResult = checks.find(c => c.id === check.id);
-            if (checkResult) {
+            if (checkResult && !checkResult.preview) {
               totalScore += checkResult.score;
               count++;
-              if (checkResult.score >= 2) {
+              // Using 0-100 scale: >= 60 is passing
+              if (checkResult.score >= 60) {
                 passingPages++;
               } else {
                 failingPages++;
               }
             }
-          } catch {}
+          } catch (e) {
+            console.error('Error parsing checks_json:', e);
+          }
         }
       });
 
@@ -144,7 +147,7 @@ export default function CategoryDetail() {
     });
   };
 
-  // Get pages that have issues in this category
+  // Get pages that have issues in this category (score < 60)
   const getPagesWithIssues = () => {
     return pages
       .map(page => {
@@ -152,7 +155,9 @@ export default function CategoryDetail() {
         try {
           const checks = JSON.parse(page.checks_json) as CheckResult[];
           const failingChecks = checks.filter(check => 
-            checksInCategory.some(c => c.id === check.id) && check.score < 3
+            pageChecksInCategory.some(c => c.id === check.id) && 
+            check.score < 60 &&
+            !check.preview
           );
           
           if (failingChecks.length === 0) return null;
@@ -185,17 +190,39 @@ export default function CategoryDetail() {
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600 bg-green-50 border-green-200';
+    if (score >= 85) return 'text-green-600 bg-green-50 border-green-200';
     if (score >= 60) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
     if (score >= 40) return 'text-orange-600 bg-orange-50 border-orange-200';
     return 'text-red-600 bg-red-50 border-red-200';
   };
 
   const getCheckScoreColor = (score: number) => {
-    if (score >= 2.5) return 'text-green-600';
-    if (score >= 1.5) return 'text-yellow-600';
-    if (score >= 0.5) return 'text-orange-600';
+    if (score >= 85) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    if (score >= 40) return 'text-orange-600';
     return 'text-red-600';
+  };
+
+  const getStatusBadge = (score: number) => {
+    if (score >= 85) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          ✓ Excellent
+        </span>
+      );
+    } else if (score >= 60) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          ⚠ Good
+        </span>
+      );
+    } else {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          ✗ Needs Work
+        </span>
+      );
+    }
   };
 
   return (
@@ -253,11 +280,11 @@ export default function CategoryDetail() {
             Category Score Breakdown
           </h2>
           <p className="text-sm text-gray-600 mb-4">
-            Performance on each check within this category
+            Performance on each check within this category (0-100 scale)
           </p>
           <div className="space-y-3">
             {checkBreakdown.length === 0 ? (
-              <p className="text-gray-500 text-sm">No checks defined for this category.</p>
+              <p className="text-gray-500 text-sm">No page-level checks defined for this category.</p>
             ) : (
               checkBreakdown.map(({ check, avgScore, passingPages, failingPages, totalPages }) => (
                 <div 
@@ -270,6 +297,7 @@ export default function CategoryDetail() {
                         {check.id}
                       </span>
                       <h3 className="font-medium text-gray-900">{check.title}</h3>
+                      {getStatusBadge(avgScore)}
                     </div>
                     <p className="text-sm text-gray-600 mb-2">{check.description}</p>
                     <div className="flex items-center gap-4 text-xs">
@@ -283,10 +311,15 @@ export default function CategoryDetail() {
                         of {totalPages} pages
                       </span>
                     </div>
+                    {check.why_it_matters && (
+                      <div className="mt-2 text-xs text-gray-500 border-l-2 border-blue-200 pl-3">
+                        <strong>Why it matters:</strong> {check.why_it_matters}
+                      </div>
+                    )}
                   </div>
                   <div className="ml-4 text-right">
                     <div className={`text-2xl font-bold ${getCheckScoreColor(avgScore)}`}>
-                      {avgScore.toFixed(1)}
+                      {Math.round(avgScore)}
                     </div>
                     <div className="text-xs text-gray-500">avg score</div>
                   </div>
@@ -303,7 +336,7 @@ export default function CategoryDetail() {
               Impacted Pages ({pagesWithIssues.length})
             </h2>
             <p className="text-sm text-gray-600">
-              Pages that have failing checks in this category
+              Pages scoring below 60 on checks in this category
             </p>
           </div>
           
@@ -325,7 +358,7 @@ export default function CategoryDetail() {
                       Failing Checks
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Issues
+                      Avg Score
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -333,41 +366,60 @@ export default function CategoryDetail() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {pagesWithIssues.map((page) => (
-                    <tr key={page.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-md truncate">
-                        <a href={page.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
-                          {page.url}
-                        </a>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {page.failingChecks.map((check) => (
-                            <CheckPill 
-                              key={check.id}
-                              code={check.id} 
-                              weight={check.weight} 
-                              score={Math.round(check.score)}
-                              alwaysShowLabel={false}
-                            />
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        <span className="text-red-600 font-medium">
-                          {page.failingChecks.length} issue{page.failingChecks.length !== 1 ? 's' : ''}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Link
-                          to={`/audits/${id}/pages/${page.id}`}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          View Details
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {pagesWithIssues.map((page) => {
+                    const avgPageScore = page.failingChecks.length > 0
+                      ? Math.round(page.failingChecks.reduce((sum, c) => sum + c.score, 0) / page.failingChecks.length)
+                      : 0;
+                    
+                    return (
+                      <tr key={page.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
+                          <a 
+                            href={page.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="hover:text-blue-600 break-all"
+                          >
+                            {page.url}
+                          </a>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            {page.failingChecks.slice(0, 5).map((check) => (
+                              <span 
+                                key={check.id}
+                                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800"
+                                title={CRITERIA_BY_ID.get(check.id)?.title || check.id}
+                              >
+                                {check.id}
+                              </span>
+                            ))}
+                            {page.failingChecks.length > 5 && (
+                              <span className="text-xs text-gray-500">
+                                +{page.failingChecks.length - 5} more
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={`font-semibold ${getCheckScoreColor(avgPageScore)}`}>
+                            {avgPageScore}
+                          </span>
+                          <span className="text-gray-500 text-xs ml-1">
+                            ({page.failingChecks.length} issue{page.failingChecks.length !== 1 ? 's' : ''})
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <Link
+                            to={`/audits/${id}/pages/${page.id}`}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            View Details →
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -377,4 +429,3 @@ export default function CategoryDetail() {
     </div>
   );
 }
-

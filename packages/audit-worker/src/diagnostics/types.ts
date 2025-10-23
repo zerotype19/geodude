@@ -5,6 +5,7 @@ export type Impact = "High" | "Medium" | "Low";
 export interface CriterionRow {
   id: string;
   label: string;
+  category: string;
   scope: Scope;
   check_type: CheckType;
   preview: 0 | 1;

@@ -1,4 +1,6 @@
-import { Checks, CheckFn } from "./checks.impl";
+import { Checks, type CheckInput, type CheckResult } from "./checks.impl";
+
+export type CheckFn = (input: CheckInput) => CheckResult;
 
 export const CHECKS: Array<[id: string, fn: CheckFn]> = [
   ["C1_title_quality", Checks.C1_title_quality],

@@ -1,11 +1,14 @@
 /**
- * Backfill Scoring Checks for Existing Audits
+ * Backfill Diagnostics for Existing Audits
  * 
- * Re-scores pages where checks_json is null/empty without re-crawling.
- * Useful for applying new scoring logic to historical audits.
+ * Re-runs diagnostics for pages where checks_json is null/empty without re-crawling.
+ * Useful for applying new diagnostic logic to historical audits.
+ * Uses the new D1 diagnostics system.
  */
 
-import { scoreAndPersistPage } from "../services/scorePage";
+import { runDiagnosticsForPage } from "../diagnostics/runPage";
+import { runDiagnosticsForSite } from "../diagnostics/runSite";
+import type { Env } from "../index";
 
 interface PageRow {
   id: string;
@@ -28,7 +31,7 @@ export async function backfillChecks(
     FROM audit_pages p
     LEFT JOIN audit_page_analysis a ON a.page_id = p.id
     WHERE p.audit_id = ?1 
-      AND (a.checks_json IS NULL OR a.checks_json = '')
+      AND (a.checks_json IS NULL OR a.checks_json = '' OR a.checks_json = '[]')
       AND (p.html_rendered IS NOT NULL OR p.html_static IS NOT NULL)
   `).bind(auditId).all()).results as PageRow[] || [];
 
@@ -36,17 +39,50 @@ export async function backfillChecks(
   let skipped = 0;
   const errors: string[] = [];
 
+  // Process page-level diagnostics
   for (const row of rows) {
     try {
-      await scoreAndPersistPage(env.DB, row, site);
+      await runDiagnosticsForPage(env.DB, {
+        pageId: row.id,
+        url: row.url,
+        html_rendered: row.html_rendered,
+        html_static: row.html_static,
+        site
+      });
       processed++;
-      console.log(`[BACKFILL] Scored: ${row.url}`);
+      console.log(`[BACKFILL] Processed diagnostics: ${row.url}`);
     } catch (error) {
       skipped++;
       const msg = `${row.url}: ${(error as Error).message}`;
       errors.push(msg);
-      console.error(`[BACKFILL] Error scoring ${msg}`);
+      console.error(`[BACKFILL] Error processing ${msg}`);
     }
+  }
+
+  // Process site-level diagnostics
+  try {
+    const pagesWithChecks = await env.DB.prepare(`
+      SELECT p.id, p.url, p.html_rendered, p.html_static, apa.checks_json
+      FROM audit_pages p
+      LEFT JOIN audit_page_analysis apa ON apa.page_id = p.id
+      WHERE p.audit_id = ?
+    `).bind(auditId).all();
+
+    await runDiagnosticsForSite(env.DB, {
+      auditId,
+      domain: site.domain,
+      pages: (pagesWithChecks.results || []).map((r: any) => ({
+        id: r.id,
+        url: r.url,
+        html_rendered: r.html_rendered,
+        html_static: r.html_static,
+        checks: r.checks_json ? JSON.parse(r.checks_json) : []
+      }))
+    });
+    console.log(`[BACKFILL] Completed site-level diagnostics for ${auditId}`);
+  } catch (error) {
+    errors.push(`Site diagnostics: ${(error as Error).message}`);
+    console.error(`[BACKFILL] Error in site diagnostics:`, error);
   }
 
   return { 
@@ -97,4 +133,3 @@ export async function backfillMultipleAudits(
   
   return results;
 }
-

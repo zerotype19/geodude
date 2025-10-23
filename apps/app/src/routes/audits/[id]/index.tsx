@@ -601,47 +601,10 @@ export default function AuditDetail() {
           </>
         ) : (
           <>
-            {/* Overview Tab - Composite Banner & Score Cards */}
+            {/* Overview Tab - Composite Banner */}
             {diagnostics.composite && (
               <CompositeBanner data={diagnostics.composite} />
             )}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <ScoreBadge
-            score={audit.aeo_score}
-            label="AEO Score"
-            icon="A"
-            iconColor="bg-blue-500"
-          />
-
-          <ScoreBadge
-            score={audit.geo_adjusted !== null && audit.geo_adjusted !== undefined ? audit.geo_adjusted : audit.geo_score}
-            label={audit.geo_adjusted !== null && audit.geo_adjusted !== undefined ? "GEO Adjusted" : "GEO Score"}
-            subtitle={audit.geo_adjustment_details ? `Raw: ${Math.round(audit.geo_adjustment_details.geo_raw)} (+${audit.geo_adjustment_details.citation_bonus} from citations)` : undefined}
-            icon="G"
-            iconColor="bg-green-500"
-            tooltip={audit.geo_adjustment_details?.explanation}
-          />
-
-          <div className="bg-white overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">P</span>
-                  </div>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">Pages Analyzed</dt>
-                    <dd className="text-2xl font-semibold text-gray-900">
-                      {audit.pages_analyzed}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Category Scores (Scorecard V2) */}
         {audit.scorecard_v2 && audit.category_scores && audit.category_scores.length > 0 && (

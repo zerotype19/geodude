@@ -7,6 +7,7 @@ export async function loadCriteriaMap(db: D1Database): Promise<Map<string, Crite
     map.set(r.id, {
       id: r.id,
       label: r.label,
+      category: r.category || "Uncategorized",
       scope: r.scope as "page" | "site",
       check_type: r.check_type as "html_dom" | "http" | "aggregate" | "llm",
       preview: r.preview as 0 | 1,

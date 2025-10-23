@@ -10,12 +10,8 @@ interface Audit {
   started_at: string;
   finished_at?: string;
   status: 'running' | 'complete' | 'failed';
-  aeo_score?: number;
-  geo_score?: number;
-  geo_adjusted?: number; // GEO score adjusted for real-world citations
   pages_analyzed: number;
-  avg_aeo_score: number;
-  avg_geo_score: number;
+  composite_score?: number;
 }
 
 const API_BASE = 'https://api.optiview.ai';
@@ -45,7 +41,25 @@ export default function AuditsIndex() {
   const fetchAudits = async () => {
     try {
       const data = await apiGet<{ audits: Audit[] }>('/api/audits');
-      setAudits(data.audits || []);
+      const auditsData = data.audits || [];
+      
+      // Fetch composite scores for completed audits
+      const auditsWithScores = await Promise.all(
+        auditsData.map(async (audit) => {
+          if (audit.status === 'complete') {
+            try {
+              const composite = await apiGet<{ total: number }>(`/api/audits/${audit.id}/composite`);
+              return { ...audit, composite_score: composite.total };
+            } catch (error) {
+              console.error(`Failed to fetch composite for ${audit.id}:`, error);
+              return audit;
+            }
+          }
+          return audit;
+        })
+      );
+      
+      setAudits(auditsWithScores);
     } catch (error) {
       console.error('Failed to fetch audits:', error);
     } finally {
@@ -113,7 +127,7 @@ export default function AuditsIndex() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Audit Dashboard</h1>
           <p className="mt-2 text-gray-600">
-            Monitor and analyze your website's AEO and GEO performance
+            Monitor and analyze your website's AI discoverability and optimization
           </p>
         </div>
 
@@ -315,17 +329,7 @@ export default function AuditsIndex() {
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      AEO Score
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <span className="inline-flex items-center">
-                        GEO Score
-                        <span className="ml-1 text-gray-400" title="Adjusted for real-world LLM citations">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </span>
-                      </span>
+                      Optiview Score
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Pages
@@ -355,16 +359,16 @@ export default function AuditsIndex() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatScore(audit.aeo_score)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className="inline-flex items-center">
-                          {formatScore(audit.geo_adjusted !== undefined && audit.geo_adjusted !== null ? audit.geo_adjusted : audit.geo_score)}
-                          {audit.geo_adjusted !== undefined && audit.geo_adjusted !== null && audit.geo_adjusted !== audit.geo_score && (
-                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800" title={`Adjusted from ${formatScore(audit.geo_score)} based on citation performance`}>
-                              +
-                            </span>
-                          )}
+                        <span className={`text-base font-semibold ${
+                          audit.composite_score 
+                            ? audit.composite_score >= 85 
+                              ? 'text-green-600' 
+                              : audit.composite_score >= 60 
+                                ? 'text-yellow-600' 
+                                : 'text-red-600'
+                            : 'text-gray-500'
+                        }`}>
+                          {formatScore(audit.composite_score)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
