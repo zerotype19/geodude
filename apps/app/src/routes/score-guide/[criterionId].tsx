@@ -48,61 +48,61 @@ export default function CriterionDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-12">
       <div className="max-w-4xl mx-auto px-4">
         {/* Back button */}
         <button
           onClick={() => navigate(-1)}
-          className="mb-6 flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
+          className="mb-8 flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold transition-colors group"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
           </svg>
           Back to Score Guide
         </button>
 
         {/* Header Card */}
-        <div className="bg-white rounded-lg border border-gray-200 p-8 mb-6">
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <span className="inline-flex items-center px-3 py-1.5 rounded text-sm font-mono font-bold bg-gray-900 text-white">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200/50 p-10 mb-8">
+          <div className="flex items-center gap-3 mb-6 flex-wrap">
+            <span className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-mono font-bold bg-gradient-to-r from-gray-800 to-gray-900 text-white shadow-md">
               {criterion.id}
             </span>
-            <span className={`inline-flex items-center px-3 py-1.5 rounded text-sm font-bold border-2 ${impactColors[criterion.impact]}`}>
+            <span className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-bold shadow-sm ${impactColors[criterion.impact]}`}>
               {criterion.impact} Impact
             </span>
-            <span className={`inline-flex items-center px-2.5 py-1 rounded text-sm font-medium ${scopeColors[criterion.scope]}`}>
+            <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold ${scopeColors[criterion.scope]}`}>
               {criterion.scope}-level
             </span>
-            <span className={`inline-flex items-center px-2.5 py-1 rounded text-sm font-medium ${checkTypeColors[criterion.check_type]}`}>
+            <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold ${checkTypeColors[criterion.check_type]}`}>
               {criterion.check_type}
             </span>
             {criterion.preview && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-amber-100 text-amber-800">
+              <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold bg-amber-100 text-amber-800">
                 Preview
               </span>
             )}
           </div>
           
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">
+          <h1 className="text-4xl font-black text-gray-900 mb-4 leading-tight">
             {criterion.title}
           </h1>
           
-          <p className="text-lg text-gray-700 leading-relaxed mb-4">
+          <p className="text-xl text-gray-700 leading-relaxed mb-6">
             {criterion.description}
           </p>
           
-          <div className="flex items-center gap-6 text-sm text-gray-600 border-t border-gray-200 pt-4">
+          <div className="flex items-center gap-8 text-base font-medium text-gray-700 bg-gray-50 rounded-xl p-4">
             <div>
-              <span className="font-semibold">Weight:</span> {criterion.weight}
+              <span className="text-gray-500">Weight:</span> <span className="text-gray-900 font-bold">{criterion.weight}</span>
             </div>
             <div>
-              <span className="font-semibold">Pass:</span> {criterion.pass_threshold}%
+              <span className="text-gray-500">Pass:</span> <span className="text-green-700 font-bold">{criterion.pass_threshold}%</span>
             </div>
             <div>
-              <span className="font-semibold">Warn:</span> {criterion.warn_threshold}%
+              <span className="text-gray-500">Warn:</span> <span className="text-yellow-700 font-bold">{criterion.warn_threshold}%</span>
             </div>
             <div>
-              <span className="font-semibold">Points:</span> {criterion.points_possible || 100}
+              <span className="text-gray-500">Points:</span> <span className="text-gray-900 font-bold">{criterion.points_possible || 100}</span>
             </div>
           </div>
         </div>
@@ -111,11 +111,11 @@ export default function CriterionDetail() {
         <div className="space-y-6">
           {/* Why it matters */}
           {criterion.why_it_matters && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="text-2xl">💡</span> Why This Matters
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-200 p-8 shadow-sm">
+              <h2 className="text-2xl font-bold text-blue-900 mb-4 flex items-center gap-3">
+                <span className="text-3xl">💡</span> Why This Matters
               </h2>
-              <p className="text-base text-gray-700 leading-relaxed">
+              <p className="text-lg text-blue-900/90 leading-relaxed">
                 {criterion.why_it_matters}
               </p>
             </div>
@@ -123,11 +123,11 @@ export default function CriterionDetail() {
 
           {/* How to fix */}
           {criterion.how_to_fix && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="text-2xl">🔧</span> How to Fix
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border-2 border-green-200 p-8 shadow-sm">
+              <h2 className="text-2xl font-bold text-green-900 mb-4 flex items-center gap-3">
+                <span className="text-3xl">🔧</span> How to Fix
               </h2>
-              <p className="text-base text-gray-700 leading-relaxed whitespace-pre-line">
+              <p className="text-lg text-green-900/90 leading-relaxed whitespace-pre-line">
                 {criterion.how_to_fix}
               </p>
             </div>
@@ -135,23 +135,23 @@ export default function CriterionDetail() {
 
           {/* Examples */}
           {criterion.examples && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="text-2xl">📝</span> Example
+            <div className="bg-white rounded-2xl border-2 border-purple-200 p-8 shadow-lg">
+              <h2 className="text-2xl font-bold text-purple-900 mb-4 flex items-center gap-3">
+                <span className="text-3xl">📝</span> Example
               </h2>
-              <pre className="text-sm text-gray-800 bg-gray-50 rounded-lg p-4 overflow-x-auto border border-gray-200 font-mono">
-                {criterion.examples}
+              <pre className="text-base text-gray-900 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-gray-300 font-mono leading-relaxed whitespace-pre-wrap break-words shadow-inner">
+{criterion.examples}
               </pre>
             </div>
           )}
 
           {/* Quick fixes */}
           {criterion.quick_fixes && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="text-2xl">⚡</span> Quick Fixes
+            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-2xl border-2 border-amber-200 p-8 shadow-sm">
+              <h2 className="text-2xl font-bold text-amber-900 mb-4 flex items-center gap-3">
+                <span className="text-3xl">⚡</span> Quick Fixes
               </h2>
-              <p className="text-base text-gray-700 leading-relaxed">
+              <p className="text-lg text-amber-900/90 leading-relaxed">
                 {criterion.quick_fixes}
               </p>
             </div>
@@ -159,49 +159,57 @@ export default function CriterionDetail() {
 
           {/* Common issues */}
           {criterion.common_issues && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="text-2xl">⚠️</span> Common Issues
+            <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl border-2 border-red-200 p-8 shadow-sm">
+              <h2 className="text-2xl font-bold text-red-900 mb-4 flex items-center gap-3">
+                <span className="text-3xl">⚠️</span> Common Issues
               </h2>
-              <p className="text-base text-gray-700 leading-relaxed">
+              <p className="text-lg text-red-900/90 leading-relaxed">
                 {criterion.common_issues}
               </p>
             </div>
           )}
 
           {/* Resources */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span className="text-2xl">📚</span> Resources
+          <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-2xl border-2 border-slate-200 p-8 shadow-sm">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+              <span className="text-3xl">📚</span> Resources
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {criterion.official_docs && (
                 <a
                   href={criterion.official_docs}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block text-base text-blue-600 hover:text-blue-800 hover:underline"
+                  className="flex items-center gap-3 text-lg text-blue-600 hover:text-blue-800 hover:underline font-medium transition-colors group"
                 >
-                  📖 Official Documentation ↗
+                  <span className="text-2xl group-hover:scale-110 transition-transform">📖</span>
+                  <span>Official Documentation</span>
+                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
                 </a>
               )}
               {criterion.references && criterion.references.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3 pt-2">
                   {criterion.references.map((ref, idx) => (
                     <a
                       key={idx}
                       href={ref}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block text-base text-blue-600 hover:text-blue-800 hover:underline"
+                      className="flex items-center gap-3 text-base text-blue-600 hover:text-blue-800 hover:underline transition-colors group"
                     >
-                      🔗 {new URL(ref).hostname} ↗
+                      <span className="text-xl group-hover:scale-110 transition-transform">🔗</span>
+                      <span>{new URL(ref).hostname}</span>
+                      <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
                     </a>
                   ))}
                 </div>
               )}
               {criterion.learn_more_links && (
-                <p className="text-base text-gray-600 pt-3 border-t border-gray-200">
+                <p className="text-base text-slate-700 pt-4 border-t-2 border-slate-200 leading-relaxed">
                   {criterion.learn_more_links}
                 </p>
               )}
@@ -209,47 +217,49 @@ export default function CriterionDetail() {
           </div>
 
           {/* Technical Details */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Technical Details</h2>
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <dt className="font-semibold text-gray-700">Scoring Approach</dt>
-                <dd className="text-gray-600">{criterion.scoring_approach || 'Automated analysis'}</dd>
+          <div className="bg-white rounded-2xl border-2 border-gray-300 p-8 shadow-sm">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+              <span className="text-3xl">⚙️</span> Technical Details
+            </h2>
+            <dl className="grid grid-cols-2 gap-6 text-base">
+              <div className="bg-gray-50 rounded-xl p-4">
+                <dt className="font-bold text-gray-700 mb-1">Scoring Approach</dt>
+                <dd className="text-gray-900">{criterion.scoring_approach || 'Automated analysis'}</dd>
               </div>
-              <div>
-                <dt className="font-semibold text-gray-700">Check Type</dt>
-                <dd className="text-gray-600">{criterion.check_type}</dd>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <dt className="font-bold text-gray-700 mb-1">Check Type</dt>
+                <dd className="text-gray-900">{criterion.check_type}</dd>
               </div>
-              <div>
-                <dt className="font-semibold text-gray-700">Scope</dt>
-                <dd className="text-gray-600">{criterion.scope}-level</dd>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <dt className="font-bold text-gray-700 mb-1">Scope</dt>
+                <dd className="text-gray-900">{criterion.scope}-level</dd>
               </div>
               {criterion.importance_rank && (
-                <div>
-                  <dt className="font-semibold text-gray-700">Priority Rank</dt>
-                  <dd className="text-gray-600">#{criterion.importance_rank}</dd>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <dt className="font-bold text-gray-700 mb-1">Priority Rank</dt>
+                  <dd className="text-gray-900">#{criterion.importance_rank}</dd>
                 </div>
               )}
-              <div>
-                <dt className="font-semibold text-gray-700">Category</dt>
-                <dd className="text-gray-600">{criterion.category}</dd>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <dt className="font-bold text-gray-700 mb-1">Category</dt>
+                <dd className="text-gray-900">{criterion.category}</dd>
               </div>
-              <div>
-                <dt className="font-semibold text-gray-700">Weight</dt>
-                <dd className="text-gray-600">{criterion.weight}</dd>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <dt className="font-bold text-gray-700 mb-1">Weight</dt>
+                <dd className="text-gray-900 text-xl font-bold">{criterion.weight}</dd>
               </div>
             </dl>
           </div>
         </div>
 
         {/* Back to top */}
-        <div className="mt-8 pt-8 border-t border-gray-200 text-center">
+        <div className="mt-10 pt-8 border-t-2 border-gray-300 text-center">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
+            className="inline-flex items-center gap-3 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all group"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
             Back to Score Guide
           </button>
