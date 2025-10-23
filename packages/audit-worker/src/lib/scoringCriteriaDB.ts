@@ -1,8 +1,7 @@
 /**
- * Scoring Criteria Database Access
+ * Scoring Criteria Database Layer
  * 
- * Single source of truth for all scoring checks.
- * Replaces scattered definitions in checksMetadata.ts, criteria.ts, etc.
+ * Functions to query and manage scoring criteria from D1
  */
 
 export interface ScoringCriterion {
@@ -16,10 +15,10 @@ export interface ScoringCriterion {
   impact_level: 'High' | 'Medium' | 'Low';
   pass_threshold: number;
   warn_threshold: number;
-  check_type: 'html_dom' | 'llm' | 'aggregation' | 'manual';
+  check_type: 'html_dom' | 'llm' | 'aggregate' | 'http';
   enabled: boolean;
   preview: boolean;
-  
+
   // Enhanced fields matching live score guide
   points_possible: number;
   importance_rank: number; // 1=Critical, 2=High, 3=Medium
@@ -31,7 +30,7 @@ export interface ScoringCriterion {
   learn_more_links: string | null; // JSON array
   official_docs: string | null; // JSON array
   display_order: number | null;
-  
+
   // Original fields
   why_it_matters: string | null;
   how_to_fix: string | null;
@@ -41,150 +40,199 @@ export interface ScoringCriterion {
 }
 
 /**
- * Get all enabled criteria
+ * Get all enabled scoring criteria
  */
 export async function getAllCriteria(db: D1Database): Promise<ScoringCriterion[]> {
-  const result = await db.prepare(`
-    SELECT * FROM scoring_criteria 
-    WHERE enabled = 1 
-    ORDER BY category, weight DESC, id
-  `).all();
+  const result = await db
+    .prepare('SELECT * FROM scoring_criteria WHERE enabled = 1 ORDER BY scope, display_order NULLS LAST, id')
+    .all();
   
-  return (result.results || []) as ScoringCriterion[];
+  return (result.results || []).map(transformRow);
 }
 
 /**
- * Get criteria by IDs
+ * Get criteria by scope (page or site)
  */
-export async function getCriteriaByIds(db: D1Database, ids: string[]): Promise<ScoringCriterion[]> {
-  if (!ids.length) return [];
+export async function getCriteriaByScope(
+  db: D1Database,
+  scope: 'page' | 'site'
+): Promise<ScoringCriterion[]> {
+  const result = await db
+    .prepare('SELECT * FROM scoring_criteria WHERE enabled = 1 AND scope = ? ORDER BY display_order NULLS LAST, id')
+    .bind(scope)
+    .all();
   
-  const placeholders = ids.map(() => '?').join(',');
-  const result = await db.prepare(`
-    SELECT * FROM scoring_criteria 
-    WHERE id IN (${placeholders}) AND enabled = 1
-  `).bind(...ids).all();
-  
-  return (result.results || []) as ScoringCriterion[];
+  return (result.results || []).map(transformRow);
 }
 
 /**
  * Get criteria by category
  */
-export async function getCriteriaByCategory(db: D1Database, category: string): Promise<ScoringCriterion[]> {
-  const result = await db.prepare(`
-    SELECT * FROM scoring_criteria 
-    WHERE category = ? AND enabled = 1 
-    ORDER BY weight DESC, id
-  `).bind(category).all();
-  
-  return (result.results || []) as ScoringCriterion[];
-}
-
-/**
- * Get criteria by check type (useful for filtering deterministic vs LLM checks)
- */
-export async function getCriteriaByType(db: D1Database, checkType: string): Promise<ScoringCriterion[]> {
-  const result = await db.prepare(`
-    SELECT * FROM scoring_criteria 
-    WHERE check_type = ? AND enabled = 1 
-    ORDER BY weight DESC, id
-  `).bind(checkType).all();
-  
-  return (result.results || []) as ScoringCriterion[];
-}
-
-/**
- * Get single criterion
- */
-export async function getCriterion(db: D1Database, id: string): Promise<ScoringCriterion | null> {
-  const result = await db.prepare(`
-    SELECT * FROM scoring_criteria WHERE id = ?
-  `).bind(id).first();
-  
-  return result as ScoringCriterion | null;
-}
-
-/**
- * Update criterion (admin only)
- */
-export async function updateCriterion(
-  db: D1Database, 
-  id: string, 
-  updates: Partial<Omit<ScoringCriterion, 'id' | 'created_at'>>
-): Promise<void> {
-  const sets = Object.keys(updates)
-    .filter(k => k !== 'id' && k !== 'created_at')
-    .map(k => `${k} = ?`);
-  
-  if (!sets.length) return;
-  
-  const values = Object.entries(updates)
-    .filter(([k]) => k !== 'id' && k !== 'created_at')
-    .map(([, v]) => v);
-  
-  await db.prepare(`
-    UPDATE scoring_criteria 
-    SET ${sets.join(', ')}, updated_at = datetime('now')
-    WHERE id = ?
-  `).bind(...values, id).run();
-}
-
-/**
- * Insert new criterion (admin only)
- */
-export async function insertCriterion(
+export async function getCriteriaByCategory(
   db: D1Database,
-  criterion: Omit<ScoringCriterion, 'version' | 'created_at' | 'updated_at'>
-): Promise<void> {
-  await db.prepare(`
-    INSERT INTO scoring_criteria (
-      id, label, description, category, scope, weight, impact_level,
-      pass_threshold, warn_threshold, check_type, enabled, preview,
-      why_it_matters, how_to_fix, references_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    criterion.id,
-    criterion.label,
-    criterion.description || null,
-    criterion.category,
-    criterion.scope,
-    criterion.weight,
-    criterion.impact_level,
-    criterion.pass_threshold,
-    criterion.warn_threshold,
-    criterion.check_type,
-    criterion.enabled ? 1 : 0,
-    criterion.preview ? 1 : 0,
-    criterion.why_it_matters || null,
-    criterion.how_to_fix || null,
-    criterion.references_json || null
-  ).run();
-}
-
-/**
- * Get all categories with check counts
- */
-export async function getCategorySummary(db: D1Database): Promise<Array<{category: string; count: number; total_weight: number}>> {
-  const result = await db.prepare(`
-    SELECT 
-      category,
-      COUNT(*) as count,
-      SUM(weight) as total_weight
-    FROM scoring_criteria
-    WHERE enabled = 1
-    GROUP BY category
-    ORDER BY total_weight DESC
-  `).all();
+  category: string
+): Promise<ScoringCriterion[]> {
+  const result = await db
+    .prepare('SELECT * FROM scoring_criteria WHERE enabled = 1 AND category = ? ORDER BY display_order NULLS LAST, id')
+    .bind(category)
+    .all();
   
-  return result.results as Array<{category: string; count: number; total_weight: number}>;
+  return (result.results || []).map(transformRow);
 }
 
 /**
- * Export all criteria as JSON (for syncing to frontend)
+ * Get production-ready criteria (excluding preview)
  */
-export async function exportCriteriaJSON(db: D1Database): Promise<string> {
-  const criteria = await getAllCriteria(db);
-  return JSON.stringify(criteria, null, 2);
+export async function getProductionCriteria(db: D1Database): Promise<ScoringCriterion[]> {
+  const result = await db
+    .prepare('SELECT * FROM scoring_criteria WHERE enabled = 1 AND preview = 0 ORDER BY scope, display_order NULLS LAST, id')
+    .all();
+  
+  return (result.results || []).map(transformRow);
 }
 
+/**
+ * Get single criterion by ID
+ */
+export async function getCriterionById(
+  db: D1Database,
+  id: string
+): Promise<ScoringCriterion | null> {
+  const result = await db
+    .prepare('SELECT * FROM scoring_criteria WHERE id = ?')
+    .bind(id)
+    .first();
+  
+  return result ? transformRow(result) : null;
+}
+
+/**
+ * Get criteria statistics
+ */
+export async function getCriteriaStats(db: D1Database): Promise<{
+  total: number;
+  page: number;
+  site: number;
+  production: number;
+  preview: number;
+  byCategory: Record<string, number>;
+  byCheckType: Record<string, number>;
+}> {
+  const all = await getAllCriteria(db);
+  
+  const stats = {
+    total: all.length,
+    page: all.filter(c => c.scope === 'page').length,
+    site: all.filter(c => c.scope === 'site').length,
+    production: all.filter(c => !c.preview).length,
+    preview: all.filter(c => c.preview).length,
+    byCategory: {} as Record<string, number>,
+    byCheckType: {} as Record<string, number>
+  };
+  
+  // Count by category
+  all.forEach(c => {
+    stats.byCategory[c.category] = (stats.byCategory[c.category] || 0) + 1;
+    stats.byCheckType[c.check_type] = (stats.byCheckType[c.check_type] || 0) + 1;
+  });
+  
+  return stats;
+}
+
+/**
+ * Get criteria map (ID -> criterion) for fast lookups
+ */
+export async function getCriteriaMap(db: D1Database): Promise<Map<string, ScoringCriterion>> {
+  const criteria = await getAllCriteria(db);
+  return new Map(criteria.map(c => [c.id, c]));
+}
+
+/**
+ * Transform D1 row to ScoringCriterion
+ */
+function transformRow(row: any): ScoringCriterion {
+  return {
+    id: row.id,
+    version: row.version || 1,
+    label: row.label,
+    description: row.description,
+    category: row.category,
+    scope: row.scope as 'page' | 'site',
+    weight: row.weight,
+    impact_level: row.impact_level as 'High' | 'Medium' | 'Low',
+    pass_threshold: row.pass_threshold,
+    warn_threshold: row.warn_threshold,
+    check_type: row.check_type as 'html_dom' | 'llm' | 'aggregate' | 'http',
+    enabled: row.enabled === 1,
+    preview: row.preview === 1,
+    points_possible: row.points_possible || 100,
+    importance_rank: row.importance_rank || 2,
+    scoring_approach: row.scoring_approach || '',
+    examples: row.examples,
+    view_in_ui: row.view_in_ui,
+    common_issues: row.common_issues,
+    quick_fixes: row.quick_fixes,
+    learn_more_links: row.learn_more_links,
+    official_docs: row.official_docs,
+    display_order: row.display_order,
+    why_it_matters: row.why_it_matters,
+    how_to_fix: row.how_to_fix,
+    references_json: row.references_json,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+/**
+ * Calculate weighted score from check results
+ * 
+ * @param checkResults Map of check ID to score (0-100)
+ * @param criteria Array of criteria to weight
+ * @returns Weighted average score
+ */
+export function calculateWeightedScore(
+  checkResults: Map<string, number>,
+  criteria: ScoringCriterion[]
+): number {
+  let totalWeight = 0;
+  let weightedSum = 0;
+  
+  for (const criterion of criteria) {
+    const score = checkResults.get(criterion.id);
+    if (score !== undefined) {
+      weightedSum += score * criterion.weight;
+      totalWeight += criterion.weight;
+    }
+  }
+  
+  return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+}
+
+/**
+ * Group criteria by category
+ */
+export function groupByCategory(criteria: ScoringCriterion[]): Record<string, ScoringCriterion[]> {
+  const grouped: Record<string, ScoringCriterion[]> = {};
+  
+  for (const criterion of criteria) {
+    if (!grouped[criterion.category]) {
+      grouped[criterion.category] = [];
+    }
+    grouped[criterion.category].push(criterion);
+  }
+  
+  return grouped;
+}
+
+/**
+ * Validate that scoring criteria are properly seeded
+ */
+export async function validateCriteriaSeeded(db: D1Database): Promise<void> {
+  const count = await db
+    .prepare('SELECT COUNT(*) as count FROM scoring_criteria WHERE enabled = 1')
+    .first<number>('count');
+  
+  if (!count || count < 30) {
+    throw new Error(`❌ Scoring criteria not seeded correctly. Expected ≥30, got ${count || 0}`);
+  }
+}

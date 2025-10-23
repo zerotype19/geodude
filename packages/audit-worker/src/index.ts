@@ -683,6 +683,17 @@ export default {
     // Load industry configuration from KV on first request
     await loadIndustryConfig(env);
     
+    // Validate scoring criteria are seeded (only runs once per worker startup)
+    if (env.SCORING_V1_ENABLED === 'true') {
+      try {
+        const { validateCriteriaSeeded } = await import('./lib/scoringCriteriaDB');
+        await validateCriteriaSeeded(env.DB);
+      } catch (error) {
+        console.error('[Startup] Scoring criteria validation failed:', error);
+        // Don't fail the worker, just log the warning
+      }
+    }
+    
     const url = new URL(req.url);
     const path = url.pathname;
 
@@ -1272,6 +1283,25 @@ export default {
         const { handlePromptsExport } = await import('./routes/prompts-export');
         const result = await handlePromptsExport(req, env);
         return result;
+      }
+
+      // Scoring Criteria API
+      if (req.method === 'GET' && path === '/api/scoring/criteria/stats') {
+        const { handleGetCriteriaStats } = await import('./routes/criteria');
+        return handleGetCriteriaStats(req, env);
+      }
+
+      if (req.method === 'GET' && path.startsWith('/api/scoring/criteria/')) {
+        const id = path.split('/').pop();
+        if (id && id !== 'stats') {
+          const { handleGetCriterionById } = await import('./routes/criteria');
+          return handleGetCriterionById(req, env, id);
+        }
+      }
+
+      if (req.method === 'GET' && path === '/api/scoring/criteria') {
+        const { handleGetCriteria } = await import('./routes/criteria');
+        return handleGetCriteria(req, env);
       }
 
       if (req.method === 'GET' && path.startsWith('/api/insights')) {
