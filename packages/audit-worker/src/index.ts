@@ -504,6 +504,70 @@ function isAllowedByRobots(rules: RobotsRules | null, path: string): boolean {
   return allowMatches.length > 0;
 }
 
+// Continue processing running audits (called by cron every 5 minutes)
+async function continueRunningAudits(env: Env): Promise<void> {
+  console.log('[AUDIT_CRON] Checking for running audits to process...');
+  
+  // Find audits that are "running" and have unprocessed pages
+  const runningAudits = await env.DB.prepare(
+    `SELECT a.id, 
+            a.started_at,
+            a.root_url,
+            (SELECT COUNT(*) FROM audit_pages WHERE audit_id = a.id) as total_queued,
+            (SELECT COUNT(*) FROM audit_page_analysis apa 
+             JOIN audit_pages ap ON apa.page_id = ap.id 
+             WHERE ap.audit_id = a.id) as pages_analyzed
+     FROM audits a
+     WHERE a.status = 'running'
+     ORDER BY a.started_at ASC
+     LIMIT 10`
+  ).all();
+  
+  if (!runningAudits.results || runningAudits.results.length === 0) {
+    console.log('[AUDIT_CRON] No running audits found');
+    return;
+  }
+  
+  console.log(`[AUDIT_CRON] Found ${runningAudits.results.length} running audits`);
+  
+  // Process each audit (with time budget per audit)
+  for (const audit of runningAudits.results) {
+    const auditData = audit as { 
+      id: string; 
+      started_at: string; 
+      root_url: string;
+      total_queued: number;
+      pages_analyzed: number;
+    };
+    
+    const unprocessed = auditData.total_queued - auditData.pages_analyzed;
+    
+    if (unprocessed === 0) {
+      // No more pages to process - will be handled by auto-finalize
+      console.log(`[AUDIT_CRON] Audit ${auditData.id} has no unprocessed pages (${auditData.pages_analyzed} analyzed)`);
+      continue;
+    }
+    
+    console.log(`[AUDIT_CRON] Processing audit ${auditData.id} (${unprocessed} unprocessed, ${auditData.pages_analyzed} analyzed)`);
+    
+    try {
+      // Continue batch processing (will process up to 20 pages, respecting 25s budget)
+      const result = await continueAuditBatch(auditData.id, env);
+      
+      if (result.finalized) {
+        console.log(`[AUDIT_CRON] ✅ Audit ${auditData.id} completed (${result.totals?.pages_analyzed || 0} pages)`);
+      } else {
+        console.log(`[AUDIT_CRON] ⏳ Audit ${auditData.id} batch completed, will continue in next cron run`);
+      }
+    } catch (error: any) {
+      console.error(`[AUDIT_CRON] ❌ Error processing audit ${auditData.id}:`, error.message || error);
+      // Don't fail the entire cron - continue to next audit
+    }
+  }
+  
+  console.log('[AUDIT_CRON] Completed processing running audits');
+}
+
 // Auto-finalize stuck audits (called by cron)
 async function autoFinalizeStuckAudits(env: Env): Promise<void> {
   console.log('[AUTO-FINALIZE] Checking for stuck audits...');
@@ -566,9 +630,9 @@ async function refreshPromptCache(env: Env): Promise<void> {
   console.log('[PROMPT_REFRESH] Starting hourly cache refresh');
   
   const { getStalePromptCache, buildAndCachePrompts } = await import('./prompt-cache');
-  // REDUCED: From 100 to 15 to avoid hitting Cloudflare's 50 subrequest limit
-  // Each domain can make 1-3 subrequests (AI calls, D1, KV), so 15 domains = ~30-45 subrequests
-  const staleDomains = await getStalePromptCache(env, 15);
+  // REDUCED: From 15 to 10 to avoid hitting Cloudflare's 50 subrequest limit
+  // Each domain can make 3-5 subrequests (AI calls, LLM, D1, KV), so 10 domains = ~30-50 subrequests
+  const staleDomains = await getStalePromptCache(env, 10);
   
   if (staleDomains.length === 0) {
     console.log('[PROMPT_REFRESH] No stale cache entries found');
@@ -1388,12 +1452,19 @@ export default {
     console.log('[CRON] Scheduled event:', event.cron);
     
     if (event.cron === '*/5 * * * *') {
-      // Every 5 minutes: Auto-finalize stuck audits + process queued citations
+      // Every 5 minutes: Continue running audits → finalize stuck → process citations
       console.log('[CRON] Running 5-minute maintenance tasks...');
+      
+      // 1. Continue processing running audits (new pages added to queue)
+      await continueRunningAudits(env);
+      
+      // 2. Auto-finalize stuck audits (no more pages to process)
       await autoFinalizeStuckAudits(env);
+      
+      // 3. Process queued citations
       await processQueuedCitations(env);
       
-      // Also refresh prompt cache every 5 minutes (spreads load vs hourly burst)
+      // 4. Refresh prompt cache (spreads load vs hourly burst)
       await refreshPromptCache(env);
     }
     
@@ -3980,10 +4051,11 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
         await env.DB.batch(chunk);
       }
       
-      console.log(`[HYBRID-DISCOVER] Starting batch processing with ${uniqueUrls.length} initial URLs`);
+      console.log(`[HYBRID-DISCOVER] Queued ${uniqueUrls.length} URLs for batch processing`);
       
-      // 3. Start batch processing (will extract more links organically)
-      await continueAuditBatch(id, env);
+      // 3. Batch processing will be handled by cron (every 5 minutes)
+      // This prevents IoContext timeouts in waitUntil()
+      console.log(`[HYBRID-DISCOVER] Audit ${id} created, cron will process pages`);
     } catch (error: any) {
       console.error(`[HYBRID-DISCOVER ERROR] ${id}:`, error);
       await markAuditFailed(env, id, `discover_error: ${error.message || 'unknown'}`);
