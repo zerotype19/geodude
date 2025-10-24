@@ -897,6 +897,170 @@ async function processQueuedCitations(env: Env): Promise<void> {
   }
 }
 
+// Bulk reclassify industries for all audits
+async function bulkReclassifyIndustries(env: Env): Promise<any> {
+  console.log('[BULK_RECLASSIFY] Starting...');
+  
+  // Get all completed audits
+  const audits = await env.DB.prepare(`
+    SELECT id, root_url, industry, industry_source 
+    FROM audits 
+    WHERE status = 'completed'
+    ORDER BY started_at DESC
+    LIMIT 100
+  `).all();
+  
+  const results = {
+    total: audits.results?.length || 0,
+    reclassified: 0,
+    unchanged: 0,
+    errors: [] as string[]
+  };
+  
+  for (const audit of (audits.results || [])) {
+    try {
+      const auditData = audit as { id: string; root_url: string; industry: string; industry_source: string };
+      const url = new URL(auditData.root_url);
+      const domain = url.hostname.replace(/^www\./, '');
+      
+      // Get correct industry from domain rules
+      const { getDomainRules } = await import('./lib/industry');
+      const domainRules = getDomainRules();
+      const correctIndustry = domainRules[domain];
+      
+      if (correctIndustry && correctIndustry !== auditData.industry) {
+        // Update the audit
+        await env.DB.prepare(
+          `UPDATE audits 
+           SET industry = ?, industry_source = 'domain_rules', industry_locked = 1 
+           WHERE id = ?`
+        ).bind(correctIndustry, auditData.id).run();
+        
+        console.log(`[RECLASSIFY] ${domain}: ${auditData.industry} → ${correctIndustry}`);
+        results.reclassified++;
+      } else {
+        results.unchanged++;
+      }
+    } catch (err) {
+      console.error(`[RECLASSIFY] Error for ${audit.id}:`, err);
+      results.errors.push(`${audit.id}: ${(err as Error).message}`);
+    }
+  }
+  
+  console.log(`[BULK_RECLASSIFY] Complete. Reclassified: ${results.reclassified}, Unchanged: ${results.unchanged}`);
+  return results;
+}
+
+// Bulk re-run citations for completed audits
+async function bulkRerunCitations(env: Env): Promise<any> {
+  console.log('[BULK_RERUN_CITATIONS] Starting...');
+  
+  // Get completed audits with wrong industry or no citations
+  const audits = await env.DB.prepare(`
+    SELECT id, root_url, industry 
+    FROM audits 
+    WHERE status = 'completed'
+    AND (
+      citations_status IS NULL 
+      OR citations_status = 'queued'
+      OR industry_source != 'domain_rules'
+    )
+    ORDER BY started_at DESC
+    LIMIT 50
+  `).all();
+  
+  const results = {
+    total: audits.results?.length || 0,
+    queued: 0,
+    errors: [] as string[]
+  };
+  
+  for (const audit of (audits.results || [])) {
+    try {
+      const auditData = audit as { id: string; root_url: string; industry: string };
+      
+      // Queue for citations
+      await env.DB.prepare(
+        `UPDATE audits 
+         SET citations_status = 'queued', 
+             citations_queued_at = datetime('now'),
+             citations_started_at = NULL,
+             citations_completed_at = NULL,
+             citations_error = NULL
+         WHERE id = ?`
+      ).bind(auditData.id).run();
+      
+      console.log(`[RERUN_CITATIONS] Queued: ${auditData.id} (${auditData.root_url})`);
+      results.queued++;
+    } catch (err) {
+      console.error(`[RERUN_CITATIONS] Error for ${audit.id}:`, err);
+      results.errors.push(`${audit.id}: ${(err as Error).message}`);
+    }
+  }
+  
+  console.log(`[BULK_RERUN_CITATIONS] Complete. Queued: ${results.queued}`);
+  return results;
+}
+
+// Fix a specific audit (reclassify + re-run citations)
+async function fixAudit(env: Env, auditId: string): Promise<any> {
+  console.log(`[FIX_AUDIT] Starting for ${auditId}...`);
+  
+  const audit = await env.DB.prepare(
+    'SELECT id, root_url, industry, industry_source, status FROM audits WHERE id = ?'
+  ).bind(auditId).first() as any;
+  
+  if (!audit) {
+    throw new Error('Audit not found');
+  }
+  
+  const result = {
+    audit_id: auditId,
+    root_url: audit.root_url,
+    old_industry: audit.industry,
+    new_industry: audit.industry,
+    reclassified: false,
+    citations_queued: false
+  };
+  
+  // Reclassify if needed
+  const url = new URL(audit.root_url);
+  const domain = url.hostname.replace(/^www\./, '');
+  const { getDomainRules } = await import('./lib/industry');
+  const domainRules = getDomainRules();
+  const correctIndustry = domainRules[domain];
+  
+  if (correctIndustry && correctIndustry !== audit.industry) {
+    await env.DB.prepare(
+      `UPDATE audits 
+       SET industry = ?, industry_source = 'domain_rules', industry_locked = 1 
+       WHERE id = ?`
+    ).bind(correctIndustry, auditId).run();
+    
+    result.new_industry = correctIndustry;
+    result.reclassified = true;
+    console.log(`[FIX_AUDIT] Reclassified ${domain}: ${audit.industry} → ${correctIndustry}`);
+  }
+  
+  // Queue for citations if completed
+  if (audit.status === 'completed') {
+    await env.DB.prepare(
+      `UPDATE audits 
+       SET citations_status = 'queued', 
+           citations_queued_at = datetime('now'),
+           citations_started_at = NULL,
+           citations_completed_at = NULL,
+           citations_error = NULL
+       WHERE id = ?`
+    ).bind(auditId).run();
+    
+    result.citations_queued = true;
+    console.log(`[FIX_AUDIT] Queued citations for ${auditId}`);
+  }
+  
+  return result;
+}
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log('[CRON] Scheduled event:', event.cron);
@@ -1607,6 +1771,41 @@ export default {
         if (req.method === 'POST' && path === '/api/admin/finalize-stuck') {
           await autoFinalizeStuckAudits(env);
           return new Response(JSON.stringify({ ok: true, message: 'Auto-finalize completed' }), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        // Bulk reclassify industries for all audits
+        if (req.method === 'POST' && path === '/api/admin/reclassify-all') {
+          const result = await bulkReclassifyIndustries(env);
+          return new Response(JSON.stringify(result), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        // Bulk re-run citations for completed audits
+        if (req.method === 'POST' && path === '/api/admin/rerun-citations-all') {
+          const result = await bulkRerunCitations(env);
+          return new Response(JSON.stringify(result), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        // Fix specific audit (reclassify + re-run citations)
+        if (req.method === 'POST' && path.startsWith('/api/admin/audits/') && path.endsWith('/fix')) {
+          const auditId = path.split('/')[4];
+          if (!auditId) {
+            return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          
+          const result = await fixAudit(env, auditId);
+          return new Response(JSON.stringify(result), { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           });
