@@ -1811,6 +1811,44 @@ export default {
           });
         }
 
+        // Re-finalize audit (re-run scoring)
+        if (req.method === 'POST' && path.startsWith('/api/admin/audits/') && path.endsWith('/refinalize')) {
+          const auditId = path.split('/')[4];
+          if (!auditId) {
+            return new Response(JSON.stringify({ error: 'Audit ID required' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          
+          try {
+            // Reset to running, then finalize properly
+            await env.DB.prepare(
+              `UPDATE audits SET status = 'running', finished_at = NULL WHERE id = ?`
+            ).bind(auditId).run();
+            
+            await finalizeAudit(env, auditId, 'admin_refinalize');
+            
+            return new Response(JSON.stringify({ 
+              ok: true, 
+              message: 'Audit re-finalized with scoring',
+              audit_id: auditId
+            }), { 
+              status: 200, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
+          } catch (error) {
+            console.error('[REFINALIZE] Error:', error);
+            return new Response(JSON.stringify({ 
+              error: 'Refinalize failed', 
+              message: (error as Error).message 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
         // Backfill scoring checks for existing audits
         if (req.method === 'POST' && path.startsWith('/api/admin/audits/') && path.endsWith('/backfill-checks')) {
           const auditId = path.split('/')[4];
