@@ -1085,6 +1085,149 @@ async function fixAudit(env: Env, auditId: string): Promise<any> {
   return result;
 }
 
+/**
+ * Backfill industry metadata for all existing audits
+ */
+async function backfillIndustryMetadata(env: Env): Promise<any> {
+  console.log('[BACKFILL] Starting industry metadata backfill for all audits...');
+  
+  const { getAncestorSlugs, mapLegacyToV2 } = await import('./config/industry-taxonomy-v2');
+  
+  const stats = {
+    total: 0,
+    updated: 0,
+    skipped: 0,
+    errors: 0,
+    confidenceDistribution: {} as Record<string, number>,
+    sourceDistribution: {} as Record<string, number>,
+    hierarchyDepth: {} as Record<number, number>
+  };
+  
+  // Infer confidence from source
+  const inferConfidence = (source: string): number => {
+    switch (source) {
+      case 'domain_rules':
+      case 'override':
+        return 1.0;
+      case 'ai_worker':
+        return 0.75;
+      case 'ai_worker_medium_conf':
+      case 'citations_reclass':
+        return 0.55;
+      case 'heuristics':
+        return 0.60;
+      case 'default':
+        return 0.0;
+      default:
+        return 0.5;
+    }
+  };
+  
+  try {
+    // Fetch all audits needing backfill (in batches)
+    const batchSize = 100;
+    let hasMore = true;
+    let offset = 0;
+    
+    while (hasMore) {
+      console.log(`[BACKFILL] Fetching batch (offset: ${offset})...`);
+      
+      const audits = await env.DB.prepare(`
+        SELECT id, root_url, industry, industry_source, industry_confidence, industry_ancestors
+        FROM audits
+        WHERE industry IS NOT NULL
+          AND (industry_confidence IS NULL OR industry_ancestors IS NULL)
+        ORDER BY started_at DESC
+        LIMIT ? OFFSET ?
+      `).bind(batchSize, offset).all();
+      
+      if (!audits.results || audits.results.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      console.log(`[BACKFILL] Processing ${audits.results.length} audits...`);
+      
+      for (const audit of audits.results) {
+        stats.total++;
+        
+        try {
+          const auditData = audit as any;
+          
+          // Skip if already has metadata
+          if (auditData.industry_confidence !== null && auditData.industry_ancestors !== null) {
+            stats.skipped++;
+            continue;
+          }
+          
+          // Ensure V2 slug
+          const v2Slug = auditData.industry.includes('.') 
+            ? auditData.industry 
+            : mapLegacyToV2(auditData.industry);
+          
+          // Get ancestors
+          const ancestors = getAncestorSlugs(v2Slug);
+          
+          // Infer confidence
+          const confidence = inferConfidence(auditData.industry_source);
+          
+          // Update audit
+          await env.DB.prepare(`
+            UPDATE audits
+            SET industry = ?,
+                industry_confidence = ?,
+                industry_ancestors = ?
+            WHERE id = ?
+          `).bind(
+            v2Slug,
+            confidence,
+            JSON.stringify(ancestors),
+            auditData.id
+          ).run();
+          
+          stats.updated++;
+          
+          // Track distributions
+          const confBucket = Math.floor(confidence * 10) / 10;
+          stats.confidenceDistribution[confBucket] = (stats.confidenceDistribution[confBucket] || 0) + 1;
+          stats.sourceDistribution[auditData.industry_source] = (stats.sourceDistribution[auditData.industry_source] || 0) + 1;
+          stats.hierarchyDepth[ancestors.length] = (stats.hierarchyDepth[ancestors.length] || 0) + 1;
+          
+          if (stats.updated % 10 === 0) {
+            console.log(`[BACKFILL] Progress: ${stats.updated} updated`);
+          }
+          
+        } catch (err) {
+          console.error(`[BACKFILL] Error processing audit ${audit.id}:`, err);
+          stats.errors++;
+        }
+      }
+      
+      if (audits.results.length < batchSize) {
+        hasMore = false;
+      } else {
+        offset += batchSize;
+      }
+    }
+    
+    console.log(`[BACKFILL] Complete! Total: ${stats.total}, Updated: ${stats.updated}, Skipped: ${stats.skipped}, Errors: ${stats.errors}`);
+    
+    return {
+      success: true,
+      stats,
+      message: `Backfilled ${stats.updated} audits with V2 metadata`
+    };
+    
+  } catch (error) {
+    console.error('[BACKFILL] Fatal error:', error);
+    return {
+      success: false,
+      error: String(error),
+      stats
+    };
+  }
+}
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log('[CRON] Scheduled event:', event.cron);
@@ -1832,6 +1975,16 @@ export default {
           return new Response(JSON.stringify(result), { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+
+        // Backfill industry metadata for all audits
+        if (req.method === 'POST' && path === '/api/admin/backfill-industry-metadata') {
+          console.log('[ADMIN] Starting industry metadata backfill...');
+          const result = await backfillIndustryMetadata(env);
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
 
