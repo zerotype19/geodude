@@ -3500,12 +3500,13 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
       
       try {
         await env.DB.batch([
-          // Update audit_pages with fetch metadata
+          // Update audit_pages with fetch metadata and mark as processed
           env.DB.prepare(
             `UPDATE audit_pages 
              SET status_code = ?, 
                  content_type = ?, 
-                 html_static = ?
+                 html_static = ?,
+                 fetched_at = datetime('now')
              WHERE id = ?`
           ).bind(
             200, // We only process successful fetches
@@ -4033,11 +4034,12 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     console.log(`[SYNC-DISCOVER] Inserting ${uniqueUrls.length} URLs into D1...`);
     
     // Use deterministic UUIDs based on audit_id + url to prevent duplicate inserts
+    // Use sentinel value '1970-01-01 00:00:00' for unprocessed pages (NOT NULL constraint prevents NULL)
     const statements = uniqueUrls.map(url => {
       const deterministicId = crypto.randomUUID(); // Still use random, but INSERT OR IGNORE based on unique constraint
       return env.DB.prepare(
         `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
-         SELECT ?, ?, ?, NULL
+         SELECT ?, ?, ?, '1970-01-01 00:00:00'
          WHERE NOT EXISTS (SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ?)`
       ).bind(deterministicId, id, url, id, url);
     });
