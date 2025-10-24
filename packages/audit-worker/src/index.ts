@@ -5137,8 +5137,9 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   urls = sortUrlsByPriority(urls);
   console.log(`[CRAWL] URLs sorted by priority - Found ${faqCount} FAQ pages, prioritizing them first`);
   
-  // Step 6: Cap at reasonable limit for focused audits (tight cap for fast discovery)
-  const MAX_URLS = 30;
+  // Step 6: Cap at reasonable limit for comprehensive audits (target 74 pages)
+  // Start with 60-80 seed URLs, organic discovery will fill gaps to reach 74+
+  const MAX_URLS = 80;
   if (urls.length > MAX_URLS) {
     console.log(`[CRAWL] Capping URL list from ${urls.length} to ${MAX_URLS}`);
     urls = urls.slice(0, MAX_URLS);
