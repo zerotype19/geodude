@@ -82,15 +82,15 @@ async function runInBatches<T, R>(
 }
 
 // Crawl/scoring budget for one run
-// NOTE: CF Workers HTTP requests timeout at ~30s, so we must finalize before that
+// NOTE: Cron-based processing has ~5min budget, allowing for comprehensive multi-page audits
 const HARD_TIME_MS = 25_000;           // 25 seconds - must finalize before CF HTTP timeout (~30s)
-const PER_REQUEST_BUDGET_MS = 22_000;  // 22 seconds per batch to leave time for finalization
-const CONCURRENCY = 8;                 // parallel page fetch/analyze
+const PER_REQUEST_BUDGET_MS = 240_000; // 4 minutes for cron batch processing (15-20 pages per run)
+const CONCURRENCY = 10;                // parallel page fetch/analyze (increased for faster crawl)
 const PER_PAGE_TIMEOUT_MS = 4_000;     // each page gets 4s max
 
-// Completion policy
-const TARGET_MIN_PAGES = 40;           // we're happy at 40+
-const TARGET_MAX_PAGES = 60;           // don't exceed this
+// Completion policy - targeting 74 pages per audit
+const TARGET_MIN_PAGES = 60;           // Minimum 60 pages for comprehensive coverage
+const TARGET_MAX_PAGES = 80;           // Cap at 80 to prevent runaway crawls
 const MAX_DISCOVER = 120;              // cap discovered queue
 
 // Rendering configuration
@@ -3616,48 +3616,45 @@ async function continueAuditBatch(auditId: string, env: Env): Promise<any> {
   // 4) Check completion policy
   const totals = await getAuditStats(env, auditId);
   const elapsed = Date.now() - auditStartedMs;
+  const batchElapsed = Date.now() - started; // Time spent in THIS batch
   
   const hitTarget = totals.pages_analyzed >= TARGET_MIN_PAGES;
-  const hitHardTime = elapsed >= HARD_TIME_MS;
   const hitMaxPages = totals.pages_analyzed >= TARGET_MAX_PAGES;
+  const hitBatchTime = batchElapsed >= PER_REQUEST_BUDGET_MS; // 4 minutes per cron run
   
   // Check if there are more unprocessed pages in the database
   const unprocessedCount = totals.pages_discovered - totals.pages_analyzed;
   const queueEmpty = unprocessedCount === 0;
   
   // Log progress
-  console.log(`[BATCH] ${auditId} pages=${totals.pages_analyzed}/${totals.pages_discovered} (${unprocessedCount} unprocessed) elapsed=${elapsed}ms`);
+  console.log(`[BATCH] ${auditId} pages=${totals.pages_analyzed}/${totals.pages_discovered} (${unprocessedCount} unprocessed) total_elapsed=${elapsed}ms batch_elapsed=${batchElapsed}ms`);
   
-  // Finalization conditions:
-  // 1. Hit target pages (40+) - success
-  // 2. Hit max pages (60) - success
-  // 3. Hit hard time limit (25s) - finalize what we have if >20 pages
-  // 4. Queue empty - finalize if we have any pages
-  // 5. SAFETY: >20s elapsed with any pages - must finalize before HTTP timeout
-  const mustFinalizeNow = elapsed >= 20_000 && totals.pages_analyzed >= 15;
+  // Finalization conditions (cron-friendly - audits can span multiple 5-min runs):
+  // 1. Hit target pages (60+) - success
+  // 2. Hit max pages (80) - success  
+  // 3. Queue empty - finalize if we have any pages
+  // 4. Batch time exhausted (4min) - continue in next cron run (NOT a failure!)
   
-  if (hitTarget || hitMaxPages || queueEmpty || (hitHardTime && totals.pages_analyzed >= 20) || mustFinalizeNow) {
-    const reason = hitHardTime ? 'time_budget_reached'
-                 : hitMaxPages ? 'max_pages_reached'
+  if (hitTarget || hitMaxPages || (queueEmpty && totals.pages_analyzed > 0)) {
+    const reason = hitMaxPages ? 'max_pages_reached'
                  : hitTarget ? 'target_min_pages_met'
-                 : mustFinalizeNow ? 'http_timeout_safety'
                  : 'queue_empty';
     
-    console.log(`[FINALIZE_TRIGGER] ${auditId}: ${reason} (elapsed=${elapsed}ms, pages=${totals.pages_analyzed})`);
+    console.log(`[FINALIZE_TRIGGER] ${auditId}: ${reason} (total_elapsed=${elapsed}ms, batch=${batchElapsed}ms, pages=${totals.pages_analyzed})`);
     await finalizeAudit(env, auditId, reason);
     return { ok: true, finalized: true, reason, totals };
   }
   
-  // If we hit hard time but have <20 pages, mark as failed
-  if (hitHardTime) {
-    await markAuditFailed(env, auditId, `timeout_insufficient_pages_${totals.pages_analyzed}`);
-    return { ok: true, finalized: true, reason: 'timeout_failed', totals };
+  // If batch time exhausted, let next cron run continue (no failure!)
+  if (hitBatchTime) {
+    console.log(`[BATCH_CONTINUE] ${auditId}: batch time exhausted, will continue in next cron (pages=${totals.pages_analyzed}, queue=${unprocessedCount})`);
+    return { ok: true, finalized: false, reason: 'batch_time_exhausted', totals };
   }
   
-  // 5) Chain the next batch synchronously (recursive in-process call)
-  console.log(`[BATCH] ${auditId} chaining next batch...`);
-  const nextBatch = await continueAuditBatch(auditId, env);
-  return { ok: true, finalized: false, analyzed, totals, chained: true, next: nextBatch };
+  // If we still have unprocessed pages and haven't hit the batch time limit, continue processing
+  // Note: We don't chain batches recursively - let the cron call us again in the next run
+  console.log(`[BATCH_CONTINUE] ${auditId}: more pages to process, will continue in next cron (pages=${totals.pages_analyzed}, queue=${unprocessedCount})`);
+  return { ok: true, finalized: false, reason: 'more_pages_to_process', totals };
 }
 
 // Helper to get audit stats
