@@ -305,14 +305,53 @@ export async function generateContextualPromptsV3(
   const intentsOrdered = (Object.keys(BRANDED_TEMPLATES) as IntentName[]);
   const bRx = brandRegex(brand);
 
-  // Seed pools
+  // 🔥 FIX: Industry-specific seed pools
   const competitors = selectCompetitors(industryHint);
   const audiences = selectAudience(industryHint);
   const purposes = selectPurposes(industryHint);
-  const goals = ['lower fees', 'faster payouts', 'international payments', 'conversion uplift'];
-  const actions = ['accept payments', 'send money', 'receive donations', 'process refunds'];
-  const useCases = ['ecommerce', 'subscriptions', 'invoices', 'donations'];
-  const userData = ['card details', 'bank info', 'account data'];
+  
+  // Industry-specific goals, actions, use cases
+  const isRestaurant = industryHint?.includes('food_restaurant') || industryHint?.includes('restaurant');
+  const isRetail = industryHint?.includes('retail');
+  const isTravel = industryHint?.includes('travel');
+  const isHealth = industryHint?.includes('health');
+  
+  const goals = isRestaurant 
+    ? ['catering', 'delivery', 'dine-in', 'takeout']
+    : isRetail
+    ? ['free shipping', 'price matching', 'loyalty rewards', 'bulk discounts']
+    : isTravel
+    ? ['flexible booking', 'cancellation', 'upgrades', 'loyalty points']
+    : isHealth
+    ? ['accepting insurance', 'appointment availability', 'specialty care', 'emergency services']
+    : ['lower fees', 'faster payouts', 'international payments', 'conversion uplift'];
+  
+  const actions = isRestaurant
+    ? ['order online', 'make a reservation', 'view the menu', 'check nutrition facts']
+    : isRetail
+    ? ['shop online', 'find products', 'check prices', 'return items']
+    : isTravel
+    ? ['book a trip', 'check availability', 'cancel reservations', 'upgrade rooms']
+    : isHealth
+    ? ['schedule appointment', 'find a doctor', 'check insurance', 'access portal']
+    : ['accept payments', 'send money', 'receive donations', 'process refunds'];
+  
+  const useCases = isRestaurant
+    ? ['lunch', 'dinner', 'events', 'parties']
+    : isRetail
+    ? ['online shopping', 'in-store pickup', 'returns', 'gift cards']
+    : isTravel
+    ? ['vacation', 'business travel', 'weekend getaway', 'family trips']
+    : isHealth
+    ? ['routine checkup', 'specialist visit', 'emergency care', 'preventive care']
+    : ['ecommerce', 'subscriptions', 'invoices', 'donations'];
+  
+  const userData = isRestaurant
+    ? ['dietary restrictions', 'food preferences', 'allergy information']
+    : isHealth
+    ? ['medical records', 'insurance info', 'health history']
+    : ['card details', 'bank info', 'account data'];
+  
   const regions = ['the US', 'EU', 'UK', 'Canada', 'Australia'];
   const currencies = ['USD', 'EUR', 'GBP', 'CAD', 'AUD'];
 

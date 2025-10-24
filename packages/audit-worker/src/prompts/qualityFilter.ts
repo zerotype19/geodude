@@ -109,6 +109,55 @@ export function isNaturalQuery(query: string): QualityCheckResult {
     }
   }
   
+  // 6. 🔥 FIX: Reject offensive or culturally inappropriate queries
+  const offensivePatterns = [
+    /\bmexicans\b/i,                                  // Using "mexicans" as a category
+    /\bthe rules for using (mexicans|chinese|japanese|italian|indian|thai|vietnamese)/i,  // Offensive ethnic category usage
+    /\bhow much do (mexicans|chinese|japanese) cost/i,  // Offensive pricing queries
+    /\btop (mexicans|chinese|japanese) for/i,         // Offensive ranking queries
+  ];
+  
+  for (const pattern of offensivePatterns) {
+    if (pattern.test(lower)) {
+      return { 
+        isValid: false, 
+        reason: `Offensive or inappropriate content: ${pattern}` 
+      };
+    }
+  }
+  
+  // 7. 🔥 FIX: Reject overly generic/stupid queries
+  const overlyGenericPatterns = [
+    /^what is a (restaurant|hotel|store|bank|hospital) and how does it work\??$/i,  // Too basic
+    /^help me understand (restaurants|hotels|stores)\??$/i,                         // Too vague
+    /^why do people use (restaurants|hotels|stores)\??$/i,                          // Obvious
+  ];
+  
+  for (const pattern of overlyGenericPatterns) {
+    if (pattern.test(lower)) {
+      return { 
+        isValid: false, 
+        reason: `Overly generic or obvious query: ${pattern}` 
+      };
+    }
+  }
+  
+  // 8. 🔥 FIX: Reject queries with wrong industry context
+  // E.g., "ecommerce" for restaurants, "fees" for restaurants, etc.
+  const wrongContextPatterns = [
+    /restaurant.*\b(ecommerce|subscription|invoices|payment processing|lower fees)\b/i,
+    /\b(restaurant|hotel|hospital).*\bcard details\b/i,  // Too generic security concern
+  ];
+  
+  for (const pattern of wrongContextPatterns) {
+    if (pattern.test(lower)) {
+      return { 
+        isValid: false, 
+        reason: `Wrong industry context: ${pattern}` 
+      };
+    }
+  }
+  
   // Passed all checks
   return { isValid: true };
 }

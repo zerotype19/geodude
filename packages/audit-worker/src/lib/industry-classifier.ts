@@ -350,8 +350,147 @@ function fuseScores(...scoreMaps: Map<IndustryKey, number>[]): Map<IndustryKey, 
 /**
  * Main classification function
  */
+/**
+ * Classify using Workers AI (Llama-3.1-8b)
+ * Fast, accurate, handles long tail of sites
+ */
+async function classifyWithAI(
+  signals: ExtractedSignals,
+  env: any
+): Promise<{ industry: string; confidence: number } | null> {
+  if (!env?.AI) return null;
+
+  try {
+    // Build rich context for AI
+    const context = [
+      signals.domain && `Domain: ${signals.domain}`,
+      signals.title && `Title: ${signals.title}`,
+      signals.h1 && `H1: ${signals.h1}`,
+      signals.metaDescription && `Description: ${signals.metaDescription}`,
+      signals.navTerms?.length && `Navigation: ${signals.navTerms.slice(0, 8).join(', ')}`,
+      signals.schemaTypes?.length && `Schema: ${signals.schemaTypes.join(', ')}`,
+      signals.bodyText && `Content: ${signals.bodyText.slice(0, 500)}...`,
+    ].filter(Boolean).join('\n');
+
+    const prompt = `You are an expert at classifying websites into industries.
+
+Analyze this website and classify it into ONE of these industries:
+
+AUTOMOTIVE:
+- automotive.oem (car manufacturers)
+- automotive.dealer (car dealerships)
+- automotive.rental (car rentals)
+- automotive.ev (electric vehicles)
+
+FINANCE:
+- finance.bank (banks)
+- finance.insurance.p_and_c (property & casualty insurance)
+- finance.insurance.life (life insurance)
+- finance.brokerage.trading (stock trading)
+- finance.lending.mortgage (mortgages)
+
+HEALTH:
+- health.providers (hospitals, clinics)
+- health.pharma.brand (pharmaceutical companies)
+- health.payers (health insurance)
+- health.dental (dental practices)
+- health.mental_behavioral (mental health)
+
+TRAVEL:
+- travel.cruise (cruise lines)
+- travel.hotels (hotels, resorts)
+- travel.air (airlines)
+- travel.vacation_rentals (Airbnb-style)
+- travel.otasearch (Expedia, Booking.com)
+
+FOOD & RESTAURANT:
+- food_restaurant.fast_casual (Chipotle, Panera)
+- food_restaurant.qsr (McDonald's, Starbucks)
+- food_restaurant.casual (Applebee's, Chili's)
+
+RETAIL:
+- retail.grocery (grocery stores)
+- retail.mass_merch (Walmart, Target)
+- retail.marketplace.horizontal (Amazon)
+- retail.beauty (Sephora, Ulta)
+
+MEDIA & ENTERTAINMENT:
+- media.streaming.video (Netflix, Hulu)
+- media.streaming.music (Spotify)
+- media.sports (ESPN, sports websites)
+- media.news (CNN, news publishers)
+- media.social (Facebook, Twitter)
+
+EDUCATION:
+- education.higher.private (Harvard, Stanford)
+- education.higher.public (state universities)
+- education.online (Coursera, Khan Academy)
+- education.bootcamps (coding bootcamps)
+
+REAL ESTATE:
+- real_estate.residential.broker (Zillow, Redfin)
+- real_estate.new_home_builders (Lennar, KB Home)
+
+SOFTWARE:
+- software.saas (Salesforce, Stripe)
+- software.cdp_crm (CRM platforms)
+
+PROFESSIONAL SERVICES:
+- professional.consulting.mgmt (McKinsey, BCG)
+- professional.accounting (accounting firms)
+
+TELECOMMUNICATIONS:
+- telecom.wireless (Verizon, AT&T)
+- telecom.isp_broadband (Comcast, Spectrum)
+
+OTHER:
+- generic_consumer (if none fit)
+
+Website to classify:
+${context}
+
+Respond with ONLY a JSON object in this exact format:
+{"industry": "category.subcategory", "confidence": 0.95, "reason": "short explanation"}
+
+Examples:
+{"industry": "media.sports", "confidence": 0.98, "reason": "ESPN is a sports media company"}
+{"industry": "real_estate.residential.broker", "confidence": 0.96, "reason": "Zillow is a real estate search platform"}
+{"industry": "education.online", "confidence": 0.94, "reason": "Coursera offers online courses"}
+
+Your response:`;
+
+    const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+      prompt,
+      max_tokens: 150,
+      temperature: 0.1, // Low temperature for consistent output
+    });
+
+    // Parse response
+    const text = response?.response || '';
+    const jsonMatch = text.match(/\{[^}]+\}/);
+    if (!jsonMatch) {
+      console.warn('[AI_CLASSIFY] No JSON in response:', text.slice(0, 200));
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.industry || !parsed.confidence) {
+      console.warn('[AI_CLASSIFY] Invalid JSON structure:', parsed);
+      return null;
+    }
+
+    console.log(`[AI_CLASSIFY] ${signals.domain} → ${parsed.industry} (${parsed.confidence.toFixed(2)}) - ${parsed.reason}`);
+    return { industry: parsed.industry, confidence: parsed.confidence };
+
+  } catch (err: any) {
+    console.error('[AI_CLASSIFY] Error:', err.message || err);
+    return null;
+  }
+}
+
 export async function classifyIndustry(
-  req: ClassifyRequest
+  req: ClassifyRequest,
+  env?: any
 ): Promise<ClassifyResponse> {
   const { domain, root_url, site_description, crawl_budget } = req;
 
@@ -372,16 +511,34 @@ export async function classifyIndustry(
     }
   }
 
-  // Score using heuristics
+  // 🔥 NEW: Try AI first (Workers AI Llama)
+  if (env?.AI) {
+    const aiResult = await classifyWithAI(signals, env);
+    if (aiResult && aiResult.confidence >= 0.70) {
+      return {
+        primary: {
+          industry_key: aiResult.industry as IndustryKey,
+          confidence: aiResult.confidence,
+          source: 'ai_worker',
+        },
+        alts: [],
+        evidence: {
+          title: signals.title,
+          nav: signals.navTerms,
+          schema: signals.schemaTypes,
+          keywords: site_description?.split(/\s+/).slice(0, 20),
+          domain_signals: domain.split(/[.-]/),
+        },
+        model_version: 'ind-v2.0-llama',
+      };
+    }
+  }
+
+  // Fallback: Score using heuristics (legacy behavior)
   const heuristicScores = scoreHeuristics(signals);
-
-  // Score using domain
   const domainScores = scoreDomain(domain);
-
-  // Fuse scores
   const fusedScores = fuseScores(heuristicScores, domainScores);
 
-  // Sort by score
   const sorted = Array.from(fusedScores.entries())
     .sort((a, b) => b[1] - a[1])
     .filter(([_, score]) => score > 0);

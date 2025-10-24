@@ -574,6 +574,14 @@ export const INDUSTRY_TAXONOMY_V2: Record<string, IndustryNode> = {
     keywords: ['bootcamp', 'coding bootcamp', 'intensive training'],
     queryTypes: ['cost', 'outcomes', 'curriculum', 'job guarantee']
   },
+  'education.online': {
+    slug: 'education.online',
+    name: 'Online Education Platforms',
+    parent: 'education',
+    enabled: true,
+    keywords: ['online courses', 'e-learning', 'mooc', 'online education', 'courses', 'certificates'],
+    queryTypes: ['course catalog', 'pricing', 'certificates', 'instructors', 'free courses']
+  },
   
   // ==================== PROFESSIONAL & BUSINESS SERVICES ====================
   'professional': {
@@ -685,6 +693,22 @@ export const INDUSTRY_TAXONOMY_V2: Record<string, IndustryNode> = {
     enabled: true,
     keywords: ['social media', 'social network', 'feed', 'post'],
     queryTypes: ['create account', 'privacy settings', 'content policy', 'ads']
+  },
+  'media.news': {
+    slug: 'media.news',
+    name: 'News & Publishing',
+    parent: 'media',
+    enabled: true,
+    keywords: ['news', 'breaking news', 'journalism', 'articles', 'headlines', 'reporting'],
+    queryTypes: ['breaking news', 'politics', 'world news', 'subscription', 'newsletter']
+  },
+  'media.sports': {
+    slug: 'media.sports',
+    name: 'Sports Media',
+    parent: 'media',
+    enabled: true,
+    keywords: ['sports', 'scores', 'highlights', 'games', 'teams', 'players', 'fantasy'],
+    queryTypes: ['live scores', 'schedules', 'fantasy sports', 'player stats', 'team news']
   },
   
   // ==================== TELECOMMUNICATIONS & CONNECTIVITY ====================

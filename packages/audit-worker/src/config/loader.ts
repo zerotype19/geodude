@@ -7,9 +7,11 @@
 import baseConfig from './industry-packs-v2.json';
 import type { IndustryConfig, IndustryPacks, IndustryRules, IntentPack } from './industry-packs.schema';
 
+// 🔥 FIX: Initialize from baseConfig immediately (no lazy loading)
 let INDUSTRY_PACKS: IndustryPacks = baseConfig.packs as unknown as IndustryPacks;
 let INDUSTRY_RULES: IndustryRules = baseConfig.industry_rules;
-let loaded = false;
+
+console.log('[INDUSTRY_LOADER_INIT] Initialized with', Object.keys(INDUSTRY_RULES?.domains || {}).length, 'domains from baseConfig');
 
 export interface Env {
   DOMAIN_RULES_KV?: KVNamespace;
@@ -17,37 +19,14 @@ export interface Env {
 
 /**
  * Load industry config from KV (call once at worker boot)
+ * Currently using baseConfig only (KV disabled for stability)
  */
 export async function loadIndustryConfig(env: Env): Promise<void> {
-  if (loaded) return;
-  
-  try {
-    const txt = await env.DOMAIN_RULES_KV?.get('industry_packs_json');
-    if (!txt) {
-      console.log('[INDUSTRY] Using default config');
-      loaded = true;
-      return;
-    }
-
-    const cfg: IndustryConfig = JSON.parse(txt);
-    
-    if (cfg.packs) {
-      INDUSTRY_PACKS = cfg.packs;
-    }
-    
-    if (cfg.industry_rules) {
-      INDUSTRY_RULES = cfg.industry_rules;
-    }
-
-    const packCount = Object.keys(INDUSTRY_PACKS).length;
-    const domainCount = Object.keys(INDUSTRY_RULES.domains || {}).length;
-    
-    console.log(`[INDUSTRY] Loaded from KV: packs=${packCount} domain_rules=${domainCount}`);
-    loaded = true;
-  } catch (error) {
-    console.error('[INDUSTRY] KV load failed, using defaults:', error);
-    loaded = true;
-  }
+  // 🔥 SIMPLIFIED: Just use baseConfig (already initialized at module level)
+  // KV override support can be added later if needed
+  const domainCount = Object.keys(INDUSTRY_RULES.domains || {}).length;
+  console.log(`[INDUSTRY] Using baseConfig: ${domainCount} domains`);
+  return Promise.resolve();
 }
 
 /**

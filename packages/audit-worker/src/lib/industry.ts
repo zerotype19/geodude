@@ -191,6 +191,8 @@ export async function resolveIndustry(ctx: {
   root_url?: string;
   site_description?: string;
 }): Promise<IndustryLock> {
+  // ✅ No need to load config - it's initialized at module level in loader.ts
+
   // 1. Explicit override
   if (ctx.override) {
     const v2Slug = ensureV2Slug(ctx.override);
@@ -228,7 +230,11 @@ export async function resolveIndustry(ctx: {
 
   // 4. Domain rules (whitelist - no AI needed)
   const domainRules = getDomainRules();
+  const totalDomains = Object.keys(domainRules).length;
   const byDomain = domainRules[domain];
+  
+  console.log(`[INDUSTRY_RESOLVE] Looking up domain: "${domain}" in ${totalDomains} rules, found: ${!!byDomain ? byDomain : 'NOT_FOUND'}`);
+  
   if (byDomain) {
     const v2Slug = ensureV2Slug(byDomain as string);
     return {
@@ -258,7 +264,7 @@ export async function resolveIndustry(ctx: {
           site_description: ctx.site_description || '',
           project_id: 'default',
           crawl_budget: { homepage: true, timeout_ms: 5000 },
-        }),
+        }, ctx.env),  // 🔥 Pass env to enable Workers AI
         new Promise<null>((_, reject) => setTimeout(() => reject(new Error('AI classifier timeout')), 8000)),
       ]);
 

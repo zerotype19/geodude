@@ -1086,7 +1086,146 @@ async function fixAudit(env: Env, auditId: string): Promise<any> {
 }
 
 /**
- * Backfill industry metadata for all existing audits
+ * STEP 1: Re-classify all audits using latest domain whitelist + AI
+ * This re-runs the full industry resolution logic
+ */
+async function reclassifyAllIndustries(env: Env): Promise<any> {
+  console.log('[RECLASSIFY] Starting industry reclassification for all audits...');
+  
+  const { resolveIndustry, IndustrySignals } = await import('./lib/industry');
+  
+  const stats = {
+    total: 0,
+    updated: 0,
+    unchanged: 0,
+    errors: 0,
+    byResult: {} as Record<string, number>,
+    bySource: {} as Record<string, number>,
+    examples: [] as Array<{ domain: string; old: string; new: string; source: string }>
+  };
+  
+  try {
+    // Fetch all audits (in batches)
+    const batchSize = 50;  // Smaller batch for AI calls
+    let hasMore = true;
+    let offset = 0;
+    
+    while (hasMore) {
+      console.log(`[RECLASSIFY] Fetching batch (offset: ${offset})...`);
+      
+      const audits = await env.DB.prepare(`
+        SELECT a.id, a.root_url, a.industry as old_industry, a.industry_source as old_source,
+               apa.title, apa.h1, apa.schema_types
+        FROM audits a
+        LEFT JOIN audit_pages ap ON ap.audit_id = a.id AND ap.url = a.root_url
+        LEFT JOIN audit_page_analysis apa ON apa.page_id = ap.id
+        ORDER BY a.started_at DESC
+        LIMIT ? OFFSET ?
+      `).bind(batchSize, offset).all();
+      
+      if (!audits.results || audits.results.length === 0) {
+        hasMore = false;
+        break;
+      }
+      
+      console.log(`[RECLASSIFY] Processing ${audits.results.length} audits...`);
+      
+      for (const audit of audits.results) {
+        stats.total++;
+        
+        try {
+          const auditData = audit as any;
+          
+          // Extract domain (normalize)
+          const url = new URL(auditData.root_url);
+          const domain = url.hostname.toLowerCase().replace(/^www\./, '');
+          
+          // Build signals
+          const signals = {
+            domain,
+            homepageTitle: auditData.title,
+            homepageH1: auditData.h1,
+            schemaTypes: auditData.schema_types ? JSON.parse(auditData.schema_types) : undefined,
+          };
+          
+          // Re-resolve industry
+          const industryLock = await resolveIndustry({
+            override: undefined,
+            project: undefined,
+            audit: undefined,  // Force re-classification
+            signals,
+            root_url: auditData.root_url,
+            site_description: undefined,
+            env
+          });
+          
+          const newIndustry = industryLock.value;
+          const newSource = industryLock.source;
+          
+          // Check if changed
+          if (newIndustry !== auditData.old_industry || newSource !== auditData.old_source) {
+            // Update audit (just industry + source, metadata will be backfilled in step 2)
+            await env.DB.prepare(`
+              UPDATE audits
+              SET industry = ?,
+                  industry_source = ?
+              WHERE id = ?
+            `).bind(newIndustry, newSource, auditData.id).run();
+            
+            stats.updated++;
+            
+            // Save example
+            if (stats.examples.length < 20) {
+              stats.examples.push({
+                domain,
+                old: `${auditData.old_industry} (${auditData.old_source})`,
+                new: `${newIndustry} (${newSource})`,
+                source: newSource
+              });
+            }
+            
+            console.log(`[RECLASSIFY] ${domain}: ${auditData.old_industry} → ${newIndustry} (${newSource})`);
+          } else {
+            stats.unchanged++;
+          }
+          
+          // Track distributions
+          stats.byResult[newIndustry] = (stats.byResult[newIndustry] || 0) + 1;
+          stats.bySource[newSource] = (stats.bySource[newSource] || 0) + 1;
+          
+          if (stats.total % 10 === 0) {
+            console.log(`[RECLASSIFY] Progress: ${stats.total} processed, ${stats.updated} updated, ${stats.unchanged} unchanged`);
+          }
+          
+        } catch (err) {
+          console.error(`[RECLASSIFY] Error processing audit ${audit.id}:`, err);
+          stats.errors++;
+        }
+      }
+      
+      if (audits.results.length < batchSize) {
+        hasMore = false;
+      } else {
+        offset += batchSize;
+      }
+    }
+    
+  } catch (err) {
+    console.error('[RECLASSIFY] Fatal error:', err);
+    throw err;
+  }
+  
+  console.log('[RECLASSIFY] Complete:', stats);
+  
+  return {
+    success: true,
+    stats,
+    message: `Reclassified ${stats.total} audits: ${stats.updated} updated, ${stats.unchanged} unchanged, ${stats.errors} errors`
+  };
+}
+
+/**
+ * STEP 2: Backfill industry metadata for all existing audits
  */
 async function backfillIndustryMetadata(env: Env): Promise<any> {
   console.log('[BACKFILL] Starting industry metadata backfill for all audits...');
@@ -1800,7 +1939,74 @@ export default {
         }
       }
 
-      // TEMP: Backfill industry metadata (NO AUTH - remove after use)
+      // TEMP: DEBUG - Check domain whitelist
+      if (req.method === 'GET' && path === '/api/admin/debug-domains') {
+        try {
+          const { loadIndustryConfig, getDomainRules } = await import('./config/loader');
+          await loadIndustryConfig(env);
+          const domainRules = getDomainRules();
+          
+          // Direct import to check baseConfig
+          const baseConfig = await import('./config/industry-packs-v2.json');
+          const cfg = baseConfig.default || baseConfig;
+          const domains = cfg.industry_rules?.domains || {};
+          
+          const testDomains = ['pfizer.com', 'chipotle.com', 'americanexpress.com', 'starbucks.com'];
+          const results = testDomains.map(d => ({
+            domain: d,
+            fromLoader: domainRules[d] || 'NOT_FOUND',
+            fromDirect: domains[d] || 'NOT_FOUND'
+          }));
+          
+          return new Response(JSON.stringify({
+            fromLoader: {
+              totalDomains: Object.keys(domainRules).length,
+              testResults: results.map(r => ({ domain: r.domain, industry: r.fromLoader })),
+              sample: Object.entries(domainRules).slice(0, 5)
+            },
+            fromDirect: {
+              totalDomains: Object.keys(domains).length,
+              testResults: results.map(r => ({ domain: r.domain, industry: r.fromDirect })),
+              sample: Object.entries(domains).slice(0, 5)
+            }
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            error: 'Debug failed',
+            message: (error as Error).message,
+            stack: (error as Error).stack
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // TEMP: STEP 1 - Reclassify ALL industries (NO AUTH - remove after use)
+      if (req.method === 'POST' && path === '/api/admin/reclassify-all-industries') {
+        try {
+          console.log('[ADMIN_NOAUTH] Starting industry reclassification...');
+          const result = await reclassifyAllIndustries(env);
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('[ADMIN_NOAUTH] Reclassify error:', error);
+          return new Response(JSON.stringify({
+            error: 'Reclassify failed',
+            message: (error as Error).message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
+      // TEMP: STEP 2 - Backfill industry metadata (NO AUTH - remove after use)
       if (req.method === 'POST' && path === '/api/admin/backfill-industry-metadata-now') {
         try {
           console.log('[ADMIN_NOAUTH] Starting industry metadata backfill...');
@@ -3608,7 +3814,32 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   const precheck = await precheckDomain(root_url, env);
   
   // Resolve industry early (before any INSERT)
-  const domain = new URL(root_url).hostname.toLowerCase().replace(/^www\./, '');
+  // Extract eTLD+1 (base domain) for proper whitelist matching
+  // e.g., "open.spotify.com" → "spotify.com", "web.mit.edu" → "mit.edu"
+  const fullHostname = new URL(root_url).hostname.toLowerCase();
+  const domainParts = fullHostname.split('.');
+  let domain: string;
+  
+  if (domainParts.length <= 2) {
+    // Already base domain (e.g., "example.com")
+    domain = fullHostname;
+  } else {
+    // Multi-part domain - extract eTLD+1
+    // Handle common multi-part TLDs (co.uk, com.au, etc.)
+    const lastPart = domainParts[domainParts.length - 1];
+    const secondLastPart = domainParts[domainParts.length - 2];
+    
+    if ((lastPart.length === 2 && secondLastPart === 'co') || 
+        (lastPart.length === 2 && ['com', 'org', 'net', 'edu', 'gov'].includes(secondLastPart))) {
+      // Multi-part TLD (e.g., "example.co.uk" or "example.com.au")
+      domain = domainParts.slice(-3).join('.');
+    } else {
+      // Standard TLD (e.g., "open.spotify.com" → "spotify.com")
+      domain = domainParts.slice(-2).join('.');
+    }
+  }
+  
+  console.log(`[DOMAIN_EXTRACTION] ${fullHostname} → ${domain} (eTLD+1)`);
   
   let industryLock;
   try {
