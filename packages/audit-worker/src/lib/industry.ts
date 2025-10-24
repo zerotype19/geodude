@@ -31,33 +31,21 @@ export interface IndustrySignals {
 function calculateSchemaBoost(industry: IndustryKey, schemaTypes: string[]): number {
   if (!schemaTypes || schemaTypes.length === 0) return 0;
   
+  // Import taxonomy
+  const { INDUSTRY_TAXONOMY } = require('../config/industry-taxonomy');
+  const industryConfig = INDUSTRY_TAXONOMY[industry];
+  if (!industryConfig) return 0;
+  
   const schemaLower = schemaTypes.map(s => s.toLowerCase());
-  
-  // Industry-specific schema mappings
-  const schemaMap: Record<string, string[]> = {
-    saas_b2b: ['softwareapplication', 'saasapplication', 'mobileapplication'],
-    automotive_oem: ['car', 'vehicle', 'automobiledealer', 'carmake'],
-    retail: ['store', 'product', 'onlinestore', 'department'],
-    financial_services: ['financialservice', 'bankaccount', 'insuranceagency'],
-    healthcare_provider: ['physician', 'hospital', 'clinic', 'medicalorganization'],
-    travel_air: ['airline', 'flight'],
-    travel_hotels: ['hotel', 'lodgingbusiness', 'resort'],
-    travel_cruise: ['touristattraction', 'travelagency'],
-    media_entertainment: ['newsarticle', 'newsmediaorganization', 'broadcastchannel'],
-    education: ['educationalorganization', 'collegeuniversity', 'school'],
-    food_restaurant: ['restaurant', 'foodestablishment'],
-    real_estate: ['realestate', 'realestateagent', 'apartment']
-  };
-  
-  const expectedTypes = schemaMap[industry];
-  if (!expectedTypes) return 0;
   
   // Check if any schema type matches expected types for this industry
   const hasMatch = schemaLower.some(type => 
-    expectedTypes.some(expected => type.includes(expected) || expected.includes(type))
+    industryConfig.schemaTypes.some((expected: string) => 
+      type.includes(expected.toLowerCase()) || expected.toLowerCase().includes(type)
+    )
   );
   
-  return hasMatch ? 0.05 : 0;  // +5% boost if schema matches
+  return hasMatch ? 0.10 : 0;  // +10% boost if schema matches (increased from 5%)
 }
 
 /**
@@ -76,9 +64,23 @@ function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+  
+  // Import taxonomy for anti-keyword checking
+  const { INDUSTRY_TAXONOMY } = require('../config/industry-taxonomy');
+  
+  /**
+   * Helper to check if text contains anti-keywords for given industry
+   */
+  const hasAntiKeywords = (industry: string): boolean => {
+    const industryConfig = INDUSTRY_TAXONOMY[industry];
+    if (!industryConfig) return false;
+    return industryConfig.antiKeywords.some((antiKeyword: string) => 
+      text.includes(antiKeyword.toLowerCase())
+    );
+  };
 
   // Automotive OEM signals
-  if (/\b(build & price|msrp|dealer|warranty|trim|rav4|tacoma|iihs|nhtsa|towing|cargo)\b/.test(text)) {
+  if (/\b(build & price|msrp|dealer|warranty|trim|rav4|tacoma|iihs|nhtsa|towing|cargo)\b/.test(text) && !hasAntiKeywords('automotive_oem')) {
     const score = (text.match(/\b(build|msrp|dealer|trim|iihs|nhtsa)/g) || []).length / 10;
     votes.push({
       key: 'automotive_oem',
@@ -88,7 +90,7 @@ function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
   }
 
   // Retail signals
-  if (/\b(shipping|returns|cart|checkout|in stock|store locator)\b/.test(text)) {
+  if (/\b(shipping|returns|cart|checkout|in stock|store locator)\b/.test(text) && !hasAntiKeywords('retail')) {
     const score = (text.match(/\b(shipping|returns|cart|checkout)/g) || []).length / 8;
     votes.push({
       key: 'retail',
@@ -98,7 +100,7 @@ function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
   }
 
   // Financial services
-  if (/\b(apr|rates|mortgage|loan|insurance|account|branch|atm)\b/.test(text)) {
+  if (/\b(apr|rates|mortgage|loan|insurance|account|branch|atm)\b/.test(text) && !hasAntiKeywords('financial_services')) {
     const score = (text.match(/\b(apr|rates|loan|insurance)/g) || []).length / 8;
     votes.push({
       key: 'financial_services',
@@ -107,8 +109,8 @@ function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
     });
   }
 
-  // Healthcare
-  if (/\b(appointments|doctors|patient|medical|hospital|clinic)\b/.test(text)) {
+  // Healthcare Provider (but NOT pharmaceutical, insurance, devices)
+  if (/\b(appointments|doctors|patient|medical|hospital|clinic)\b/.test(text) && !hasAntiKeywords('healthcare_provider')) {
     const score = (text.match(/\b(appointments|doctors|patient)/g) || []).length / 8;
     votes.push({
       key: 'healthcare_provider',
@@ -116,9 +118,19 @@ function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
       signals: ['appointments', 'doctors']
     });
   }
+  
+  // Pharmaceutical (new explicit check)
+  if (/\b(fda approved|prescription|clinical trial|drug|medication|vaccine|pharmaceutical)\b/.test(text) && !hasAntiKeywords('pharmaceutical')) {
+    const score = (text.match(/\b(fda approved|prescription|drug|vaccine)/g) || []).length / 6;
+    votes.push({
+      key: 'pharmaceutical',
+      score: Math.min(1, score + 0.3),
+      signals: ['fda', 'prescription', 'drug']
+    });
+  }
 
   // Travel (air)
-  if (/\b(flight|baggage|miles|fare|airline|routes)\b/.test(text)) {
+  if (/\b(flight|baggage|miles|fare|airline|routes)\b/.test(text) && !hasAntiKeywords('travel_air')) {
     const score = (text.match(/\b(flight|baggage|fare)/g) || []).length / 8;
     votes.push({
       key: 'travel_air',
@@ -127,8 +139,8 @@ function heuristicsVote(signals: IndustrySignals): HeuristicVote[] {
     });
   }
 
-  // Travel & Tourism (hotels, attractions, destinations) - ✅ NEW!
-  if (/\b(hotel|vacation|things to do|attractions|visit|tourism|travel guide|restaurants?|destination)\b/.test(text)) {
+  // Travel & Tourism (hotels, attractions, destinations)
+  if (/\b(hotel|vacation|things to do|attractions|visit|tourism|travel guide|restaurants?|destination)\b/.test(text) && !hasAntiKeywords('travel_hotels')) {
     const score = (text.match(/\b(hotel|vacation|visit|tourism|attractions|things to do)/g) || []).length / 6;
     votes.push({
       key: 'travel_hotels',

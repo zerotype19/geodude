@@ -192,7 +192,43 @@ export function filterQueriesByQuality(queries: string[]): {
 }
 
 /**
- * Comprehensive quality filter with anti-patterns and rewrites
+ * Filter queries by industry appropriateness
+ * Uses industry taxonomy to reject incompatible queries
+ */
+export function validateQueriesForIndustry(
+  queries: string[],
+  industry: string
+): { valid: string[]; rejected: Array<{ query: string; reason: string }> } {
+  try {
+    const { validateQueryForIndustry } = require('../config/industry-taxonomy');
+    
+    const valid: string[] = [];
+    const rejected: Array<{ query: string; reason: string }> = [];
+    
+    for (const query of queries) {
+      const validation = validateQueryForIndustry(query, industry);
+      if (validation.valid) {
+        valid.push(query);
+        // Log warnings for queries that don't match expected types but aren't rejected
+        if (validation.reason) {
+          console.log(`[QUERY_VALIDATION_WARN] "${query}" for "${industry}" - ${validation.reason}`);
+        }
+      } else {
+        rejected.push({ query, reason: validation.reason || 'Failed industry validation' });
+        console.log(`[QUERY_VALIDATION_REJECT] "${query}" for "${industry}" - ${validation.reason}`);
+      }
+    }
+    
+    return { valid, rejected };
+  } catch (err) {
+    // If taxonomy import fails, allow all queries (graceful fallback)
+    console.warn('[QUERY_VALIDATION] Industry taxonomy not available, skipping validation');
+    return { valid: queries, rejected: [] };
+  }
+}
+
+/**
+ * Comprehensive quality filter with anti-patterns, rewrites, and industry validation
  * This is the NEW recommended method for filtering queries
  */
 export function filterAndRewriteQueries(
@@ -230,7 +266,20 @@ export function filterAndRewriteQueries(
   for (let query of queries) {
     const originalQuery = query;
     
-    // Step 1: Check anti-patterns (most critical)
+    // Step 1: Industry validation (CRITICAL - reject incompatible queries immediately)
+    if (opts.industry) {
+      const industryValidation = validateQueriesForIndustry([query], opts.industry);
+      if (industryValidation.rejected.length > 0) {
+        rejected.push({
+          query,
+          reason: industryValidation.rejected[0].reason,
+          severity: 'critical'
+        });
+        continue;
+      }
+    }
+    
+    // Step 2: Check anti-patterns (most critical)
     const antiPatternCheck = checkAntiPatterns(query, opts.industry);
     if (!antiPatternCheck.isValid) {
       rejected.push({
@@ -241,7 +290,7 @@ export function filterAndRewriteQueries(
       continue;
     }
     
-    // Step 2: Check legacy quality filters
+    // Step 3: Check legacy quality filters
     const qualityCheck = isNaturalQuery(query);
     if (!qualityCheck.isValid) {
       rejected.push({
@@ -252,7 +301,7 @@ export function filterAndRewriteQueries(
       continue;
     }
     
-    // Step 3: Apply rewrites if enabled
+    // Step 4: Apply rewrites if enabled
     if (opts.applyRewrites) {
       const { rewritten: newQuery, applied } = applyRewrites(query);
       if (applied.length > 0) {
@@ -265,7 +314,7 @@ export function filterAndRewriteQueries(
       }
     }
     
-    // Step 4: Check human score
+    // Step 5: Check human score
     const hScore = humanScore(query);
     totalHumanScore += hScore;
     
