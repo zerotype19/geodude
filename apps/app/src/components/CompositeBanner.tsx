@@ -24,6 +24,11 @@ const getScoreGlow = (score: number): string => {
 };
 
 export default function CompositeBanner({ data }: Props) {
+  // Safety check for data structure
+  if (!data || !data.counts) {
+    return null;
+  }
+
   return (
     <div className="kpi-grid mb-8">
       <Stat
@@ -34,7 +39,7 @@ export default function CompositeBanner({ data }: Props) {
       <Stat
         value={fmt(data.page_score)}
         label="Page Score"
-        meta={`${data.counts.included} checks`}
+        meta={`${data.counts.included || 0} checks`}
         className={getScoreGlow(data.page_score)}
       />
       <Stat
