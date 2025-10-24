@@ -4050,8 +4050,15 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
       const chunk = statements.slice(i, i + BATCH_SIZE);
       try {
         const results = await env.DB.batch(chunk);
-        // Count successful inserts (D1 batch returns array of results)
-        insertedCount += results.filter((r: any) => r.success !== false).length;
+        console.log(`[SYNC-DISCOVER] D1 batch returned:`, JSON.stringify(results).slice(0, 200));
+        // Count successful inserts - check meta.changes or rows_written
+        for (const result of results) {
+          if (result.meta?.changes > 0 || result.meta?.rows_written > 0 || !result.error) {
+            insertedCount++;
+          } else if (result.error) {
+            console.error(`[SYNC-DISCOVER] Insert failed:`, result.error);
+          }
+        }
       } catch (error: any) {
         console.error(`[SYNC-DISCOVER] Batch insert error (continuing):`, error.message || error);
         // Continue even if batch fails - organic discovery will handle missing URLs
@@ -4059,6 +4066,16 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     }
     
     console.log(`[SYNC-DISCOVER] ✅ Queued ${insertedCount}/${uniqueUrls.length} URLs - cron will fetch+process in ~5 min`);
+    
+    // Verification: Count actual rows inserted
+    try {
+      const verifyResult = await env.DB.prepare(
+        `SELECT COUNT(*) as count FROM audit_pages WHERE audit_id = ?`
+      ).bind(id).first();
+      console.log(`[SYNC-DISCOVER] D1 verification: ${verifyResult?.count || 0} rows in audit_pages for audit ${id}`);
+    } catch (verifyError: any) {
+      console.error(`[SYNC-DISCOVER] Verification error:`, verifyError.message || verifyError);
+    }
   } catch (error: any) {
     console.error(`[SYNC-DISCOVER ERROR] ${id}:`, error);
     await markAuditFailed(env, id, `discover_error: ${error.message || 'unknown'}`);
