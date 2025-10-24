@@ -4034,25 +4034,27 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     console.log(`[SYNC-DISCOVER] Inserting ${uniqueUrls.length} URLs into D1...`);
     
     // Use sentinel value '1970-01-01 00:00:00' for unprocessed pages (NOT NULL constraint prevents NULL)
-    // Insert URLs one by one to handle duplicates gracefully
+    // Batch insert all URLs (duplicates will be caught as errors but won't stop the batch)
+    const statements = uniqueUrls.map(url => {
+      const pageId = crypto.randomUUID();
+      return env.DB.prepare(
+        `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
+         VALUES (?, ?, ?, '1970-01-01 00:00:00')`
+      ).bind(pageId, id, url);
+    });
+    
+    // Batch insert - D1 batch() is atomic per statement, continues on errors
+    const BATCH_SIZE = 100;
     let insertedCount = 0;
-    for (const url of uniqueUrls) {
+    for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+      const chunk = statements.slice(i, i + BATCH_SIZE);
       try {
-        // Check if URL already exists for this audit
-        const existing = await env.DB.prepare(
-          `SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ? LIMIT 1`
-        ).bind(id, url).first();
-        
-        if (!existing) {
-          const pageId = crypto.randomUUID();
-          await env.DB.prepare(
-            `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
-             VALUES (?, ?, ?, '1970-01-01 00:00:00')`
-          ).bind(pageId, id, url).run();
-          insertedCount++;
-        }
+        const results = await env.DB.batch(chunk);
+        // Count successful inserts (D1 batch returns array of results)
+        insertedCount += results.filter((r: any) => r.success !== false).length;
       } catch (error: any) {
-        console.error(`[SYNC-DISCOVER] Failed to insert ${url}:`, error.message || error);
+        console.error(`[SYNC-DISCOVER] Batch insert error (continuing):`, error.message || error);
+        // Continue even if batch fails - organic discovery will handle missing URLs
       }
     }
     
