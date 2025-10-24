@@ -27,25 +27,29 @@ interface Page {
 
 interface PagesTabProps {
   auditId: string;
+  isPublic?: boolean;
 }
 
 const API_BASE = 'https://api.optiview.ai';
 
-export default function PagesTab({ auditId }: PagesTabProps) {
+export default function PagesTab({ auditId, isPublic = false }: PagesTabProps) {
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'issues' | 'good'>('all');
   const [sortBy, setSortBy] = useState<'url' | 'score'>('url');
-  const { getCitationCount } = useCitedPages(auditId);
+  const { getCitationCount } = useCitedPages(auditId, isPublic);
 
   useEffect(() => {
     fetchPages();
-  }, [auditId]);
+  }, [auditId, isPublic]);
 
   const fetchPages = async () => {
     try {
-      const data = await apiGet<{ pages: Page[] }>(`/api/audits/${auditId}/pages?limit=500`);
+      const endpoint = isPublic 
+        ? `/api/public/audits/${auditId}/pages?limit=500`
+        : `/api/audits/${auditId}/pages?limit=500`;
+      const data = await apiGet<{ pages: Page[] }>(endpoint);
       setPages(data.pages || []);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unknown error');

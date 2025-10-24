@@ -15,7 +15,7 @@ interface CitationSummary {
  * Hook to fetch cited pages for an audit
  * Returns a Map of URL -> citation count for easy lookup
  */
-export function useCitedPages(auditId: string | undefined) {
+export function useCitedPages(auditId: string | undefined, isPublic: boolean = false) {
   const [citedPages, setCitedPages] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +27,10 @@ export function useCitedPages(auditId: string | undefined) {
 
     const fetchCitedPages = async () => {
       try {
-        const data = await apiGet<CitationSummary>(`/api/citations/summary?audit_id=${auditId}`);
+        const endpoint = isPublic
+          ? `/api/public/citations/summary?audit_id=${auditId}`
+          : `/api/citations/summary?audit_id=${auditId}`;
+        const data = await apiGet<CitationSummary>(endpoint);
         
         // Build a map of URL -> citation count for fast lookup
         const citedMap = new Map<string, number>();
@@ -56,7 +59,7 @@ export function useCitedPages(auditId: string | undefined) {
     };
 
     fetchCitedPages();
-  }, [auditId]);
+  }, [auditId, isPublic]);
 
   const getCitationCount = (url: string): number => {
     const normalizedUrl = url.replace(/\/$/, '');

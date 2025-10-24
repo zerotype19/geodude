@@ -61,9 +61,10 @@ const API_BASE = 'https://api.optiview.ai';
 
 interface CitationsTabProps {
   auditId: string;
+  isPublic?: boolean;
 }
 
-export default function CitationsTab({ auditId }: CitationsTabProps) {
+export default function CitationsTab({ auditId, isPublic = false }: CitationsTabProps) {
   const [summary, setSummary] = useState<CitationSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -72,11 +73,14 @@ export default function CitationsTab({ auditId }: CitationsTabProps) {
 
   useEffect(() => {
     fetchSummary();
-  }, [auditId]);
+  }, [auditId, isPublic]);
 
   const fetchSummary = async () => {
     try {
-      const data = await apiGet<CitationSummary>(`/api/citations/summary?audit_id=${auditId}`);
+      const endpoint = isPublic
+        ? `/api/public/citations/summary?audit_id=${auditId}`
+        : `/api/citations/summary?audit_id=${auditId}`;
+      const data = await apiGet<CitationSummary>(endpoint);
       setSummary(data);
     } catch (error) {
       console.error('Failed to fetch citations summary:', error);

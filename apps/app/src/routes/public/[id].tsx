@@ -185,9 +185,9 @@ export default function PublicAudit() {
 
         {/* Tab Content */}
         {activeTab === 'pages' ? (
-          <PagesTab pages={pages} auditId={id!} />
+          <PagesTab pages={pages} auditId={id!} isPublic={true} />
         ) : activeTab === 'citations' ? (
-          <CitationsTab auditId={id!} />
+          <CitationsTab auditId={id!} isPublic={true} />
         ) : (
           <>
             {/* Overview Tab */}
