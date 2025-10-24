@@ -17,7 +17,7 @@
       "bestbuy.com": "retail",
       "target.com": "retail",
       "walmart.com": "retail",
-      "amazon.com": "retail",
+      "amazon.com": "ecommerce",
       "apple.com": "retail",
       "nike.com": "retail",
       "adidas.com": "retail",
@@ -184,7 +184,6 @@
       "snowflake.com": "saas_b2b",
       "tableau.com": "saas_b2b",
       "palantir.com": "saas_b2b",
-      "amazon.com": "ecommerce",
       "ebay.com": "ecommerce",
       "etsy.com": "ecommerce",
       "wayfair.com": "ecommerce",
@@ -218,7 +217,7 @@
       "jetblue.com": "travel_air",
       "alaskaair.com": "travel_air",
       "spiritairlines.com": "travel_air",
-      "frontier.com": "travel_air",
+      "frontier.com": "telecom",
       "marriott.com": "travel_hotels",
       "hilton.com": "travel_hotels",
       "hyatt.com": "travel_hotels",
@@ -241,17 +240,6 @@
       "airbnb.com": "vacation_rentals",
       "vrbo.com": "vacation_rentals",
       "homeaway.com": "vacation_rentals",
-      "toyota.com": "automotive_oem",
-      "ford.com": "automotive_oem",
-      "gm.com": "automotive_oem",
-      "stellantis.com": "automotive_oem",
-      "honda.com": "automotive_oem",
-      "nissan.com": "automotive_oem",
-      "hyundai.com": "automotive_oem",
-      "kia.com": "automotive_oem",
-      "bmw.com": "automotive_oem",
-      "mercedes-benz.com": "automotive_oem",
-      "tesla.com": "automotive_oem",
       "vw.com": "automotive_oem",
       "volkswagen.com": "automotive_oem",
       "mazda.com": "automotive_oem",
@@ -295,8 +283,6 @@
       "dunkindonuts.com": "restaurants",
       "sonicdrivein.com": "restaurants",
       "arbys.com": "restaurants",
-      "walmart.com": "retail",
-      "target.com": "retail",
       "costco.com": "retail",
       "kroger.com": "retail",
       "homedepot.com": "retail",
@@ -325,31 +311,17 @@
       "ey.com": "consulting",
       "kpmg.com": "consulting",
       "accenture.com": "consulting",
-      "carnival.com": "travel_cruise",
-      "princess.com": "travel_cruise",
-      "royalcaribbean.com": "travel_cruise",
-      "norwegiancruiseline.com": "travel_cruise",
       "msccruises.com": "travel_cruise",
       "celebritycruises.com": "travel_cruise",
       "hollandamerica.com": "travel_cruise",
       "hollandamericaline.com": "travel_cruise",
       "adobe.com": "saas_b2b",
-      "salesforce.com": "saas_b2b",
       "microsoft.com": "saas_b2b",
       "google.com": "saas_b2b",
       "aws.amazon.com": "saas_b2b",
       "oracle.com": "saas_b2b",
       "sap.com": "saas_b2b",
       "ibm.com": "saas_b2b",
-      "zoom.us": "saas_b2b",
-      "slack.com": "saas_b2b",
-      "dropbox.com": "saas_b2b",
-      "hubspot.com": "saas_b2b",
-      "atlassian.com": "saas_b2b",
-      "zendesk.com": "saas_b2b",
-      "shopify.com": "saas_b2b",
-      "stripe.com": "saas_b2b",
-      "twilio.com": "saas_b2b",
       "github.com": "saas_b2b",
       "gitlab.com": "saas_b2b",
       "paypal.com": "financial_services",
@@ -417,12 +389,10 @@
       "helpscout.com": "saas_b2b",
       "freshdesk.com": "saas_b2b",
       "zoho.com": "saas_b2b",
-      "monday.com": "saas_b2b",
       "smartsheet.com": "saas_b2b",
       "wrike.com": "saas_b2b",
       "teamwork.com": "saas_b2b",
       "clarizen.com": "saas_b2b",
-      "asana.com": "saas_b2b",
       "todoist.com": "saas_b2b",
       "any.do": "saas_b2b",
       "evernote.com": "saas_b2b",
@@ -552,7 +522,6 @@
       "qdrant.tech": "saas_b2b",
       "supabase.com": "saas_b2b",
       "firebase.google.com": "saas_b2b",
-      "aws.amazon.com": "saas_b2b",
       "azure.microsoft.com": "saas_b2b",
       "cloud.google.com": "saas_b2b",
       "planetscale.com": "saas_b2b",
@@ -567,7 +536,6 @@
       "tooljet.com": "saas_b2b",
       "internal.io": "saas_b2b",
       "airplane.dev": "saas_b2b",
-      "datadog.com": "saas_b2b",
       "newrelic.com": "saas_b2b",
       "dynatrace.com": "saas_b2b",
       "appdynamics.com": "saas_b2b",
@@ -575,15 +543,12 @@
       "rollbar.com": "saas_b2b",
       "bugsnag.com": "saas_b2b",
       "logrocket.com": "saas_b2b",
-      "fullstory.com": "saas_b2b",
       "pendo.io": "saas_b2b",
       "walkme.com": "saas_b2b",
       "appcues.com": "saas_b2b",
       "userpilot.com": "saas_b2b",
       "chameleon.io": "saas_b2b",
       "userflow.com": "saas_b2b",
-      "lilly.com": "pharmaceutical",
-      "abbvie.com": "pharmaceutical",
       "bristol myers.com": "pharmaceutical",
       "ge healthcare.com": "medical_devices",
       "philips.com": "medical_devices",
@@ -593,8 +558,6 @@
       "mckesson.com": "health_services",
       "amerisourcebergen.com": "health_services",
       "cvshealth.com": "pharmacy",
-      "walgreens.com": "pharmacy",
-      "riteaid.com": "pharmacy",
       "wegmans.com": "retail",
       "publix.com": "retail",
       "heb.com": "retail",
@@ -617,7 +580,6 @@
       "pay-less.com": "retail",
       "petsmart.com": "retail",
       "petco.com": "retail",
-      "chewy.com": "ecommerce",
       "staples.com": "retail",
       "officedepot.com": "retail",
       "officemax.com": "retail",
@@ -653,7 +615,6 @@
       "sephora.com": "retail",
       "ulta.com": "retail",
       "bluemercury.com": "retail",
-      "macys.com": "retail",
       "bloomingdales.com": "retail",
       "neiman marcus.com": "retail",
       "saksfifthavenue.com": "retail",
@@ -690,9 +651,7 @@
       "brandless.com": "ecommerce",
       "boxed.com": "ecommerce",
       "jet.com": "ecommerce",
-      "wish.com": "ecommerce",
       "aliexpress.com": "ecommerce",
-      "alibaba.com": "ecommerce",
       "mercado libre.com": "ecommerce",
       "rakuten.com": "ecommerce",
       "shopee.com": "ecommerce",
@@ -736,9 +695,6 @@
       "gumtree.com": "ecommerce",
       "kijiji.ca": "ecommerce",
       "craigslist.org": "ecommerce",
-      "facebook.com": "social_media",
-      "instagram.com": "social_media",
-      "twitter.com": "social_media",
       "threads.net": "social_media",
       "bluesky.app": "social_media",
       "mastodon.social": "social_media",
@@ -746,7 +702,6 @@
       "telegram.org": "social_media",
       "signal.org": "social_media",
       "discord.com": "social_media",
-      "slack.com": "saas_b2b",
       "teams.microsoft.com": "saas_b2b",
       "wechat.com": "social_media",
       "line.me": "social_media",
@@ -758,7 +713,6 @@
       "weibo.com": "social_media",
       "douyin.com": "social_media",
       "kuaishou.com": "social_media",
-      "youtube.com": "streaming",
       "twitch.tv": "streaming",
       "vimeo.com": "streaming",
       "dailymotion.com": "streaming",
@@ -768,7 +722,6 @@
       "dtube.video": "streaming",
       "odysee.com": "streaming",
       "lbry.tv": "streaming",
-      "hulu.com": "streaming",
       "paramount plus.com": "streaming",
       "max.com": "streaming",
       "discovery plus.com": "streaming",
@@ -790,7 +743,6 @@
       "directvstream.com": "streaming",
       "att tv.com": "streaming",
       "spectrum.net": "telecom",
-      "frontier.com": "telecom",
       "centurylink.com": "telecom",
       "windstream.com": "telecom",
       "ziply fiber.com": "telecom",
@@ -861,7 +813,6 @@
       "aer lingus.com": "travel_air",
       "iberia.com": "travel_air",
       "aireuropa.com": "travel_air",
-      "wyndham.com": "travel_hotels",
       "choice hotels.com": "travel_hotels",
       "best western.com": "travel_hotels",
       "radisson.com": "travel_hotels",
@@ -925,7 +876,6 @@
       "even hotels.com": "travel_hotels",
       "viceroy hotels.com": "travel_hotels",
       "kimpton.com": "travel_hotels",
-      "canopy by hilton.com": "travel_hotels",
       "mgm resorts.com": "travel_hotels",
       "caesars.com": "travel_hotels",
       "wynn.com": "travel_hotels",
@@ -980,7 +930,6 @@
       "hostelworld.com": "vacation_rentals",
       "hostelbookers.com": "vacation_rentals",
       "bookings.com": "travel_booking",
-      "hotels.com": "travel_booking",
       "trivago.com": "travel_booking",
       "hotel tonight.com": "travel_booking",
       "room key.com": "travel_booking",
@@ -1005,8 +954,6 @@
       "corporate housing by owner.com": "vacation_rentals",
       "extended stay america.com": "vacation_rentals",
       "oakwood.com": "vacation_rentals",
-      "columbia.edu": "university",
-      "upenn.edu": "university",
       "brown.edu": "university",
       "dartmouth.edu": "university",
       "vanderbilt.edu": "university",
@@ -1018,8 +965,6 @@
       "unc.edu": "university",
       "virginia.edu": "university",
       "michigan.edu": "university",
-      "usc.edu": "university",
-      "nyu.edu": "university",
       "boston.edu": "university",
       "rochester.edu": "university",
       "brandeis.edu": "university",
@@ -1088,15 +1033,6 @@
       "mississippi.edu": "university",
       "oklahoma.edu": "university",
       "south carolina.edu": "university",
-      "subway.com": "restaurants",
-      "tacobell.com": "restaurants",
-      "wendys.com": "restaurants",
-      "burgerking.com": "restaurants",
-      "kfc.com": "restaurants",
-      "pandaexpress.com": "restaurants",
-      "dunkindonuts.com": "restaurants",
-      "sonicdrivein.com": "restaurants",
-      "arbys.com": "restaurants",
       "jimmyjohns.com": "restaurants",
       "fiveguys.com": "restaurants",
       "shake shack.com": "restaurants",
@@ -1140,7 +1076,6 @@
       "chilis.com": "restaurants",
       "tgi fridays.com": "restaurants",
       "red robin.com": "restaurants",
-      "buffalo wild wings.com": "restaurants",
       "bdubs.com": "restaurants",
       "bww.com": "restaurants",
       "panera.com": "restaurants",
@@ -1179,7 +1114,6 @@
       "raising canes.com": "restaurants",
       "popeyes.com": "restaurants",
       "church's chicken.com": "restaurants",
-      "el pollo loco.com": "restaurants",
       "qdoba.com": "restaurants",
       "moes.com": "restaurants",
       "torchys tacos.com": "restaurants",
@@ -1205,7 +1139,6 @@
       "teriyaki madness.com": "restaurants",
       "tokyo joe's.com": "restaurants",
       "panda express.com": "restaurants",
-      "pei wei.com": "restaurants",
       "pick up stix.com": "restaurants",
       "mama fu's.com": "restaurants",
       "zoes kitchen.com": "restaurants",
@@ -1225,11 +1158,9 @@
       "clean juice.com": "restaurants",
       "wells fargo.com": "financial_services",
       "bofa.com": "financial_services",
-      "citi.com": "financial_services",
       "usbank.com": "financial_services",
       "pnc.com": "financial_services",
       "truist.com": "financial_services",
-      "capitalone.com": "financial_services",
       "tdbank.com": "financial_services",
       "fifth third.com": "financial_services",
       "regions.com": "financial_services",
@@ -1238,8 +1169,6 @@
       "huntington.com": "financial_services",
       "mandt.com": "financial_services",
       "synchrony.com": "financial_services",
-      "discover.com": "financial_services",
-      "americanexpress.com": "financial_services",
       "barclays.com": "financial_services",
       "hsbc.com": "financial_services",
       "santander.com": "financial_services",
@@ -1290,7 +1219,6 @@
       "united wholesale mortgage.com": "financial_services",
       "caliber home loans.com": "financial_services",
       "guild mortgage.com": "financial_services",
-      "usaa.com": "financial_services",
       "navy federal.org": "financial_services",
       "pentagon federal.org": "financial_services",
       "state farm.com": "financial_services",
@@ -1374,7 +1302,9 @@
         "add to cart",
         "checkout"
       ],
-      "inherits": ["generic_consumer"],
+      "inherits": [
+        "generic_consumer"
+      ],
       "description": "Automotive OEM (Toyota, Ford, GM, etc.)"
     },
     "retail": {
@@ -1401,7 +1331,9 @@
         "dealer",
         "test drive"
       ],
-      "inherits": ["generic_consumer"],
+      "inherits": [
+        "generic_consumer"
+      ],
       "description": "Retail stores (Best Buy, Target, etc.)"
     },
     "financial_services": {
@@ -1427,7 +1359,9 @@
         "in stock",
         "towing capacity"
       ],
-      "inherits": ["generic_consumer"],
+      "inherits": [
+        "generic_consumer"
+      ],
       "description": "Banks, credit unions, insurance (Chase, USAA, etc.)"
     },
     "healthcare_provider": {
@@ -1449,7 +1383,9 @@
         "promo code",
         "gift card"
       ],
-      "inherits": ["generic_consumer"],
+      "inherits": [
+        "generic_consumer"
+      ],
       "description": "Hospitals, clinics, medical practices"
     },
     "travel_air": {
@@ -1472,7 +1408,9 @@
         "towing capacity",
         "mpg"
       ],
-      "inherits": ["generic_consumer"],
+      "inherits": [
+        "generic_consumer"
+      ],
       "description": "Airlines (Delta, United, etc.)"
     },
     "travel_hotels": {
@@ -1492,7 +1430,9 @@
         "mpg",
         "trim levels"
       ],
-      "inherits": ["generic_consumer"],
+      "inherits": [
+        "generic_consumer"
+      ],
       "description": "Hotels and resorts (Marriott, Hilton, etc.)"
     },
     "saas_b2b": {
@@ -1514,7 +1454,9 @@
         "return policy",
         "in stock"
       ],
-      "inherits": ["generic_consumer"],
+      "inherits": [
+        "generic_consumer"
+      ],
       "description": "B2B Software (Salesforce, Slack, etc.)"
     },
     "ecommerce_fashion": {
@@ -1536,15 +1478,18 @@
         "dealer",
         "test drive"
       ],
-      "inherits": ["retail"],
+      "inherits": [
+        "retail"
+      ],
       "description": "Fashion e-commerce"
     },
     "unknown": {
       "allow_tags": [],
       "deny_phrases": [],
-      "inherits": ["generic_consumer"],
+      "inherits": [
+        "generic_consumer"
+      ],
       "description": "Fallback for unclassified sites"
     }
   }
 }
-
