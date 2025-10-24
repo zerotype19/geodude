@@ -845,9 +845,19 @@ async function processQueuedCitations(env: Env): Promise<void> {
         await env.DB.prepare(`
           UPDATE audits
           SET industry = ?,
-              industry_source = ?
+              industry_source = ?,
+              industry_confidence = ?,
+              industry_ancestors = ?,
+              industry_metadata = ?
           WHERE id = ?
-        `).bind(newIndustryLock.value, `${newIndustryLock.source}_citations_reclass`, audit.id).run();
+        `).bind(
+          newIndustryLock.value, 
+          `${newIndustryLock.source}_citations_reclass`, 
+          newIndustryLock.confidence || null,
+          newIndustryLock.ancestors ? JSON.stringify(newIndustryLock.ancestors) : null,
+          newIndustryLock.metadata ? JSON.stringify(newIndustryLock.metadata) : null,
+          audit.id
+        ).run();
       } else {
         console.log(`[CITATIONS_CRON] Keeping original industry: ${audit.industry} (new: ${newIndustryLock.value} from ${newIndustryLock.source} not confident enough)`);
       }
@@ -929,12 +939,19 @@ async function bulkReclassifyIndustries(env: Env): Promise<any> {
       const correctIndustry = domainRules[domain];
       
       if (correctIndustry && correctIndustry !== auditData.industry) {
-        // Update the audit
+        // Update the audit (include V2 metadata)
+        const { getAncestorSlugs } = await import('./config/industry-taxonomy-v2');
+        const ancestors = getAncestorSlugs(correctIndustry);
+        
         await env.DB.prepare(
           `UPDATE audits 
-           SET industry = ?, industry_source = 'domain_rules', industry_locked = 1 
+           SET industry = ?, 
+               industry_source = 'domain_rules', 
+               industry_locked = 1,
+               industry_confidence = 1.0,
+               industry_ancestors = ?
            WHERE id = ?`
-        ).bind(correctIndustry, auditData.id).run();
+        ).bind(correctIndustry, JSON.stringify(ancestors), auditData.id).run();
         
         console.log(`[RECLASSIFY] ${domain}: ${auditData.industry} → ${correctIndustry}`);
         results.reclassified++;
@@ -1031,11 +1048,18 @@ async function fixAudit(env: Env, auditId: string): Promise<any> {
   const correctIndustry = domainRules[domain];
   
   if (correctIndustry && correctIndustry !== audit.industry) {
+    const { getAncestorSlugs } = await import('./config/industry-taxonomy-v2');
+    const ancestors = getAncestorSlugs(correctIndustry);
+    
     await env.DB.prepare(
       `UPDATE audits 
-       SET industry = ?, industry_source = 'domain_rules', industry_locked = 1 
+       SET industry = ?, 
+           industry_source = 'domain_rules', 
+           industry_locked = 1,
+           industry_confidence = 1.0,
+           industry_ancestors = ?
        WHERE id = ?`
-    ).bind(correctIndustry, auditId).run();
+    ).bind(correctIndustry, JSON.stringify(ancestors), auditId).run();
     
     result.new_industry = correctIndustry;
     result.reclassified = true;
@@ -3445,8 +3469,18 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
   if (!precheck.ok) {
     // Domain failed validation - create audit as failed immediately
     await env.DB.prepare(
-      "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, finished_at, status, fail_reason, fail_at, config_json, industry, industry_source, industry_locked) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 'failed', ?, datetime('now'), ?, ?, ?, ?)"
-    ).bind(id, project_id, root_url, site_description || null, userId, precheck.reason, JSON.stringify(config), industryLock.value, industryLock.source, 1).run();
+      "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, finished_at, status, fail_reason, fail_at, config_json, industry, industry_source, industry_locked, industry_confidence, industry_ancestors, industry_metadata) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), 'failed', ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(
+      id, project_id, root_url, site_description || null, userId, 
+      precheck.reason, 
+      JSON.stringify(config), 
+      industryLock.value, 
+      industryLock.source, 
+      1,
+      industryLock.confidence || null,
+      industryLock.ancestors ? JSON.stringify(industryLock.ancestors) : null,
+      industryLock.metadata ? JSON.stringify(industryLock.metadata) : null
+    ).run();
     
     console.log(`[PRECHECK FAILED] ${id}: ${precheck.reason}`);
     return { audit_id: id, status: 'failed', reason: precheck.reason };
@@ -3458,10 +3492,19 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     root_url = precheck.finalUrl;
   }
   
-  // Create audit
+  // Create audit (with V2 hierarchical taxonomy metadata)
   await env.DB.prepare(
-    "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, status, config_json, industry, industry_source, industry_locked) VALUES (?, ?, ?, ?, ?, datetime('now'), 'running', ?, ?, ?, ?)"
-  ).bind(id, project_id, root_url, site_description || null, userId, JSON.stringify(config), industryLock.value, industryLock.source, 1).run();
+    "INSERT INTO audits (id, project_id, root_url, site_description, user_id, started_at, status, config_json, industry, industry_source, industry_locked, industry_confidence, industry_ancestors, industry_metadata) VALUES (?, ?, ?, ?, ?, datetime('now'), 'running', ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(
+    id, project_id, root_url, site_description || null, userId, 
+    JSON.stringify(config), 
+    industryLock.value, 
+    industryLock.source, 
+    1,
+    industryLock.confidence || null,
+    industryLock.ancestors ? JSON.stringify(industryLock.ancestors) : null,
+    industryLock.metadata ? JSON.stringify(industryLock.metadata) : null
+  ).run();
 
   // Hybrid discovery: Try sitemap first (fast timeout), then fill with organic discovery
   ctx.waitUntil((async () => {
