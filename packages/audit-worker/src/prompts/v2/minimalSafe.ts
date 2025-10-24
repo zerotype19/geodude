@@ -8,6 +8,7 @@ import { inferIndustryV2 } from "./lib/inferIndustryV2";
 import { loadSafeTemplate } from "./mssTemplates";
 import { initEmbeddingModel } from "./lib/embeddings";
 import type { IndustryKey } from "./taxonomy/industryTaxonomy";
+import { resolveTemplates } from "../templateResolver";
 
 export type MSSContext = {
   brand: string;
@@ -117,8 +118,10 @@ export async function buildMinimalSafeSetV2(
     }
   }
 
-  // Load template for detected industry
-  const template = loadSafeTemplate(industry);
+  // Load templates using NEW V2 templateResolver (cascading hierarchy)
+  // This resolves media.news → media.news → media → generic_consumer
+  const brandedTemplates = resolveTemplates(industry, 'branded');
+  const nonBrandedTemplates = resolveTemplates(industry, 'nonBranded');
 
   // Calculate realism score based on industry match quality
   let realism = 0.62; // default fallback
@@ -131,9 +134,9 @@ export async function buildMinimalSafeSetV2(
     }
   }
 
-  // Replace {{brand}} placeholder in branded queries
-  const branded = template.branded.map(q => q.replace(/\{\{brand\}\}/g, ctx.brand));
-  const nonBranded = template.nonBranded;
+  // Replace {brand} placeholder in branded queries (templateResolver uses {brand}, not {{brand}})
+  const branded = brandedTemplates.map(q => q.replace(/\{brand\}/g, ctx.brand));
+  const nonBranded = nonBrandedTemplates;
 
   // Log MSS usage for telemetry
   console.log(JSON.stringify({
@@ -142,7 +145,7 @@ export async function buildMinimalSafeSetV2(
     industry,
     source,
     confidence,
-    template_version: template.version,
+    template_version: "v1.0", // templateResolver version
     realism_score: realism,
     branded_count: branded.length,
     nonBranded_count: nonBranded.length
@@ -152,12 +155,12 @@ export async function buildMinimalSafeSetV2(
     branded,
     nonBranded,
     industry,
-    template_version: template.version,
+    template_version: "v1.0", // templateResolver version
     realism_score: realism,
     source,
     meta: {
       industry,
-      template_version: template.version,
+      template_version: "v1.0",
       realism_target: realism,
       confidence,
       confidence_adjusted: false

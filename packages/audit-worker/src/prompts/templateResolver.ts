@@ -600,6 +600,364 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
     ]
   },
   
+  // ==================== MEDIA (Parent) ====================
+  'media': {
+    branded: [
+      '{brand} content and programming',
+      '{brand} subscription cost',
+      '{brand} vs {competitor}',
+      '{brand} app and streaming',
+      '{brand} customer reviews'
+    ],
+    nonBranded: [
+      'Best media streaming services',
+      'How to cut cable',
+      'Streaming vs traditional media',
+      'Entertainment options comparison'
+    ]
+  },
+  
+  // ==================== MEDIA.NEWS ====================
+  'media.news': {
+    branded: [
+      '{brand} breaking news coverage',
+      '{brand} political bias and objectivity',
+      '{brand} subscription cost',
+      '{brand} vs {competitor}',
+      '{brand} investigative reporting',
+      '{brand} digital subscription benefits',
+      '{brand} mobile app features',
+      'Is {brand} reliable?',
+      '{brand} opinion vs news coverage',
+      '{brand} international news',
+      '{brand} fact-checking accuracy'
+    ],
+    nonBranded: [
+      'Most trusted news sources',
+      'How to identify news bias',
+      'Best news apps',
+      'Free vs paid news subscriptions',
+      'Breaking news alerts',
+      'Local vs national news coverage',
+      'Fact-checking websites',
+      'News media literacy'
+    ]
+  },
+  
+  // ==================== MEDIA.SPORTS ====================
+  'media.sports': {
+    branded: [
+      '{brand} live sports streaming',
+      '{brand}+ subscription worth it?',
+      '{brand} vs {competitor} for sports coverage',
+      '{brand} live scores and updates',
+      '{brand} fantasy sports',
+      '{brand} mobile app features',
+      '{brand} streaming quality',
+      'What sports does {brand} cover?',
+      '{brand} blackout restrictions',
+      '{brand} international sports coverage',
+      '{brand} college vs pro sports'
+    ],
+    nonBranded: [
+      'Best sports streaming services',
+      'How to watch live sports online',
+      'Sports streaming without cable',
+      'Fantasy sports tips and strategy',
+      'Live sports scores apps',
+      'College sports streaming',
+      'International sports coverage',
+      'Sports news aggregators'
+    ]
+  },
+  
+  // ==================== MEDIA.STREAMING.VIDEO ====================
+  'media.streaming.video': {
+    branded: [
+      '{brand} original content',
+      '{brand} subscription plans',
+      '{brand} vs {competitor}',
+      '{brand} content library size',
+      '{brand} 4K and HDR support',
+      '{brand} simultaneous streams',
+      '{brand} download for offline',
+      '{brand} family profiles',
+      'Is {brand} worth it?',
+      'Best shows on {brand}'
+    ],
+    nonBranded: [
+      'Best streaming services for movies',
+      'Streaming bundles comparison',
+      'Free streaming services',
+      'How many streaming services do I need?',
+      '4K streaming requirements',
+      'Best original series streaming'
+    ]
+  },
+  
+  // ==================== EDUCATION.ONLINE ====================
+  'education.online': {
+    branded: [
+      '{brand} course catalog',
+      '{brand} pricing and subscription',
+      '{brand} certificates and credentials',
+      '{brand} vs {competitor}',
+      '{brand} course quality',
+      '{brand} instructor reviews',
+      '{brand} free courses',
+      'Are {brand} certificates worth it?',
+      '{brand} course completion rates',
+      '{brand} career outcomes'
+    ],
+    nonBranded: [
+      'Best online learning platforms',
+      'Free online courses',
+      'Online degrees vs certifications',
+      'MOOCs comparison',
+      'How to learn programming online',
+      'Online course credibility',
+      'Self-paced vs instructor-led courses'
+    ]
+  },
+  
+  // ==================== REAL_ESTATE (Parent) ====================
+  'real_estate': {
+    branded: [
+      '{brand} property search',
+      '{brand} agent services',
+      '{brand} market data',
+      '{brand} vs {competitor}',
+      '{brand} fees and commissions'
+    ],
+    nonBranded: [
+      'How to buy a house',
+      'Real estate market trends',
+      'Home buying process',
+      'Real estate agent vs FSBO'
+    ]
+  },
+  
+  // ==================== REAL_ESTATE.RESIDENTIAL.BROKER ====================
+  'real_estate.residential.broker': {
+    branded: [
+      '{brand} homes for sale near me',
+      '{brand} home value estimator',
+      '{brand} vs {competitor}',
+      '{brand} mobile app features',
+      '{brand} agent services',
+      'How accurate is {brand} Zestimate?',
+      '{brand} rental listings',
+      '{brand} market trends',
+      '{brand} mortgage calculator',
+      '{brand} seller resources'
+    ],
+    nonBranded: [
+      'Best real estate websites',
+      'How to find homes for sale',
+      'Home value estimation accuracy',
+      'Real estate market data',
+      'First-time home buyer tips',
+      'How to price your home',
+      'Real estate listing strategies'
+    ]
+  },
+  
+  // ==================== REAL_ESTATE.COMMERCIAL ====================
+  'real_estate.commercial': {
+    branded: [
+      '{brand} commercial listings',
+      '{brand} property types',
+      '{brand} market analysis',
+      '{brand} investment properties',
+      '{brand} vs {competitor}',
+      '{brand} broker services',
+      '{brand} lease vs buy calculator'
+    ],
+    nonBranded: [
+      'Commercial real estate investing',
+      'Office space vs coworking',
+      'Retail space for lease',
+      'Commercial property financing',
+      'CRE market trends'
+    ]
+  },
+  
+  // ==================== FINANCE (Parent) ====================
+  'finance': {
+    branded: [
+      '{brand} account types',
+      '{brand} fees and rates',
+      '{brand} vs {competitor}',
+      '{brand} customer service',
+      '{brand} mobile banking',
+      'Is {brand} safe?'
+    ],
+    nonBranded: [
+      'Best financial services',
+      'How to manage money',
+      'Personal finance tips',
+      'Financial planning basics'
+    ]
+  },
+  
+  // ==================== FINANCE.BANK ====================
+  'finance.bank': {
+    branded: [
+      '{brand} checking account',
+      '{brand} savings account rates',
+      '{brand} credit card rewards',
+      '{brand} vs {competitor}',
+      '{brand} branch locations',
+      '{brand} ATM network',
+      '{brand} overdraft fees',
+      '{brand} mobile deposit',
+      'How to open account with {brand}',
+      '{brand} customer service hours'
+    ],
+    nonBranded: [
+      'Best banks for checking accounts',
+      'High-yield savings accounts',
+      'Online banks vs traditional banks',
+      'How to avoid bank fees',
+      'Bank account for students',
+      'Business banking options'
+    ]
+  },
+  
+  // ==================== FINANCE.CREDIT_CARD ====================
+  'finance.credit_card': {
+    branded: [
+      '{brand} rewards program',
+      '{brand} annual fee',
+      '{brand} welcome bonus',
+      '{brand} vs {competitor}',
+      '{brand} travel benefits',
+      '{brand} cash back rate',
+      '{brand} balance transfer',
+      'How to apply for {brand} card',
+      '{brand} credit score needed',
+      '{brand} foreign transaction fees'
+    ],
+    nonBranded: [
+      'Best credit cards for rewards',
+      'Cash back vs travel rewards',
+      'How to choose a credit card',
+      'Credit card with no annual fee',
+      'Building credit with credit cards',
+      'Balance transfer strategies'
+    ]
+  },
+  
+  // ==================== TRAVEL (Parent) ====================
+  'travel': {
+    branded: [
+      '{brand} booking process',
+      '{brand} cancellation policy',
+      '{brand} customer service',
+      '{brand} vs {competitor}',
+      '{brand} rewards program',
+      '{brand} mobile app'
+    ],
+    nonBranded: [
+      'Best travel booking sites',
+      'How to find travel deals',
+      'Travel planning tips',
+      'Budget travel strategies'
+    ]
+  },
+  
+  // ==================== TRAVEL.AIR ====================
+  'travel.air': {
+    branded: [
+      '{brand} flight status',
+      '{brand} baggage fees',
+      '{brand} seat selection',
+      '{brand} vs {competitor}',
+      '{brand} frequent flyer program',
+      '{brand} flight deals',
+      '{brand} change flight policy',
+      '{brand} in-flight wifi',
+      'How to check in with {brand}',
+      '{brand} customer service'
+    ],
+    nonBranded: [
+      'Best airlines for service',
+      'How to find cheap flights',
+      'Airline baggage policies',
+      'Frequent flyer programs comparison',
+      'Basic economy vs regular economy',
+      'Flight booking tips'
+    ]
+  },
+  
+  // ==================== TRAVEL.HOTEL ====================
+  'travel.hotel': {
+    branded: [
+      '{brand} hotel search',
+      '{brand} rewards program',
+      '{brand} cancellation policy',
+      '{brand} vs {competitor}',
+      '{brand} room types',
+      '{brand} amenities',
+      '{brand} member rates',
+      'Best {brand} properties',
+      '{brand} elite status benefits'
+    ],
+    nonBranded: [
+      'Best hotel booking sites',
+      'Hotel vs vacation rental',
+      'Hotel rewards programs comparison',
+      'How to get hotel upgrades',
+      'Budget hotel chains',
+      'Luxury hotel comparison'
+    ]
+  },
+  
+  // ==================== GOVERNMENT ====================
+  'government': {
+    branded: [
+      '{brand} services and resources',
+      'How to contact {brand}',
+      '{brand} office locations',
+      '{brand} hours of operation',
+      '{brand} forms and applications',
+      '{brand} eligibility requirements',
+      '{brand} appointment scheduling',
+      '{brand} online portal'
+    ],
+    nonBranded: [
+      'Government services by state',
+      'How to access public records',
+      'Government assistance programs',
+      'Voter registration process',
+      'How to contact elected officials',
+      'Government agency directory'
+    ]
+  },
+  
+  // ==================== NONPROFIT ====================
+  'nonprofit': {
+    branded: [
+      '{brand} mission and impact',
+      '{brand} donation options',
+      '{brand} volunteer opportunities',
+      '{brand} programs and services',
+      '{brand} vs {competitor}',
+      'How to donate to {brand}',
+      '{brand} tax deductible',
+      '{brand} annual report',
+      '{brand} success stories'
+    ],
+    nonBranded: [
+      'Best charities to donate to',
+      'How to evaluate nonprofit effectiveness',
+      'Volunteer opportunities near me',
+      'Tax-deductible donations',
+      'Nonprofit ratings and reviews',
+      'Charitable giving strategies'
+    ]
+  },
+  
   // ==================== FALLBACK ====================
   'generic_consumer': {
     branded: [

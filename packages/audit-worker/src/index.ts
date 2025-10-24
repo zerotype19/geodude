@@ -4002,13 +4002,16 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     const discoveredUrls = new Set<string>();
     discoveredUrls.add(normalizeUrl(root_url)); // Always include homepage (normalized)
     
-    // 1. Try sitemap discovery (with 3s timeout - reduced from 10s for HTTP request budget)
+    // 1. Try sitemap discovery (with 5s timeout - was 3s, too short for some sites)
     try {
+      console.log(`[SYNC-DISCOVER] Fetching sitemap URLs...`);
       const sitemapPromise = discoverUrls(root_url, env);
       const sitemapUrls = await Promise.race([
         sitemapPromise,
-        new Promise<string[]>((_, reject) => setTimeout(() => reject('timeout'), 3000))
+        new Promise<string[]>((_, reject) => setTimeout(() => reject('timeout'), 5000))
       ]);
+      
+      console.log(`[SYNC-DISCOVER] Sitemap returned ${sitemapUrls.length} raw URLs`);
       
       // Normalize and sort by depth (closest to root first) and take top 50
       const normalizedUrls = sitemapUrls.map(u => normalizeUrl(u));
@@ -4019,9 +4022,9 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
       }).slice(0, 50);
       
       sortedUrls.forEach(u => discoveredUrls.add(u));
-      console.log(`[SYNC-DISCOVER] Found ${sortedUrls.length} normalized URLs from sitemap`);
+      console.log(`[SYNC-DISCOVER] ✅ Found ${sortedUrls.length} normalized URLs from sitemap`);
     } catch (sitemapError: any) {
-      console.log(`[SYNC-DISCOVER] Sitemap discovery failed/timeout (${sitemapError}), cron will use organic discovery`);
+      console.log(`[SYNC-DISCOVER] ⚠️  Sitemap discovery failed/timeout: ${sitemapError}, cron will use organic discovery`);
     }
     
     // 2. Insert discovered URLs synchronously (batch insert for speed)
@@ -4034,7 +4037,7 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
       const deterministicId = crypto.randomUUID(); // Still use random, but INSERT OR IGNORE based on unique constraint
       return env.DB.prepare(
         `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
-         SELECT ?, ?, ?, datetime('now')
+         SELECT ?, ?, ?, NULL
          WHERE NOT EXISTS (SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ?)`
       ).bind(deterministicId, id, url, id, url);
     });
