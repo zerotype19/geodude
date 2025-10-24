@@ -44,11 +44,12 @@ export const PRECHECK_RETRY_BASE_MS = 2000;            // Base delay for exponen
 export const PRECHECK_RETRY_MAX_MS = 30000;            // Max retry delay (30s)
 
 // Citations Performance & Safety
-export const DISABLE_BRAVE_TEMP = false;                // Temporarily disable Brave if connector broken (Note: 0 URLs = quota exhausted, not broken)
+// FIXED: Increased timeouts to reduce timeout errors, disabled Brave due to rate limiting
+export const DISABLE_BRAVE_TEMP = true;                 // DISABLED: Brave hitting 100% rate limits (429 errors)
 export const CITATIONS_BATCH_SIZE = 5;                  // Concurrent queries per source
 export const CITATIONS_TIMEOUT_MS = 10000;              // 10s timeout per query
-export const CITATIONS_PERPLEXITY_TIMEOUT_MS = 15000;   // Perplexity specific timeout (increased - it's slower)
-export const CITATIONS_CHATGPT_TIMEOUT_MS = 8000;       // ChatGPT specific timeout
-export const CITATIONS_CLAUDE_TIMEOUT_MS = 8000;        // Claude specific timeout
-export const CITATIONS_BRAVE_TIMEOUT_MS = 5000;         // Brave specific timeout
+export const CITATIONS_PERPLEXITY_TIMEOUT_MS = 20000;   // INCREASED: 15s → 20s (was timing out frequently)
+export const CITATIONS_CHATGPT_TIMEOUT_MS = 12000;      // INCREASED: 8s → 12s (was timing out on complex queries)
+export const CITATIONS_CLAUDE_TIMEOUT_MS = 10000;       // INCREASED: 8s → 10s (for consistency)
+export const CITATIONS_BRAVE_TIMEOUT_MS = 5000;         // Brave specific timeout (currently disabled)
 

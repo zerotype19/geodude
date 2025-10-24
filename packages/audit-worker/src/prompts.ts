@@ -131,8 +131,28 @@ export function extractBrandNameV2(opts: {
     return opts.ogSiteName.trim();
   }
 
-  // 3) Domain prettifier (royalcaribbean.com -> Royal Caribbean)
-  const sld = opts.domain.replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0].split('.')[0];
+  // 3) Domain prettifier - extract eTLD+1 (e.g., mit.edu from web.mit.edu)
+  const fullDomain = opts.domain.replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
+  const parts = fullDomain.split('.');
+  
+  // Extract eTLD+1: for standard TLDs (com, org, edu), take last 2 parts
+  // For multi-part TLDs (co.uk, com.au), would need a full public suffix list
+  // For now, handle common cases: if TLD is edu/gov/mil or ends with .co.*, take last 2
+  let sld: string;
+  if (parts.length >= 2) {
+    const tld = parts[parts.length - 1];
+    const secondLevel = parts[parts.length - 2];
+    
+    // Multi-part TLD check (co.uk, com.au, etc.)
+    if (parts.length >= 3 && ['co', 'com', 'org', 'net', 'edu', 'gov', 'ac'].includes(secondLevel)) {
+      sld = parts[parts.length - 3];  // e.g., bbc.co.uk → bbc
+    } else {
+      sld = secondLevel;  // e.g., mit.edu → mit, google.com → google
+    }
+  } else {
+    sld = parts[0];
+  }
+  
   const prettyFromDomain = titleCaseTokens(sld);
   if (prettyFromDomain && !GENERIC.has(prettyFromDomain.toLowerCase())) {
     return prettyFromDomain;
@@ -638,9 +658,40 @@ async function buildWithDbContext(env: Env, domain: string, row: any) {
   const ents = normalizeEntities(classification.primary_entities || []);
   
   // Get industry from audit record (locked during audit creation)
-  // Legacy industry detection removed - now using audit lock system
+  // If industry is "unknown", re-resolve using AI classifier
   let industry = row.industry || "default";
-  console.log(`[PROMPTS] Using locked industry from audit: ${industry} (source: audit.industry_source)`);
+  
+  if (industry === "unknown" || industry === "default") {
+    console.log(`[PROMPTS] Industry is ${industry}, attempting re-classification for ${domain}`);
+    try {
+      const { resolveIndustry } = await import('./lib/industry');
+      const resolved = await resolveIndustry({
+        signals: {
+          domain,
+          title: row.title,
+          h1: row.h1,
+          metaDescription: row.meta_description,
+          navTerms: row.nav_terms ? JSON.parse(row.nav_terms) : [],
+          schemaTypes: row.schema_types ? JSON.parse(row.schema_types) : [],
+          bodyText: row.body_text,
+        },
+        env,
+        root_url: `https://${domain}`,
+        site_description: row.site_description
+      });
+      
+      if (resolved && resolved.value && resolved.value !== "unknown" && resolved.confidence >= 0.70) {
+        industry = resolved.value;
+        console.log(`[PROMPTS] ✅ Re-classified ${domain} as ${industry} (conf: ${resolved.confidence.toFixed(2)}, source: ${resolved.source})`);
+      } else {
+        console.log(`[PROMPTS] ⚠️  Re-classification failed or low confidence for ${domain}, keeping ${industry}`);
+      }
+    } catch (err: any) {
+      console.error(`[PROMPTS] Error re-classifying ${domain}:`, err.message || err);
+    }
+  } else {
+    console.log(`[PROMPTS] Using locked industry from audit: ${industry} (source: audit.industry_source)`);
+  }
   
   const categoryTerms = buildCategoryTerms(industry, ents, classification.site_type || 'corporate');
   

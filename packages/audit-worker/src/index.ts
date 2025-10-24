@@ -560,12 +560,15 @@ async function autoFinalizeStuckAudits(env: Env): Promise<void> {
 /**
  * Refresh oldest prompt cache entries (rolling refresh strategy)
  * Runs hourly to keep cache fresh
+ * FIXED: Reduced batch size and added delays to avoid subrequest limits
  */
 async function refreshPromptCache(env: Env): Promise<void> {
   console.log('[PROMPT_REFRESH] Starting hourly cache refresh');
   
   const { getStalePromptCache, buildAndCachePrompts } = await import('./prompt-cache');
-  const staleDomains = await getStalePromptCache(env, 100);
+  // REDUCED: From 100 to 15 to avoid hitting Cloudflare's 50 subrequest limit
+  // Each domain can make 1-3 subrequests (AI calls, D1, KV), so 15 domains = ~30-45 subrequests
+  const staleDomains = await getStalePromptCache(env, 15);
   
   if (staleDomains.length === 0) {
     console.log('[PROMPT_REFRESH] No stale cache entries found');
@@ -574,17 +577,30 @@ async function refreshPromptCache(env: Env): Promise<void> {
   
   console.log(`[PROMPT_REFRESH] Refreshing ${staleDomains.length} domains`);
   let refreshed = 0;
+  let skipped = 0;
   
   for (const domain of staleDomains) {
     try {
       await buildAndCachePrompts(env, domain);
       refreshed++;
-    } catch (err) {
-      console.error(`[PROMPT_REFRESH] Failed to refresh ${domain}:`, err);
+      
+      // Add 100ms delay between domains to avoid rate limits
+      if (refreshed < staleDomains.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    } catch (err: any) {
+      // Log and continue - don't let one failure stop the whole refresh
+      if (err.message?.includes('Too many subrequests')) {
+        console.warn(`[PROMPT_REFRESH] Subrequest limit hit at ${refreshed}/${staleDomains.length}, stopping refresh`);
+        skipped = staleDomains.length - refreshed;
+        break;
+      }
+      console.error(`[PROMPT_REFRESH] Failed to refresh ${domain}:`, err.message || err);
+      skipped++;
     }
   }
   
-  console.log(`[PROMPT_REFRESH] Refreshed ${refreshed}/${staleDomains.length} domains`);
+  console.log(`[PROMPT_REFRESH] Refreshed ${refreshed}/${staleDomains.length} domains${skipped > 0 ? ` (skipped: ${skipped})` : ''}`);
 }
 
 /**
