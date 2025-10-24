@@ -17,9 +17,14 @@ export type AuthSession = {
   };
 };
 
-export function useAuth() {
+export interface UseAuthOptions {
+  skip?: boolean; // Skip auth check (for public pages)
+}
+
+export function useAuth(options?: UseAuthOptions) {
+  const { skip = false } = options || {};
   const [me, setMe] = useState<AuthSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(skip ? false : true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchMe = useCallback(async () => {
@@ -52,6 +57,11 @@ export function useAuth() {
   }, [fetchMe]);
 
   useEffect(() => {
+    // Skip auth check for public pages
+    if (skip) {
+      return;
+    }
+
     let cancelled = false;
     
     (async () => {
@@ -76,7 +86,7 @@ export function useAuth() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [skip]);
 
   return {
     me,

@@ -24,10 +24,18 @@ function Navigation() {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [signInModalOpen, setSignInModalOpen] = useState(false)
-  const { me, isAuthed, logout } = useAuth()
+  
+  // Skip auth check for public routes
+  const isPublicRoute = location.pathname.startsWith('/public/')
+  const { me, isAuthed, logout } = useAuth({ skip: isPublicRoute })
   
   // Check if user is an admin (from backend session)
   const isAdmin = me?.isAdmin === true
+  
+  // Hide navigation for public routes
+  if (isPublicRoute) {
+    return null
+  }
   
   return (
     <nav className="bg-surface-1 border-b border-border shadow-sm relative">
@@ -142,6 +150,18 @@ function Navigation() {
   )
 }
 
+function AppFooter() {
+  const location = useLocation()
+  const isPublicRoute = location.pathname.startsWith('/public/')
+  
+  // Hide footer for public routes
+  if (isPublicRoute) {
+    return null
+  }
+  
+  return <FooterLegal />
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -168,7 +188,7 @@ function App() {
             <Route path="/auth/error" element={<AuthError />} />
           </Routes>
         </main>
-        <FooterLegal />
+        <AppFooter />
       </div>
     </BrowserRouter>
   )
