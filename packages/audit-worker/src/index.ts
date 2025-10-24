@@ -1136,13 +1136,16 @@ export default {
             .flat();
           
           const criteriaMap = await loadCriteriaMap(env.DB);
-          const composite = computeComposite(siteChecks, pageChecks, criteriaMap);
+          // Convert Map to Array for computeComposite
+          const criteriaArray = Array.from(criteriaMap.values());
+          const composite = computeComposite(pageChecks, siteChecks, criteriaArray);
           
           return new Response(JSON.stringify(composite), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         } catch (error: any) {
+          console.error('[PUBLIC_COMPOSITE] Error:', error);
           return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
