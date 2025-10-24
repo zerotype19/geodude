@@ -1800,6 +1800,27 @@ export default {
         }
       }
 
+      // TEMP: Backfill industry metadata (NO AUTH - remove after use)
+      if (req.method === 'POST' && path === '/api/admin/backfill-industry-metadata-now') {
+        try {
+          console.log('[ADMIN_NOAUTH] Starting industry metadata backfill...');
+          const result = await backfillIndustryMetadata(env);
+          return new Response(JSON.stringify(result), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('[ADMIN_NOAUTH] Backfill error:', error);
+          return new Response(JSON.stringify({
+            error: 'Backfill failed',
+            message: (error as Error).message
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // TEMP: Quick backfill bypass (NO AUTH - remove after use)
       if (req.method === 'GET' && path === '/api/admin/backfill-now') {
         try {
