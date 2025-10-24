@@ -6,6 +6,7 @@
 
 import { getDomainRules, getDefaultIndustry } from '../config/loader';
 import type { IndustryKey, HeuristicVote } from '../config/industry-packs.schema';
+import { mapLegacyToV2 } from '../config/industry-taxonomy-v2';
 
 export interface IndustryLock {
   value: IndustryKey;
@@ -22,6 +23,20 @@ export interface IndustrySignals {
   schemaTypes?: string[];
   keywords?: string[];
   navTerms?: string[];
+}
+
+/**
+ * Ensure industry key is a V2 hierarchical slug
+ * Maps legacy flat keys (e.g., 'pharmaceutical') to V2 slugs (e.g., 'health.pharma.brand')
+ */
+function ensureV2Slug(industryKey: string): IndustryKey {
+  // Check if already a V2 slug (contains a dot)
+  if (industryKey.includes('.')) {
+    return industryKey as IndustryKey;
+  }
+  
+  // Map legacy to V2
+  return mapLegacyToV2(industryKey) as IndustryKey;
 }
 
 /**
@@ -172,7 +187,7 @@ export async function resolveIndustry(ctx: {
   // 1. Explicit override
   if (ctx.override) {
     return {
-      value: ctx.override,
+      value: ensureV2Slug(ctx.override),
       source: 'override',
       locked: true
     };
@@ -181,7 +196,7 @@ export async function resolveIndustry(ctx: {
   // 2. Project-level override
   if (ctx.project?.industry_override) {
     return {
-      value: ctx.project.industry_override,
+      value: ensureV2Slug(ctx.project.industry_override),
       source: 'override',
       locked: true
     };
@@ -190,7 +205,7 @@ export async function resolveIndustry(ctx: {
   // 3. Already locked in audit
   if (ctx.audit?.industry) {
     return {
-      value: ctx.audit.industry,
+      value: ensureV2Slug(ctx.audit.industry),
       source: (ctx.audit.industry_source as any) || 'override',
       locked: true
     };
@@ -203,7 +218,7 @@ export async function resolveIndustry(ctx: {
   const byDomain = domainRules[domain];
   if (byDomain) {
     return {
-      value: byDomain as IndustryKey,
+      value: ensureV2Slug(byDomain as string),
       source: 'domain_rules',
       locked: true
     };
@@ -269,7 +284,7 @@ export async function resolveIndustry(ctx: {
           }
           
           return {
-            value: result.primary.industry_key,
+            value: ensureV2Slug(result.primary.industry_key as string),
             source,
             locked: true,
             confidence: finalConfidence,
@@ -288,7 +303,7 @@ export async function resolveIndustry(ctx: {
   if (heuristicsResult && heuristicsResult.score >= 0.5) {
     console.log(`[INDUSTRY_HEURISTICS] ${domain} → ${heuristicsResult.key} (score: ${heuristicsResult.score.toFixed(3)}, AI: ${aiResult ? `${aiResult.industry_key} @ ${aiResult.confidence.toFixed(3)}` : 'unavailable'})`);
     return {
-      value: heuristicsResult.key,
+      value: ensureV2Slug(heuristicsResult.key as string),
       source: 'heuristics',
       locked: true,
       votes: votes.slice(0, 3),
@@ -297,9 +312,10 @@ export async function resolveIndustry(ctx: {
   }
 
   // 8. Default fallback
-  console.log(`[INDUSTRY_DEFAULT] ${domain} → ${getDefaultIndustry()} (AI: ${aiResult ? `${aiResult.confidence.toFixed(3)}` : 'N/A'}, heuristics: ${heuristicsResult ? heuristicsResult.score.toFixed(3) : 'N/A'})`);
+  const defaultIndustry = getDefaultIndustry();
+  console.log(`[INDUSTRY_DEFAULT] ${domain} → ${defaultIndustry} (AI: ${aiResult ? `${aiResult.confidence.toFixed(3)}` : 'N/A'}, heuristics: ${heuristicsResult ? heuristicsResult.score.toFixed(3) : 'N/A'})`);
   return {
-    value: getDefaultIndustry() as IndustryKey,
+    value: ensureV2Slug(defaultIndustry) as IndustryKey,
     source: 'default',
     locked: true,
     votes,

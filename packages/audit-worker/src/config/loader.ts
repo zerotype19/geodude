@@ -1,10 +1,10 @@
 /**
  * Industry Config Loader
  * 
- * Loads industry packs from default JSON + KV overrides
+ * Loads industry packs from V2 hierarchical JSON + KV overrides
  */
 
-import baseConfig from './industry-packs.default.json';
+import baseConfig from './industry-packs-v2.json';
 import type { IndustryConfig, IndustryPacks, IndustryRules, IntentPack } from './industry-packs.schema';
 
 let INDUSTRY_PACKS: IndustryPacks = baseConfig.packs as unknown as IndustryPacks;

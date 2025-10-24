@@ -19,6 +19,7 @@ import { brandLeak as detectBrandLeak, buildLeakRegex, type BrandLeakCtx } from 
 import { buildMinimalSafeSet, type MSSInput } from './minimalSafeSet';
 import { buildMinimalSafeSetV2 } from './v2/minimalSafe';
 import { INDUSTRY_V2_ENABLED } from '../config';
+import { resolveTemplates, getTemplatesWithMetadata } from './templateResolver';
 
 // Brand aliases for more natural queries
 const BRAND_ALIASES: Record<string, string[]> = {
@@ -264,10 +265,40 @@ function getBrandNicknames(brand: string): string {
 
 /**
  * Build contextual examples based on industry/brand
+ * Now uses hierarchical template resolver for industry-specific prompts
  */
 function buildContextualExamples(brand: string, categoryTerms: string[], industry?: string | null): string {
   const firstCategory = categoryTerms[0] || 'service';
   const brandLower = brand.toLowerCase();
+  
+  // Try to get industry-specific templates from V2 taxonomy
+  if (industry && industry !== 'unknown') {
+    try {
+      const metadata = getTemplatesWithMetadata(industry);
+      if (metadata.branded.length > 0 || metadata.nonBranded.length > 0) {
+        // Use templates from hierarchical taxonomy
+        const brandedExamples = metadata.branded.slice(0, 10).map(t => 
+          `  - "${t.replace('{brand}', brand).replace('{competitor}', 'Competitor')}"`
+        ).join('\n');
+        
+        const nonBrandedExamples = metadata.nonBranded.slice(0, 8).map(t =>
+          `  - "${t.replace('{category}', firstCategory)}"`
+        ).join('\n');
+        
+        return `Examples of GOOD queries for ${brand} (${metadata.name}):
+Branded (focus on ${brand} products/services):
+${brandedExamples}
+
+NonBranded (generic ${firstCategory} queries - NO brand name):
+${nonBrandedExamples}
+
+**CRITICAL: NonBranded queries MUST NOT include "${brand}" or "${brandLower}" or variants like "${brandLower}s".**
+For example, "best ${brandLower}s for tickets" is WRONG. Use "best ${firstCategory} sites" instead.`;
+      }
+    } catch (error) {
+      console.log(`[V4] Could not resolve templates for industry "${industry}", using legacy examples`);
+    }
+  }
   
   // Special case: Entertainment/Theater/Ticketing (Broadway, StubHub, Ticketmaster, etc.)
   if (/theater|entertainment|tickets|shows|broadway|events|venues/i.test(categoryTerms.join(' ')) || 
