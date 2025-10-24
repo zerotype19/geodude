@@ -4033,25 +4033,30 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     const uniqueUrls = Array.from(discoveredUrls);
     console.log(`[SYNC-DISCOVER] Inserting ${uniqueUrls.length} URLs into D1...`);
     
-    // Use deterministic UUIDs based on audit_id + url to prevent duplicate inserts
     // Use sentinel value '1970-01-01 00:00:00' for unprocessed pages (NOT NULL constraint prevents NULL)
-    const statements = uniqueUrls.map(url => {
-      const deterministicId = crypto.randomUUID(); // Still use random, but INSERT OR IGNORE based on unique constraint
-      return env.DB.prepare(
-        `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
-         SELECT ?, ?, ?, '1970-01-01 00:00:00'
-         WHERE NOT EXISTS (SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ?)`
-      ).bind(deterministicId, id, url, id, url);
-    });
-    
-    // Batch insert (100 at a time)
-    const BATCH_SIZE = 100;
-    for (let i = 0; i < statements.length; i += BATCH_SIZE) {
-      const chunk = statements.slice(i, i + BATCH_SIZE);
-      await env.DB.batch(chunk);
+    // Insert URLs one by one to handle duplicates gracefully
+    let insertedCount = 0;
+    for (const url of uniqueUrls) {
+      try {
+        // Check if URL already exists for this audit
+        const existing = await env.DB.prepare(
+          `SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ? LIMIT 1`
+        ).bind(id, url).first();
+        
+        if (!existing) {
+          const pageId = crypto.randomUUID();
+          await env.DB.prepare(
+            `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
+             VALUES (?, ?, ?, '1970-01-01 00:00:00')`
+          ).bind(pageId, id, url).run();
+          insertedCount++;
+        }
+      } catch (error: any) {
+        console.error(`[SYNC-DISCOVER] Failed to insert ${url}:`, error.message || error);
+      }
     }
     
-    console.log(`[SYNC-DISCOVER] ✅ Queued ${uniqueUrls.length} URLs - cron will fetch+process in ~5 min`);
+    console.log(`[SYNC-DISCOVER] ✅ Queued ${insertedCount}/${uniqueUrls.length} URLs - cron will fetch+process in ~5 min`);
   } catch (error: any) {
     console.error(`[SYNC-DISCOVER ERROR] ${id}:`, error);
     await markAuditFailed(env, id, `discover_error: ${error.message || 'unknown'}`);
