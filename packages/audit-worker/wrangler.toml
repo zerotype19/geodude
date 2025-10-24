@@ -62,6 +62,19 @@ FEATURE_INDUSTRY_AI_CLASSIFY = "1"
 # Scoring V1 - HTML-based deterministic checks
 SCORING_V1_ENABLED = "true"
 
+# Prompt Generation - Phase 2B
+FEATURE_PROMPT_GROUNDED = "1"
+FEATURE_PROMPTS_FEWSHOT = "1"
+FEATURE_PROMPTS_PERSONAS = "1"
+FEATURE_PROMPTS_VALIDATION = "1"
+FEATURE_PROMPTS_BY_ASSISTANT = "1"
+FEATURE_PROMPTS_COVERAGE = "1"
+
+# Prompt Caching & Batch Processing
+PROMPTS_CACHE_TTL_DAYS = "14"
+PROMPTS_REFRESH_BATCH_SIZE = "15"
+PROMPTS_VERSION = "v4-humanized-001"
+
 [triggers]
 crons = [
   "*/5 * * * *",  # Auto-finalize stuck audits & citations (every 5 minutes)

@@ -1,78 +1,32 @@
 /**
  * Enterprise Buyer Persona
- * 
- * Characteristics:
- * - Focused on scalability and integration
- * - Security and compliance are critical
- * - Longer evaluation cycles
- * - Multiple stakeholders
- * - Needs vendor support and SLAs
+ * Focused on scalability, security, compliance, and vendor stability
  */
 
 export const ENTERPRISE_BUYER = {
   name: "enterprise_buyer",
-  
-  concerns: [
-    "security",
-    "compliance",
-    "scalability",
-    "integration",
-    "vendor support",
-    "SLAs",
-    "total cost of ownership"
-  ],
-  
+  concerns: ["security", "compliance", "scalability", "vendor stability", "integration", "support SLA"],
   language_patterns: [
-    "Does {brand} support SSO",
-    "What are {brand}'s security certifications",
-    "How does {brand} handle data residency",
-    "What's {brand}'s uptime SLA",
-    "{brand} integration with Salesforce",
-    "Is {brand} SOC 2 compliant",
-    "What's {brand}'s enterprise pricing",
-    "Does {brand} offer dedicated support"
+    "Does it meet compliance requirements",
+    "How does it scale",
+    "What's the enterprise pricing",
+    "Integration with existing systems",
+    "What's included in enterprise support",
+    "SOC 2 compliance"
   ],
-  
   question_starters: [
-    "What are the",
-    "Does it support",
-    "How does it integrate",
-    "What's the",
-    "Can we",
-    "Is there",
-    "What kind of"
+    "How does [product] handle",
+    "What enterprise features does",
+    "Does [product] support",
+    "What's the difference between Business and Enterprise",
+    "How secure is",
+    "Can [product] integrate with"
   ],
-  
-  decision_drivers: [
-    "Security certifications (SOC 2, ISO 27001)",
-    "Integration ecosystem",
-    "Scalability proof points",
-    "Enterprise SLAs",
-    "Dedicated support options",
-    "Data residency options",
-    "Migration support"
-  ],
-  
-  pain_points: [
-    "Legacy system integration",
-    "Change management",
-    "Security approval process",
-    "Multi-department buy-in",
-    "Budget approval cycles",
-    "Vendor risk assessment"
-  ],
-  
+  tone: "formal and risk-averse",
   typical_queries: [
-    "{brand} SOC 2 compliance",
-    "Does {brand} support SAML SSO?",
-    "{brand} vs {competitor} for enterprise",
-    "{brand} data residency options",
-    "What's {brand}'s uptime SLA?",
-    "{brand} integration with Salesforce",
-    "{brand} enterprise pricing tiers",
-    "Does {brand} offer dedicated account manager?",
-    "{brand} migration support from {competitor}",
-    "Is {brand} HIPAA compliant?"
+    "[product] enterprise pricing and features",
+    "[product] security compliance (SOC 2, HIPAA)",
+    "[product] vs [competitor] for large organizations",
+    "[product] API and integration capabilities"
   ]
 };
-

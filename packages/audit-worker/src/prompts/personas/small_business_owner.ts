@@ -1,74 +1,32 @@
 /**
  * Small Business Owner Persona
- * 
- * Characteristics:
- * - Cost-conscious
- * - Time-sensitive
- * - Needs simple, easy-to-use solutions
- * - Values customer support and reliability
- * - Often DIY mindset
+ * Concerned with cost, ease of use, and practical ROI
  */
 
 export const SMALL_BUSINESS_OWNER = {
   name: "small_business_owner",
-  
-  concerns: [
-    "cost",
-    "ease of use",
-    "time to value",
-    "customer support",
-    "reliability",
-    "simplicity"
-  ],
-  
+  concerns: ["cost", "ease of use", "support", "roi", "time to value"],
   language_patterns: [
-    "Is it worth it for my small business",
+    "Is it worth it for my business",
     "Can I afford",
     "How long does it take to",
     "What's the simplest way to",
-    "Do I need to hire someone to",
-    "Is this too complicated for",
-    "Will this save me time",
-    "Can I set this up myself"
+    "Do I really need",
+    "Is there a cheaper option"
   ],
-  
   question_starters: [
     "Should I",
     "Is it worth",
     "How much do I really need to",
-    "What's the cheapest",
-    "Best affordable",
-    "Do I need",
-    "Can I",
-    "Will this work for"
+    "Can my small business",
+    "What's the easiest way to",
+    "Do I need to hire someone to"
   ],
-  
-  decision_drivers: [
-    "ROI and payback period",
-    "Monthly cost predictability",
-    "Free trial availability",
-    "Easy cancellation",
-    "No long-term contracts",
-    "Good customer reviews from similar businesses"
-  ],
-  
-  pain_points: [
-    "Limited budget",
-    "Wearing multiple hats",
-    "No dedicated IT support",
-    "Time constraints",
-    "Fear of making wrong investment"
-  ],
-  
+  tone: "practical and cost-conscious",
   typical_queries: [
-    "{brand} worth it for 5-person team?",
-    "Cheapest {category} for small business",
-    "{brand} vs {competitor} for startups",
-    "Can I afford {brand} monthly cost?",
-    "Best {category} under $100/month",
-    "Is {brand} easy to use without training?",
-    "{brand} free trial length",
-    "Does {brand} have good support?"
+    "affordable [product] for small business",
+    "is [product] worth it for 10 employees",
+    "easiest [category] to set up",
+    "[product] vs [competitor] for small business"
   ]
 };
-

@@ -1,0 +1,233 @@
+{
+  "adobe.com": {
+    "products": [
+      "Adobe Creative Cloud",
+      "Photoshop",
+      "Illustrator",
+      "InDesign",
+      "Premiere Pro",
+      "After Effects",
+      "Adobe XD",
+      "Adobe Express",
+      "Acrobat",
+      "Adobe Sign",
+      "Adobe Experience Cloud",
+      "Adobe Analytics"
+    ],
+    "avoid_terms": [
+      "Adobe Makers",
+      "Adobe Builders",
+      "Adobe Creators",
+      "Adobe Pros"
+    ],
+    "common_comparisons": [
+      "Canva",
+      "Figma",
+      "Sketch",
+      "Affinity Designer",
+      "CorelDRAW"
+    ],
+    "pricing_tiers": ["Individual", "Business", "Teams", "Enterprise"],
+    "personas": ["designer", "photographer", "video_editor", "marketer", "enterprise_buyer"]
+  },
+  "salesforce.com": {
+    "products": [
+      "Sales Cloud",
+      "Service Cloud",
+      "Marketing Cloud",
+      "Commerce Cloud",
+      "Tableau",
+      "MuleSoft",
+      "Slack"
+    ],
+    "avoid_terms": [
+      "Salesforce Makers",
+      "Salesforce Builders",
+      "Salesforce Pros"
+    ],
+    "common_comparisons": [
+      "HubSpot",
+      "Microsoft Dynamics",
+      "Oracle CX",
+      "SAP"
+    ],
+    "pricing_tiers": ["Essentials", "Professional", "Enterprise", "Unlimited"],
+    "personas": ["sales_rep", "sales_manager", "admin", "enterprise_buyer"]
+  },
+  "stripe.com": {
+    "products": [
+      "Payments",
+      "Billing",
+      "Connect",
+      "Terminal",
+      "Radar",
+      "Sigma",
+      "Atlas"
+    ],
+    "avoid_terms": [
+      "Stripe Merchants",
+      "Stripe Pros",
+      "Stripe Plus"
+    ],
+    "common_comparisons": [
+      "PayPal",
+      "Square",
+      "Adyen",
+      "Braintree"
+    ],
+    "pricing_tiers": ["Standard", "Plus", "Custom"],
+    "personas": ["developer", "founder", "finance_manager"]
+  },
+  "pfizer.com": {
+    "products": [
+      "Comirnaty",
+      "Paxlovid",
+      "Eliquis",
+      "Prevnar",
+      "Ibrance",
+      "Xeljanz",
+      "Vyndaqel"
+    ],
+    "avoid_terms": [
+      "Pfizer Makers",
+      "Pfizer Builders",
+      "Pfizer Plus"
+    ],
+    "common_comparisons": [
+      "Moderna",
+      "Johnson & Johnson",
+      "Merck",
+      "AstraZeneca"
+    ],
+    "pricing_tiers": [],
+    "personas": ["patient", "caregiver", "healthcare_professional"]
+  },
+  "microsoft.com": {
+    "products": [
+      "Microsoft 365",
+      "Teams",
+      "Azure",
+      "Windows",
+      "Surface",
+      "Xbox",
+      "Dynamics 365",
+      "Power Platform"
+    ],
+    "avoid_terms": [
+      "Microsoft Makers",
+      "Microsoft Builders"
+    ],
+    "common_comparisons": [
+      "Google Workspace",
+      "AWS",
+      "Salesforce",
+      "Slack",
+      "Zoom"
+    ],
+    "pricing_tiers": ["Business Basic", "Business Standard", "Business Premium", "Enterprise"],
+    "personas": ["it_admin", "business_user", "developer", "enterprise_buyer"]
+  },
+  "apple.com": {
+    "products": [
+      "iPhone",
+      "iPad",
+      "Mac",
+      "Apple Watch",
+      "AirPods",
+      "Apple TV",
+      "iCloud",
+      "Apple Music",
+      "Apple Pay"
+    ],
+    "avoid_terms": [
+      "Apple Makers",
+      "Apple Builders",
+      "Apple Plus",
+      "Apple Pros"
+    ],
+    "common_comparisons": [
+      "Samsung",
+      "Google Pixel",
+      "Dell",
+      "Microsoft Surface"
+    ],
+    "pricing_tiers": ["Base", "Pro", "Max", "Ultra"],
+    "personas": ["consumer", "creative_professional", "developer", "business_user"]
+  },
+  "amazon.com": {
+    "products": [
+      "Prime",
+      "AWS",
+      "Kindle",
+      "Echo",
+      "Fire TV",
+      "Amazon Fresh",
+      "Amazon Pharmacy"
+    ],
+    "avoid_terms": [
+      "Amazon Makers",
+      "Amazon Builders"
+    ],
+    "common_comparisons": [
+      "Walmart",
+      "Target",
+      "eBay",
+      "Azure",
+      "Google Cloud"
+    ],
+    "pricing_tiers": ["Pay-as-you-go", "Prime", "Business", "Enterprise"],
+    "personas": ["shopper", "prime_member", "seller", "developer", "enterprise_buyer"]
+  },
+  "nike.com": {
+    "products": [
+      "Air Max",
+      "Air Force 1",
+      "Air Jordan",
+      "Pegasus",
+      "Metcon",
+      "Nike Pro",
+      "Nike Training Club"
+    ],
+    "avoid_terms": [
+      "Nike Pros",
+      "Nike Plus",
+      "Nike Makers"
+    ],
+    "common_comparisons": [
+      "Adidas",
+      "Under Armour",
+      "Puma",
+      "New Balance"
+    ],
+    "pricing_tiers": ["Standard", "Premium", "Luxury"],
+    "personas": ["athlete", "fitness_enthusiast", "sneaker_collector", "casual_wearer"]
+  },
+  "google.com": {
+    "products": [
+      "Google Search",
+      "Google Workspace",
+      "Gmail",
+      "Google Cloud",
+      "Google Ads",
+      "Google Analytics",
+      "Android",
+      "Chrome",
+      "Google Meet"
+    ],
+    "avoid_terms": [
+      "Google Makers",
+      "Google Builders",
+      "Google Plus"
+    ],
+    "common_comparisons": [
+      "Microsoft 365",
+      "AWS",
+      "Azure",
+      "Zoom",
+      "Slack"
+    ],
+    "pricing_tiers": ["Free", "Business Starter", "Business Standard", "Business Plus", "Enterprise"],
+    "personas": ["business_user", "developer", "advertiser", "enterprise_buyer"]
+  }
+}
+

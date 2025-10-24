@@ -1,77 +1,32 @@
 /**
  * Consumer User Persona
- * 
- * Characteristics:
- * - Personal use, not business
- * - Price-sensitive
- * - Values simplicity and convenience
- * - Influenced by reviews and recommendations
- * - Quick decision-making
+ * Focused on value, quality, and convenience
  */
 
 export const CONSUMER_USER = {
   name: "consumer_user",
-  
-  concerns: [
-    "price",
-    "ease of use",
-    "quality",
-    "customer service",
-    "return policy",
-    "shipping/delivery"
-  ],
-  
+  concerns: ["price", "quality", "convenience", "reviews", "return policy"],
   language_patterns: [
-    "Is {brand} worth it",
-    "Should I buy",
-    "{brand} vs {competitor} which is better",
+    "Is it worth the money",
     "What do people say about",
-    "Is {brand} good quality",
-    "Does {brand} have free shipping",
-    "Can I return {brand} if",
-    "Best {category} for families"
+    "Is it better than",
+    "How much does it really cost",
+    "Can I return it if",
+    "Is it good quality"
   ],
-  
   question_starters: [
-    "Is it worth",
-    "Should I",
+    "Is [product] worth it",
     "What's the best",
-    "Does it",
-    "Can I",
-    "Which is better",
-    "How much does",
-    "Where can I"
+    "Should I buy",
+    "Is [product] better than",
+    "How much is",
+    "Where can I get"
   ],
-  
-  decision_drivers: [
-    "Customer reviews and ratings",
-    "Price and value",
-    "Brand reputation",
-    "Ease of purchase",
-    "Return policy",
-    "Friend/family recommendations"
-  ],
-  
-  pain_points: [
-    "Too many options",
-    "Confusing pricing",
-    "Uncertain about quality",
-    "Fear of buyer's remorse",
-    "Hidden fees",
-    "Shipping costs"
-  ],
-  
+  tone: "conversational and value-focused",
   typical_queries: [
-    "Is {brand} worth the money?",
-    "{brand} vs {competitor} comparison",
-    "What's better, {brand} or {competitor}?",
-    "{brand} customer reviews",
-    "Does {brand} have sales?",
-    "Best {category} under $50",
-    "{brand} return policy",
-    "Where to buy {brand} cheap",
-    "Is {brand} good for beginners?",
-    "{brand} promo codes"
+    "is [product] worth the price",
+    "[product] vs [competitor] comparison",
+    "[product] reviews and ratings",
+    "best [category] under $[price]"
   ]
 };
-

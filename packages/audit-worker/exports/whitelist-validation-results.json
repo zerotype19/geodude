@@ -1,0 +1,68 @@
+{
+  "timestamp": "2025-10-24T12:37:25.907Z",
+  "total_domains": 1244,
+  "sample_size": 50,
+  "accuracy": 100,
+  "avg_confidence": 1,
+  "passed": 50,
+  "failed": 0,
+  "industry_breakdown": {
+    "financial_services": 8,
+    "restaurants": 5,
+    "telecom": 4,
+    "streaming": 4,
+    "travel_hotels": 8,
+    "pharmacy": 1,
+    "retail": 4,
+    "university": 2,
+    "saas_b2b": 6,
+    "ecommerce": 2,
+    "social_media": 2,
+    "automotive_oem": 2,
+    "travel_air": 1,
+    "travel_booking": 1
+  },
+  "failures": [],
+  "sample_successes": [
+    {
+      "domain": "metlife.com",
+      "industry": "financial_services"
+    },
+    {
+      "domain": "interactive brokers.com",
+      "industry": "financial_services"
+    },
+    {
+      "domain": "eddie v's.com",
+      "industry": "restaurants"
+    },
+    {
+      "domain": "straighttalk.com",
+      "industry": "telecom"
+    },
+    {
+      "domain": "sprint.com",
+      "industry": "telecom"
+    },
+    {
+      "domain": "appletv.com",
+      "industry": "streaming"
+    },
+    {
+      "domain": "montage hotels.com",
+      "industry": "travel_hotels"
+    },
+    {
+      "domain": "usaa.com",
+      "industry": "financial_services"
+    },
+    {
+      "domain": "cvs.com",
+      "industry": "pharmacy"
+    },
+    {
+      "domain": "pnc.com",
+      "industry": "financial_services"
+    }
+  ]
+}

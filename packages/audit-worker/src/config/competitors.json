@@ -1,0 +1,133 @@
+{
+  "adobe.com": {
+    "direct": ["Canva", "Figma", "Sketch", "Affinity Designer"],
+    "category": ["CorelDRAW", "GIMP", "Inkscape", "DaVinci Resolve"],
+    "product_specific": {
+      "Photoshop": ["GIMP", "Affinity Photo", "Pixelmator"],
+      "Illustrator": ["Inkscape", "CorelDRAW", "Affinity Designer"],
+      "Premiere Pro": ["DaVinci Resolve", "Final Cut Pro", "iMovie"],
+      "XD": ["Figma", "Sketch", "InVision"]
+    }
+  },
+  "salesforce.com": {
+    "direct": ["HubSpot", "Microsoft Dynamics 365", "Oracle CX", "SAP CRM"],
+    "category": ["Zoho CRM", "Pipedrive", "Freshsales"],
+    "product_specific": {
+      "Sales Cloud": ["HubSpot Sales Hub", "Pipedrive", "Close"],
+      "Service Cloud": ["Zendesk", "Freshdesk", "Intercom"],
+      "Marketing Cloud": ["HubSpot Marketing Hub", "Marketo", "Pardot"]
+    }
+  },
+  "stripe.com": {
+    "direct": ["PayPal", "Square", "Adyen", "Braintree"],
+    "category": ["Authorize.Net", "2Checkout", "Worldpay"],
+    "product_specific": {
+      "Payments": ["PayPal Payments", "Square Payments"],
+      "Billing": ["Chargebee", "Recurly", "Zuora"],
+      "Terminal": ["Square Terminal", "Clover"]
+    }
+  },
+  "pfizer.com": {
+    "direct": ["Moderna", "Johnson & Johnson", "Merck", "AstraZeneca"],
+    "category": ["GSK", "Sanofi", "Novartis", "Roche"],
+    "product_specific": {
+      "Comirnaty": ["Spikevax (Moderna)", "Jcovden (J&J)"],
+      "Eliquis": ["Xarelto", "Pradaxa", "Warfarin"],
+      "Prevnar": ["Pneumovax 23"]
+    }
+  },
+  "microsoft.com": {
+    "direct": ["Google", "Apple", "AWS", "Salesforce"],
+    "category": ["IBM", "Oracle", "SAP"],
+    "product_specific": {
+      "Microsoft 365": ["Google Workspace", "Zoho Workplace"],
+      "Teams": ["Slack", "Zoom", "Google Meet"],
+      "Azure": ["AWS", "Google Cloud", "IBM Cloud"],
+      "Dynamics 365": ["Salesforce", "Oracle NetSuite", "SAP"]
+    }
+  },
+  "apple.com": {
+    "direct": ["Samsung", "Google", "Microsoft", "Dell"],
+    "category": ["HP", "Lenovo", "OnePlus", "Huawei"],
+    "product_specific": {
+      "iPhone": ["Samsung Galaxy", "Google Pixel", "OnePlus"],
+      "iPad": ["Samsung Galaxy Tab", "Microsoft Surface", "Amazon Fire"],
+      "Mac": ["Dell XPS", "HP Spectre", "Microsoft Surface", "Lenovo ThinkPad"],
+      "Apple Watch": ["Samsung Galaxy Watch", "Fitbit", "Garmin"]
+    }
+  },
+  "amazon.com": {
+    "direct": ["Walmart", "Target", "eBay", "Alibaba"],
+    "category": ["Best Buy", "Costco", "Etsy"],
+    "product_specific": {
+      "Prime": ["Walmart+", "Target Circle"],
+      "AWS": ["Microsoft Azure", "Google Cloud", "IBM Cloud"],
+      "Kindle": ["Kobo", "Nook", "Boox"],
+      "Echo": ["Google Nest", "Apple HomePod", "Sonos"]
+    }
+  },
+  "nike.com": {
+    "direct": ["Adidas", "Under Armour", "Puma", "New Balance"],
+    "category": ["Reebok", "Asics", "Saucony", "Brooks"],
+    "product_specific": {
+      "Air Jordan": ["Adidas Yeezy", "Puma Suede"],
+      "Air Max": ["Adidas UltraBoost", "New Balance 990"],
+      "Metcon": ["Reebok Nano", "Under Armour TriBase"]
+    }
+  },
+  "google.com": {
+    "direct": ["Microsoft", "Apple", "AWS", "Meta"],
+    "category": ["Yahoo", "Bing", "DuckDuckGo"],
+    "product_specific": {
+      "Google Workspace": ["Microsoft 365", "Zoho Workplace"],
+      "Google Cloud": ["AWS", "Microsoft Azure", "IBM Cloud"],
+      "Google Ads": ["Microsoft Advertising", "Meta Ads"],
+      "Android": ["iOS", "Windows"]
+    }
+  },
+  "starbucks.com": {
+    "direct": ["Dunkin'", "Peet's Coffee", "Tim Hortons"],
+    "category": ["The Coffee Bean", "Costa Coffee", "Local cafes"],
+    "product_specific": {}
+  },
+  "target.com": {
+    "direct": ["Walmart", "Amazon", "Costco", "Best Buy"],
+    "category": ["Kroger", "Meijer", "Fred Meyer"],
+    "product_specific": {}
+  },
+  "delta.com": {
+    "direct": ["United", "American Airlines", "Southwest"],
+    "category": ["JetBlue", "Alaska Airlines", "Spirit"],
+    "product_specific": {}
+  },
+  "marriott.com": {
+    "direct": ["Hilton", "Hyatt", "IHG", "Wyndham"],
+    "category": ["Airbnb", "VRBO", "Booking.com"],
+    "product_specific": {}
+  },
+  "mayoclinic.org": {
+    "direct": ["Cleveland Clinic", "Johns Hopkins", "Mass General"],
+    "category": ["Kaiser Permanente", "Cedars-Sinai"],
+    "product_specific": {}
+  },
+  "chase.com": {
+    "direct": ["Bank of America", "Wells Fargo", "Citibank"],
+    "category": ["Capital One", "Discover", "American Express"],
+    "product_specific": {}
+  },
+  "harvard.edu": {
+    "direct": ["Stanford", "MIT", "Yale", "Princeton"],
+    "category": ["Columbia", "Penn", "Duke", "Northwestern"],
+    "product_specific": {}
+  },
+  "tesla.com": {
+    "direct": ["Rivian", "Lucid", "Polestar", "BMW"],
+    "category": ["Ford", "GM", "Volkswagen", "Hyundai"],
+    "product_specific": {
+      "Model 3": ["BMW 3 Series", "Audi A4", "Mercedes C-Class"],
+      "Model Y": ["Ford Mustang Mach-E", "Volkswagen ID.4"],
+      "Model S": ["Porsche Taycan", "Mercedes EQS", "Lucid Air"]
+    }
+  }
+}
+

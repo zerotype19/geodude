@@ -86,6 +86,26 @@ export const FEWSHOT_EXAMPLES: Record<string, FewShotExamples> = {
     ]
   },
   
+  pharmaceutical: {
+    good: [
+      "Is Pfizer's COVID vaccine safe?",
+      "Pfizer vaccine side effects vs Moderna",
+      "How effective is the Pfizer booster?",
+      "Eliquis vs Xarelto for blood clots",
+      "Pfizer drug pricing transparency",
+      "Moderna vaccine vs Pfizer differences",
+      "What are Lipitor side effects?",
+      "Keytruda effectiveness for lung cancer"
+    ],
+    bad: [
+      "Pfizer patient portal login",
+      "Moderna makers membership",
+      "Pfizer emergency room services",
+      "Schedule appointment with Pfizer",
+      "Pfizer clinic locations"
+    ]
+  },
+  
   travel_hotels: {
     good: [
       "Is Marriott Bonvoy worth it?",
@@ -96,7 +116,7 @@ export const FEWSHOT_EXAMPLES: Record<string, FewShotExamples> = {
       "How much is a night at Marriott?",
       "Best hotel chain for families"
     ],
-    good: [
+    bad: [
       "Marriott travelers membership",
       "Hilton guests pro account",
       "Hotel members exclusive pricing"
