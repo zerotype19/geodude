@@ -901,22 +901,19 @@ export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log('[CRON] Scheduled event:', event.cron);
     
+    if (event.cron === '*/5 * * * *') {
+      // Every 5 minutes: Auto-finalize stuck audits + process queued citations
+      console.log('[CRON] Running 5-minute maintenance tasks...');
+      await autoFinalizeStuckAudits(env);
+      await processQueuedCitations(env);
+      
+      // Also refresh prompt cache every 5 minutes (spreads load vs hourly burst)
+      await refreshPromptCache(env);
+    }
+    
     if (event.cron === '0 14 * * 1') {
       // Weekly citations run (Mondays 14:00 UTC)
       await runWeeklyCitations(env);
-    }
-    
-    if (event.cron === '*/10 * * * *') {
-      // Every 10 minutes: Process queued citations
-      await processQueuedCitations(env);
-    }
-    
-    if (event.cron === '0 * * * *') {
-      // Hourly: Auto-finalize stuck audits
-      await autoFinalizeStuckAudits(env);
-      
-      // Hourly: Refresh oldest 100 prompt cache entries
-      await refreshPromptCache(env);
     }
     
     if (event.cron === '0 2 * * *') {

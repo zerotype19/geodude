@@ -64,9 +64,8 @@ SCORING_V1_ENABLED = "true"
 
 [triggers]
 crons = [
-  "*/10 * * * *", # Citations runs (every 10 minutes)
+  "*/5 * * * *",  # Auto-finalize stuck audits & citations (every 5 minutes)
   "0 14 * * 1",   # Weekly classifier benchmark
-  "0 * * * *",    # Hourly health check
   "0 2 * * *",    # Daily MVA computation
   "0 3 * * *"     # Nightly recommendations (Learning Loop)
 ]
