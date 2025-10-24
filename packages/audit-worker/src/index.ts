@@ -3998,69 +3998,62 @@ async function createAudit(req: Request, env: Env, ctx: ExecutionContext) {
     industryLock.metadata ? JSON.stringify(industryLock.metadata) : null
   ).run();
 
-  // Hybrid discovery: Try sitemap first (fast timeout), then fill with organic discovery
-  ctx.waitUntil((async () => {
+  // Synchronous URL discovery (< 3s, prevents IoContext timeout in waitUntil)
+  try {
+    console.log(`[SYNC-DISCOVER] Starting discovery for: ${root_url}`);
+    
+    const discoveredUrls = new Set<string>();
+    discoveredUrls.add(normalizeUrl(root_url)); // Always include homepage (normalized)
+    
+    // 1. Try sitemap discovery (with 3s timeout - reduced from 10s for HTTP request budget)
     try {
-      console.log(`[HYBRID-DISCOVER] Starting discovery for: ${root_url}`);
+      const sitemapPromise = discoverUrls(root_url, env);
+      const sitemapUrls = await Promise.race([
+        sitemapPromise,
+        new Promise<string[]>((_, reject) => setTimeout(() => reject('timeout'), 3000))
+      ]);
       
-      const discoveredUrls = new Set<string>();
-      discoveredUrls.add(normalizeUrl(root_url)); // Always include homepage (normalized)
+      // Normalize and sort by depth (closest to root first) and take top 50
+      const normalizedUrls = sitemapUrls.map(u => normalizeUrl(u));
+      const sortedUrls = normalizedUrls.sort((a, b) => {
+        const depthA = new URL(a).pathname.split('/').filter(Boolean).length;
+        const depthB = new URL(b).pathname.split('/').filter(Boolean).length;
+        return depthA - depthB;
+      }).slice(0, 50);
       
-      // 1. Try sitemap discovery (with 10s timeout)
-      try {
-        const sitemapPromise = discoverUrls(root_url, env);
-        const sitemapUrls = await Promise.race([
-          sitemapPromise,
-          new Promise<string[]>((_, reject) => setTimeout(() => reject('timeout'), 10000))
-        ]);
-        
-        // Normalize and sort by depth (closest to root first) and take top 50
-        const normalizedUrls = sitemapUrls.map(u => normalizeUrl(u));
-        const sortedUrls = normalizedUrls.sort((a, b) => {
-          const depthA = new URL(a).pathname.split('/').filter(Boolean).length;
-          const depthB = new URL(b).pathname.split('/').filter(Boolean).length;
-          return depthA - depthB;
-        }).slice(0, 50);
-        
-        sortedUrls.forEach(u => discoveredUrls.add(u));
-        console.log(`[HYBRID-DISCOVER] Found ${sortedUrls.length} normalized URLs from sitemap`);
-      } catch (sitemapError: any) {
-        console.log(`[HYBRID-DISCOVER] Sitemap discovery failed/timeout, will use organic discovery: ${sitemapError}`);
-      }
-      
-      // 2. Insert discovered URLs (batch insert for speed)
-      // URL normalization already handled above, discoveredUrls Set ensures uniqueness
-      const uniqueUrls = Array.from(discoveredUrls);
-      console.log(`[HYBRID-DISCOVER] Inserting ${uniqueUrls.length} unique normalized URLs`);
-      
-      // Use deterministic UUIDs based on audit_id + url to prevent duplicate inserts
-      const statements = uniqueUrls.map(url => {
-        const urlHash = `${id}:${url}`;
-        const deterministicId = crypto.randomUUID(); // Still use random, but INSERT OR IGNORE based on unique constraint
-        return env.DB.prepare(
-          `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
-           SELECT ?, ?, ?, datetime('now')
-           WHERE NOT EXISTS (SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ?)`
-        ).bind(deterministicId, id, url, id, url);
-      });
-      
-      // Batch insert (100 at a time)
-      const BATCH_SIZE = 100;
-      for (let i = 0; i < statements.length; i += BATCH_SIZE) {
-        const chunk = statements.slice(i, i + BATCH_SIZE);
-        await env.DB.batch(chunk);
-      }
-      
-      console.log(`[HYBRID-DISCOVER] Queued ${uniqueUrls.length} URLs for batch processing`);
-      
-      // 3. Batch processing will be handled by cron (every 5 minutes)
-      // This prevents IoContext timeouts in waitUntil()
-      console.log(`[HYBRID-DISCOVER] Audit ${id} created, cron will process pages`);
-    } catch (error: any) {
-      console.error(`[HYBRID-DISCOVER ERROR] ${id}:`, error);
-      await markAuditFailed(env, id, `discover_error: ${error.message || 'unknown'}`);
+      sortedUrls.forEach(u => discoveredUrls.add(u));
+      console.log(`[SYNC-DISCOVER] Found ${sortedUrls.length} normalized URLs from sitemap`);
+    } catch (sitemapError: any) {
+      console.log(`[SYNC-DISCOVER] Sitemap discovery failed/timeout (${sitemapError}), cron will use organic discovery`);
     }
-  })());
+    
+    // 2. Insert discovered URLs synchronously (batch insert for speed)
+    // URL normalization already handled above, discoveredUrls Set ensures uniqueness
+    const uniqueUrls = Array.from(discoveredUrls);
+    console.log(`[SYNC-DISCOVER] Inserting ${uniqueUrls.length} URLs into D1...`);
+    
+    // Use deterministic UUIDs based on audit_id + url to prevent duplicate inserts
+    const statements = uniqueUrls.map(url => {
+      const deterministicId = crypto.randomUUID(); // Still use random, but INSERT OR IGNORE based on unique constraint
+      return env.DB.prepare(
+        `INSERT INTO audit_pages (id, audit_id, url, fetched_at) 
+         SELECT ?, ?, ?, datetime('now')
+         WHERE NOT EXISTS (SELECT 1 FROM audit_pages WHERE audit_id = ? AND url = ?)`
+      ).bind(deterministicId, id, url, id, url);
+    });
+    
+    // Batch insert (100 at a time)
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < statements.length; i += BATCH_SIZE) {
+      const chunk = statements.slice(i, i + BATCH_SIZE);
+      await env.DB.batch(chunk);
+    }
+    
+    console.log(`[SYNC-DISCOVER] ✅ Queued ${uniqueUrls.length} URLs - cron will fetch+process in ~5 min`);
+  } catch (error: any) {
+    console.error(`[SYNC-DISCOVER ERROR] ${id}:`, error);
+    await markAuditFailed(env, id, `discover_error: ${error.message || 'unknown'}`);
+  }
 
   return { audit_id: id, status: 'running' };
 }
