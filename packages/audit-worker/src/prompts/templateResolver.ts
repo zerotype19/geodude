@@ -38,25 +38,26 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
   // ==================== HEALTH.PHARMA.BRAND (Child) ====================
   'health.pharma.brand': {
     branded: [
-      'What are the side effects of {brand} {product}?',
-      'Is {brand} {product} right for me?',
-      '{brand} {product} vs {competitor}',
-      'How effective is {brand} {product}?',
-      'Does {brand} offer patient assistance programs?',
+      '{brand} {product} Prescribing Information (PI) PDF and Medication Guide',
+      '{brand} {product} indication and who it\'s for',
+      'Contraindications and boxed warnings for {brand} {product}',
       '{brand} {product} dosage and administration',
-      'What conditions does {brand} {product} treat?',
-      '{brand} {product} FDA approval status',
-      'How do I get a prescription for {brand} {product}?',
-      '{brand} clinical trial results',
-      '{brand} drug interactions and warnings'
+      '{brand} {product} side effects and safety info',
+      '{brand} {product} mechanism of action (MoA)',
+      '{brand} {product} patient savings card / copay assistance',
+      '{brand} {product} clinical trial results (phase, outcome)',
+      '{brand} {product} vs {competitor} (on-label comparison)',
+      '{brand} {product} HCP vs Patient site—official links',
+      '{brand} {product} FDA approval date/status',
+      'How to report side effects to {brand} (pharmacovigilance contact)'
     ],
     nonBranded: [
-      'What are the best treatments for {condition}?',
-      'Comparing prescription medications for {condition}',
-      'Side effects of {drug_class} medications',
-      'Patient assistance programs for expensive medications',
-      'FDA drug approval process',
-      'Understanding prescription drug labels'
+      'Treatments for {condition}: overview and official PI sources',
+      'Side effects by {drug_class} (and how to read PI sections)',
+      'How to find patient assistance for expensive medications',
+      'Understanding the FDA drug approval process',
+      'What to ask your doctor about starting {drug_class}',
+      'Generic vs brand medicines for {condition}'
     ]
   },
   
@@ -64,23 +65,25 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
   'health.providers': {
     branded: [
       'How do I find a doctor at {brand}?',
-      'Does {brand} accept {insurance}?',
-      '{brand} emergency room wait times',
+      'Does {brand} accept {insurance} and {plan}?',
+      '{brand} urgent care hours today ({today}) in {city}',
       'How to schedule an appointment at {brand}',
-      '{brand} patient portal login',
-      'What specialties does {brand} offer?',
-      '{brand} vs {competitor} for {procedure}',
-      '{brand} hospital reviews and ratings',
-      '{brand} billing and payment options',
-      'Does {brand} have urgent care?'
+      '{brand} patient portal login (name of portal and official link)',
+      'What specialties and {department} does {brand} offer?',
+      '{brand} emergency room wait times in {city}',
+      '{brand} billing, payment options, and financial assistance',
+      'Is {brand} accepting new patients for {department}?',
+      '{brand} medical records release and contact',
+      'Parking, directions, and campus map for {brand} {city} location',
+      '{brand} visitor policy and official site link'
     ],
     nonBranded: [
-      'Best hospitals for {procedure}',
-      'How to find a specialist for {condition}',
-      'What to expect at urgent care',
-      'Hospital patient rights and billing',
-      'How to choose a primary care doctor',
-      'Emergency room vs urgent care'
+      'Best hospitals for {procedure} in {city}, {state}',
+      'How to find an in-network primary care doctor in {city}',
+      'What to expect at urgent care vs emergency room',
+      'Hospital patient rights and medical billing basics',
+      'How to choose a specialist for {condition}',
+      'Where to get same-day appointments in {city}'
     ]
   },
   
@@ -105,20 +108,23 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
   // ==================== SOFTWARE.SAAS (Child) ====================
   'software.saas': {
     branded: [
-      '{brand} integrations and API',
-      '{brand} security and compliance',
-      '{brand} implementation timeline',
-      '{brand} data migration',
-      '{brand} uptime and reliability',
-      'How to get started with {brand}',
-      '{brand} training and onboarding',
-      '{brand} ROI and business case'
+      '{brand} pricing and plans (official pricing page)',
+      '{brand} integrations & API docs',
+      '{brand} security & compliance (SOC 2, ISO, HIPAA/BAA)',
+      '{brand} data residency and privacy policy',
+      '{brand} service SLA and uptime guarantees',
+      '{brand} status page and incident history',
+      '{brand} SSO/SAML setup and supported IdPs',
+      '{brand} rate limits and API quotas',
+      '{brand} implementation timeline and onboarding guide',
+      'Migrating from {competitor} to {brand} (official migration docs)'
     ],
     nonBranded: [
-      'SaaS vs on-premise software',
-      'How to evaluate SaaS vendors',
-      'SaaS pricing models explained',
-      'SaaS security best practices'
+      'SaaS vs on-prem: security, cost, and compliance checklist',
+      'How to evaluate SaaS vendors (security questionnaire basics)',
+      'Data residency vs data sovereignty in cloud apps',
+      'SSO/SAML vs OAuth for business apps',
+      'SLA terms explained (RTO/RPO, uptime, credits)'
     ]
   },
   
@@ -162,21 +168,26 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
   // ==================== AUTOMOTIVE.OEM (Child) ====================
   'automotive.oem': {
     branded: [
-      '{brand} {model} specs and features',
-      '{brand} {model} mpg and fuel economy',
-      '{brand} {model} safety ratings',
-      '{brand} {model} vs {competitor_model}',
-      '{brand} {model} trim levels and pricing',
-      'Configure and price {brand} {model}',
-      '{brand} {model} towing capacity',
-      'Where to buy {brand} {model}',
-      '{brand} certified pre-owned program'
+      '{brand} {model} specs and features (official brochure)',
+      '{brand} {model} safety ratings and driver-assist features',
+      '{brand} {model} owner\'s manual and maintenance schedule',
+      '{brand} {model} warranty coverage and exclusions',
+      '{brand} {model} build & price (official configurator)',
+      '{brand} {model} MPG/range and charging time (EV/hybrid)',
+      '{brand} {model} towing capacity and payload',
+      '{brand} {model} software updates / OTA release notes',
+      '{brand} certified pre-owned program details',
+      '{brand} recalls and VIN lookup (official)',
+      '{brand} {model} winter/terrain performance',
+      '{brand} roadside assistance coverage and contact'
     ],
     nonBranded: [
-      'Best SUVs under $40k',
-      'Most fuel-efficient sedans',
-      'Safest family vehicles',
-      'Electric vs hybrid cars comparison'
+      'Safest family vehicles this year',
+      'EV vs hybrid cost of ownership overview',
+      'Best SUVs under $40k (features to compare)',
+      'How to check recalls with a VIN',
+      'How often to service a new car',
+      'What\'s included in manufacturer warranties'
     ]
   },
   
@@ -243,20 +254,23 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
   // ==================== FOOD_RESTAURANT.CASUAL ====================
   'food_restaurant.casual': {
     branded: [
-      '{brand} menu and prices',
-      '{brand} happy hour specials',
-      '{brand} reservations',
-      '{brand} takeout and delivery',
-      '{brand} rewards program',
-      '{brand} kids menu',
-      '{brand} near me',
-      '{brand} wait times'
+      '{brand} menu and current prices (official menu page)',
+      '{brand} nutrition & allergens PDF',
+      '{brand} happy hour and specials in {city}',
+      '{brand} reservations and wait times (official app/page)',
+      '{brand} takeout & delivery partners and fees',
+      '{brand} kids menu and family deals',
+      '{brand} gift cards balance and terms',
+      '{brand} catering options and order lead times',
+      '{brand} location hours today ({today}) in {city}',
+      '{brand} return/refund policy for online orders'
     ],
     nonBranded: [
-      'Best casual dining restaurants',
-      'Family-friendly restaurants',
-      'Casual dining deals and coupons',
-      'Restaurant reservations tips'
+      'Best casual dining options for families in {city}',
+      'How to check restaurant allergen info',
+      'Tips for finding wait times and booking tables',
+      'Comparing delivery fees across apps',
+      'What counts as a "kids eat free" deal'
     ]
   },
   
@@ -288,7 +302,36 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
     ]
   },
   
-  // Aliases for common food/beverage classifications
+  // ==================== RETAIL.CPG.BEVERAGE (Taxonomy V2: Proper classification for beverages/CPG) ====================
+  // This is the proper home for energy drinks, coffee, packaged beverages
+  'retail.cpg.beverage': {
+    branded: [
+      '{brand} nutrition facts',
+      '{brand} flavors and varieties',
+      'Where to buy {brand}',
+      '{brand} vs {competitor}',
+      '{brand} ingredients and caffeine',
+      'Is {brand} healthy?',
+      '{brand} promotions and deals',
+      '{brand} near me',
+      '{brand} reviews and ratings',
+      'Benefits of {brand}',
+      '{brand} side effects',
+      '{brand} pricing'
+    ],
+    nonBranded: [
+      'Best energy drinks for focus',
+      'Healthiest energy drink options',
+      'Energy drink caffeine comparison',
+      'Natural energy boosters',
+      'Energy drinks vs coffee',
+      'Low sugar energy drinks',
+      'Energy drink safety',
+      'Best tasting energy drinks'
+    ]
+  },
+  
+  // Aliases for backward compatibility (map to retail.cpg.beverage)
   'FOOD & RESTAURANT.qsr': {
     branded: [
       '{brand} nutrition facts',
@@ -859,24 +902,26 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
   // ==================== FINANCE.BANK ====================
   'finance.bank': {
     branded: [
-      '{brand} checking account',
-      '{brand} savings account rates',
-      '{brand} credit card rewards',
-      '{brand} vs {competitor}',
-      '{brand} branch locations',
-      '{brand} ATM network',
-      '{brand} overdraft fees',
-      '{brand} mobile deposit',
-      'How to open account with {brand}',
-      '{brand} customer service hours'
+      '{brand} checking accounts (fees, minimums) — official page',
+      '{brand} savings account APY today ({today})',
+      '{brand} routing number and wire instructions',
+      '{brand} Zelle / instant transfer support',
+      '{brand} mobile deposit and daily limits',
+      '{brand} branch hours and holiday schedule in {city}',
+      '{brand} ATM network and surcharge policy',
+      'How to open an account with {brand} (requirements)',
+      '{brand} overdraft policy and fees',
+      '{brand} privacy policy and data sharing opt-outs',
+      '{brand} customer service contact and secure message portal',
+      '{brand} vs {competitor} for business banking'
     ],
     nonBranded: [
-      'Best banks for checking accounts',
-      'High-yield savings accounts',
-      'Online banks vs traditional banks',
+      'Best banks for high-yield savings',
+      'Online vs branch banks: fees, access, support',
       'How to avoid bank fees',
-      'Bank account for students',
-      'Business banking options'
+      'Student checking account features to compare',
+      'What is a routing number vs account number?',
+      'How overdraft protection works'
     ]
   },
   
@@ -1017,20 +1062,24 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
   // ==================== FALLBACK ====================
   'generic_consumer': {
     branded: [
-      '{brand} reviews and ratings',
-      '{brand} pricing and cost',
-      '{brand} vs {competitor}',
-      'Is {brand} worth it?',
-      'Where to buy {brand}',
-      '{brand} customer service',
-      '{brand} return policy',
-      '{brand} deals and discounts'
+      '{brand} official website and contact page',
+      '{brand} pricing and current promotions',
+      '{brand} return & refund policy',
+      '{brand} warranty terms and how to file a claim',
+      '{brand} privacy policy and data deletion request',
+      '{brand} owner\'s manual / getting started guide',
+      '{brand} store hours today ({today}) in {city}',
+      '{brand} product registration page',
+      'Is {brand} legit? — official company info and about page',
+      '{brand} vs {competitor} (feature comparison from official pages)'
     ],
     nonBranded: [
-      'Best {category} options',
-      'How to choose {category}',
-      '{category} buying guide',
-      '{category} comparison'
+      'Best {category} options this year',
+      '{category} buying guide: features to compare',
+      'How to read a {category} warranty',
+      'Return policy red flags to watch for',
+      'How to contact customer support effectively',
+      'How to spot counterfeit {category} products'
     ]
   }
 };

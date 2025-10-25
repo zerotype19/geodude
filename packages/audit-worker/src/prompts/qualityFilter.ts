@@ -34,6 +34,15 @@ export function isNaturalQuery(query: string): QualityCheckResult {
     /\{drug_class\}/i,
     /\{insurance\}/i,
     /\{model\}/i,
+    // NEW placeholders
+    /\{city\}/i,
+    /\{state\}/i,
+    /\{zip\}/i,
+    /\{today\}/i,
+    /\{department\}/i,
+    /\{plan\}/i,
+    /\{doc_type\}/i,
+    /\{aka\}/i,
   ];
   
   for (const pattern of placeholderPatterns) {

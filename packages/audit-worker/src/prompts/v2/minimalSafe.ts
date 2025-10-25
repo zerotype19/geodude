@@ -103,6 +103,51 @@ function getCompetitor(industry: string): string {
   return 'Alternative';
 }
 
+/**
+ * Get current date in YYYY-MM-DD format
+ */
+function getToday(): string {
+  const now = new Date();
+  return now.toISOString().split('T')[0];
+}
+
+/**
+ * Get generic city/state (can be enriched with actual geo data later)
+ */
+function getCity(): string {
+  return 'your area';
+}
+
+function getState(): string {
+  return 'your state';
+}
+
+function getDepartment(industry: string): string {
+  const lower = industry.toLowerCase();
+  if (lower.includes('health') || lower.includes('hospital')) {
+    return 'cardiology';
+  }
+  return 'department';
+}
+
+function getPlan(): string {
+  return 'your plan';
+}
+
+function getDocType(industry: string): string {
+  const lower = industry.toLowerCase();
+  if (lower.includes('pharma')) {
+    return 'Prescribing Information';
+  }
+  if (lower.includes('automotive')) {
+    return 'owner\'s manual';
+  }
+  if (lower.includes('software')) {
+    return 'SOC 2 report';
+  }
+  return 'documentation';
+}
+
 export type MSSResult = {
   branded: string[];
   nonBranded: string[];
@@ -222,15 +267,49 @@ export async function buildMinimalSafeSetV2(
       .replace(/\{category\}/g, getCategory(industry, ctx.domain))
       .replace(/\{product\}/g, ctx.brand) // For products, use brand name
       .replace(/\{competitor\}/g, getCompetitor(industry))
-      .replace(/\{condition\}/g, 'common health concerns') // Generic fallback
-      .replace(/\{procedure\}/g, 'medical procedures') // Generic fallback
-      .replace(/\{drug_class\}/g, 'medications') // Generic fallback
-      .replace(/\{insurance\}/g, 'major insurance') // Generic fallback
-      .replace(/\{model\}/g, 'product line'); // Generic fallback
+      .replace(/\{condition\}/g, 'common health concerns')
+      .replace(/\{procedure\}/g, 'medical procedures')
+      .replace(/\{drug_class\}/g, 'medications')
+      .replace(/\{insurance\}/g, 'major insurance')
+      .replace(/\{model\}/g, 'product line')
+      // NEW: Geo & temporal placeholders
+      .replace(/\{city\}/g, getCity())
+      .replace(/\{state\}/g, getState())
+      .replace(/\{zip\}/g, '')  // Empty for now, can enrich later
+      .replace(/\{today\}/g, getToday())
+      // NEW: Industry-specific placeholders
+      .replace(/\{department\}/g, getDepartment(industry))
+      .replace(/\{plan\}/g, getPlan())
+      .replace(/\{doc_type\}/g, getDocType(industry))
+      .replace(/\{aka\}/g, ''); // Empty for now
   };
   
-  const branded = brandedTemplates.map(q => replacePlaceholders(q));
-  const nonBranded = nonBrandedTemplates.map(q => replacePlaceholders(q));
+  // 🆕 MAJOR: Citation-seeking variants
+  // For each branded query, create a parallel version that explicitly requests the official URL
+  // This dramatically increases citation rates from AI assistants
+  const citationSuffix = ' and include the official {brand} URL you used.';
+  const expandWithCitationVariants = (queries: string[], isBranded: boolean): string[] => {
+    if (!isBranded) return queries;
+    
+    const expanded: string[] = [];
+    for (const q of queries) {
+      expanded.push(q); // Original version
+      // Add citation-seeking variant (but don't double-suffix)
+      if (!q.includes('official') && !q.includes('link') && !q.includes('URL')) {
+        const withCitation = q.replace(/([\?\.!])?$/, '') + citationSuffix.replace(/\{brand\}/g, ctx.brand);
+        expanded.push(withCitation);
+      }
+    }
+    return expanded;
+  };
+  
+  // Apply placeholder replacement
+  const brandedReplaced = brandedTemplates.map(q => replacePlaceholders(q));
+  const nonBrandedReplaced = nonBrandedTemplates.map(q => replacePlaceholders(q));
+  
+  // Apply citation-seeking expansion (doubles the branded query count for max citation pull)
+  const branded = expandWithCitationVariants(brandedReplaced, true);
+  const nonBranded = nonBrandedReplaced;
 
   // Log MSS usage for telemetry
   console.log(JSON.stringify({
