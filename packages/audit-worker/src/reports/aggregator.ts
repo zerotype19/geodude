@@ -242,14 +242,14 @@ async function getCategoryDetails(db: D1Database, auditId: string): Promise<Cate
   const criteria = await db.prepare(`
     SELECT 
       id,
-      display_name,
+      label,
       category,
       weight,
       impact_level,
       why_it_matters
     FROM scoring_criteria
-    WHERE is_active = 1
-    ORDER BY category, display_order
+    WHERE enabled = 1
+    ORDER BY category, id
   `).all() as any;
 
   // Get page checks for this audit
@@ -359,15 +359,14 @@ async function getPriorityFixes(db: D1Database, auditId: string): Promise<Priori
   const criteria = await db.prepare(`
     SELECT 
       id,
-      display_name,
+      label,
       category,
       weight,
       impact_level,
       why_it_matters,
-      how_to_fix,
-      common_issues
+      how_to_fix
     FROM scoring_criteria
-    WHERE is_active = 1
+    WHERE enabled = 1
     ORDER BY weight DESC, impact_level DESC
   `).all() as any;
 
@@ -398,9 +397,11 @@ async function getPriorityFixes(db: D1Database, auditId: string): Promise<Priori
 
         issueMap.set(check.id, {
           id: check.id,
-          name: criterion.display_name,
+          name: criterion.label,
           category: criterion.category,
-          severity: criterion.impact_level === 'critical' ? 'high' : criterion.impact_level === 'high' ? 'medium' : 'low',
+          severity: criterion.impact_level === 'critical' || criterion.impact_level === 'High' ? 'high' 
+                  : criterion.impact_level === 'high' || criterion.impact_level === 'Medium' ? 'medium' 
+                  : 'low',
           weight: criterion.weight,
           why_it_matters: criterion.why_it_matters || '',
           how_to_fix: criterion.how_to_fix || '',
