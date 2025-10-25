@@ -38,23 +38,23 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
   // ==================== HEALTH.PHARMA.BRAND (Child) ====================
   'health.pharma.brand': {
     branded: [
-      '{brand} {product} Prescribing Information (PI) PDF and Medication Guide',
-      '{brand} {product} indication and who it\'s for',
-      'Contraindications and boxed warnings for {brand} {product}',
-      '{brand} {product} dosage and administration',
-      '{brand} {product} side effects and safety info',
-      '{brand} {product} mechanism of action (MoA)',
-      '{brand} {product} patient savings card / copay assistance',
-      '{brand} {product} clinical trial results (phase, outcome)',
-      '{brand} {product} vs {competitor} (on-label comparison)',
-      '{brand} {product} HCP vs Patient site—official links',
-      '{brand} {product} FDA approval date/status',
+      '{brand} medications prescribing information (PI) and medication guides',
+      '{brand} drug indications and approved uses',
+      '{brand} medications contraindications and boxed warnings',
+      '{brand} dosage and administration guidelines',
+      '{brand} medication side effects and safety information',
+      '{brand} drug mechanism of action and clinical data',
+      '{brand} patient savings cards and copay assistance',
+      '{brand} clinical trial results and efficacy studies',
+      '{brand} vs {competitor} pharmaceutical comparison',
+      '{brand} healthcare provider and patient resources',
+      '{brand} FDA approval status and drug pipeline',
       'How to report side effects to {brand} (pharmacovigilance contact)',
       // 🆕 Official doc targets (high citation value)
-      '{brand} {product} REMS requirements (official REMS or brand site)',
-      '{brand} {product} Medication Guide PDF (patient version)',
-      '{brand} {product} storage and handling instructions (official label)',
-      '{brand} {product} how supplied (strengths, NDC codes)'
+      '{brand} REMS programs and requirements (official site)',
+      '{brand} medication guide PDFs (patient information)',
+      '{brand} drug storage and handling guidelines',
+      '{brand} product catalog and NDC codes'
     ],
     nonBranded: [
       'Treatments for {condition}: overview and official PI sources',

@@ -115,11 +115,13 @@ function getToday(): string {
  * Get generic city/state (can be enriched with actual geo data later)
  */
 function getCity(): string {
-  return 'your area';
+  const cities = ['Boston', 'Chicago', 'Dallas', 'Denver', 'Los Angeles', 'Miami', 'New York', 'Phoenix', 'Seattle', 'Atlanta'];
+  return cities[Math.floor(Math.random() * cities.length)];
 }
 
 function getState(): string {
-  return 'your state';
+  const states = ['California', 'Texas', 'Florida', 'New York', 'Illinois', 'Pennsylvania', 'Ohio', 'Georgia', 'North Carolina', 'Michigan'];
+  return states[Math.floor(Math.random() * states.length)];
 }
 
 function getDepartment(industry: string): string {
@@ -146,6 +148,20 @@ function getDocType(industry: string): string {
     return 'SOC 2 report';
   }
   return 'documentation';
+}
+
+function getProduct(brand: string, industry: string): string {
+  const lower = industry.toLowerCase();
+  // For pharma, we don't have specific product names, so use "medications" or similar
+  if (lower.includes('pharma')) {
+    return 'medications';
+  }
+  // For automotive, use "vehicles"
+  if (lower.includes('automotive')) {
+    return 'vehicles';
+  }
+  // For other industries, use the brand name (existing behavior)
+  return brand;
 }
 
 export type MSSResult = {
@@ -265,7 +281,7 @@ export async function buildMinimalSafeSetV2(
     return query
       .replace(/\{brand\}/g, ctx.brand)
       .replace(/\{category\}/g, getCategory(industry, ctx.domain))
-      .replace(/\{product\}/g, ctx.brand) // For products, use brand name
+      .replace(/\{product\}/g, getProduct(ctx.brand, industry)) // Industry-aware product replacement
       .replace(/\{competitor\}/g, getCompetitor(industry))
       .replace(/\{condition\}/g, 'common health concerns')
       .replace(/\{procedure\}/g, 'medical procedures')
