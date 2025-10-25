@@ -249,7 +249,7 @@ async function getCategoryDetails(db: D1Database, auditId: string): Promise<Cate
       why_it_matters
     FROM scoring_criteria
     WHERE enabled = 1
-    ORDER BY category, id
+    ORDER BY category, display_order, id
   `).all() as any;
 
   // Get page checks for this audit
@@ -364,10 +364,11 @@ async function getPriorityFixes(db: D1Database, auditId: string): Promise<Priori
       weight,
       impact_level,
       why_it_matters,
-      how_to_fix
+      how_to_fix,
+      common_issues
     FROM scoring_criteria
     WHERE enabled = 1
-    ORDER BY weight DESC, impact_level DESC
+    ORDER BY weight DESC, display_order
   `).all() as any;
 
   // Get all failing checks across pages
