@@ -242,7 +242,7 @@ async function getCategoryDetails(db: D1Database, auditId: string): Promise<Cate
   const criteria = await db.prepare(`
     SELECT 
       id,
-      name,
+      display_name,
       category,
       weight,
       impact_level,
@@ -359,7 +359,7 @@ async function getPriorityFixes(db: D1Database, auditId: string): Promise<Priori
   const criteria = await db.prepare(`
     SELECT 
       id,
-      name,
+      display_name,
       category,
       weight,
       impact_level,
@@ -398,7 +398,7 @@ async function getPriorityFixes(db: D1Database, auditId: string): Promise<Priori
 
         issueMap.set(check.id, {
           id: check.id,
-          name: criterion.name,
+          name: criterion.display_name,
           category: criterion.category,
           severity: criterion.impact_level === 'critical' ? 'high' : criterion.impact_level === 'high' ? 'medium' : 'low',
           weight: criterion.weight,
