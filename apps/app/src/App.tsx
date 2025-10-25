@@ -5,6 +5,7 @@ import SignInModal from './components/SignInModal.tsx'
 import AuditsIndex from './routes/audits/index.tsx'
 import NewAudit from './routes/audits/new.tsx'
 import AuditDetail from './routes/audits/[id]/index.tsx'
+import AuditReport from './routes/audits/[id]/report.tsx'
 import PageDetail from './routes/audits/[id]/pages/[pageId].tsx'
 import CategoryDetail from './routes/audits/[id]/category/[category].tsx'
 import PublicAudit from './routes/public/[id].tsx'
@@ -173,6 +174,7 @@ function App() {
             <Route path="/audits" element={<AuditsIndex />} />
             <Route path="/audits/new" element={<NewAudit />} />
             <Route path="/audits/:id" element={<AuditDetail />} />
+            <Route path="/audits/:id/report" element={<AuditReport />} />
             <Route path="/audits/:id/category/:category" element={<CategoryDetail />} />
             <Route path="/audits/:id/pages/:pageId" element={<PageDetail />} />
             <Route path="/public/:id" element={<PublicAudit />} />

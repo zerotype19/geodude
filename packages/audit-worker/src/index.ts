@@ -1894,6 +1894,26 @@ export default {
           });
         }
 
+        if (path === `/api/audits/${auditId}/report`) {
+          try {
+            const { aggregateReportData } = await import('./reports/aggregator');
+            const reportData = await aggregateReportData(env.DB, auditId);
+            return new Response(JSON.stringify(reportData), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (error: any) {
+            console.error('[REPORT] Error generating report:', error);
+            return new Response(JSON.stringify({ 
+              error: 'Failed to generate report', 
+              details: error.message 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+
         if (path === `/api/audits/${auditId}/pages`) {
           const result = await getAuditPages(auditId, url.searchParams, env);
           return new Response(JSON.stringify(result), { 
