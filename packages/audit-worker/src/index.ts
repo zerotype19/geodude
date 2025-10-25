@@ -4088,28 +4088,55 @@ async function getAuditsList(searchParams: URLSearchParams, env: Env, userId: st
   const limit = parseInt(searchParams.get('limit') || '50');
   const offset = parseInt(searchParams.get('offset') || '0');
   
-  // SECURITY: Always filter by user_id - users can only see their own audits
-  const query = `
-    SELECT 
-      id,
-      project_id,
-      root_url,
-      started_at,
-      finished_at,
-      status,
-      aeo_score,
-      geo_score,
-      composite_score,
-      config_json,
-      user_id,
-      is_public
-    FROM audits 
-    WHERE user_id = ?
-    ORDER BY started_at DESC 
-    LIMIT ? OFFSET ?
-  `;
+  // Check if user is admin
+  const isAdmin = await verifyIsAdmin(env.DB, userId);
   
-  const bindings = [userId, limit, offset];
+  // SECURITY: Admins see all audits, regular users see only their own
+  let query: string;
+  let bindings: any[];
+  
+  if (isAdmin) {
+    query = `
+      SELECT 
+        id,
+        project_id,
+        root_url,
+        started_at,
+        finished_at,
+        status,
+        aeo_score,
+        geo_score,
+        composite_score,
+        config_json,
+        user_id,
+        is_public
+      FROM audits 
+      ORDER BY started_at DESC 
+      LIMIT ? OFFSET ?
+    `;
+    bindings = [limit, offset];
+  } else {
+    query = `
+      SELECT 
+        id,
+        project_id,
+        root_url,
+        started_at,
+        finished_at,
+        status,
+        aeo_score,
+        geo_score,
+        composite_score,
+        config_json,
+        user_id,
+        is_public
+      FROM audits 
+      WHERE user_id = ?
+      ORDER BY started_at DESC 
+      LIMIT ? OFFSET ?
+    `;
+    bindings = [userId, limit, offset];
+  }
   
   const results = await env.DB.prepare(query).bind(...bindings).all();
 

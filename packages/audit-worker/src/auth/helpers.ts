@@ -37,11 +37,18 @@ export async function getUserIdFromRequest(request: Request, env: Env): Promise<
 }
 
 /**
- * Verify that the authenticated user owns the specified audit
- * Returns true if user owns audit, false otherwise
+ * Verify that the authenticated user owns the specified audit OR is an admin
+ * Returns true if user owns audit or is admin, false otherwise
  */
 export async function verifyAuditOwnership(db: D1Database, auditId: string, userId: string): Promise<boolean> {
   try {
+    // Check if user is admin first
+    const isAdmin = await verifyIsAdmin(db, userId);
+    if (isAdmin) {
+      return true; // Admins can access any audit
+    }
+
+    // If not admin, check ownership
     const audit = await db.prepare(
       'SELECT user_id FROM audits WHERE id = ?'
     ).bind(auditId).first() as any;
