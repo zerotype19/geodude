@@ -77,6 +77,31 @@ li a:hover,
   text-decoration-line: underline;
 }
 
+/* Ensure buttons styled as links maintain button colors */
+a.btn,
+a.btn-primary,
+a.btn-soft,
+a.btn-ghost,
+a.btn-secondary {
+  text-decoration: none !important;
+}
+
+a.btn-primary {
+  color: var(--color-brand-foreground) !important;
+}
+
+a.btn-soft {
+  color: var(--color-brand) !important;
+}
+
+a.btn-ghost {
+  color: var(--color-ink) !important;
+}
+
+a.btn-secondary {
+  color: var(--color-ink) !important;
+}
+
 /* Component utilities */
 @layer utilities {
   .card {
