@@ -22,6 +22,87 @@ export type MSSContext = {
   siteType?: string;
 };
 
+/**
+ * Get appropriate category name for the industry
+ */
+function getCategory(industry: string, domain: string): string {
+  const lower = industry.toLowerCase();
+  
+  // Food & Beverage
+  if (lower.includes('food') || lower.includes('restaurant') || lower.includes('qsr')) {
+    if (domain.includes('energy') || domain.includes('redbull') || domain.includes('monster')) {
+      return 'energy drink';
+    }
+    if (domain.includes('coffee') || domain.includes('starbucks')) {
+      return 'coffee';
+    }
+    return 'food';
+  }
+  
+  // Software
+  if (lower.includes('software') || lower.includes('saas')) {
+    return 'software';
+  }
+  
+  // Healthcare
+  if (lower.includes('health') || lower.includes('pharma') || lower.includes('medical')) {
+    return 'healthcare';
+  }
+  
+  // Finance
+  if (lower.includes('finance') || lower.includes('bank') || lower.includes('insurance')) {
+    return 'financial service';
+  }
+  
+  // Education
+  if (lower.includes('education') || lower.includes('university')) {
+    return 'education program';
+  }
+  
+  // Travel
+  if (lower.includes('travel') || lower.includes('hotel') || lower.includes('cruise')) {
+    return 'travel service';
+  }
+  
+  // Automotive
+  if (lower.includes('automotive') || lower.includes('vehicle')) {
+    return 'vehicle';
+  }
+  
+  // Retail
+  if (lower.includes('retail') || lower.includes('grocery')) {
+    return 'retail store';
+  }
+  
+  // Generic fallback
+  return 'product';
+}
+
+/**
+ * Get a generic competitor name for the industry
+ */
+function getCompetitor(industry: string): string {
+  const lower = industry.toLowerCase();
+  
+  // Food & Beverage
+  if (lower.includes('food') || lower.includes('restaurant') || lower.includes('qsr')) {
+    return 'Monster';
+  }
+  
+  // Software
+  if (lower.includes('software') || lower.includes('saas')) {
+    return 'Competitor';
+  }
+  
+  // Healthcare
+  if (lower.includes('health') || lower.includes('pharma')) {
+    return 'Alternative';
+  }
+  
+  // Generic fallback
+  return 'Alternative';
+}
+
 export type MSSResult = {
   branded: string[];
   nonBranded: string[];
@@ -134,9 +215,22 @@ export async function buildMinimalSafeSetV2(
     }
   }
 
-  // Replace {brand} placeholder in branded queries (templateResolver uses {brand}, not {{brand}})
-  const branded = brandedTemplates.map(q => q.replace(/\{brand\}/g, ctx.brand));
-  const nonBranded = nonBrandedTemplates;
+  // Replace all placeholders in templates
+  const replacePlaceholders = (query: string): string => {
+    return query
+      .replace(/\{brand\}/g, ctx.brand)
+      .replace(/\{category\}/g, getCategory(industry, ctx.domain))
+      .replace(/\{product\}/g, ctx.brand) // For products, use brand name
+      .replace(/\{competitor\}/g, getCompetitor(industry))
+      .replace(/\{condition\}/g, 'common health concerns') // Generic fallback
+      .replace(/\{procedure\}/g, 'medical procedures') // Generic fallback
+      .replace(/\{drug_class\}/g, 'medications') // Generic fallback
+      .replace(/\{insurance\}/g, 'major insurance') // Generic fallback
+      .replace(/\{model\}/g, 'product line'); // Generic fallback
+  };
+  
+  const branded = brandedTemplates.map(q => replacePlaceholders(q));
+  const nonBranded = nonBrandedTemplates.map(q => replacePlaceholders(q));
 
   // Log MSS usage for telemetry
   console.log(JSON.stringify({

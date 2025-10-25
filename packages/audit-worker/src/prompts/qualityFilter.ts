@@ -23,6 +23,29 @@ interface QualityCheckResult {
 export function isNaturalQuery(query: string): QualityCheckResult {
   const lower = query.toLowerCase().trim();
   
+  // 0. Reject queries with unreplaced placeholders
+  const placeholderPatterns = [
+    /\{brand\}/i,
+    /\{category\}/i,
+    /\{product\}/i,
+    /\{competitor\}/i,
+    /\{condition\}/i,
+    /\{procedure\}/i,
+    /\{drug_class\}/i,
+    /\{insurance\}/i,
+    /\{model\}/i,
+  ];
+  
+  for (const pattern of placeholderPatterns) {
+    if (pattern.test(query)) {
+      return { 
+        isValid: false, 
+        reason: `Unreplaced placeholder detected: ${pattern}`,
+        severity: 'critical'
+      };
+    }
+  }
+  
   // 1. Reject queries with obvious template artifacts
   const templateArtifacts = [
     /availability and limits for \w+s in/i,  // "Availability and limits for orlandos in..."
@@ -154,6 +177,26 @@ export function isNaturalQuery(query: string): QualityCheckResult {
       return { 
         isValid: false, 
         reason: `Wrong industry context: ${pattern}` 
+      };
+    }
+  }
+  
+  // 9. 🔥 FIX: Reject overly generic "drinks" language for beverage brands
+  // E.g., "What's the safest drink?" should be "What's the safest energy drink?"
+  const genericBeveragePatterns = [
+    /^what'?s? (the safest|a good|the best) drinks?\b(?!.*?(energy|coffee|soda|juice))/i,
+    /^help me understand drinks\.?$/i,
+    /^how do i use drinks\??$/i,
+    /^what are the rules for using drinks\??$/i,
+    /^top-rated drinks comparison\.?$/i,
+    /^what is a drink and how does it work\??$/i,
+  ];
+  
+  for (const pattern of genericBeveragePatterns) {
+    if (pattern.test(lower)) {
+      return { 
+        isValid: false, 
+        reason: `Overly generic beverage language: ${pattern}. Should be more specific (energy drink, coffee, etc.)` 
       };
     }
   }

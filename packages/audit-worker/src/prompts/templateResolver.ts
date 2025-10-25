@@ -260,6 +260,62 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
     ]
   },
   
+  // ==================== FOOD_RESTAURANT.QSR (Quick Service / Fast Food / Beverages) ====================
+  'food_restaurant.qsr': {
+    branded: [
+      '{brand} nutrition facts',
+      '{brand} flavors and varieties',
+      'Where to buy {brand}',
+      '{brand} vs {competitor}',
+      '{brand} ingredients and caffeine',
+      'Is {brand} healthy?',
+      '{brand} promotions and deals',
+      '{brand} near me',
+      '{brand} reviews and ratings',
+      'Benefits of {brand}',
+      '{brand} side effects',
+      '{brand} pricing'
+    ],
+    nonBranded: [
+      'Best energy drinks for focus',
+      'Healthiest energy drink options',
+      'Energy drink caffeine comparison',
+      'Natural energy boosters',
+      'Energy drinks vs coffee',
+      'Low sugar energy drinks',
+      'Energy drink safety',
+      'Best tasting energy drinks'
+    ]
+  },
+  
+  // Aliases for common food/beverage classifications
+  'FOOD & RESTAURANT.qsr': {
+    branded: [
+      '{brand} nutrition facts',
+      '{brand} flavors and varieties',
+      'Where to buy {brand}',
+      '{brand} vs {competitor}',
+      '{brand} ingredients and caffeine',
+      'Is {brand} healthy?',
+      '{brand} promotions and deals',
+      '{brand} near me',
+      '{brand} reviews and ratings',
+      'Benefits of {brand}',
+      '{brand} side effects',
+      '{brand} pricing'
+    ],
+    nonBranded: [
+      'Best energy drinks for focus',
+      'Healthiest energy drink options',
+      'Energy drink caffeine comparison',
+      'Natural energy boosters',
+      'Energy drinks vs coffee',
+      'Low sugar energy drinks',
+      'Energy drink safety',
+      'Best tasting energy drinks'
+    ]
+  },
+  
   // ==================== FINANCE.INSURANCE.P_AND_C ====================
   'finance.insurance.p_and_c': {
     branded: [
