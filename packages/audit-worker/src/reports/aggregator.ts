@@ -472,17 +472,17 @@ async function getCitationAnalysis(db: D1Database, auditId: string): Promise<Cit
   // Get top cited pages
   const topCited = await db.prepare(`
     SELECT 
-      cited_url,
+      first_match_url,
       COUNT(*) as citation_count
     FROM ai_citations
-    WHERE audit_id = ? AND cited_match_count > 0
-    GROUP BY cited_url
+    WHERE audit_id = ? AND cited_match_count > 0 AND first_match_url IS NOT NULL
+    GROUP BY first_match_url
     ORDER BY citation_count DESC
     LIMIT 10
   `).bind(auditId).all() as any;
 
   const topCitedPages = topCited.results.map((row: any) => ({
-    url: row.cited_url,
+    url: row.first_match_url,
     citation_count: row.citation_count,
     top_queries: [], // TODO: Fetch actual queries
   }));
@@ -508,7 +508,7 @@ async function getTopPages(db: D1Database, auditId: string): Promise<PagePerform
       (
         SELECT COUNT(*)
         FROM ai_citations
-        WHERE audit_id = ? AND cited_url = ap.url AND cited_match_count > 0
+        WHERE audit_id = ? AND first_match_url = ap.url AND cited_match_count > 0
       ) as citation_count
     FROM audit_pages ap
     JOIN audit_page_analysis apa ON apa.page_id = ap.id
