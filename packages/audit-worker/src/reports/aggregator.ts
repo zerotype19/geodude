@@ -11,8 +11,18 @@ export interface ReportData {
   categories: CategoryDetail[];
   priorityFixes: PriorityFix[];
   citations: CitationAnalysis;
+  siteDiagnostics: SiteDiagnostic[];
   topPages: PagePerformance[];
   quickWins: PagePerformance[];
+}
+
+export interface SiteDiagnostic {
+  id: string;
+  name: string;
+  score: number;
+  status: 'ok' | 'warn' | 'fail';
+  impact_level: string;
+  description: string;
 }
 
 export interface AuditInfo {
@@ -82,8 +92,14 @@ export interface CitationAnalysis {
     citation_count: number;
     top_queries: string[];
   }>;
+  successful_citations: Array<{
+    query: string;
+    source: string;
+    cited_url: string;
+  }>;
   missed_opportunities: Array<{
     query: string;
+    source: string;
     competitor_cited?: string;
     reason: string;
   }>;
@@ -117,6 +133,7 @@ export async function aggregateReportData(
     categories,
     priorityFixes,
     citations,
+    siteDiagnostics,
     topPages,
     quickWins
   ] = await Promise.all([
@@ -125,6 +142,7 @@ export async function aggregateReportData(
     getCategoryDetails(db, auditId),
     getPriorityFixes(db, auditId),
     getCitationAnalysis(db, auditId),
+    getSiteDiagnostics(db, auditId),
     getTopPages(db, auditId),
     getQuickWins(db, auditId),
   ]);
@@ -135,6 +153,7 @@ export async function aggregateReportData(
     categories,
     priorityFixes,
     citations,
+    siteDiagnostics,
     topPages,
     quickWins,
   };
@@ -476,7 +495,7 @@ async function getCitationAnalysis(db: D1Database, auditId: string): Promise<Cit
   const citedQueries = bySource.reduce((sum, s) => sum + s.cited, 0);
   const overallRate = totalQueries > 0 ? Math.round((citedQueries / totalQueries) * 100) : 0;
 
-  // Get top cited pages
+  // Get top cited pages with their queries
   const topCited = await db.prepare(`
     SELECT 
       first_match_url,
@@ -488,11 +507,38 @@ async function getCitationAnalysis(db: D1Database, auditId: string): Promise<Cit
     LIMIT 10
   `).bind(auditId).all() as any;
 
-  const topCitedPages = topCited.results.map((row: any) => ({
-    url: row.first_match_url,
-    citation_count: row.citation_count,
-    top_queries: [], // TODO: Fetch actual queries
+  const topCitedPages = await Promise.all(topCited.results.map(async (row: any) => {
+    const queries = await db.prepare(`
+      SELECT query
+      FROM ai_citations
+      WHERE audit_id = ? AND first_match_url = ? AND cited_match_count > 0
+      LIMIT 3
+    `).bind(auditId, row.first_match_url).all() as any;
+    
+    return {
+      url: row.first_match_url,
+      citation_count: row.citation_count,
+      top_queries: queries.results.map((q: any) => q.query),
+    };
   }));
+
+  // Get successful citation examples (queries where domain was cited)
+  const successfulCitations = await db.prepare(`
+    SELECT query, ai_source, first_match_url
+    FROM ai_citations
+    WHERE audit_id = ? AND cited_match_count > 0
+    ORDER BY occurred_at DESC
+    LIMIT 12
+  `).bind(auditId).all() as any;
+
+  // Get missed opportunities (queries with 0 citations)
+  const missedOpportunities = await db.prepare(`
+    SELECT query, ai_source
+    FROM ai_citations
+    WHERE audit_id = ? AND cited_match_count = 0
+    ORDER BY occurred_at DESC
+    LIMIT 10
+  `).bind(auditId).all() as any;
 
   return {
     overall_rate: overallRate,
@@ -500,8 +546,58 @@ async function getCitationAnalysis(db: D1Database, auditId: string): Promise<Cit
     cited_queries: citedQueries,
     by_source: bySource,
     top_cited_pages: topCitedPages,
-    missed_opportunities: [], // TODO: Fetch queries with 0 citations
+    successful_citations: successfulCitations.results.map((row: any) => ({
+      query: row.query,
+      source: row.ai_source,
+      cited_url: row.first_match_url,
+    })),
+    missed_opportunities: missedOpportunities.results.map((row: any) => ({
+      query: row.query,
+      source: row.ai_source,
+      reason: 'Domain not cited in AI response',
+    })),
   };
+}
+
+/**
+ * Get site-level diagnostics
+ */
+async function getSiteDiagnostics(db: D1Database, auditId: string): Promise<SiteDiagnostic[]> {
+  // Get site checks from audits table
+  const audit = await db.prepare(`
+    SELECT site_checks_json
+    FROM audits
+    WHERE id = ?
+  `).bind(auditId).first() as any;
+
+  if (!audit?.site_checks_json) {
+    return [];
+  }
+
+  const siteChecks = JSON.parse(audit.site_checks_json);
+
+  // Get criteria metadata for site checks
+  const criteria = await db.prepare(`
+    SELECT id, label, impact_level, description
+    FROM scoring_criteria
+    WHERE scope = 'site' AND enabled = 1
+  `).all() as any;
+
+  const criteriaMap = new Map(criteria.results.map((c: any) => [c.id, c]));
+
+  return siteChecks.map((check: any) => {
+    const criterion = criteriaMap.get(check.id);
+    const status = check.score >= 85 ? 'ok' : check.score >= 60 ? 'warn' : 'fail';
+
+    return {
+      id: check.id,
+      name: criterion?.label || check.id,
+      score: check.score,
+      status,
+      impact_level: criterion?.impact_level || 'Medium',
+      description: criterion?.description || '',
+    };
+  }).sort((a: any, b: any) => a.score - b.score); // Lowest scores first
 }
 
 /**

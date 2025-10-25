@@ -66,15 +66,27 @@ export default function AuditReport() {
 
   return (
     <div className="min-h-screen bg-surface-2 report-view">
-      {/* Print-only styles */}
+      {/* Print-only styles + tighter spacing */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
           .report-view { background: white !important; }
-          .page-max { max-width: 100% !important; }
-          .card { page-break-inside: avoid; margin-bottom: 2rem; }
+          .page-max { max-width: 100% !important; padding: 1rem !important; }
+          .card { page-break-inside: avoid; margin-bottom: 1rem !important; padding: 0.75rem !important; }
           .page-break { page-break-before: always; }
+          h2 { font-size: 1.5rem !important; margin-bottom: 0.75rem !important; }
+          h3 { font-size: 1.125rem !important; margin-bottom: 0.5rem !important; }
+          .mb-12 { margin-bottom: 1.5rem !important; }
+          .mb-6 { margin-bottom: 0.75rem !important; }
+          .mb-4 { margin-bottom: 0.5rem !important; }
+          .py-12 { padding-top: 1rem !important; padding-bottom: 1rem !important; }
         }
+        
+        /* Tighter on screen too */
+        .report-view .mb-12 { margin-bottom: 2rem; }
+        .report-view .mb-6 { margin-bottom: 1rem; }
+        .report-view h2 { font-size: 1.875rem; margin-bottom: 1rem; }
+        .report-view h3 { font-size: 1.25rem; margin-bottom: 0.75rem; }
       `}</style>
 
       {/* Screen-only header */}
@@ -110,6 +122,14 @@ export default function AuditReport() {
         {/* Priority Fixes */}
         <div className="page-break"></div>
         <PriorityFixes fixes={report.priorityFixes} />
+
+        {/* Site-Level Diagnostics */}
+        {report.siteDiagnostics && report.siteDiagnostics.length > 0 && (
+          <>
+            <div className="page-break"></div>
+            <SiteDiagnostics diagnostics={report.siteDiagnostics} />
+          </>
+        )}
 
         {/* Citation Analysis */}
         {report.citations.total_queries > 0 && (
@@ -409,6 +429,43 @@ function PriorityFixes({ fixes }: { fixes: PriorityFix[] }) {
   );
 }
 
+// Site Diagnostics Component
+function SiteDiagnostics({ diagnostics }: { diagnostics: any[] }) {
+  const getStatusColor = (status: string) => {
+    if (status === 'ok') return 'text-success';
+    if (status === 'warn') return 'text-warn';
+    return 'text-danger';
+  };
+
+  return (
+    <div className="mb-12">
+      <h2 className="text-3xl font-bold mb-6">Site-Level Diagnostics</h2>
+      <p className="text-ink-muted mb-4 text-sm">
+        These checks evaluate your site's overall foundation and structure.
+      </p>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {diagnostics.slice(0, 12).map((diagnostic) => (
+          <div key={diagnostic.id} className="card card-body">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="font-semibold text-sm flex-1">{diagnostic.name}</h3>
+              <span className={`text-2xl font-bold ml-2 ${getStatusColor(diagnostic.status)}`}>
+                {diagnostic.score}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`pill pill-${diagnostic.status === 'ok' ? 'success' : diagnostic.status === 'warn' ? 'warn' : 'danger'}`}>
+                {diagnostic.status.toUpperCase()}
+              </span>
+              <span className="text-ink-subtle">{diagnostic.impact_level} Impact</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Citation Analysis Component
 function CitationAnalysis({ citations }: { citations: CitationAnalysis }) {
   return (
@@ -416,32 +473,32 @@ function CitationAnalysis({ citations }: { citations: CitationAnalysis }) {
       <h2 className="text-3xl font-bold mb-6">AI Citation Performance</h2>
 
       {/* Overall Performance */}
-      <div className="card card-body mb-6">
-        <div className="grid md:grid-cols-3 gap-6">
+      <div className="card card-body mb-4">
+        <div className="grid md:grid-cols-3 gap-4">
           <div className="text-center">
-            <div className="text-4xl font-bold text-brand mb-2">{citations.overall_rate}%</div>
-            <div className="text-sm text-ink-subtle">Overall Citation Rate</div>
+            <div className="text-3xl font-bold text-brand mb-1">{citations.overall_rate}%</div>
+            <div className="text-xs text-ink-subtle">Overall Citation Rate</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl font-bold text-ink-muted mb-2">{citations.cited_queries}</div>
-            <div className="text-sm text-ink-subtle">Queries with Citations</div>
+            <div className="text-3xl font-bold text-ink-muted mb-1">{citations.cited_queries}</div>
+            <div className="text-xs text-ink-subtle">Queries with Citations</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl font-bold text-ink-muted mb-2">{citations.total_queries}</div>
-            <div className="text-sm text-ink-subtle">Total Queries Tested</div>
+            <div className="text-3xl font-bold text-ink-muted mb-1">{citations.total_queries}</div>
+            <div className="text-xs text-ink-subtle">Total Queries Tested</div>
           </div>
         </div>
       </div>
 
       {/* By Source */}
-      <div className="card card-body mb-6">
-        <h3 className="text-lg font-semibold mb-4">Performance by AI Source</h3>
-        <div className="space-y-4">
+      <div className="card card-body mb-4">
+        <h3 className="text-lg font-semibold mb-3">Performance by AI Source</h3>
+        <div className="space-y-3">
           {citations.by_source.map((source) => (
             <div key={source.source}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium capitalize">{source.source}</span>
-                <span className="text-lg font-bold">{source.rate}%</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium capitalize text-sm">{source.source}</span>
+                <span className="text-base font-bold">{source.rate}%</span>
               </div>
               <div className="bar">
                 <span 
@@ -457,19 +514,71 @@ function CitationAnalysis({ citations }: { citations: CitationAnalysis }) {
         </div>
       </div>
 
+      {/* Successful Citations Examples */}
+      {citations.successful_citations && citations.successful_citations.length > 0 && (
+        <div className="card card-body mb-4">
+          <h3 className="text-lg font-semibold mb-3">✅ Successful Citations (Where You're Cited)</h3>
+          <p className="text-sm text-ink-muted mb-3">
+            Example queries where your domain appears in AI responses:
+          </p>
+          <div className="space-y-2">
+            {citations.successful_citations.slice(0, 10).map((citation, index) => (
+              <div key={index} className="p-2 bg-surface-2 rounded text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <span className="font-medium">"{citation.query}"</span>
+                    <div className="text-xs text-ink-subtle mt-1">
+                      <span className="capitalize">{citation.source}</span>
+                      {citation.cited_url && (
+                        <> • <span className="truncate">{citation.cited_url.replace(/^https?:\/\//, '')}</span></>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Missed Opportunities */}
+      {citations.missed_opportunities && citations.missed_opportunities.length > 0 && (
+        <div className="card card-body mb-4">
+          <h3 className="text-lg font-semibold mb-3">⚠️ Missed Opportunities (Where You're Not Cited)</h3>
+          <p className="text-sm text-ink-muted mb-3">
+            Queries where your domain wasn't cited - potential content gaps:
+          </p>
+          <div className="space-y-2">
+            {citations.missed_opportunities.slice(0, 8).map((miss, index) => (
+              <div key={index} className="p-2 bg-surface-2 rounded text-sm">
+                <div className="font-medium">"{miss.query}"</div>
+                <div className="text-xs text-ink-subtle mt-1">
+                  <span className="capitalize">{miss.source}</span> • {miss.reason}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Top Cited Pages */}
       {citations.top_cited_pages.length > 0 && (
         <div className="card card-body">
-          <h3 className="text-lg font-semibold mb-4">Top Cited Pages</h3>
-          <div className="space-y-3">
+          <h3 className="text-lg font-semibold mb-3">Top Cited Pages</h3>
+          <div className="space-y-2">
             {citations.top_cited_pages.slice(0, 5).map((page, index) => (
               <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                 <div className="flex-1 truncate text-sm">
                   <span className="font-medium mr-2">{index + 1}.</span>
-                  {page.url}
+                  <span className="truncate">{page.url}</span>
+                  {page.top_queries.length > 0 && (
+                    <div className="text-xs text-ink-subtle mt-1 ml-6">
+                      Ex: "{page.top_queries[0]}"
+                    </div>
+                  )}
                 </div>
                 <div className="flex-shrink-0 ml-4">
-                  <span className="pill pill-brand">{page.citation_count} citations</span>
+                  <span className="pill pill-brand text-xs">{page.citation_count}</span>
                 </div>
               </div>
             ))}

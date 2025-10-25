@@ -8,8 +8,18 @@ export interface ReportData {
   categories: CategoryDetail[];
   priorityFixes: PriorityFix[];
   citations: CitationAnalysis;
+  siteDiagnostics: SiteDiagnostic[];
   topPages: PagePerformance[];
   quickWins: PagePerformance[];
+}
+
+export interface SiteDiagnostic {
+  id: string;
+  name: string;
+  score: number;
+  status: 'ok' | 'warn' | 'fail';
+  impact_level: string;
+  description: string;
 }
 
 export interface AuditInfo {
@@ -79,8 +89,14 @@ export interface CitationAnalysis {
     citation_count: number;
     top_queries: string[];
   }>;
+  successful_citations: Array<{
+    query: string;
+    source: string;
+    cited_url: string;
+  }>;
   missed_opportunities: Array<{
     query: string;
+    source: string;
     competitor_cited?: string;
     reason: string;
   }>;
