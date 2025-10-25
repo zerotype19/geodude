@@ -40,7 +40,7 @@ These templates now work for any pharma company without requiring a product cata
 
 ## ⚠️ Known Issues Requiring Manual Fix
 
-### 3. **Perplexity API Authentication Failure** 🔴
+### 3. **Perplexity API Credits Exhausted** 🔴
 **Status**: All 28 Delta queries failed with `401 Unauthorized`
 
 **Error**: 
@@ -49,22 +49,17 @@ These templates now work for any pharma company without requiring a product cata
 ```
 
 **Root Cause**: 
-The `PERPLEXITY_API_KEY` worker secret is either:
-1. Missing
-2. Expired/invalid
-3. Incorrectly formatted
+Perplexity account has run out of API credits (not an authentication issue).
 
 **How to Fix**:
-1. Go to Cloudflare Dashboard → Workers & Pages → optiview-audit-worker → Settings → Variables and Secrets
-2. Check if `PERPLEXITY_API_KEY` exists
-3. If missing or expired, generate a new API key from [Perplexity API Console](https://www.perplexity.ai/settings/api)
-4. Update/add the secret: `PERPLEXITY_API_KEY = <new-key>`
-5. Redeploy worker or trigger a new citation run
+1. Go to [Perplexity API Console](https://www.perplexity.ai/settings/api) → Billing
+2. Add more credits to your account
+3. Citations will automatically resume on next cron run (no redeployment needed)
 
 **Impact**: 
 - ChatGPT: ✅ Working (got 36 citations from Delta queries)
 - Claude: ✅ Working (got 29 citations from Delta queries)  
-- Perplexity: ❌ 0 citations (API key issue)
+- Perplexity: ❌ 0 citations (out of credits)
 - Brave: ⚪ Temporarily disabled
 
 **Total Delta Citations**: 65 from ChatGPT + Claude (missing ~28 from Perplexity)
