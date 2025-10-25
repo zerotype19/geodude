@@ -375,7 +375,6 @@ async function getPriorityFixes(db: D1Database, auditId: string): Promise<Priori
   const pageChecks = await db.prepare(`
     SELECT 
       ap.url,
-      ap.title,
       apa.checks_json
     FROM audit_page_analysis apa
     JOIN audit_pages ap ON apa.page_id = ap.id
@@ -414,7 +413,6 @@ async function getPriorityFixes(db: D1Database, auditId: string): Promise<Priori
       const issue = issueMap.get(check.id);
       issue.affected_pages.push({
         url: row.url,
-        title: row.title,
         current_score: check.score,
       });
       issue.total_score_impact += (100 - check.score) * issue.weight;
@@ -506,7 +504,6 @@ async function getTopPages(db: D1Database, auditId: string): Promise<PagePerform
   const pages = await db.prepare(`
     SELECT 
       ap.url,
-      ap.title,
       apa.checks_json,
       (
         SELECT COUNT(*)
@@ -528,7 +525,6 @@ async function getTopPages(db: D1Database, auditId: string): Promise<PagePerform
 
     return {
       url: row.url,
-      title: row.title,
       score: avgScore,
       citation_count: row.citation_count,
       strengths: [], // TODO: Extract from passing checks
@@ -544,7 +540,6 @@ async function getQuickWins(db: D1Database, auditId: string): Promise<PagePerfor
   const pages = await db.prepare(`
     SELECT 
       ap.url,
-      ap.title,
       apa.checks_json
     FROM audit_pages ap
     JOIN audit_page_analysis apa ON apa.page_id = ap.id
@@ -565,7 +560,6 @@ async function getQuickWins(db: D1Database, auditId: string): Promise<PagePerfor
       
       quickWins.push({
         url: row.url,
-        title: row.title,
         score: avgScore,
         citation_count: 0,
         strengths: [],
