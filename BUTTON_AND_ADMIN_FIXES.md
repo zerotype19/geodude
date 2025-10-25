@@ -5,14 +5,16 @@
 ### Problem
 Button text was invisible across the entire app, including:
 - Error page retry buttons
-- Action buttons
+- Action buttons (e.g., "Run Citation Test")
 - Submit buttons
-- All primary buttons
+- All primary buttons on both `<button>` and `<Link>` components
 
-**Root Cause**: The `.btn-primary` class used `text-white` but Tailwind v4 with the custom theme doesn't have a `white` color defined.
+**Root Causes**: 
+1. The `.btn-primary` class used `text-white` but Tailwind v4 with the custom theme doesn't have a `white` color defined
+2. Base link styles (`a { @apply text-brand }`) were overriding button text colors when button classes were applied to `<Link>` components
 
 ### Solution
-Changed button text color to use the design system:
+**Part 1: Fixed button base color**
 ```css
 /* Before */
 .btn-primary {
@@ -25,7 +27,24 @@ Changed button text color to use the design system:
 }
 ```
 
-**Result**: All button text now visible using `--color-brand-foreground: oklch(100% 0 0)` (white)
+**Part 2: Fixed buttons on Link components**
+Added specific CSS rules to ensure button classes maintain correct colors when applied to `<a>` elements:
+```css
+/* Ensure buttons styled as links maintain button colors */
+a.btn-primary {
+  color: var(--color-brand-foreground) !important;
+}
+
+a.btn-soft {
+  color: var(--color-brand) !important;
+}
+
+a.btn-ghost, a.btn-secondary {
+  color: var(--color-ink) !important;
+}
+```
+
+**Result**: All button text now visible on both `<button>` elements and `<Link>`/`<a>` components
 
 ---
 
@@ -130,8 +149,9 @@ Once `is_admin = 1`, the user will:
 ### Button Text
 - [x] Error page buttons show text
 - [x] Dashboard action buttons show text
+- [x] Citation "Run Citation Test" button shows text
 - [x] Form submit buttons show text
-- [x] All primary buttons visible
+- [x] All primary buttons visible on both `<button>` and `<Link>` components
 
 ### Admin Permissions
 - [x] Admin users see all audits in dashboard
