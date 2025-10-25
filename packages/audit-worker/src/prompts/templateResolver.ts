@@ -49,7 +49,12 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} {product} vs {competitor} (on-label comparison)',
       '{brand} {product} HCP vs Patient site—official links',
       '{brand} {product} FDA approval date/status',
-      'How to report side effects to {brand} (pharmacovigilance contact)'
+      'How to report side effects to {brand} (pharmacovigilance contact)',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} {product} REMS requirements (official REMS or brand site)',
+      '{brand} {product} Medication Guide PDF (patient version)',
+      '{brand} {product} storage and handling instructions (official label)',
+      '{brand} {product} how supplied (strengths, NDC codes)'
     ],
     nonBranded: [
       'Treatments for {condition}: overview and official PI sources',
@@ -75,7 +80,15 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       'Is {brand} accepting new patients for {department}?',
       '{brand} medical records release and contact',
       'Parking, directions, and campus map for {brand} {city} location',
-      '{brand} visitor policy and official site link'
+      '{brand} visitor policy and official site link',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} {department} phone number and hours in {city} (official link)',
+      '{brand} patient price transparency / chargemaster (official page)',
+      '{brand} HIPAA Notice of Privacy Practices (official PDF)',
+      // 🆕 Navigational anchors (high CTR)
+      '{brand} login / sign in (identify exact portal name)',
+      '{brand} find a doctor search tool',
+      '{brand} customer service phone number (official contact page)'
     ],
     nonBranded: [
       'Best hospitals for {procedure} in {city}, {state}',
@@ -117,7 +130,18 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} SSO/SAML setup and supported IdPs',
       '{brand} rate limits and API quotas',
       '{brand} implementation timeline and onboarding guide',
-      'Migrating from {competitor} to {brand} (official migration docs)'
+      'Migrating from {competitor} to {brand} (official migration docs)',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} Trust Center (security, compliance, sub-processors)',
+      '{brand} sub-processor list and notification policy',
+      '{brand} Data Processing Addendum (DPA) (official PDF)',
+      '{brand} vulnerability disclosure / bug bounty program',
+      '{brand} data retention & deletion policy',
+      '{brand} business continuity & disaster recovery (BC/DR) overview',
+      // 🆕 Navigational anchors (high CTR)
+      '{brand} login / sign in',
+      '{brand} customer service phone number (official contact)',
+      '{brand} careers / jobs'
     ],
     nonBranded: [
       'SaaS vs on-prem: security, cost, and compliance checklist',
@@ -179,7 +203,17 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} certified pre-owned program details',
       '{brand} recalls and VIN lookup (official)',
       '{brand} {model} winter/terrain performance',
-      '{brand} roadside assistance coverage and contact'
+      '{brand} roadside assistance coverage and contact',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} {model} tire pressure and oil type (official manual)',
+      '{brand} {model} maintenance schedule intervals (PDF link)',
+      '{brand} recall lookup by VIN (official link only)',
+      '{brand} {model} towing guide PDF',
+      '{brand} {model} warranty booklet PDF',
+      // 🆕 Navigational anchors (high CTR)
+      '{brand} find a dealer / store locator',
+      '{brand} customer service phone number',
+      '{brand} careers / jobs'
     ],
     nonBranded: [
       'Safest family vehicles this year',
@@ -263,7 +297,16 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} gift cards balance and terms',
       '{brand} catering options and order lead times',
       '{brand} location hours today ({today}) in {city}',
-      '{brand} return/refund policy for online orders'
+      '{brand} return/refund policy for online orders',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} allergen matrix PDF',
+      '{brand} nutrition calculator (official tool link)',
+      '{brand} franchise information and requirements (official page)',
+      '{brand} gift card terms PDF',
+      // 🆕 Navigational anchors (high CTR)
+      '{brand} location finder / store locator',
+      '{brand} customer service phone number',
+      '{brand} careers / jobs'
     ],
     nonBranded: [
       'Best casual dining options for families in {city}',
@@ -469,7 +512,13 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} campus life and housing',
       '{brand} acceptance rate',
       '{brand} vs {competitor}',
-      'How to get into {brand}'
+      'How to get into {brand}',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} Common Data Set (CDS) (official PDF)',
+      '{brand} Net Price Calculator (official link)',
+      '{brand} academic calendar (official page)',
+      '{brand} course catalog / bulletin (official PDF)',
+      '{brand} tuition and fees PDF'
     ],
     nonBranded: [
       'Best public universities',
@@ -509,7 +558,15 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} unlimited data options',
       '{brand} international roaming',
       '{brand} vs {competitor}',
-      'How to switch to {brand}'
+      'How to switch to {brand}',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} coverage map (official) for {zip}',
+      '{brand} BYOD compatibility checker / eSIM activation',
+      '{brand} network bands supported (official spec)',
+      // 🆕 Navigational anchors (high CTR)
+      '{brand} login / my account',
+      '{brand} store locator',
+      '{brand} customer service phone number'
     ],
     nonBranded: [
       'Best cell phone plans',
@@ -913,7 +970,17 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} overdraft policy and fees',
       '{brand} privacy policy and data sharing opt-outs',
       '{brand} customer service contact and secure message portal',
-      '{brand} vs {competitor} for business banking'
+      '{brand} vs {competitor} for business banking',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} fee schedule PDF (checking/savings)',
+      '{brand} electronic funds transfer (EFT)/Reg E disclosures',
+      '{brand} funds availability policy',
+      '{brand} Zelle limits and eligibility (official page)',
+      '{brand} routing number by state (official list)',
+      // 🆕 Navigational anchors (high CTR)
+      '{brand} login / online banking sign in',
+      '{brand} branch locator',
+      '{brand} customer service phone number'
     ],
     nonBranded: [
       'Best banks for high-yield savings',
@@ -979,7 +1046,16 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} change flight policy',
       '{brand} in-flight wifi',
       'How to check in with {brand}',
-      '{brand} customer service'
+      '{brand} customer service',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} contract of carriage (official PDF)',
+      '{brand} baggage fee chart (official page/PDF)',
+      '{brand} tarmac delay policy',
+      '{brand} pet policy and carrier requirements',
+      '{brand} route map (official)',
+      // 🆕 Navigational anchors (high CTR)
+      '{brand} login / check-in online',
+      '{brand} customer service phone number'
     ],
     nonBranded: [
       'Best airlines for service',
@@ -1002,7 +1078,15 @@ export const PROMPT_TEMPLATES_V2: Record<string, PromptTemplateSet> = {
       '{brand} amenities',
       '{brand} member rates',
       'Best {brand} properties',
-      '{brand} elite status benefits'
+      '{brand} elite status benefits',
+      // 🆕 Official doc targets (high citation value)
+      '{brand} best rate guarantee terms',
+      '{brand} resort fee policy (official page)',
+      '{brand} loyalty program terms PDF',
+      '{brand} incidentals/hold policy',
+      // 🆕 Navigational anchors (high CTR)
+      '{brand} login / rewards account',
+      '{brand} customer service phone number'
     ],
     nonBranded: [
       'Best hotel booking sites',
