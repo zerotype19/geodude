@@ -204,28 +204,26 @@ async function getScoreBreakdown(db: D1Database, auditId: string): Promise<Score
   }
   const siteScoreNormalized = siteMaxScore > 0 ? Math.round((siteScore / siteMaxScore) * 100) : 0;
 
-  // Get page checks average
-  const pageStats = await db.prepare(`
-    SELECT 
-      AVG(
-        CASE 
-          WHEN apa.checks_json IS NOT NULL 
-          THEN (
-            SELECT AVG(
-              CAST(json_extract(value, '$.score') AS REAL) * 
-              CAST(json_extract(value, '$.weight') AS REAL)
-            )
-            FROM json_each(apa.checks_json)
-          )
-          ELSE 0 
-        END
-      ) as avg_page_score
+  // Get page checks - calculate properly weighted average
+  const pageChecks = await db.prepare(`
+    SELECT apa.checks_json
     FROM audit_page_analysis apa
     JOIN audit_pages ap ON apa.page_id = ap.id
-    WHERE ap.audit_id = ?
-  `).bind(auditId).first() as any;
+    WHERE ap.audit_id = ? AND apa.checks_json IS NOT NULL
+  `).bind(auditId).all() as any;
 
-  const pageScore = Math.round(pageStats?.avg_page_score || 0);
+  let totalWeightedScore = 0;
+  let totalMaxScore = 0;
+  
+  for (const row of pageChecks.results) {
+    const checks = JSON.parse(row.checks_json);
+    for (const check of checks) {
+      totalWeightedScore += check.score * (check.weight || 1);
+      totalMaxScore += 100 * (check.weight || 1);
+    }
+  }
+  
+  const pageScore = totalMaxScore > 0 ? Math.round((totalWeightedScore / totalMaxScore) * 100) : 0;
 
   return {
     overall: audit?.composite_score || 0,
@@ -272,24 +270,23 @@ async function getCategoryDetails(db: D1Database, auditId: string): Promise<Cate
   // Aggregate by category
   const categoryMap = new Map<string, any>();
 
-  // Process criteria
+  // Process criteria to initialize categories
   for (const criterion of criteria.results) {
     if (!categoryMap.has(criterion.category)) {
       categoryMap.set(criterion.category, {
         category: criterion.category,
         display_name: formatCategoryName(criterion.category),
-        total_weight: 0,
-        total_score: 0,
-        checks_total: 0,
+        checks_in_category: 0,
+        weighted_score_sum: 0,
+        max_possible_score: 0,
         checks_passing: 0,
-        impact_level: 'medium',
-        affected_pages: 0,
+        checks_total: 0,
+        unique_pages: new Set(),
       });
     }
 
     const cat = categoryMap.get(criterion.category);
-    cat.total_weight += criterion.weight;
-    cat.checks_total++;
+    cat.checks_in_category++;
   }
 
   // Process page checks
@@ -304,11 +301,15 @@ async function getCategoryDetails(db: D1Database, auditId: string): Promise<Cate
       const cat = categoryMap.get(criterion.category);
       if (!cat) continue;
 
-      cat.total_score += check.score * criterion.weight;
+      // Accumulate weighted score
+      cat.weighted_score_sum += check.score * criterion.weight;
+      cat.max_possible_score += 100 * criterion.weight;
+      cat.checks_total++;
+      
+      // Count passing checks
       if (check.score >= 70) {
         cat.checks_passing++;
       }
-      cat.affected_pages++;
     }
   }
 
@@ -320,7 +321,12 @@ async function getCategoryDetails(db: D1Database, auditId: string): Promise<Cate
     const cat = categoryMap.get(criterion.category);
     if (!cat) continue;
 
-    cat.total_score += check.score * criterion.weight;
+    // Accumulate weighted score
+    cat.weighted_score_sum += check.score * criterion.weight;
+    cat.max_possible_score += 100 * criterion.weight;
+    cat.checks_total++;
+    
+    // Count passing checks
     if (check.score >= 70) {
       cat.checks_passing++;
     }
@@ -329,22 +335,23 @@ async function getCategoryDetails(db: D1Database, auditId: string): Promise<Cate
   // Convert to array and calculate percentages
   const categories: CategoryDetail[] = [];
   for (const [_, cat] of categoryMap) {
-    const percentage = cat.total_weight > 0 
-      ? Math.round((cat.total_score / (cat.total_weight * 100)) * 100)
+    // Calculate percentage: (actual weighted score / max possible weighted score) * 100
+    const percentage = cat.max_possible_score > 0 
+      ? Math.round((cat.weighted_score_sum / cat.max_possible_score) * 100)
       : 0;
 
     categories.push({
       category: cat.category,
       display_name: cat.display_name,
-      score: Math.round(cat.total_score / (cat.total_weight || 1)),
+      score: percentage, // Use the percentage as the score
       max_score: 100,
       percentage,
       checks_passing: cat.checks_passing,
-      checks_total: cat.checks_total,
+      checks_total: cat.checks_in_category, // Unique checks in this category
       impact_level: percentage < 60 ? 'high' : percentage < 80 ? 'medium' : 'low',
       strengths: [], // TODO: Populate from passing checks
       opportunities: [], // TODO: Populate from failing checks
-      affected_pages: cat.affected_pages,
+      affected_pages: Math.floor(cat.checks_total / (cat.checks_in_category || 1)), // Estimate pages from total check instances
     });
   }
 
