@@ -83,13 +83,11 @@
       padding: 1rem 1.5rem;
     }
     .logo {
-      font-size: 1.5rem;
-      font-weight: 700;
+      font-size: 1.25rem;
+      font-weight: 800;
       letter-spacing: -0.5px;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      text-transform: uppercase;
+      color: var(--purple);
       text-decoration: none;
     }
     nav {
@@ -277,7 +275,7 @@
 <body>
   <header>
     <div class="header-inner">
-      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <a href="/" class="logo">OPTIVIEW</a>
       <button class="menu-toggle" onclick="document.querySelector('nav').classList.toggle('active')" aria-label="Toggle menu">
         <span></span>
         <span></span>
@@ -314,7 +312,10 @@
 
       <div class="faq-grid">
         <a href="/faq/about.html" class="faq-card">
-          <span class="faq-icon">🧭</span>
+          <svg class="faq-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #667eea;">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 8v4M12 16h.01"/>
+          </svg>
           <h2>About Optiview & AI Visibility</h2>
           <p>
             Understand what AI Visibility means, how Optiview measures it, and why it matters for your brand's 
@@ -324,7 +325,12 @@
         </a>
 
         <a href="/faq/audit-process.html" class="faq-card">
-          <span class="faq-icon">🧩</span>
+          <svg class="faq-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #667eea;">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
           <h2>Audit Process & Scoring</h2>
           <p>
             Deep dive into how our audits work, what the Visibility Score measures, and how to interpret 
@@ -334,7 +340,10 @@
         </a>
 
         <a href="/faq/citations.html" class="faq-card">
-          <span class="faq-icon">🔍</span>
+          <svg class="faq-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #667eea;">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
           <h2>AI Citations & Crawlers</h2>
           <p>
             Learn how AI assistants source and reference web content, which crawlers we track, and what 
@@ -344,7 +353,10 @@
         </a>
 
         <a href="/faq/structured-data.html" class="faq-card">
-          <span class="faq-icon">⚙️</span>
+          <svg class="faq-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #667eea;">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6M23 12h-6m-6 0H1"/>
+          </svg>
           <h2>Structured Data & Schema</h2>
           <p>
             Master the schema markup that makes your content machine-readable. Learn which types matter 
@@ -354,7 +366,10 @@
         </a>
 
         <a href="/faq/improving-score.html" class="faq-card">
-          <span class="faq-icon">📈</span>
+          <svg class="faq-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #667eea;">
+            <path d="M3 3v18h18"/>
+            <path d="M18 17l-5-5-3 3-5-5"/>
+          </svg>
           <h2>Improving Your Score</h2>
           <p>
             Convert audit findings into action. Discover which fixes have the biggest impact and how 
@@ -364,7 +379,10 @@
         </a>
 
         <a href="/faq/use-cases.html" class="faq-card">
-          <span class="faq-icon">🧪</span>
+          <svg class="faq-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #667eea;">
+            <path d="M9 11l3 3L22 4"/>
+            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+          </svg>
           <h2>Use Cases & Examples</h2>
           <p>
             See real-world applications across e-commerce, healthcare, publishing, and B2B SaaS. 
@@ -374,7 +392,10 @@
         </a>
 
         <a href="/faq/privacy.html" class="faq-card">
-          <span class="faq-icon">🔒</span>
+          <svg class="faq-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #667eea;">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
           <h2>Privacy & Data Handling</h2>
           <p>
             Understand our data sources, accuracy standards, and privacy practices. GDPR compliance, 
@@ -384,7 +405,11 @@
         </a>
 
         <a href="/faq/glossary.html" class="faq-card">
-          <span class="faq-icon">📚</span>
+          <svg class="faq-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #667eea;">
+            <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+            <path d="M8 7h8M8 11h8M8 15h8"/>
+          </svg>
           <h2>Glossary</h2>
           <p>
             Clear definitions of AI Visibility, AEO, GEO, answerability, citation coverage, and other 
