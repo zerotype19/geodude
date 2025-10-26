@@ -34,20 +34,46 @@ export default function ScoreGuide() {
 
   return (
     <div className="min-h-screen bg-surface-2">
-      <div className="page-max container-px py-8">
-        {/* Header */}
-        <header className="mb-12">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-brand via-brand/90 to-brand/80 text-white">
+        <div className="page-max container-px py-12">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-4xl font-bold mb-2">
+              <h1 className="text-5xl font-bold mb-3">
                 Optiview Score Guide
               </h1>
-              <p className="text-lg muted">
-                {STATS.total} checks ({STATS.page} page-level + {STATS.site} site-level) that determine how assistants discover, understand, and cite your content
+              <p className="text-xl opacity-95 max-w-3xl">
+                {STATS.total} diagnostic checks that determine how AI assistants discover, understand, and cite your content
               </p>
             </div>
             <ViewToggle />
           </div>
+          
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+              <div className="text-3xl font-bold">{STATS.total}</div>
+              <div className="text-sm opacity-90">Total Checks</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+              <div className="text-3xl font-bold">{STATS.page}</div>
+              <div className="text-sm opacity-90">Page-Level</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+              <div className="text-3xl font-bold">{STATS.site}</div>
+              <div className="text-sm opacity-90">Site-Level</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
+              <div className="text-3xl font-bold">6</div>
+              <div className="text-sm opacity-90">Categories</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="page-max container-px py-8">
+        {/* Methodology Overview */}
+        <header className="mb-12">
 
           {/* Methodology Overview */}
           <div className="card card-body space-y-6 mt-8">
@@ -132,10 +158,32 @@ export default function ScoreGuide() {
 
         </header>
 
+        {/* Category Quick Navigation */}
+        {mode === 'business' && (
+          <nav className="card card-body mb-8">
+            <h3 className="text-lg font-semibold mb-4">Jump to Category</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {CATEGORY_ORDER.map((category) => {
+                const categoryId = category.toLowerCase().replace(/\s*&\s*/g, '-').replace(/\s+/g, '-');
+                return (
+                  <a
+                    key={category}
+                    href={`#${categoryId}`}
+                    className="flex items-center gap-2 p-3 rounded-lg border border-border hover:border-brand hover:bg-brand/5 transition-all group"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-brand group-hover:scale-125 transition-transform"></div>
+                    <span className="text-sm font-medium group-hover:text-brand">{category}</span>
+                  </a>
+                );
+              })}
+            </div>
+          </nav>
+        )}
+
         {/* Content */}
         {mode === 'business' ? (
           // Business View: Category Sections
-          <div className="space-y-16">
+          <div>
             {CATEGORY_ORDER.map((category) => (
               <CategorySection
                 key={category}
