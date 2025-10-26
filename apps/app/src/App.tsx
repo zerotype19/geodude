@@ -43,11 +43,11 @@ function Navigation() {
       <div className="page-max container-px">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className="text-xl font-black tracking-tight text-brand"
             >
-              OPTIVIEW.AI
+              OPTIVIEW
             </Link>
           </div>
           
