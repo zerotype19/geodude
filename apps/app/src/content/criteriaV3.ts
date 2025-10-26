@@ -1187,13 +1187,14 @@ export const CATEGORY_DESCRIPTIONS: Record<Category, string> = {
   "Experience & Performance": "Speed, mobile-readiness, and user experience metrics"
 };
 
+// Category icons are now rendered as SVG components in the UI
 export const CATEGORY_EMOJIS: Record<Category, string> = {
-  "Content & Clarity": "📝",
-  "Structure & Organization": "🏗️",
-  "Authority & Trust": "🎖️",
-  "Technical Foundations": "⚙️",
-  "Crawl & Discoverability": "🔍",
-  "Experience & Performance": "⚡"
+  "Content & Clarity": "",
+  "Structure & Organization": "",
+  "Authority & Trust": "",
+  "Technical Foundations": "",
+  "Crawl & Discoverability": "",
+  "Experience & Performance": ""
 };
 
 export const CATEGORY_SLUGS: Record<Category, string> = {

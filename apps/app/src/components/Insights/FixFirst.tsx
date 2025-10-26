@@ -85,7 +85,10 @@ export default function FixFirst({ pages, onFilterClick }: FixFirstProps) {
     return (
       <div className="bg-success-soft dark:bg-green-900/20 rounded-2xl p-6">
         <div className="flex items-center gap-3">
-          <span className="text-3xl">✨</span>
+          <svg className="w-8 h-8 text-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 12l2 2 4-4"/>
+            <circle cx="12" cy="12" r="10"/>
+          </svg>
           <div>
             <h3 className="font-semibold text-green-900 dark:text-green-300">
               All high-impact checks passing!
@@ -102,8 +105,13 @@ export default function FixFirst({ pages, onFilterClick }: FixFirstProps) {
   return (
     <div className="bg-surface-1 dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
+        <svg className="w-5 h-5 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="6"/>
+          <circle cx="12" cy="12" r="2" fill="currentColor"/>
+        </svg>
         <h3 className="text-lg font-semibold  dark:text-white">
-          🎯 Fix First
+          Fix First
         </h3>
         <span className="text-sm subtle dark:subtle">
           Top {sortedFailures.length} priorities
@@ -151,9 +159,16 @@ export default function FixFirst({ pages, onFilterClick }: FixFirstProps) {
       </div>
 
       <div className="mt-4 pt-4 border-t border-border dark:border-gray-700">
-        <p className="text-xs subtle dark:subtle">
-          💡 Tip: Click an item to filter the pages table to show only failing pages for that check.
-        </p>
+        <div className="flex items-start gap-2">
+          <svg className="w-4 h-4 text-warn flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L2 20h20L12 2zm0 3.5l7.5 13h-15L12 5.5z"/>
+            <circle cx="12" cy="16" r="1"/>
+            <path d="M12 10v4" stroke="white" strokeWidth="2"/>
+          </svg>
+          <p className="text-xs subtle dark:subtle">
+            Tip: Click an item to filter the pages table to show only failing pages for that check.
+          </p>
+        </div>
       </div>
     </div>
   );
