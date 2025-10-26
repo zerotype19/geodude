@@ -7,7 +7,6 @@
   <meta name="description" content="Comprehensive AI visibility platform with 36-point diagnostics, executive summary reports, and real-time citation testing across ChatGPT, Claude, and Perplexity. Industry-specific insights with PDF export.">
   <link rel="canonical" href="https://optiview.ai/" />
   
-  <!-- WebPage JSON-LD with Organization and WebSite SearchAction -->
   <script type="application/ld+json">
   {
     "@context":"https://schema.org",
@@ -17,7 +16,7 @@
         "@id":"https://optiview.ai/#page",
         "url":"https://optiview.ai/",
         "name":"AI Visibility Intelligence Platform | Optiview",
-        "description":"Comprehensive AI visibility platform with 36-point diagnostics, executive summary reports, and real-time citation testing across ChatGPT, Claude, and Perplexity. Industry-specific insights with PDF export.",
+        "description":"Comprehensive AI visibility platform with 36-point diagnostics, executive summary reports, and real-time citation testing across ChatGPT, Claude, and Perplexity.",
         "isPartOf":{"@id":"https://optiview.ai/#site"},
         "about":{"@id":"https://optiview.ai/#org"},
         "primaryImageOfPage":{"@type":"ImageObject","url":"https://optiview.ai/logo.png"},
@@ -49,7 +48,6 @@
   }
   </script>
 
-  <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -61,27 +59,34 @@
   <style>
     :root {
       --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      --purple: #667eea;
+      --brand: #667eea;
+      --brand-dark: #5568d3;
       --dark: #111;
       --gray: #666;
       --light: #fafafa;
       --border: #e5e7eb;
+      --surface-1: #fff;
+      --surface-2: #f9fafb;
       --max-w: 1200px;
     }
+    
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       line-height: 1.7;
       color: var(--dark);
       background: var(--light);
     }
+    
     header {
-      background: #fff;
+      background: var(--surface-1);
       border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
       z-index: 100;
     }
+    
     .header-inner {
       max-width: var(--max-w);
       margin: 0 auto;
@@ -90,33 +95,32 @@
       justify-content: space-between;
       padding: 1rem 1.5rem;
     }
+    
     .logo {
-      font-size: 1.5rem;
-      font-weight: 700;
+      font-size: 1.25rem;
+      font-weight: 800;
       letter-spacing: -0.5px;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      text-transform: uppercase;
+      color: var(--brand);
       text-decoration: none;
     }
+    
     nav {
       display: flex;
       gap: 2rem;
       align-items: center;
     }
+    
     nav a {
       text-decoration: none;
       color: var(--gray);
       font-weight: 500;
+      font-size: 0.9375rem;
       transition: color 0.2s;
     }
-    nav a:hover { color: var(--purple); }
-    nav a.btn {
-      color: #fff !important;
-    }
     
-    /* Hamburger Menu */
+    nav a:hover { color: var(--brand); }
+    
     .menu-toggle {
       display: none;
       flex-direction: column;
@@ -126,6 +130,7 @@
       cursor: pointer;
       padding: 8px;
     }
+    
     .menu-toggle span {
       display: block;
       width: 24px;
@@ -133,9 +138,7 @@
       background: var(--gray);
       transition: all 0.3s;
     }
-    .menu-toggle:hover span { background: var(--purple); }
     
-    /* Mobile Navigation */
     @media (max-width: 768px) {
       nav {
         position: fixed;
@@ -143,7 +146,7 @@
         right: -100%;
         width: 250px;
         height: calc(100vh - 65px);
-        background: #fff;
+        background: var(--surface-1);
         flex-direction: column;
         gap: 0;
         padding: 1rem 0;
@@ -158,253 +161,226 @@
       }
       .menu-toggle { display: flex; }
     }
-    .btn {
-      display: inline-block;
-      padding: 0.75rem 1.5rem;
-      background: var(--gradient);
-      color: #fff;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    }
+    
     .hero {
-      max-width: var(--max-w);
-      margin: 0 auto;
+      background: var(--gradient);
+      color: white;
       padding: 4rem 1.5rem;
       text-align: center;
     }
-    h1 {
-      font-size: clamp(2rem, 5vw, 3.5rem);
-      line-height: 1.2;
+    
+    .hero-content {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .hero h1 {
+      font-size: clamp(2.25rem, 5vw, 3.5rem);
+      font-weight: 800;
+      line-height: 1.1;
       margin-bottom: 1.5rem;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-    .subtitle {
-      font-size: 1.25rem;
-      color: var(--gray);
-      max-width: 700px;
-      margin: 0 auto 2.5rem;
+    
+    .hero .subtitle {
+      font-size: clamp(1.125rem, 2vw, 1.375rem);
+      line-height: 1.6;
+      margin-bottom: 2rem;
+      opacity: 0.95;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
     }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: white;
+      color: var(--brand);
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.125rem;
+      transition: all 0.3s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(0,0,0,0.2);
+    }
+    
     .features {
       max-width: var(--max-w);
       margin: 0 auto;
-      padding: 3rem 1.5rem;
+      padding: 4rem 1.5rem;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
       gap: 2rem;
     }
+    
     .feature {
-      background: #fff;
-      padding: 2.5rem;
+      background: var(--surface-1);
+      padding: 2rem;
       border-radius: 16px;
-      border: 2px solid transparent;
-      background-clip: padding-box;
-      position: relative;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    }
-    .feature::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      border-radius: 16px;
-      padding: 2px;
-      background: var(--gradient);
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    }
-    .feature:hover {
-      transform: translateY(-6px);
-      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15);
-    }
-    .feature:hover::before {
-      opacity: 1;
-    }
-    .feature-icon {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
+      border: 2px solid var(--border);
+      transition: all 0.3s;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
       display: block;
     }
+    
+    .feature:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.15);
+      border-color: var(--brand);
+    }
+    
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      color: var(--brand);
+      margin-bottom: 1rem;
+    }
+    
     .feature h3 {
-      font-size: 1.375rem;
-      line-height: 1.4;
+      font-size: 1.5rem;
       margin-bottom: 1rem;
       color: var(--dark);
       font-weight: 700;
-      white-space: nowrap;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
     }
+    
     .feature p {
-      color: #4b5563;
-      line-height: 1.75;
-      font-size: 0.9375rem;
+      color: var(--gray);
+      line-height: 1.7;
     }
-    .feature strong {
-      color: var(--dark);
-      font-weight: 600;
-    }
+    
     .stats-section {
-      max-width: var(--max-w);
-      margin: 4rem auto;
-      padding: 4rem 2rem;
-      background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-      border-radius: 24px;
-      border: 2px solid transparent;
-      background-clip: padding-box;
-      position: relative;
-      overflow: hidden;
-    }
-    .stats-section::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      border-radius: 24px;
-      padding: 2px;
-      background: var(--gradient);
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      opacity: 0.3;
-    }
-    .stats-section::after {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -10%;
-      width: 300px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(102, 126, 234, 0.15) 0%, transparent 70%);
-      border-radius: 50%;
-      pointer-events: none;
-    }
-    .stats-section h2 {
+      background: var(--surface-2);
+      padding: 4rem 1.5rem;
       text-align: center;
-      font-size: 2.25rem;
+    }
+    
+    .stats-section h2 {
+      font-size: 2rem;
       margin-bottom: 3rem;
       color: var(--dark);
-      font-weight: 700;
-      position: relative;
-      z-index: 1;
     }
+    
     .stats-grid {
+      max-width: var(--max-w);
+      margin: 0 auto;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 2.5rem;
-      text-align: center;
-      position: relative;
-      z-index: 1;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+      gap: 2rem;
     }
+    
     .stat {
-      padding: 2rem 1.5rem;
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(10px);
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.9);
-      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.1);
-      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
     }
-    .stat:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
-      background: rgba(255, 255, 255, 0.95);
-    }
+    
     .stat-number {
-      font-size: 3.5rem;
+      font-size: 3rem;
       font-weight: 800;
       background: var(--gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      display: block;
-      margin-bottom: 0.75rem;
       line-height: 1;
     }
+    
     .stat-label {
-      color: #4b5563;
+      color: var(--gray);
       font-size: 0.9375rem;
-      line-height: 1.6;
-      font-weight: 500;
+      line-height: 1.5;
     }
+    
     .cta-section {
-      background: var(--gradient);
-      color: #fff;
-      text-align: center;
+      background: var(--surface-1);
       padding: 4rem 1.5rem;
-      margin-top: 4rem;
+      text-align: center;
     }
+    
     .cta-section h2 {
-      font-size: 2.5rem;
+      font-size: 2rem;
       margin-bottom: 1rem;
+      color: var(--dark);
     }
+    
     .cta-section p {
+      max-width: 700px;
+      margin: 0 auto 2rem;
+      color: var(--gray);
       font-size: 1.125rem;
-      margin-bottom: 2rem;
-      opacity: 0.9;
+      line-height: 1.7;
     }
+    
     .btn-white {
-      background: #fff;
-      color: var(--purple);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--brand);
+      color: white;
       padding: 1rem 2rem;
+      border-radius: 12px;
       text-decoration: none;
-      border-radius: 8px;
       font-weight: 600;
-      display: inline-block;
-      transition: transform 0.2s, box-shadow 0.2s;
+      font-size: 1.125rem;
+      transition: all 0.3s;
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
     }
+    
     .btn-white:hover {
+      background: var(--brand-dark);
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 6px 30px rgba(102, 126, 234, 0.4);
     }
+    
     footer {
-      background: #fff;
+      background: var(--surface-1);
       border-top: 1px solid var(--border);
       padding: 2rem 1.5rem;
       text-align: center;
       color: var(--gray);
       font-size: 0.9rem;
     }
-    footer a {
-      color: var(--purple);
-      text-decoration: none;
-    }
-    footer a:hover { text-decoration: underline; }
+    
     footer nav {
       margin-top: 1rem;
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
       gap: 1.5rem;
+      position: static;
+      width: auto;
+      height: auto;
+      box-shadow: none;
+      padding: 0;
+      background: transparent;
     }
-    @media (max-width: 640px) {
-      .header-inner { padding: 0.75rem 1rem; }
-      nav { gap: 1rem; font-size: 0.9rem; }
-      .hero { padding: 2.5rem 1rem; }
-      .features { padding: 2rem 1rem; }
+    
+    footer a {
+      color: var(--brand);
+      text-decoration: none;
+      padding: 0;
+      border: none;
     }
+    
+    footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <header>
     <div class="header-inner">
-      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <a href="/" class="logo">OPTIVIEW</a>
       <button class="menu-toggle" onclick="document.querySelector('nav').classList.toggle('active')" aria-label="Toggle menu">
         <span></span>
         <span></span>
@@ -421,45 +397,60 @@
 
   <main>
     <section class="hero">
-      <h1>Measure & Improve Your AI Visibility</h1>
-      <p class="subtitle">
-        Comprehensive AI visibility platform with 36-point diagnostics, real-time citation testing across major LLMs, 
-        and executive summary reports. Know exactly where you're cited, where you're missing, and what to fix first—with 
-        industry-specific insights and one-click PDF export.
-      </p>
-      <a href="https://app.optiview.ai/" class="btn">Run Your First Audit Free →</a>
+      <div class="hero-content">
+        <h1>Measure & Improve Your AI Visibility</h1>
+        <p class="subtitle">
+          Comprehensive AI visibility platform with 36-point diagnostics, real-time citation testing across major LLMs, 
+          and executive summary reports. Know exactly where you're cited, where you're missing, and what to fix first.
+        </p>
+        <a href="https://app.optiview.ai/" class="btn">
+          Run Your First Audit Free
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 10h10M10 5l5 5-5 5"/>
+          </svg>
+        </a>
+      </div>
     </section>
 
     <section class="features">
-      <div class="feature">
-        <span class="feature-icon">📊</span>
+      <a href="https://app.optiview.ai/score-guide" class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 3v18h18"/>
+          <path d="M18 17V9M12 17v-4M6 17v-2"/>
+        </svg>
         <h3>36-Point Diagnostic System</h3>
         <p>
-          Get comprehensive <strong>site-level and page-level diagnostics</strong> across 6 categories: Content & Clarity, 
-          Technical Foundations, Semantic Structure, Discovery & Navigation, Authority & Trust, and AI Citation Performance. 
-          Every check includes impact level, scoring logic, and fix guidance.
+          Comprehensive site-level and page-level diagnostics across 6 categories. Every check includes impact level, 
+          scoring logic, and fix guidance.
         </p>
-      </div>
+      </a>
       
-      <div class="feature">
-        <span class="feature-icon">🎯</span>
+      <a href="/citations" class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="6"/>
+          <circle cx="12" cy="12" r="2" fill="currentColor"/>
+        </svg>
         <h3>Industry-Specific Citation Testing</h3>
         <p>
-          Run <strong>real queries tailored to your industry</strong> (200+ industry taxonomies) across ChatGPT, Claude, 
-          and Perplexity. See exactly where you're cited with query examples, discover missed opportunities, 
-          and understand your competitive positioning with real-world data.
+          Real queries tailored to your industry (200+ taxonomies) across ChatGPT, Claude, and Perplexity. 
+          See exactly where you're cited.
         </p>
-      </div>
+      </a>
       
-      <div class="feature">
-        <span class="feature-icon">📄</span>
+      <a href="/reports" class="feature">
+        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
         <h3>Executive Summary Reports</h3>
         <p>
-          Get professional <strong>PDF-exportable reports</strong> with category breakdowns, priority fixes ranked by impact, 
-          site diagnostics, successful citation examples, and missed opportunities. Perfect for stakeholder presentations 
-          and tracking progress over time.
+          Professional PDF-exportable reports with category breakdowns, priority fixes, and citation examples. 
+          Perfect for stakeholder presentations.
         </p>
-      </div>
+      </a>
     </section>
 
     <section class="stats-section">
@@ -467,19 +458,19 @@
       <div class="stats-grid">
         <div class="stat">
           <span class="stat-number">36</span>
-          <span class="stat-label">diagnostic criteria across page-level and site-level checks</span>
+          <span class="stat-label">diagnostic criteria across page and site checks</span>
         </div>
         <div class="stat">
           <span class="stat-number">200+</span>
-          <span class="stat-label">industry taxonomies for personalized citation testing</span>
+          <span class="stat-label">industry taxonomies for citation testing</span>
         </div>
         <div class="stat">
           <span class="stat-number">3</span>
-          <span class="stat-label">major LLMs tested (ChatGPT, Claude, Perplexity) with real queries</span>
+          <span class="stat-label">major LLMs tested (ChatGPT, Claude, Perplexity)</span>
         </div>
         <div class="stat">
           <span class="stat-number">PDF</span>
-          <span class="stat-label">export for executive summary reports with all findings</span>
+          <span class="stat-label">export for executive summary reports</span>
         </div>
       </div>
     </section>
@@ -488,10 +479,14 @@
       <h2>Start Measuring Your AI Visibility Today</h2>
       <p>
         Get comprehensive diagnostics, industry-specific citation testing, and professional reports 
-        showing exactly where you're cited, where you're missing, and what to fix first. 
-        Start your first audit free—no credit card required.
+        showing exactly where you're cited, where you're missing, and what to fix first.
       </p>
-      <a href="https://app.optiview.ai/" class="btn-white">Run Free Audit Now →</a>
+      <a href="https://app.optiview.ai/" class="btn-white">
+        Run Free Audit Now
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 10h10M10 5l5 5-5 5"/>
+        </svg>
+      </a>
     </section>
   </main>
 

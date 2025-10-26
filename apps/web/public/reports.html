@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Executive Summary Reports | Optiview</title>
+  <meta name="description" content="Professional PDF-exportable reports with comprehensive AI visibility analysis, category breakdowns, priority fixes, citation examples, and actionable recommendations.">
+  <link rel="canonical" href="https://optiview.ai/reports" />
+  
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+
+  <style>
+    :root {
+      --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --brand: #667eea;
+      --brand-dark: #5568d3;
+      --dark: #111;
+      --gray: #666;
+      --light: #fafafa;
+      --border: #e5e7eb;
+      --surface-1: #fff;
+      --surface-2: #f9fafb;
+      --max-w: 1200px;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.7;
+      color: var(--dark);
+      background: var(--light);
+    }
+    
+    header {
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .header-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      text-transform: uppercase;
+      color: var(--brand);
+      text-decoration: none;
+    }
+    
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      font-size: 0.9375rem;
+      transition: color 0.2s;
+    }
+    
+    nav a:hover { color: var(--brand); }
+    
+    .container {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+    
+    h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      margin-bottom: 1rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--gray);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+    }
+    
+    .section {
+      background: var(--surface-1);
+      padding: 2.5rem;
+      border-radius: 16px;
+      margin-bottom: 2rem;
+      border: 1px solid var(--border);
+    }
+    
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      color: var(--dark);
+    }
+    
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 2rem 0 1rem;
+      color: var(--dark);
+    }
+    
+    p {
+      color: var(--gray);
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+    
+    ul, ol {
+      margin: 1rem 0 1.5rem 1.5rem;
+      color: var(--gray);
+    }
+    
+    li {
+      margin-bottom: 0.75rem;
+      line-height: 1.7;
+    }
+    
+    .highlight {
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+      border-left: 4px solid var(--brand);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin: 2rem 0;
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+    
+    .feature-box {
+      padding: 1.5rem;
+      background: var(--surface-2);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    
+    .feature-box h4 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--dark);
+    }
+    
+    .feature-box p {
+      font-size: 0.9375rem;
+      color: var(--gray);
+      margin-bottom: 0;
+    }
+    
+    .cta-box {
+      background: var(--gradient);
+      color: white;
+      padding: 3rem;
+      border-radius: 16px;
+      text-align: center;
+      margin-top: 3rem;
+    }
+    
+    .cta-box h2 {
+      color: white;
+      margin-bottom: 1rem;
+    }
+    
+    .cta-box p {
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 2rem;
+      font-size: 1.125rem;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: white;
+      color: var(--brand);
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1.125rem;
+      transition: all 0.3s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(0,0,0,0.2);
+    }
+    
+    footer {
+      background: var(--surface-1);
+      border-top: 1px solid var(--border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.9rem;
+    }
+    
+    footer nav {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+    
+    footer a {
+      color: var(--brand);
+      text-decoration: none;
+    }
+    
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="https://app.optiview.ai/score-guide">Score Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/citations">Citations Guide</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>Executive Summary Reports</h1>
+    <p class="subtitle">
+      Professional, stakeholder-ready reports with comprehensive AI visibility analysis, 
+      actionable recommendations, and PDF export for easy sharing.
+    </p>
+
+    <div class="section">
+      <h2>What's Included</h2>
+      <p>
+        Every Optiview audit generates a comprehensive executive summary report designed for sharing with 
+        stakeholders, leadership, or clients. Each report provides a complete picture of your AI visibility 
+        with specific, actionable recommendations.
+      </p>
+
+      <div class="features-grid">
+        <div class="feature-box">
+          <h4>Cover Page</h4>
+          <p>Overall composite score, citation rate, audit date, and key metrics at a glance</p>
+        </div>
+        <div class="feature-box">
+          <h4>Score Breakdown</h4>
+          <p>Category-by-category analysis with strengths, opportunities, and affected pages</p>
+        </div>
+        <div class="feature-box">
+          <h4>Priority Fixes</h4>
+          <p>Top issues ranked by weighted impact with specific recommendations</p>
+        </div>
+        <div class="feature-box">
+          <h4>Site Diagnostics</h4>
+          <p>Site-wide checks with status indicators and actionable guidance</p>
+        </div>
+        <div class="feature-box">
+          <h4>Citation Examples</h4>
+          <p>Real queries where your content is cited by AI models</p>
+        </div>
+        <div class="feature-box">
+          <h4>Missed Opportunities</h4>
+          <p>Queries where you should appear but don't, with fix recommendations</p>
+        </div>
+        <div class="feature-box">
+          <h4>Page Insights</h4>
+          <p>Top-performing pages and quick wins for immediate impact</p>
+        </div>
+        <div class="feature-box">
+          <h4>PDF Export</h4>
+          <p>One-click download for offline sharing and presentations</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Report Sections in Detail</h2>
+
+      <h3>1. Executive Summary</h3>
+      <p>
+        High-level overview of your AI visibility performance, including overall composite score, 
+        citation rate across AI platforms, and key takeaways. Perfect for leadership briefings.
+      </p>
+
+      <h3>2. Category Breakdown</h3>
+      <p>
+        Detailed analysis across all 6 scoring categories: Content & Clarity, Technical Foundations, 
+        Semantic Structure, Discovery & Navigation, Authority & Trust, and AI Citation Performance. 
+        Each category shows:
+      </p>
+      <ul>
+        <li>Current score and percentage</li>
+        <li>Number of checks passing vs total</li>
+        <li>Strengths to maintain</li>
+        <li>Opportunities to improve</li>
+        <li>Affected pages requiring attention</li>
+      </ul>
+
+      <h3>3. Priority Fixes</h3>
+      <p>
+        Top 10-15 issues ranked by weighted impact. Each fix includes:
+      </p>
+      <ul>
+        <li>Specific problem identified</li>
+        <li>Impact level (High/Medium/Low)</li>
+        <li>Expected score improvement</li>
+        <li>Step-by-step fix instructions</li>
+        <li>Affected pages</li>
+      </ul>
+
+      <h3>4. Citation Analysis</h3>
+      <p>
+        Real-world citation performance across ChatGPT, Claude, and Perplexity:
+      </p>
+      <ul>
+        <li>Overall citation rate by AI source</li>
+        <li>8-10 successful citation examples (queries where you appear)</li>
+        <li>8+ missed opportunities (queries where competitors appear but you don't)</li>
+        <li>Top cited pages from your domain</li>
+        <li>Suggested content gaps to fill</li>
+      </ul>
+
+      <h3>5. Site-Level Diagnostics</h3>
+      <p>
+        Site-wide health checks with pass/warn/fail indicators:
+      </p>
+      <ul>
+        <li>FAQ coverage across your site</li>
+        <li>Entity graph completeness</li>
+        <li>Robots.txt configuration</li>
+        <li>AI crawler access policies</li>
+        <li>Sitemap quality and coverage</li>
+      </ul>
+
+      <h3>6. Page Insights</h3>
+      <p>
+        Detailed analysis of individual page performance:
+      </p>
+      <ul>
+        <li>Top-performing pages (highest scores)</li>
+        <li>Pages needing attention (lowest scores)</li>
+        <li>Quick wins (easy fixes with high impact)</li>
+        <li>Pages being cited in AI responses</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Why Executive Reports Matter</h2>
+      
+      <div class="highlight">
+        <p style="margin-bottom:0;"><strong>Professional & Actionable:</strong> Reports are designed to be client-ready and stakeholder-friendly, 
+        with clear explanations of technical issues and specific next steps. Perfect for justifying AI visibility 
+        investments or demonstrating progress to leadership.</p>
+      </div>
+
+      <p><strong>Use Cases:</strong></p>
+      <ul>
+        <li><strong>Stakeholder Buy-In:</strong> Present clear ROI for AI optimization investments</li>
+        <li><strong>Progress Tracking:</strong> Run monthly audits and compare reports over time</li>
+        <li><strong>Client Deliverables:</strong> Agencies can use reports for client presentations</li>
+        <li><strong>Team Alignment:</strong> Give clear priorities to content and dev teams</li>
+        <li><strong>Executive Briefings:</strong> High-level summary for leadership</li>
+      </ul>
+    </div>
+
+    <div class="cta-box">
+      <h2>Generate Your First Report</h2>
+      <p>
+        Run a free audit and get your comprehensive executive summary report with all findings, 
+        recommendations, and PDF export included.
+      </p>
+      <a href="https://app.optiview.ai/" class="btn">
+        Run Free Audit Now
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 10h10M10 5l5 5-5 5"/>
+        </svg>
+      </a>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
+    <nav>
+      <a href="https://app.optiview.ai">Run Audit</a>
+      <a href="https://app.optiview.ai/score-guide">Score Guide</a>
+      <a href="/faq/">Knowledge Base</a>
+      <a href="/citations">Citations Guide</a>
+      <a href="/methodology">Methodology</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/bot">Bot Info</a>
+    </nav>
+  </footer>
+</body>
+</html>
+

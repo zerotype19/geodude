@@ -61,8 +61,14 @@ export default function ScoreGuide() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">🔍 What We Look For</h3>
+              <div className="bg-surface-1 p-6 rounded-xl border border-border">
+                <div className="flex items-start gap-3 mb-3">
+                  <svg className="w-6 h-6 text-brand flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                  </svg>
+                  <h3 className="text-lg font-semibold">What We Look For</h3>
+                </div>
                 <ul className="space-y-2 text-sm muted">
                   <li><strong>Technical Foundation:</strong> Schema markup, meta tags, canonical URLs, mobile optimization</li>
                   <li><strong>Content Quality:</strong> Answer-first structure, FAQ presence, semantic headings, clarity</li>
@@ -73,8 +79,14 @@ export default function ScoreGuide() {
                 </ul>
               </div>
 
-              <div>
-                <h3 className="text-lg font-semibold mb-2">📊 Scoring Methodology</h3>
+              <div className="bg-surface-1 p-6 rounded-xl border border-border">
+                <div className="flex items-start gap-3 mb-3">
+                  <svg className="w-6 h-6 text-brand flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 3v18h18"/>
+                    <path d="M18 17V9M12 17v-4M6 17v-2"/>
+                  </svg>
+                  <h3 className="text-lg font-semibold">Scoring Methodology</h3>
+                </div>
                 <ul className="space-y-2 text-sm muted">
                   <li><strong>Page-Level Checks ({STATS.page}):</strong> Run on every page analyzed, measuring content quality, structure, and technical implementation</li>
                   <li><strong>Site-Level Checks ({STATS.site}):</strong> Evaluate overall site properties like FAQ coverage, entity graph completeness, and crawl policies</li>
@@ -85,12 +97,20 @@ export default function ScoreGuide() {
               </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-semibold mb-2">📄 Executive Summary Reports</h3>
-              <p className="text-sm muted leading-relaxed">
+            <div className="bg-gradient-to-br from-brand/5 to-brand/10 p-6 rounded-xl border border-brand/20">
+              <div className="flex items-start gap-3 mb-3">
+                <svg className="w-6 h-6 text-brand flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+                <h3 className="text-lg font-semibold">Executive Summary Reports</h3>
+              </div>
+              <p className="text-sm muted leading-relaxed mb-3">
                 Every audit generates a comprehensive <strong>executive summary report</strong> that includes:
               </p>
-              <ul className="grid md:grid-cols-2 gap-x-6 gap-y-2 text-sm muted mt-2">
+              <ul className="grid md:grid-cols-2 gap-x-6 gap-y-2 text-sm muted">
                 <li>• Cover page with overall score and citation rate</li>
                 <li>• Category breakdown with strengths and opportunities</li>
                 <li>• Priority fixes ranked by weighted impact</li>
