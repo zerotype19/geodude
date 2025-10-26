@@ -407,22 +407,83 @@
     </div>
 
     <div class="faq-item">
-      <h2>How do I interpret "Preview" vs "Production" checks?</h2>
+      <h2>What's included in the Executive Summary Report?</h2>
       <p>
-        Our scoring system includes two types of criteria:
+        Every audit generates a comprehensive <strong>Executive Summary Report</strong> designed for sharing with 
+        stakeholders, leadership, or clients. The report includes:
       </p>
-      <p>
-        <strong>Production Checks:</strong> Fully validated criteria that directly impact your composite 
-        score. These are stable, well-tested diagnostics.
-      </p>
-      <p>
-        <strong>Preview Checks:</strong> Experimental criteria being validated but not yet affecting your 
-        score. We show you the results to help you prepare for future scoring changes.
-      </p>
+      
+      <ul>
+        <li><strong>Cover Page:</strong> Overall composite score, citation rate, audit date, and key metrics at a glance</li>
+        <li><strong>Score Breakdown:</strong> Category-by-category analysis with strengths, opportunities, and affected pages</li>
+        <li><strong>Priority Fixes:</strong> Top issues ranked by weighted impact, with specific recommendations and expected improvement</li>
+        <li><strong>Site-Level Diagnostics:</strong> Site-wide checks with status indicators (pass/warn/fail) and actionable guidance</li>
+        <li><strong>Successful Citations:</strong> 8-10 real queries where your content is cited by AI models, including source and cited URL</li>
+        <li><strong>Missed Opportunities:</strong> 8+ queries where you should appear but don't, with reasons and fix recommendations</li>
+        <li><strong>Page Insights:</strong> Top-performing pages, pages needing attention, and quick wins for immediate impact</li>
+        <li><strong>PDF Export:</strong> One-click download for offline sharing, presentations, or archiving</li>
+      </ul>
+      
       <div class="highlight-box">
         <p>
-          <strong>Why we do this:</strong> AI visibility is an evolving field. Preview checks let you see 
-          emerging best practices before they become industry standard—giving you a competitive advantage.
+          <strong>Professional & Actionable:</strong> Reports are designed to be client-ready and stakeholder-friendly, 
+          with clear explanations of technical issues and specific next steps. Perfect for justifying AI visibility 
+          investments or demonstrating progress to leadership.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>How are Industry-Specific Citation Queries Generated?</h2>
+      <p>
+        Optiview uses <strong>200+ industry taxonomies</strong> to generate realistic, relevant test queries that reflect 
+        how users actually search for information in your space.
+      </p>
+      
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.75rem;">How It Works:</h3>
+      <ol>
+        <li><strong>Industry Detection:</strong> We analyze your domain, content, and schema to classify your site using hierarchical dot-slug taxonomy (e.g., <code>health.pharma.brand</code>, <code>travel.air.commercial</code>, <code>retail.grocery</code>)</li>
+        <li><strong>Template Selection:</strong> Based on your industry, we select appropriate query templates (branded and non-branded) that match real user intent</li>
+        <li><strong>Dynamic Placeholder Replacement:</strong> Templates include placeholders like <code>{brand}</code>, <code>{product}</code>, <code>{category}</code>, <code>{city}</code>, <code>{competitor}</code> that get replaced with your actual data</li>
+        <li><strong>Query Validation:</strong> Queries are filtered for realism, avoiding hallucinated products or nonsensical phrasing</li>
+        <li><strong>Multi-Source Testing:</strong> Each query is tested across ChatGPT, Claude, and Perplexity to measure citation coverage</li>
+      </ol>
+      
+      <h3 style="font-size: 1.125rem; margin-top: 2rem; margin-bottom: 0.75rem;">Industry Examples:</h3>
+      <ul>
+        <li><strong>Healthcare (Pharma):</strong> "prescribing information for {brand}", "{brand} side effects", "{brand} vs {competitor} comparison"</li>
+        <li><strong>E-commerce (Fashion):</strong> "{brand} sizing guide", "Best {category} from {brand}", "{brand} return policy"</li>
+        <li><strong>B2B SaaS:</strong> "{brand} pricing plans", "{brand} integrations", "{brand} vs {competitor} features"</li>
+        <li><strong>Travel (Airlines):</strong> "{brand} baggage policy", "{brand} customer service number", "Check-in for {brand} flights"</li>
+        <li><strong>Education (Higher Ed):</strong> "{brand} admissions requirements", "{brand} tuition costs", "{brand} vs {competitor} rankings"</li>
+      </ul>
+      
+      <div class="highlight-box">
+        <p>
+          <strong>Why Industry-Specific Matters:</strong> Generic queries like "tell me about {domain}" don't reflect 
+          real user behavior. Our taxonomy ensures you're tested on the exact queries your potential customers are 
+          actually asking AI assistants.
+        </p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <h2>What Check Types Does Optiview Use?</h2>
+      <p>
+        Our 36 diagnostic criteria use four different check types, each optimized for specific aspects of AI visibility:
+      </p>
+      
+      <ul>
+        <li><strong>html_dom Checks (23 page-level):</strong> Deterministic HTML analysis using DOM parsing. These checks examine your rendered HTML for specific elements like title tags, meta descriptions, H1 tags, FAQ markup, internal links, and more. Fast, accurate, and consistent.</li>
+        <li><strong>aggregate Checks (10 site-level):</strong> Site-wide rollups that combine page-level data to measure overall coverage. Examples include FAQ presence percentage, entity graph completeness, and H2 coverage ratio.</li>
+        <li><strong>http Checks (2 site-level):</strong> Validates HTTP-level properties like robots.txt policies, sitemap availability, and crawl access for AI bots (GPTBot, Claude-Web, etc.).</li>
+        <li><strong>llm Checks (1 experimental):</strong> AI-assisted evaluation for subjective criteria that require human-like judgment. Currently used for answerability assessment.</li>
+      </ul>
+      
+      <div class="highlight-box">
+        <p>
+          <strong>Transparent & Reproducible:</strong> You can see exactly which check type was used for each criterion 
+          in the Score Guide. This transparency helps you understand how we arrive at each score and what you can do to improve.
         </p>
       </div>
     </div>
