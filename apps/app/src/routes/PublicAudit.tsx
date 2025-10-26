@@ -78,7 +78,7 @@ export default function PublicAudit() {
       notification.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: start;">
           <div>
-            <div style="font-weight: 600; margin-bottom: 4px;">✓ New audit started!</div>
+            <div style="font-weight: 600; margin-bottom: 4px;"> New audit started!</div>
             <div style="opacity: 0.9;">Redirecting to audit ${result.id}...</div>
           </div>
           <button style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; padding: 0; margin-left: 12px; line-height: 1;">×</button>
@@ -116,7 +116,7 @@ export default function PublicAudit() {
         cursor: pointer;
       `;
       notification.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 4px;">✕ Re-run Failed</div>
+        <div style="font-weight: 600; margin-bottom: 4px;"> Re-run Failed</div>
         <div style="opacity: 0.9;">${message}</div>
         <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">Click to dismiss</div>
       `;
@@ -223,7 +223,7 @@ export default function PublicAudit() {
           marginBottom: 24,
         }}>
           <div style={{ display: 'flex', alignItems: 'start', gap: 12 }}>
-            <div style={{ fontSize: 24 }}>⚠️</div>
+            <div style={{ fontSize: 24 }}>️</div>
             <div style={{ flex: 1 }}>
               <h3 style={{ margin: '0 0 8px', color: '#991b1b', fontSize: 18, fontWeight: 600 }}>
                 AI Crawlers Are Blocked
@@ -294,7 +294,7 @@ export default function PublicAudit() {
                 background: audit.scores.breakdown.crawlability.robotsTxtFound ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
                 color: audit.scores.breakdown.crawlability.robotsTxtFound ? '#10b981' : '#ef4444',
               }}>
-                robots.txt {audit.scores.breakdown.crawlability.robotsTxtFound ? '✓' : '✗'}
+                robots.txt {audit.scores.breakdown.crawlability.robotsTxtFound ? '' : ''}
               </span>
               <span style={{
                 fontSize: 11,
@@ -303,7 +303,7 @@ export default function PublicAudit() {
                 background: audit.scores.breakdown.crawlability.sitemapOk ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.15)',
                 color: audit.scores.breakdown.crawlability.sitemapOk ? '#10b981' : '#ef4444',
               }}>
-                sitemap {audit.scores.breakdown.crawlability.sitemapOk ? '✓' : '✗'}
+                sitemap {audit.scores.breakdown.crawlability.sitemapOk ? '' : ''}
               </span>
               <span style={{
                 fontSize: 11,
@@ -327,7 +327,7 @@ export default function PublicAudit() {
                 background: audit.site.aiAccess.summary.blocked > 0 ? 'rgba(239,68,68,.2)' : 'rgba(16,185,129,.2)',
                 color: audit.site.aiAccess.summary.blocked > 0 ? '#ef4444' : '#10b981',
               }} title={`${audit.site.aiAccess.summary.blocked} blocked bots detected`}>
-                AI Access: {audit.site.aiAccess.summary.allowed}/{audit.site.aiAccess.summary.tested} {audit.site.aiAccess.summary.blocked > 0 ? '⚠' : '✓'}
+                AI Access: {audit.site.aiAccess.summary.allowed}/{audit.site.aiAccess.summary.tested} {audit.site.aiAccess.summary.blocked > 0 ? '' : ''}
               </span>
               {audit.site.aiAccess.summary.waf && (
                 <span style={{
@@ -395,7 +395,7 @@ export default function PublicAudit() {
                   : ''
               }`}
             >
-              <span>🤖 Brave AI:</span>
+              <span> Brave AI:</span>
               <span style={{ fontWeight: 'bold' }}>
                 {audit.site.braveAI.resultsTotal ?? 0}/{audit.site.braveAI.queriesTotal ?? 0}
               </span>
@@ -433,7 +433,7 @@ export default function PublicAudit() {
               color: '#9ca3af',
               display: 'inline-block',
             }}>
-              <span>🤖 Brave AI -</span>
+              <span> Brave AI -</span>
             </div>
           )}
         </div>
@@ -454,7 +454,7 @@ export default function PublicAudit() {
                   }}
                   title="Detected FAQ page by URL/title"
                 >
-                  FAQ page {audit.scores.breakdown.structured.faqPagePresent ? '✓' : '✗'}
+                  FAQ page {audit.scores.breakdown.structured.faqPagePresent ? '' : ''}
                 </span>
               )}
               {/* FAQ Schema (JSON-LD FAQPage) */}
@@ -469,7 +469,7 @@ export default function PublicAudit() {
                   }}
                   title="Detected FAQPage JSON-LD schema"
                 >
-                  FAQ schema {audit.scores.breakdown.structured.faqSchemaPresent ? '✓' : '✗'}
+                  FAQ schema {audit.scores.breakdown.structured.faqSchemaPresent ? '' : ''}
                 </span>
               )}
               <span style={{
@@ -632,7 +632,7 @@ export default function PublicAudit() {
               }}>
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>🤖 Crawlability</span>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}> Crawlability</span>
                     <span style={{
                       fontSize: 12,
                       fontWeight: 600,
@@ -663,7 +663,7 @@ export default function PublicAudit() {
               }}>
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>📊 Structured Data</span>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}> Structured Data</span>
                     <span style={{
                       fontSize: 12,
                       fontWeight: 600,
@@ -694,7 +694,7 @@ export default function PublicAudit() {
               }}>
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>💬 Answerability</span>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}> Answerability</span>
                     <span style={{
                       fontSize: 12,
                       fontWeight: 600,
@@ -725,7 +725,7 @@ export default function PublicAudit() {
               }}>
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
                   <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>🔒 Trust</span>
+                    <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}> Trust</span>
                     <span style={{
                       fontSize: 12,
                       fontWeight: 600,
@@ -802,7 +802,7 @@ export default function PublicAudit() {
                 }}>
                   <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12}}>
                     <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
-                      <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>👁️ Visibility</span>
+                      <span style={{fontSize: 18, fontWeight: 600, color: '#1e293b'}}>️ Visibility</span>
                       <span style={{
                         fontSize: 12,
                         fontWeight: 600,
@@ -834,24 +834,24 @@ export default function PublicAudit() {
               border: '1px solid #bfdbfe',
               borderRadius: 8
             }}>
-              <div style={{fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e40af'}}>📈 Component Scoring Thresholds</div>
+              <div style={{fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#1e40af'}}> Component Scoring Thresholds</div>
               <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12, fontSize: 13}}>
                 <div>
-                  <div style={{fontWeight: 600, color: '#10b981', marginBottom: 4}}>🟢 Excellent (70%+)</div>
+                  <div style={{fontWeight: 600, color: '#10b981', marginBottom: 4}}> Excellent (70%+)</div>
                   <div style={{color: '#475569', fontSize: 12}}>
                     Crawl: 29+/42 • Struct: 21+/30 • Answer: 14+/20 • Trust: 7+/10
                     {audit.scores.visibilityPct !== undefined && ' • Vis: 7+/10'}
                   </div>
                 </div>
                 <div>
-                  <div style={{fontWeight: 600, color: '#f59e0b', marginBottom: 4}}>🟡 Good (40-70%)</div>
+                  <div style={{fontWeight: 600, color: '#f59e0b', marginBottom: 4}}> Good (40-70%)</div>
                   <div style={{color: '#475569', fontSize: 12}}>
                     Crawl: 17-28 • Struct: 12-20 • Answer: 8-13 • Trust: 4-6
                     {audit.scores.visibilityPct !== undefined && ' • Vis: 4-6'}
                   </div>
                 </div>
                 <div>
-                  <div style={{fontWeight: 600, color: '#ef4444', marginBottom: 4}}>🔴 Needs Work (&lt;40%)</div>
+                  <div style={{fontWeight: 600, color: '#ef4444', marginBottom: 4}}> Needs Work (&lt;40%)</div>
                   <div style={{color: '#475569', fontSize: 12}}>
                     Crawl: &lt;17 • Struct: &lt;12 • Answer: &lt;8 • Trust: &lt;4
                     {audit.scores.visibilityPct !== undefined && ' • Vis: &lt;4'}
@@ -859,7 +859,7 @@ export default function PublicAudit() {
                 </div>
               </div>
               <p style={{fontSize: 13, color: '#475569', marginTop: 12, marginBottom: 0}}>
-                💡 <strong>Tip:</strong> Check the Issues tab for specific recommendations on how to improve each component score. See <a href="https://optiview.ai/docs/audit" target="_blank" rel="noopener" style={{color: '#3b82f6'}}>full audit methodology</a>.
+                 <strong>Tip:</strong> Check the Issues tab for specific recommendations on how to improve each component score. See <a href="https://optiview.ai/docs/audit" target="_blank" rel="noopener" style={{color: '#3b82f6'}}>full audit methodology</a>.
               </p>
             </div>
           </div>

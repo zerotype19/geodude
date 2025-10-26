@@ -308,9 +308,9 @@ export default function CriterionDetail() {
                 <dt className="font-bold muted mb-1">Visible in UI</dt>
                 <dd>
                   {criterion.view_in_ui !== false ? (
-                    <span className="text-success font-semibold">✓ Yes</span>
+                    <span className="text-success font-semibold"> Yes</span>
                   ) : (
-                    <span className="subtle">✗ No</span>
+                    <span className="subtle"> No</span>
                   )}
                 </dd>
               </div>

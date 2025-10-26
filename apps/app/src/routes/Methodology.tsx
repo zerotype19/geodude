@@ -68,27 +68,27 @@ export default function Methodology() {
                 <h3 className="font-semibold text-lg text-ink mb-3">Check Categories</h3>
                 <div className="grid md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <h4 className="font-medium text-ink mb-2">📐 Technical Foundations (8 checks)</h4>
+                    <h4 className="font-medium text-ink mb-2"> Technical Foundations (8 checks)</h4>
                     <p className="text-xs text-ink-muted">Schema, metadata, and semantic markup that explain meaning to machines</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-ink mb-2">🗂️ Structure & Organization (6 checks)</h4>
+                    <h4 className="font-medium text-ink mb-2">️ Structure & Organization (6 checks)</h4>
                     <p className="text-xs text-ink-muted">Pages and links arranged so people and parsers understand your site</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-ink mb-2">✍️ Content & Clarity (7 checks)</h4>
+                    <h4 className="font-medium text-ink mb-2">️ Content & Clarity (7 checks)</h4>
                     <p className="text-xs text-ink-muted">Clear, complete answers that AI assistants can quote</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-ink mb-2">🛡️ Authority & Trust (5 checks)</h4>
+                    <h4 className="font-medium text-ink mb-2">️ Authority & Trust (5 checks)</h4>
                     <p className="text-xs text-ink-muted">Visible expertise and evidence to earn citations</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-ink mb-2">🔍 Crawl & Discoverability (6 checks)</h4>
+                    <h4 className="font-medium text-ink mb-2"> Crawl & Discoverability (6 checks)</h4>
                     <p className="text-xs text-ink-muted">Ensure crawlers and AIs can reach and render your content</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-ink mb-2">⚡ Experience & Performance (4 checks)</h4>
+                    <h4 className="font-medium text-ink mb-2"> Experience & Performance (4 checks)</h4>
                     <p className="text-xs text-ink-muted">Fast, readable, accessible everywhere</p>
                   </div>
                 </div>

@@ -139,7 +139,7 @@ export default function AdminPage() {
       const data = await apiGet<any>(`/api/llm/prompts?domain=${domain}&refresh=true`);
       
       if (data.meta) {
-        showMessage('success', `✅ ${domain}: ${data.meta.industry || 'unknown'} industry, ${data.branded.length} branded + ${data.nonBranded.length} non-branded queries`);
+        showMessage('success', ` ${domain}: ${data.meta.industry || 'unknown'} industry, ${data.branded.length} branded + ${data.nonBranded.length} non-branded queries`);
       } else {
         showMessage('error', `Failed to regenerate prompts for ${domain}`);
       }
@@ -163,7 +163,7 @@ export default function AdminPage() {
       await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limit
     }
 
-    showMessage('success', '✅ All prompts regenerated!');
+    showMessage('success', ' All prompts regenerated!');
   };
 
   const rescoreRecent = async () => {
@@ -178,7 +178,7 @@ export default function AdminPage() {
       if (data.ok) {
         const successCount = data.results.filter((r: any) => r.status === 'success').length;
         const errorCount = data.results.filter((r: any) => r.status === 'error').length;
-        showMessage('success', `✅ Re-scored ${successCount} audits (${errorCount} errors)`);
+        showMessage('success', ` Re-scored ${successCount} audits (${errorCount} errors)`);
         fetchAudits();
       } else {
         showMessage('error', 'Failed to re-score audits');
@@ -211,7 +211,7 @@ export default function AdminPage() {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    showMessage('success', `✅ Deleted ${failedAudits.length} failed audits`);
+    showMessage('success', ` Deleted ${failedAudits.length} failed audits`);
     // Refresh once at the end
     fetchAudits();
   };
@@ -258,7 +258,7 @@ export default function AdminPage() {
         {/* System Health & Monitoring */}
         <div className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
           <h2 className="text-xl font-bold  mb-4 flex items-center gap-2">
-            <span>🏥</span> System Health & Monitoring
+            <span></span> System Health & Monitoring
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Classifier Health */}
@@ -267,7 +267,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">🧠</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">Classifier Health</div>
                   <div className="text-sm muted">V2 metrics, alerts, cache hit rate</div>
@@ -281,7 +281,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">🔍</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">Classifier Compare</div>
                   <div className="text-sm muted">Legacy vs V2 side-by-side</div>
@@ -297,7 +297,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-blue-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">📊</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">API Health JSON</div>
                   <div className="text-sm muted">Raw metrics endpoint →</div>
@@ -313,7 +313,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-green-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">🤖</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">Bot Documentation</div>
                   <div className="text-sm muted">OptiviewAuditBot info →</div>
@@ -327,7 +327,7 @@ export default function AdminPage() {
               className="block w-full bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-purple-100 text-left"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">🔄</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">Re-score Recent</div>
                   <div className="text-sm muted">Re-compute last 10 audits (all criteria live)</div>
@@ -343,7 +343,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-orange-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">☁️</div>
+                <div className="text-3xl">️</div>
                 <div>
                   <div className="font-semibold ">Cloudflare Dashboard</div>
                   <div className="text-sm muted">Worker logs, D1, KV →</div>
@@ -359,7 +359,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-purple-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">📝</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">Worker Logs</div>
                   <div className="text-sm muted">Real-time logs & errors →</div>
@@ -373,7 +373,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-green-100 ring-2 ring-green-200"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">✨</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold  flex items-center gap-2">
                     Prompts Compare
@@ -392,7 +392,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-teal-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">💚</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">System Status JSON</div>
                   <div className="text-sm muted">Full system overview →</div>
@@ -408,7 +408,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-gray-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">🔧</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">Bot Metadata</div>
                   <div className="text-sm muted">Machine-readable info →</div>
@@ -424,7 +424,7 @@ export default function AdminPage() {
               className="block bg-surface-1 p-4 rounded-lg shadow-sm hover:shadow-md transition border border-yellow-100"
             >
               <div className="flex items-center gap-3">
-                <div className="text-3xl">📈</div>
+                <div className="text-3xl"></div>
                 <div>
                   <div className="font-semibold ">Google Analytics</div>
                   <div className="text-sm muted">Traffic & usage stats →</div>
@@ -443,25 +443,25 @@ export default function AdminPage() {
               <div>
                 <div className="muted">V4 Pipeline</div>
                 <div className="font-semibold text-success flex items-center gap-1">
-                  ✓ Active
+                   Active
                   <span className="text-xs bg-success-soft text-success px-1.5 py-0.5 rounded">Blended</span>
                 </div>
               </div>
               <div>
                 <div className="muted">MSS V2 Fallback</div>
-                <div className="font-semibold text-success">✓ Live</div>
+                <div className="font-semibold text-success"> Live</div>
               </div>
               <div>
                 <div className="muted">Industry Detection</div>
-                <div className="font-semibold text-success">✓ 18+ Verticals</div>
+                <div className="font-semibold text-success"> 18+ Verticals</div>
               </div>
               <div>
                 <div className="muted">Cron Jobs</div>
-                <div className="font-semibold text-success">✓ Hourly</div>
+                <div className="font-semibold text-success"> Hourly</div>
               </div>
               <div>
                 <div className="muted">Citations</div>
-                <div className="font-semibold text-success">✓ 3 Sources</div>
+                <div className="font-semibold text-success"> 3 Sources</div>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
@@ -524,13 +524,13 @@ export default function AdminPage() {
             onClick={regenerateAllPrompts}
             className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand transition"
           >
-            🔄 Regenerate All Prompts
+             Regenerate All Prompts
           </button>
           <button
             onClick={deleteFailedAudits}
             className="btn-primary bg-danger hover:opacity-90"
           >
-            🗑️ Delete All Failed Audits
+            ️ Delete All Failed Audits
           </button>
           <button
             onClick={fetchAudits}
@@ -609,7 +609,7 @@ export default function AdminPage() {
                           disabled={deletingIds.has(audit.id)}
                           className="text-danger hover:opacity-80 disabled:opacity-50"
                         >
-                          {deletingIds.has(audit.id) ? 'Deleting...' : '🗑️ Delete'}
+                          {deletingIds.has(audit.id) ? 'Deleting...' : '️ Delete'}
                         </button>
                       </td>
                     </tr>

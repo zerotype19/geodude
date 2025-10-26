@@ -223,7 +223,7 @@ function ExecutiveSummary({ report }: { report: ReportData }) {
         {/* Strengths */}
         <div className="card card-body">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <span className="text-2xl">✅</span>
+            <span className="text-2xl"></span>
             Top Strengths
           </h3>
           <div className="space-y-3">
@@ -244,7 +244,7 @@ function ExecutiveSummary({ report }: { report: ReportData }) {
         {/* Opportunities */}
         <div className="card card-body">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <span className="text-2xl">⚠️</span>
+            <span className="text-2xl">️</span>
             Key Opportunities
           </h3>
           <div className="space-y-3">
@@ -374,9 +374,9 @@ function PriorityFixes({ fixes }: { fixes: PriorityFix[] }) {
                 </div>
 
                 <div className="flex items-center gap-4 text-sm text-ink-subtle mb-3">
-                  <span>📂 {fix.category}</span>
-                  <span>📊 Weight: {fix.weight}</span>
-                  <span>📄 {fix.affected_pages.length} pages</span>
+                  <span> {fix.category}</span>
+                  <span> Weight: {fix.weight}</span>
+                  <span> {fix.affected_pages.length} pages</span>
                 </div>
 
                 {/* Why it matters */}
@@ -517,7 +517,7 @@ function CitationAnalysis({ citations }: { citations: CitationAnalysis }) {
       {/* Successful Citations Examples */}
       {citations.successful_citations && citations.successful_citations.length > 0 && (
         <div className="card card-body mb-4">
-          <h3 className="text-lg font-semibold mb-3">✅ Successful Citations (Where You're Cited)</h3>
+          <h3 className="text-lg font-semibold mb-3"> Successful Citations (Where You're Cited)</h3>
           <p className="text-sm text-ink-muted mb-3">
             Example queries where your domain appears in AI responses:
           </p>
@@ -544,7 +544,7 @@ function CitationAnalysis({ citations }: { citations: CitationAnalysis }) {
       {/* Missed Opportunities */}
       {citations.missed_opportunities && citations.missed_opportunities.length > 0 && (
         <div className="card card-body mb-4">
-          <h3 className="text-lg font-semibold mb-3">⚠️ Missed Opportunities (Where You're Not Cited)</h3>
+          <h3 className="text-lg font-semibold mb-3">️ Missed Opportunities (Where You're Not Cited)</h3>
           <p className="text-sm text-ink-muted mb-3">
             Queries where your domain wasn't cited - potential content gaps:
           </p>

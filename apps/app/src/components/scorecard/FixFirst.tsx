@@ -19,7 +19,7 @@ export default function FixFirst({ fixes, onClickFix }: FixFirstProps) {
     return (
       <div className="bg-gradient-to-r from-green-50 to-teal-50 border-2 border-success rounded-lg p-6 mb-8">
         <div className="flex items-start gap-3">
-          <span className="text-2xl">✅</span>
+          <span className="text-2xl"></span>
           <div>
             <h2 className="text-xl font-bold ">Great news!</h2>
             <p className="text-sm muted mt-1">
@@ -34,7 +34,7 @@ export default function FixFirst({ fixes, onClickFix }: FixFirstProps) {
   return (
     <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-danger rounded-lg p-6 mb-8">
       <div className="flex items-start gap-3 mb-4">
-        <span className="text-2xl">🔴</span>
+        <span className="text-2xl"></span>
         <div>
           <h2 className="text-xl font-bold ">Fix First</h2>
           <p className="text-sm muted mt-1">

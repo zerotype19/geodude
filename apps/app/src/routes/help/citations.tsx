@@ -30,18 +30,18 @@ Optiview doesn't use fixed templates. Instead, we've built a **context-aware pro
 
 **What Makes Our Queries Unique:**
 
-✨ **Human-realistic patterns**: Our query engine analyzes your homepage, meta descriptions, and site structure to generate questions that match natural language patterns-no awkward grammar, no "cruises cruises" repetition, no generic templates.
+ **Human-realistic patterns**: Our query engine analyzes your homepage, meta descriptions, and site structure to generate questions that match natural language patterns-no awkward grammar, no "cruises cruises" repetition, no generic templates.
 
-🧠 **Self-learning context extraction**: After every audit, the system automatically:
+ **Self-learning context extraction**: After every audit, the system automatically:
 - Extracts your brand identity with intelligent camelCase and compound-word splitting
 - Identifies primary entities and 2-word semantic phrases
 - Classifies your site type (e-commerce, media, corporate, software, nonprofit)
 - Maps competitive positioning and category relationships
 - Updates a **Prompt Intelligence Index** that improves with each audit
 
-🎯 **Intent diversity**: Queries span multiple user journeys-comparison, informational, evaluative, commercial, and navigational-ensuring comprehensive coverage of how real users discover and evaluate your content.
+ **Intent diversity**: Queries span multiple user journeys-comparison, informational, evaluative, commercial, and navigational-ensuring comprehensive coverage of how real users discover and evaluate your content.
 
-🔄 **Dynamic adaptation**: The system continuously refines its understanding of your domain, detecting brand aliases, filtering meta-noise, and ensuring query realism through multi-layer quality gates.
+ **Dynamic adaptation**: The system continuously refines its understanding of your domain, detecting brand aliases, filtering meta-noise, and ensuring query realism through multi-layer quality gates.
 
 **The result?** Queries that AI platforms process as genuine user questions, giving you accurate visibility into how your content performs when people are actually searching.
 
@@ -56,7 +56,7 @@ Our proprietary query engine combines:
 
 **Query Types Generated:**
 
-**🏷️ Branded Queries (~10 per run):**
+**️ Branded Queries (~10 per run):**
 
 Questions that test brand recognition and direct discovery:
 - Identity queries ("What is [Brand]?")
@@ -66,25 +66,25 @@ Questions that test brand recognition and direct discovery:
 - Comparative positioning
 - Brand-specific FAQs
 
-**🌐 Non-Branded Queries (~18 per run):**
+** Non-Branded Queries (~18 per run):**
 
 Category-level questions that test topical authority across multiple intent types:
 
-- **🔍 Discovery**: "Best [category] options", "Top [services] to consider"
-- **📚 Informational**: "How does [technology] work?", "What are [services]?"
-- **⚖️ Evaluative**: "Pros and cons of [category]", "Is [service] worth it?"
-- **💰 Commercial**: "How much does [service] cost?", "[Category] pricing guide"
-- **🔄 Alternatives**: "Alternatives to [category]", "[Service] competitors"
-- **🎯 Problem-solving**: "How to [accomplish goal] with [category]"
+- ** Discovery**: "Best [category] options", "Top [services] to consider"
+- ** Informational**: "How does [technology] work?", "What are [services]?"
+- **️ Evaluative**: "Pros and cons of [category]", "Is [service] worth it?"
+- ** Commercial**: "How much does [service] cost?", "[Category] pricing guide"
+- ** Alternatives**: "Alternatives to [category]", "[Service] competitors"
+- ** Problem-solving**: "How to [accomplish goal] with [category]"
 
 **Linguistic Quality Assurance:**
 
 Every query passes through intelligent filters that ensure:
-- ✅ Natural grammar and syntax
-- ✅ No brand leakage into non-branded queries
-- ✅ No repetitive phrases or awkward constructions
-- ✅ Appropriate verb conjugation and pluralization
-- ✅ Intent-appropriate phrasing
+-  Natural grammar and syntax
+-  No brand leakage into non-branded queries
+-  No repetitive phrases or awkward constructions
+-  Appropriate verb conjugation and pluralization
+-  Intent-appropriate phrasing
 
 The system learns from each audit, refining its understanding of your domain to produce increasingly accurate, human-like queries.
 
@@ -94,21 +94,21 @@ The system learns from each audit, refining its understanding of your domain to 
 
 The true power of Optiview's citation system is its **continuous learning architecture**. After every audit and citation run, the system automatically:
 
-**📊 Builds Domain Intelligence:**
+** Builds Domain Intelligence:**
 
 - Extracts and normalizes your brand identity across name variants
 - Maps primary entities and semantic relationships (2-word phrases, category terms)
 - Classifies site type and competitive positioning
 - Tracks citation performance trends over time
 
-**🔄 Improves Future Queries:**
+** Improves Future Queries:**
 
 - Updates entity frequency models based on what AI platforms respond to
 - Refines brand detection logic using real citation outcomes
 - Discovers new category relationships through cross-domain pattern matching
 - Adapts query diversity based on what produces meaningful answers
 
-**🎯 Enables Semantic Discovery:**
+** Enables Semantic Discovery:**
 
 The **Prompt Intelligence Index** powers entity-based search, allowing you to discover:
 
@@ -201,11 +201,11 @@ Results are aggregated by:
 
 This breakdown shows how well you're cited when your brand is mentioned vs when users search for topics/categories:
 
-- **🏷️ Branded Queries**: Tests brand awareness - "What is [YourBrand]?", "How do I contact [YourBrand]?"
+- **️ Branded Queries**: Tests brand awareness - "What is [YourBrand]?", "How do I contact [YourBrand]?"
   - High citation rate (>80%) = Strong brand recognition
   - Low citation rate (<50%) = AI systems don't have good information about your brand
   
-- **🌐 Non-Branded Queries**: Tests category authority - "Best ways to [your service]", "How does [your technology] work?"
+- ** Non-Branded Queries**: Tests category authority - "Best ways to [your service]", "How does [your technology] work?"
   - High citation rate (>50%) = You're a trusted authority in your category
   - Low citation rate (<30%) = Opportunity to create more educational/topic-focused content
 
@@ -295,21 +295,21 @@ Click "View Details" to see:
 
 Optiview's citation system uses a **three-tier intelligent caching architecture** that balances speed with freshness:
 
-**⚡ Tier 1: Hot Cache (KV Store)**
+** Tier 1: Hot Cache (KV Store)**
 
 - **5-10ms response time**
 - Project-namespaced for multi-tenant isolation
 - 7-day TTL with smart invalidation
 - Serves 90% of requests instantly
 
-**📦 Tier 2: Canonical Store (D1 SQL)**
+** Tier 2: Canonical Store (D1 SQL)**
 
 - **50-100ms response time**
 - Durable backup with full query history
 - Version tracking (v2-contextual → v3-archetypes → v4-llm)
 - Enables historical trend analysis
 
-**🔨 Tier 3: Fresh Build (On-Demand)**
+** Tier 3: Fresh Build (On-Demand)**
 
 - **300-500ms response time**
 - Triggered by cache miss or audit completion
@@ -318,7 +318,7 @@ Optiview's citation system uses a **three-tier intelligent caching architecture*
 
 ---
 
-**🔄 Automatic Learning Cycle:**
+** Automatic Learning Cycle:**
 
 The system continuously refines itself through:
 
@@ -389,23 +389,23 @@ This ensures ongoing visibility monitoring without manual intervention.
 
 **Optiview's approach** is fundamentally different:
 
-**✨ Learns from your actual content**
+** Learns from your actual content**
 
 No two domains get the same queries-each audit produces unique, contextually grounded questions based on *your* homepage, *your* brand, and *your* positioning.
 
-**🧠 Self-improving intelligence**
+** Self-improving intelligence**
 
 The system gets smarter with every audit, learning which query patterns, entity combinations, and linguistic structures produce genuine AI citations across different site types and industries.
 
-**🎯 Human-realistic at scale**
+** Human-realistic at scale**
 
 Our multi-layer quality filtering ensures queries read like authentic user questions-proper grammar, natural phrasing, intent-appropriate language-so AI platforms treat them as real searches.
 
-**🔄 Cross-domain learning**
+** Cross-domain learning**
 
 Insights from thousands of audits feed back into the prompt generation engine, creating a network effect where every new audit improves the system for everyone.
 
-**📊 Actionable intelligence**
+** Actionable intelligence**
 
 Beyond citation counts, you get entity-level insights, competitive benchmarking, and trend analysis-powered by the same intelligence index that generates your queries.
 

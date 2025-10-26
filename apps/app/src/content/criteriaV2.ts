@@ -410,10 +410,10 @@ export const CATEGORY_DESCRIPTIONS: Record<Category, string> = {
  * Category icons
  */
 export const CATEGORY_ICONS: Record<Category, string> = {
-  'Content & Clarity': '📝',
-  'Structure & Organization': '🗂️',
-  'Authority & Trust': '🛡️',
-  'Technical Foundations': '⚙️',
-  'Crawl & Discoverability': '🔍',
-  'Experience & Performance': '⚡'
+  'Content & Clarity': '',
+  'Structure & Organization': '️',
+  'Authority & Trust': '️',
+  'Technical Foundations': '️',
+  'Crawl & Discoverability': '',
+  'Experience & Performance': ''
 };

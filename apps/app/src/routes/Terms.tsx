@@ -177,7 +177,7 @@ export default function Terms() {
               If you have questions about these Terms or wish to report a concern, contact us at:
             </p>
             <p className="text-brand mt-2">
-              📧 <a href="mailto:legal@optiview.ai" className="hover:underline">legal@optiview.ai</a>
+               <a href="mailto:legal@optiview.ai" className="hover:underline">legal@optiview.ai</a>
             </p>
           </section>
 

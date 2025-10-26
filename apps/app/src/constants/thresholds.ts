@@ -23,7 +23,7 @@ export function renderParityLabel(ratio: number): {
 } {
   if (ratio >= 0.9) {
     return { 
-      emoji: '✅', 
+      emoji: '', 
       label: 'High parity', 
       hint: '≥90% of content present in server HTML',
       severity: 'success'
@@ -31,14 +31,14 @@ export function renderParityLabel(ratio: number): {
   }
   if (ratio >= 0.5) {
     return { 
-      emoji: '⚠️', 
+      emoji: '️', 
       label: 'Partial parity', 
       hint: '50–90% present - consider server-rendering key blocks',
       severity: 'warning'
     };
   }
   return { 
-    emoji: '❌', 
+    emoji: '', 
     label: 'Low parity', 
     hint: '<50% present - LLM crawlers likely miss key content',
     severity: 'error'

@@ -218,7 +218,7 @@ export default function AuditsIndex() {
               
               <div className="card-muted p-4 mb-4">
                 <p className="text-sm">
-                  🔐 <strong>Magic link authentication</strong>
+                   <strong>Magic link authentication</strong>
                 </p>
                 <p className="text-sm text-brand mt-1">
                   We'll send you a secure link to start this audit. This ensures your audits are private and only accessible by you.

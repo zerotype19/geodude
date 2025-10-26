@@ -11,19 +11,19 @@ interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   {
     target: '[data-tour="overview-tab"]',
-    title: '📊 Overview Tab',
+    title: ' Overview Tab',
     content: 'See your AEO and GEO scores, Top Blockers (high-impact issues), and Quick Wins (easy fixes). This is your starting point for improving your site.',
     position: 'bottom'
   },
   {
     target: '[data-tour="pages-tab"]',
-    title: '📄 Pages Tab',
+    title: ' Pages Tab',
     content: 'Browse all analyzed pages with individual scores. Click any page to see detailed evidence for each check.',
     position: 'bottom'
   },
   {
     target: '[data-tour="citations-tab"]',
-    title: '🔍 Citations Tab',
+    title: ' Citations Tab',
     content: 'Test if your brand appears in real LLM responses from ChatGPT, Claude, Perplexity, and Brave. Click here to switch to the Citations tab.',
     position: 'bottom',
     action: () => {

@@ -400,7 +400,7 @@ export default function CategoryDetail() {
           
           {pagesWithIssues.length === 0 ? (
             <div className="card-body text-center py-12">
-              <div className="text-4xl mb-2">🎉</div>
+              <div className="text-4xl mb-2"></div>
               <p className="font-medium mb-1">All pages passing!</p>
               <p className="subtle text-sm">No issues found in this category</p>
             </div>

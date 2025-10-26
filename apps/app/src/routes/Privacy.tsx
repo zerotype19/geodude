@@ -125,7 +125,7 @@ export default function Privacy() {
               For privacy inquiries or deletion requests, contact:
             </p>
             <p className="text-brand mt-2">
-              📧 <a href="mailto:privacy@optiview.ai" className="hover:underline">privacy@optiview.ai</a>
+               <a href="mailto:privacy@optiview.ai" className="hover:underline">privacy@optiview.ai</a>
             </p>
           </section>
 

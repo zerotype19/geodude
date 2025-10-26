@@ -25,12 +25,12 @@ interface CategorySectionProps {
 
 // Category emoji map
 const CATEGORY_EMOJIS: Record<CheckCategory, string> = {
-  'Content & Clarity': '📝',
-  'Structure & Organization': '🏗️',
-  'Authority & Trust': '🛡️',
-  'Technical Foundations': '⚙️',
-  'Crawl & Discoverability': '🔍',
-  'Experience & Performance': '⚡'
+  'Content & Clarity': '',
+  'Structure & Organization': '️',
+  'Authority & Trust': '️',
+  'Technical Foundations': '️',
+  'Crawl & Discoverability': '',
+  'Experience & Performance': ''
 };
 
 // Category descriptions

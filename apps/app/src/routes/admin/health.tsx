@@ -116,7 +116,7 @@ export default function HealthDashboard() {
                   Metrics showing 0.0% are expected with low traffic.
                 </div>
                 <div className="text-sm text-brand mt-2">
-                  💡 Run a few audits to populate the health dashboard with meaningful data.
+                   Run a few audits to populate the health dashboard with meaningful data.
                 </div>
               </div>
             </div>
@@ -135,7 +135,7 @@ export default function HealthDashboard() {
               >
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">
-                    {alert.level === 'error' ? '🚨' : '⚠️'}
+                    {alert.level === 'error' ? '' : '️'}
                   </span>
                   <div className="flex-1">
                     <div className="font-semibold">{alert.message}</div>
@@ -295,7 +295,7 @@ function StatusCheck({ label, status, value }: { label: string; status: boolean;
   return (
     <div className="flex items-center justify-between py-2 px-4 rounded bg-neutral-50">
       <div className="flex items-center gap-2">
-        <span className="text-xl">{status ? '✅' : '❌'}</span>
+        <span className="text-xl">{status ? '' : ''}</span>
         <span>{label}</span>
       </div>
       <span className="font-mono text-sm">{value}</span>

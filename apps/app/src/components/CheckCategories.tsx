@@ -17,12 +17,12 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
 
 // Category icons matching the score guide
 const CATEGORY_ICONS: Record<string, string> = {
-  'Content & Clarity': '📝',
-  'Structure & Organization': '🏗️',
-  'Authority & Trust': '🛡️',
-  'Technical Foundations': '⚙️',
-  'Crawl & Discoverability': '🔍',
-  'Experience & Performance': '⚡'
+  'Content & Clarity': '',
+  'Structure & Organization': '️',
+  'Authority & Trust': '️',
+  'Technical Foundations': '️',
+  'Crawl & Discoverability': '',
+  'Experience & Performance': ''
 };
 
 export default function CheckCategories({ scores = {} }: CheckCategoriesProps) {

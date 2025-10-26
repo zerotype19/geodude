@@ -247,10 +247,10 @@ export default function PagesTab({ auditId, isPublic = false }: PagesTabProps) {
                   <div className="text-xs font-medium text-ink-muted uppercase tracking-wide mb-1">Check Status</div>
                   <div className="flex items-center gap-3 text-sm">
                     <span className="text-success font-semibold">
-                      {passingChecks.length} ✓
+                      {passingChecks.length} 
                     </span>
                     <span className="text-danger font-semibold">
-                      {failingChecks.length} ✗
+                      {failingChecks.length} 
                     </span>
                   </div>
                 </div>

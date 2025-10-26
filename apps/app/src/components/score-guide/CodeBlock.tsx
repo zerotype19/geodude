@@ -30,7 +30,7 @@ export default function CodeBlock({ code, language = "json", checkId }: CodeBloc
         className="absolute right-2 top-2 text-xs px-2 py-1 rounded bg-surface-1 border border-border hover:bg-surface-2 transition-colors muted"
         aria-label="Copy code"
       >
-        {copied ? "Copied ✓" : "Copy"}
+        {copied ? "Copied " : "Copy"}
       </button>
       <pre className="overflow-x-auto p-4 text-sm ">
         <code className={`language-${language}`}>{code}</code>
