@@ -49,6 +49,67 @@ export default function ScoreGuide() {
             <ViewToggle />
           </div>
 
+          {/* Methodology Overview */}
+          <div className="card card-body space-y-6 mt-8">
+            <div>
+              <h2 className="text-2xl font-bold mb-3">How Optiview Scoring Works</h2>
+              <p className="text-base muted leading-relaxed">
+                Optiview provides a comprehensive assessment of your AI visibility across 36 diagnostic criteria organized into 6 practical categories. 
+                Our scoring system combines deterministic HTML analysis, AI-assisted evaluation, site-level aggregates, and real-world citation testing 
+                to give you a complete picture of how LLMs discover, understand, and reference your content.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">🔍 What We Look For</h3>
+                <ul className="space-y-2 text-sm muted">
+                  <li><strong>Technical Foundation:</strong> Schema markup, meta tags, canonical URLs, mobile optimization</li>
+                  <li><strong>Content Quality:</strong> Answer-first structure, FAQ presence, semantic headings, clarity</li>
+                  <li><strong>Semantic Structure:</strong> Entity graphs, structured data, internal linking, breadcrumbs</li>
+                  <li><strong>Crawl Access:</strong> Robots policies, sitemap coverage, render visibility, AI crawler access</li>
+                  <li><strong>Authority Signals:</strong> Author attribution, dates, citations, external references</li>
+                  <li><strong>Real Citations:</strong> Actual appearance in ChatGPT, Claude, and Perplexity responses</li>
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold mb-2">📊 Scoring Methodology</h3>
+                <ul className="space-y-2 text-sm muted">
+                  <li><strong>Page-Level Checks ({STATS.page}):</strong> Run on every page analyzed, measuring content quality, structure, and technical implementation</li>
+                  <li><strong>Site-Level Checks ({STATS.site}):</strong> Evaluate overall site properties like FAQ coverage, entity graph completeness, and crawl policies</li>
+                  <li><strong>Weighted Scores:</strong> Each check has an impact weight (1-15) reflecting its importance for AI visibility</li>
+                  <li><strong>Composite Score:</strong> Overall score combines page and site checks, weighted by impact and normalized to 0-100</li>
+                  <li><strong>Category Scores:</strong> Grouped into 6 actionable categories for easier prioritization</li>
+                </ul>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-2">📄 Executive Summary Reports</h3>
+              <p className="text-sm muted leading-relaxed">
+                Every audit generates a comprehensive <strong>executive summary report</strong> that includes:
+              </p>
+              <ul className="grid md:grid-cols-2 gap-x-6 gap-y-2 text-sm muted mt-2">
+                <li>• Cover page with overall score and citation rate</li>
+                <li>• Category breakdown with strengths and opportunities</li>
+                <li>• Priority fixes ranked by weighted impact</li>
+                <li>• Site-level diagnostics with status indicators</li>
+                <li>• Successful citation examples (queries where you appear)</li>
+                <li>• Missed opportunities (queries where you don't appear)</li>
+                <li>• Page-level insights and quick wins</li>
+                <li>• One-click PDF export for stakeholder sharing</li>
+              </ul>
+            </div>
+
+            <div className="pt-4 border-t border-border">
+              <p className="text-sm muted">
+                <strong>Industry-Specific Testing:</strong> Citation queries are tailored to your industry using 200+ taxonomies, 
+                ensuring relevant, realistic prompts that reflect how users actually search for information in your space.
+              </p>
+            </div>
+          </div>
+
         </header>
 
         {/* Content */}
