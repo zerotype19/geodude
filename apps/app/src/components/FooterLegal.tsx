@@ -11,7 +11,7 @@ export default function FooterLegal() {
           <Link to="/score-guide" className="hover: transition-colors">
             Scoring Guide
           </Link>
-          <a href="https://optiview.ai/docs/citations.html" className="hover: transition-colors">
+          <a href="https://optiview.ai/citations" className="hover: transition-colors">
             Citations Guide
           </a>
           <a href="https://optiview.ai/methodology" className="hover: transition-colors">

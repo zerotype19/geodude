@@ -132,7 +132,7 @@ export default function CitationsTab({ auditId, isPublic = false }: CitationsTab
             Visibility across AI sources • Last run: {summary?.bySource[0]?.last_run || 'Never'}
             {' '}
             <a 
-              href="/help/citations" 
+              href="https://optiview.ai/citations" 
               className="text-brand hover:underline"
               target="_blank"
               rel="noopener noreferrer"

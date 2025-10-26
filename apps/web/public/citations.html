@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-CY45NV4CNE');
+    </script>
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Citations Intelligence System | Optiview</title>
+    <meta name="description" content="Discover how Optiview's self-learning citation intelligence system uses 200+ industry taxonomies and human-realistic query generation to measure your visibility across ChatGPT, Claude, Perplexity, and Brave AI.">
+    <link rel="canonical" href="https://optiview.ai/citations" />
+    
+    <!-- FAQPage Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How does Optiview's citation intelligence system work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Optiview uses a self-learning system powered by 200+ industry taxonomies to generate human-realistic test queries. The system analyzes your content, classifies your industry, and creates contextually appropriate questions that mirror real user search patterns. Each query is tested across ChatGPT, Claude, Perplexity, and Brave AI to measure citation frequency and accuracy."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What makes Optiview's query generation unique?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Unlike static template tools, Optiview's v4-llm system learns from your actual site content to produce unique, contextually grounded queries for every audit. The system extracts brand identity, identifies entities, classifies site type, maps competitive positioning, and continuously refines its Prompt Intelligence Index with each audit."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which AI platforms does Optiview track?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Optiview tracks citations across ChatGPT (OpenAI), Claude (Anthropic), Perplexity, and Brave AI. We use native API integrations for structured citation data where available, and enhanced parsing for heuristic URL extraction from conversational responses."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .hero-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .feature-card {
+            background: var(--surface-1);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+            transition: all 0.3s ease;
+        }
+        .feature-card:hover {
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.15);
+            transform: translateY(-2px);
+        }
+        .feature-card h3 {
+            color: var(--ink);
+            margin: 0 0 1rem 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .feature-card h4 {
+            color: var(--ink);
+            margin: 1.5rem 0 0.75rem 0;
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+        .feature-card p, .feature-card li {
+            color: var(--ink-muted);
+            line-height: 1.8;
+        }
+        .feature-card ul, .feature-card ol {
+            margin: 0.75rem 0 0.75rem 1.5rem;
+        }
+        .feature-card li {
+            margin-bottom: 0.5rem;
+        }
+        .metric-badge {
+            display: inline-block;
+            background: var(--brand);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-right: 8px;
+        }
+        .metric-badge.native {
+            background: hsl(142 76% 36%);
+        }
+        .metric-badge.heuristic {
+            background: hsl(217 91% 60%);
+        }
+        .success-box {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+            border-left: 4px solid var(--brand);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+        }
+        .success-box h4 {
+            margin-top: 0;
+            color: var(--ink);
+            font-weight: 700;
+        }
+        .taxonomy-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+        .taxonomy-item {
+            background: var(--surface-2);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: var(--ink-muted);
+        }
+        code {
+            background: var(--surface-2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: var(--brand);
+        }
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        .stat-card {
+            background: var(--surface-2);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+        .stat-card .label {
+            color: var(--ink-muted);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="bg-surface-2">
+    <!-- Navigation -->
+    <header class="bg-surface-1 border-b border-border sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-semibold text-brand">Optiview</a>
+                </div>
+                
+                <nav class="hidden md:flex space-x-8">
+                    <a href="https://app.optiview.ai" class="text-ink-muted hover:text-brand transition-colors">Audits</a>
+                    <a href="https://app.optiview.ai/score-guide" class="text-ink-muted hover:text-brand transition-colors">Score Guide</a>
+                    <a href="/citations" class="text-brand font-medium">Citations Guide</a>
+                    <a href="/faq/" class="text-ink-muted hover:text-brand transition-colors">Knowledge Base</a>
+                    <a href="/methodology" class="text-ink-muted hover:text-brand transition-colors">Methodology</a>
+                </nav>
+                
+                <!-- Mobile menu button -->
+                <button class="md:hidden p-2" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" aria-label="Toggle menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="hidden md:hidden border-t border-border">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="https://app.optiview.ai" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Audits</a>
+                <a href="https://app.optiview.ai/score-guide" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Score Guide</a>
+                <a href="/citations" class="block px-3 py-2 text-brand font-medium bg-surface-2 rounded-md">Citations Guide</a>
+                <a href="/faq/" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Knowledge Base</a>
+                <a href="/methodology" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Methodology</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero-gradient text-white py-16">
+        <div class="max-w-4xl mx-auto px-4 text-center">
+            <h1 class="text-5xl font-bold mb-4">AI Citations Intelligence System</h1>
+            <p class="text-xl opacity-95 mb-6">Self-learning citation tracking powered by 200+ industry taxonomies and human-realistic query generation</p>
+            <div class="stat-row">
+                <div class="stat-card" style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);">
+                    <div class="number" style="-webkit-text-fill-color: white; background: none;">200+</div>
+                    <div class="label" style="color: rgba(255,255,255,0.9);">Industry Taxonomies</div>
+                </div>
+                <div class="stat-card" style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);">
+                    <div class="number" style="-webkit-text-fill-color: white; background: none;">4</div>
+                    <div class="label" style="color: rgba(255,255,255,0.9);">Major AI Platforms</div>
+                </div>
+                <div class="stat-card" style="background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);">
+                    <div class="number" style="-webkit-text-fill-color: white; background: none;">~28</div>
+                    <div class="label" style="color: rgba(255,255,255,0.9);">Queries Per Audit</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto px-4 py-12">
+        
+        <!-- Overview -->
+        <section class="feature-card">
+            <h3>🧠 Self-Learning Citation Intelligence</h3>
+            <p>Optiview's citation system doesn't use static templates. Instead, we've built a <strong>context-aware, self-learning engine</strong> that analyzes your actual site content to generate queries indistinguishable from real user searches.</p>
+            
+            <div class="success-box">
+                <h4>Why This Matters</h4>
+                <p style="color: var(--ink-muted); margin-bottom: 0;">Traditional citation tools use fixed templates that feel robotic—AI platforms recognize them as synthetic and may respond differently than they would to genuine user queries. Optiview's approach produces <strong>human-realistic queries</strong> that mirror what real users actually ask, giving you accurate visibility into how AI platforms will surface your content when it matters most.</p>
+            </div>
+        </section>
+
+        <!-- How It Works -->
+        <section class="feature-card">
+            <h3>⚙️ How the System Works</h3>
+            
+            <h4>1. 🏭 Industry Classification (200+ Taxonomies)</h4>
+            <p>When you run an audit, the system automatically classifies your site using a hierarchical dot-slug taxonomy:</p>
+            <ul>
+                <li><strong>AI-Powered Detection:</strong> Analyzes your domain, content, and schema</li>
+                <li><strong>Hierarchical Structure:</strong> From broad categories to specific niches (e.g., <code>health.pharma.brand</code>, <code>travel.air.commercial</code>, <code>retail.grocery</code>)</li>
+                <li><strong>Cascading Templates:</strong> Industry-specific query patterns that match real user intent</li>
+            </ul>
+            
+            <div class="taxonomy-grid">
+                <div class="taxonomy-item">🚗 automotive.oem</div>
+                <div class="taxonomy-item">🏨 travel.hotels</div>
+                <div class="taxonomy-item">💊 health.pharma.brand</div>
+                <div class="taxonomy-item">✈️ travel.air.commercial</div>
+                <div class="taxonomy-item">🏦 finance.bank</div>
+                <div class="taxonomy-item">🛒 retail.grocery</div>
+                <div class="taxonomy-item">💻 software.saas.b2b</div>
+                <div class="taxonomy-item">🏥 health.providers</div>
+                <div class="taxonomy-item">🍕 food.restaurants.casual</div>
+                <div class="taxonomy-item">🎓 education.higher</div>
+                <div class="taxonomy-item">📰 media.news</div>
+                <div class="taxonomy-item">🏭 manufacturing.industrial</div>
+            </div>
+
+            <h4>2. 🎯 Context-Aware Query Generation (v4-llm)</h4>
+            <p>Our proprietary query engine combines multiple intelligence layers:</p>
+            <ul>
+                <li><strong>Contextual Grounding:</strong> Analyzes your homepage title, H1, meta description, and site structure</li>
+                <li><strong>Entity Intelligence:</strong> Extracts brand name, primary topics, and semantic relationships with intelligent camelCase and compound-word splitting</li>
+                <li><strong>Intent Modeling:</strong> Maps your content to real user search behaviors across discovery, informational, evaluative, commercial, and navigational intents</li>
+                <li><strong>Quality Filtering:</strong> Multi-stage validation ensures queries read like authentic user questions—proper grammar, natural phrasing, no awkward repetition</li>
+                <li><strong>Competitive Awareness:</strong> Understands category positioning without explicit input</li>
+            </ul>
+
+            <h4>3. 📚 Prompt Intelligence Index</h4>
+            <p>The system continuously learns and improves through:</p>
+            <ul>
+                <li><strong>Post-Audit Updates:</strong> Brand, entities, and site type immediately indexed</li>
+                <li><strong>Citation Feedback Loop:</strong> Analyzes which queries produce citations, feeding back into query generation</li>
+                <li><strong>Cross-Domain Pattern Mining:</strong> Learns from successful query patterns across thousands of audits</li>
+                <li><strong>Semantic Discovery:</strong> Powers entity-based search for competitive intelligence and category benchmarking</li>
+            </ul>
+
+            <div class="success-box">
+                <h4>🔄 The Flywheel Effect</h4>
+                <p style="color: var(--ink-muted); margin-bottom: 0;">Each audit makes the next one smarter. The system learns which query patterns yield genuine citations, which brand formulations AI platforms recognize, and which content structures maximize visibility—then applies those insights across all future audits. This creates a network effect where more domains = better intelligence for everyone.</p>
+            </div>
+        </section>
+
+        <!-- Query Types -->
+        <section class="feature-card">
+            <h3>🔍 Query Types Generated</h3>
+            
+            <h4>🏷️ Branded Queries (~10 per run)</h4>
+            <p>Questions that test brand recognition and direct discovery:</p>
+            <ul>
+                <li>Identity queries ("What is [Brand]?")</li>
+                <li>Service/product inquiries ("[Brand] features and capabilities")</li>
+                <li>Trust and safety questions ("[Brand] customer reviews")</li>
+                <li>Contact and support searches ("[Brand] customer service number")</li>
+                <li>Comparative positioning ("[Brand] vs [Competitor]")</li>
+                <li>Navigational anchors ("[Brand] login", "[Brand] store locator")</li>
+            </ul>
+
+            <h4>🌐 Non-Branded Queries (~18 per run)</h4>
+            <p>Category-level questions that test topical authority:</p>
+            <ul>
+                <li><strong>🔍 Discovery:</strong> "Best [category] options", "Top [services] to consider"</li>
+                <li><strong>📚 Informational:</strong> "How does [technology] work?", "What are [services]?"</li>
+                <li><strong>⚖️ Evaluative:</strong> "Pros and cons of [category]", "Is [service] worth it?"</li>
+                <li><strong>💰 Commercial:</strong> "How much does [service] cost?", "[Category] pricing guide"</li>
+                <li><strong>🔄 Alternatives:</strong> "Alternatives to [category]", "[Service] competitors"</li>
+                <li><strong>🎯 Problem-solving:</strong> "How to [accomplish goal] with [category]"</li>
+            </ul>
+
+            <h4>✅ Linguistic Quality Assurance</h4>
+            <p>Every query passes through intelligent filters:</p>
+            <ul>
+                <li>Natural grammar and syntax</li>
+                <li>No brand leakage into non-branded queries</li>
+                <li>No repetitive phrases or awkward constructions (e.g., "cruises cruises")</li>
+                <li>Appropriate verb conjugation and pluralization</li>
+                <li>Intent-appropriate phrasing</li>
+            </ul>
+        </section>
+
+        <!-- AI Platforms -->
+        <section class="feature-card">
+            <h3>🤖 AI Platforms Tracked</h3>
+            <p>Each query is tested across all major AI assistants:</p>
+            
+            <div style="margin: 2rem 0;">
+                <div style="background: var(--surface-2); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <h4 style="margin-top: 0;">🔍 Perplexity AI</h4>
+                    <p><strong>Citation Style:</strong> Direct source links with context</p>
+                    <p><strong>Tracking Method:</strong> Native API integration with structured citation data</p>
+                    <p style="margin-bottom: 0;"><span class="metric-badge native">NATIVE</span> <strong>Success Rate:</strong> ~80%</p>
+                </div>
+
+                <div style="background: var(--surface-2); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <h4 style="margin-top: 0;">🤖 ChatGPT (OpenAI)</h4>
+                    <p><strong>Citation Style:</strong> Contextual references in responses</p>
+                    <p><strong>Tracking Method:</strong> Heuristic URL extraction from GPT-4 responses</p>
+                    <p style="margin-bottom: 0;"><span class="metric-badge heuristic">HEURISTIC</span> <strong>Success Rate:</strong> ~70-85%</p>
+                </div>
+
+                <div style="background: var(--surface-2); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <h4 style="margin-top: 0;">🧠 Claude (Anthropic)</h4>
+                    <p><strong>Citation Style:</strong> Markdown-style links and references</p>
+                    <p><strong>Tracking Method:</strong> Enhanced parsing for URLs and [text](url) format</p>
+                    <p style="margin-bottom: 0;"><span class="metric-badge heuristic">HEURISTIC</span> <strong>Success Rate:</strong> ~80-100%</p>
+                </div>
+
+                <div style="background: var(--surface-2); padding: 1.5rem; border-radius: 8px;">
+                    <h4 style="margin-top: 0;">🦁 Brave AI</h4>
+                    <p><strong>Citation Style:</strong> Inline source references with snippets</p>
+                    <p><strong>Tracking Method:</strong> Native API integration with search result citations</p>
+                    <p style="margin-bottom: 0;"><span class="metric-badge native">NATIVE</span> <strong>Success Rate:</strong> ~45% (API rate limited)</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Industry Examples -->
+        <section class="feature-card">
+            <h3>💡 Industry-Specific Examples</h3>
+            <p>Here's how query generation adapts to different industries:</p>
+            
+            <h4>Healthcare (Pharma)</h4>
+            <ul>
+                <li>"prescribing information for {brand}"</li>
+                <li>"{brand} medications contraindications and warnings"</li>
+                <li>"{brand} dosage and administration guidelines"</li>
+                <li>"How to report side effects to {brand}"</li>
+            </ul>
+
+            <h4>Travel (Airlines)</h4>
+            <ul>
+                <li>"{brand} baggage policy"</li>
+                <li>"{brand} customer service phone number"</li>
+                <li>"Check-in for {brand} flights"</li>
+                <li>"{brand} flight status and delays"</li>
+            </ul>
+
+            <h4>B2B SaaS</h4>
+            <ul>
+                <li>"{brand} pricing plans and features"</li>
+                <li>"{brand} integrations with {technology}"</li>
+                <li>"{brand} vs {competitor} comparison"</li>
+                <li>"How to set up {brand} for {use-case}"</li>
+            </ul>
+
+            <h4>E-commerce (Fashion)</h4>
+            <ul>
+                <li>"{brand} sizing guide"</li>
+                <li>"Best {category} from {brand}"</li>
+                <li>"{brand} return policy and shipping"</li>
+                <li>"{brand} customer reviews for {product}"</li>
+            </ul>
+
+            <h4>Education (Higher Ed)</h4>
+            <ul>
+                <li>"{brand} admissions requirements"</li>
+                <li>"{brand} tuition costs and financial aid"</li>
+                <li>"{brand} vs {competitor} rankings"</li>
+                <li>"{brand} academic programs in {field}"</li>
+            </ul>
+        </section>
+
+        <!-- Intelligence Features -->
+        <section class="feature-card">
+            <h3>🚀 Advanced Intelligence Features</h3>
+            
+            <h4>⚡ Three-Tier Intelligent Caching</h4>
+            <ul>
+                <li><strong>Tier 1: Hot Cache (KV Store)</strong> - 5-10ms response, 7-day TTL, serves 90% of requests instantly</li>
+                <li><strong>Tier 2: Canonical Store (D1 SQL)</strong> - 50-100ms response, full query history, version tracking</li>
+                <li><strong>Tier 3: Fresh Build (On-Demand)</strong> - 300-500ms response, applies latest intelligence models</li>
+            </ul>
+
+            <h4>📊 Semantic Discovery & Competitive Intelligence</h4>
+            <ul>
+                <li>Find competitors by entity overlap</li>
+                <li>Benchmark citation performance against category peers</li>
+                <li>Discover emerging topic trends in your industry</li>
+                <li>Identify content gaps where competitors are cited but you're not</li>
+            </ul>
+
+            <h4>🔄 Automatic Learning Cycle</h4>
+            <ul>
+                <li>Post-audit updates to brand, entities, and site classification</li>
+                <li>Hourly refresh jobs for 100 least-recently-refreshed domains</li>
+                <li>Citation feedback loop analyzes successful query patterns</li>
+                <li>Cross-domain pattern mining improves all future audits</li>
+            </ul>
+        </section>
+
+        <!-- Results & Metrics -->
+        <section class="feature-card">
+            <h3>📈 Understanding Your Results</h3>
+            
+            <h4>Citation Percentage by Source</h4>
+            <ul>
+                <li><strong>0-10%:</strong> Low visibility—focus on content clarity, FAQ structure, and crawler access</li>
+                <li><strong>10-25%:</strong> Moderate visibility—optimize content chunkability and add citations</li>
+                <li><strong>25-50%:</strong> Strong visibility—expand content depth and maintain quality</li>
+                <li><strong>50%+:</strong> Excellent visibility—you're a trusted source for this AI platform</li>
+            </ul>
+
+            <h4>Query Type Performance</h4>
+            <p><strong>🏷️ Branded Queries:</strong> Tests brand awareness</p>
+            <ul>
+                <li>High citation rate (&gt;80%) = Strong brand recognition</li>
+                <li>Low citation rate (&lt;50%) = AI systems lack good brand information</li>
+            </ul>
+
+            <p><strong>🌐 Non-Branded Queries:</strong> Tests category authority</p>
+            <ul>
+                <li>High citation rate (&gt;50%) = You're a trusted authority in your category</li>
+                <li>Low citation rate (&lt;30%) = Opportunity for educational/topic-focused content</li>
+            </ul>
+        </section>
+
+        <!-- Optimization -->
+        <section class="feature-card">
+            <h3>🎯 Optimizing for AI Citations</h3>
+            
+            <h4>Content Strategy</h4>
+            <ul>
+                <li><strong>Answer-Focused Content:</strong> Create content that directly answers common questions</li>
+                <li><strong>FAQ Optimization:</strong> Structure content with clear questions and detailed answers</li>
+                <li><strong>Comprehensive Coverage:</strong> Provide thorough, authoritative information on topics</li>
+                <li><strong>Technical Accuracy:</strong> Ensure information is current and factually correct</li>
+                <li><strong>Unique Value:</strong> Offer original insights, data, or research</li>
+            </ul>
+
+            <h4>Technical Implementation</h4>
+            <ul>
+                <li><strong>Structured Data:</strong> Implement FAQPage, QAPage, and Organization JSON-LD markup</li>
+                <li><strong>Clear Headings:</strong> Use descriptive H1, H2, H3 tags that AI can easily parse</li>
+                <li><strong>Meta Descriptions:</strong> Write compelling descriptions that summarize key points</li>
+                <li><strong>Internal Linking:</strong> Connect related content to help AI understand relationships</li>
+                <li><strong>Mobile Optimization:</strong> Ensure content is accessible and well-formatted on all devices</li>
+            </ul>
+
+            <h4>AI Crawler Access</h4>
+            <ul>
+                <li>Allow GPTBot, Claude-Web, PerplexityBot in robots.txt</li>
+                <li>Ensure content is accessible without JavaScript (SPA parity)</li>
+                <li>Use semantic HTML structure</li>
+                <li>Provide clear, stable URLs for key content</li>
+            </ul>
+        </section>
+
+        <!-- Getting Started -->
+        <section class="feature-card">
+            <h3>🚀 Getting Started</h3>
+            <p>Ready to measure your AI citation performance?</p>
+            <ol style="line-height: 2;">
+                <li>Visit the <a href="https://app.optiview.ai" class="text-brand hover:underline" style="font-weight: 600;">Optiview Dashboard</a></li>
+                <li>Run an audit on your domain</li>
+                <li>Check the <strong>Citations tab</strong> to see AI references to your content</li>
+                <li>Review your citation rates by AI source (ChatGPT, Claude, Perplexity, Brave)</li>
+                <li>Analyze branded vs non-branded query performance</li>
+                <li>Identify top cited pages and missed opportunities</li>
+                <li>Implement recommended optimizations</li>
+                <li>Re-run citations to track improvement over time</li>
+            </ol>
+
+            <div class="success-box">
+                <h4>💡 Pro Tip</h4>
+                <p style="color: var(--ink-muted); margin-bottom: 0;">Citation changes lag by 2-8 weeks as AI models refresh their grounding data. Run audits monthly to track trends and measure the impact of your optimization efforts.</p>
+            </div>
+        </section>
+
+        <!-- API Access -->
+        <section class="feature-card">
+            <h3>🔌 API Access</h3>
+            <p>Programmatic access to citation intelligence:</p>
+            
+            <h4>Query & Prompt Endpoints</h4>
+            <ul>
+                <li><code>GET /api/llm/prompts?domain=example.com</code> - Get cached queries with metadata</li>
+                <li><code>GET /api/prompts/related?entity=cruise&limit=20</code> - Find related domains by entity</li>
+            </ul>
+
+            <h4>Citation Endpoints</h4>
+            <ul>
+                <li><code>POST /api/citations/run</code> - Trigger manual citation runs</li>
+                <li><code>GET /api/citations/summary</code> - Get aggregated metrics</li>
+                <li><code>GET /api/citations/list</code> - Retrieve detailed citation records</li>
+                <li><code>GET /api/insights/:domain</code> - Combined scoring + citations analysis</li>
+            </ul>
+
+            <p><strong>Performance:</strong> ~98% cache hit rate, &lt;20ms avg response time for cached queries</p>
+        </section>
+
+        <!-- Back Link -->
+        <div class="mt-12 text-center">
+            <a href="https://app.optiview.ai" class="btn-primary inline-block">Start Tracking Your Citations →</a>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-surface-1 border-t border-border mt-16">
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <nav class="flex flex-wrap justify-center gap-6 mb-4">
+                <a href="https://app.optiview.ai" class="text-ink-muted hover:text-brand">Audits</a>
+                <a href="https://app.optiview.ai/score-guide" class="text-ink-muted hover:text-brand">Score Guide</a>
+                <a href="/citations" class="text-ink-muted hover:text-brand">Citations Guide</a>
+                <a href="/faq/" class="text-ink-muted hover:text-brand">Knowledge Base</a>
+                <a href="/methodology" class="text-ink-muted hover:text-brand">Methodology</a>
+                <a href="/terms" class="text-ink-muted hover:text-brand">Terms</a>
+                <a href="/privacy" class="text-ink-muted hover:text-brand">Privacy</a>
+                <a href="/bot" class="text-ink-muted hover:text-brand">Bot Info</a>
+            </nav>
+            <p class="text-center text-ink-muted text-sm">© 2025 Optiview.ai · AI visibility intelligence for modern brands</p>
+        </div>
+    </footer>
+</body>
+</html>
+
