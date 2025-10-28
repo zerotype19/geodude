@@ -361,6 +361,85 @@ export default function AuditDetail() {
   const topBlockers = getTopBlockers();
   const quickWins = getQuickWins();
 
+  // Show progress view for running audits
+  if (audit.status?.toLowerCase() === 'running') {
+    const elapsedMinutes = Math.floor((Date.now() - new Date(audit.started_at).getTime()) / 60000);
+    const progress = Math.min((elapsedMinutes / 5) * 100, 95);
+    
+    return (
+      <div className="min-h-screen bg-surface-2">
+        <div className="page-max container-px py-8">
+          <Link to="/audits" className="text-brand hover:underline mb-4 inline-block">
+            ← Back to Audits
+          </Link>
+          
+          <div className="bg-white p-8 rounded-lg shadow-sm">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Audit in Progress</h2>
+              <p className="text-gray-600">{audit.root_url}</p>
+              <p className="text-sm text-gray-500 mt-2">This typically takes 3-5 minutes</p>
+            </div>
+            
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-600 mb-2">
+                <span>Progress</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="bg-blue-50 rounded-lg p-6 space-y-3">
+              <div className="flex items-start">
+                <svg className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium text-blue-900">What's happening?</p>
+                  <p className="text-sm text-blue-700 mt-1">
+                    We're crawling your website, analyzing content, running diagnostic checks, and computing optimization scores.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start">
+                <svg className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-medium text-blue-900">Elapsed Time</p>
+                  <p className="text-sm text-blue-700 mt-1">{elapsedMinutes} {elapsedMinutes === 1 ? 'minute' : 'minutes'}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-500">
+                🔄 This page will auto-refresh. Results will appear when the audit completes.
+              </p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="mt-4 px-4 py-2 text-blue-600 hover:text-blue-800"
+              >
+                Refresh Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-surface-2">
       <AuditTour />
