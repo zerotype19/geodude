@@ -12,8 +12,26 @@
       "hyundai.com": "automotive.oem",
       "kia.com": "automotive.oem",
       "bmw.com": "automotive.oem",
+      "bmwusa.com": "automotive.oem",
       "mercedes-benz.com": "automotive.oem",
       "tesla.com": "automotive.oem",
+      "chevron.com": "energy.oil_gas",
+      "exxonmobil.com": "energy.oil_gas",
+      "shell.com": "energy.oil_gas",
+      "bp.com": "energy.oil_gas",
+      "conocophillips.com": "energy.oil_gas",
+      "marathon.com": "energy.oil_gas",
+      "valero.com": "energy.oil_gas",
+      "phillips66.com": "energy.oil_gas",
+      "carvana.com": "automotive.used_dealer",
+      "carmax.com": "automotive.used_dealer",
+      "vroom.com": "automotive.used_dealer",
+      "shift.com": "automotive.used_dealer",
+      "autotrader.com": "automotive.marketplace",
+      "cars.com": "automotive.marketplace",
+      "truecar.com": "automotive.marketplace",
+      "edmunds.com": "automotive.marketplace",
+      "kbb.com": "automotive.marketplace",
       "bestbuy.com": "retail.mass_merch",
       "target.com": "retail.mass_merch",
       "walmart.com": "retail.mass_merch",
@@ -1503,6 +1521,88 @@
         "generic_consumer"
       ],
       "description": "Fallback for unclassified sites"
+    },
+    "energy.oil_gas": {
+      "allow_tags": [
+        "fuel_prices",
+        "gas_stations",
+        "station_locator",
+        "rewards_program",
+        "credit_card",
+        "business_solutions",
+        "fleet",
+        "energy_products",
+        "sustainability",
+        "investor_relations",
+        "careers"
+      ],
+      "deny_phrases": [
+        "shipping",
+        "return policy",
+        "in stock",
+        "add to cart",
+        "towing capacity",
+        "mpg",
+        "test drive"
+      ],
+      "inherits": [
+        "generic_consumer"
+      ],
+      "description": "Oil & gas companies (Chevron, Shell, BP, ExxonMobil, etc.)"
+    },
+    "automotive.used_dealer": {
+      "allow_tags": [
+        "inventory",
+        "search_cars",
+        "financing",
+        "trade_in",
+        "delivery",
+        "warranty",
+        "vehicle_history",
+        "carfax",
+        "test_drive",
+        "inspection",
+        "return_policy",
+        "locations",
+        "online_buying"
+      ],
+      "deny_phrases": [
+        "msrp",
+        "build_price",
+        "new_models",
+        "dealer_network",
+        "factory_warranty"
+      ],
+      "inherits": [
+        "generic_consumer"
+      ],
+      "description": "Used car dealerships (Carvana, CarMax, Vroom, etc.)"
+    },
+    "automotive.marketplace": {
+      "allow_tags": [
+        "search_cars",
+        "reviews",
+        "pricing_tools",
+        "value_calculator",
+        "dealer_reviews",
+        "compare",
+        "incentives",
+        "rebates",
+        "financing_calculator",
+        "trade_in_value",
+        "research",
+        "ratings"
+      ],
+      "deny_phrases": [
+        "checkout",
+        "add to cart",
+        "shipping",
+        "return policy"
+      ],
+      "inherits": [
+        "generic_consumer"
+      ],
+      "description": "Automotive marketplaces and research sites (Autotrader, Cars.com, KBB, Edmunds, etc.)"
     }
   }
 }

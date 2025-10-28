@@ -20,6 +20,8 @@ import FooterLegal from './components/FooterLegal.tsx'
 import CheckEmail from './routes/auth/CheckEmail.tsx'
 import Callback from './routes/auth/Callback.tsx'
 import AuthError from './routes/auth/Error.tsx'
+import Terms from './routes/Terms.tsx'
+import Privacy from './routes/Privacy.tsx'
 
 function Navigation() {
   const location = useLocation()
@@ -45,14 +47,69 @@ function Navigation() {
           <div className="flex items-center">
             <Link
               to="/"
-              className="text-xl font-black tracking-tight text-brand"
+              className="text-xl font-black tracking-tight text-brand uppercase"
             >
-              OPTIVIEW
+              OPTIVIEW.AI
             </Link>
           </div>
           
-          {/* Hamburger menu button */}
-          <div className="flex items-center relative">
+          {/* Desktop navigation links */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link
+              to="/audits"
+              className={`text-sm font-medium transition-colors ${
+                location.pathname === '/' || location.pathname === '/audits'
+                  ? 'text-brand'
+                  : 'muted hover:text-brand'
+              }`}
+            >
+              My Audits
+            </Link>
+            <Link
+              to="/score-guide"
+              className={`text-sm font-medium transition-colors ${
+                location.pathname.startsWith('/score-guide')
+                  ? 'text-brand'
+                  : 'muted hover:text-brand'
+              }`}
+            >
+              Score Guide
+            </Link>
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`text-sm font-medium transition-colors ${
+                  location.pathname.startsWith('/admin')
+                    ? 'text-brand'
+                    : 'muted hover:text-brand'
+                }`}
+              >
+                Admin
+              </Link>
+            )}
+            <div className="border-l border-border h-6"></div>
+            {isAuthed && me ? (
+              <div className="flex items-center space-x-4">
+                <span className="text-sm subtle">{me.email}</span>
+                <button
+                  onClick={logout}
+                  className="text-sm font-medium muted hover:text-brand transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setSignInModalOpen(true)}
+                className="btn-primary text-sm"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
+          
+          {/* Mobile hamburger menu button */}
+          <div className="md:hidden flex items-center relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="btn-ghost p-2"
@@ -70,7 +127,7 @@ function Navigation() {
               )}
             </button>
             
-            {/* Dropdown menu - positioned below hamburger */}
+            {/* Mobile dropdown menu - positioned below hamburger */}
             {menuOpen && (
               <div className="absolute top-full right-0 mt-2 w-72 card shadow-lg z-50">
           <div className="pt-2 pb-3 space-y-1">
@@ -188,6 +245,8 @@ function App() {
             <Route path="/auth/check-email" element={<CheckEmail />} />
             <Route path="/auth/callback" element={<Callback />} />
             <Route path="/auth/error" element={<AuthError />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
           </Routes>
         </main>
         <AppFooter />

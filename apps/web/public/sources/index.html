@@ -21,8 +21,22 @@
     body { font-family: system-ui, sans-serif; line-height:1.7; color:#111; margin:0; background:#fafafa; }
     header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem; max-width:980px; margin:0 auto; }
     .logo { font-size:1.4rem; font-weight:700; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-    nav a { margin-left:1rem; text-decoration:none; color:#333; font-weight:500; }
+    nav { display:flex; gap:1rem; }
+    nav a { text-decoration:none; color:#333; font-weight:500; }
     nav a:hover { color:#667eea; }
+    .menu-toggle { display:none; background:none; border:none; cursor:pointer; padding:0.5rem; }
+    .menu-toggle svg { width:1.5rem; height:1.5rem; color:#333; }
+    .mobile-menu { display:none; border-top:1px solid #e5e7eb; background:#fff; position:absolute; left:0; right:0; }
+    .mobile-menu.active { display:block; }
+    .mobile-menu nav { flex-direction:column; gap:0; padding:0.5rem 1.25rem; }
+    .mobile-menu a { display:block; padding:0.75rem; }
+    @media (max-width: 768px) {
+      nav { display:none; }
+      .menu-toggle { display:block; }
+    }
+    @media (min-width: 769px) {
+      .mobile-menu { display:none !important; }
+    }
     main { max-width:980px; margin:0 auto; padding:2rem 1.5rem; }
     h1 { font-size:2.5rem; margin-bottom:1rem; }
     h2 { font-size:1.8rem; margin-top:2.5rem; border-bottom:2px solid #667eea; padding-bottom:0.5rem; }
@@ -40,10 +54,27 @@
     <nav>
       <a href="/">Home</a>
       <a href="https://app.optiview.ai">Audits</a>
-      <a href="https://app.optiview.ai/score-guide">Score Guide</a>
-      <a href="/docs/citations.html">Citations Guide</a>
+      <a href="/score-guide">Score Guide</a>
+      <a href="/citations">Citations Guide</a>
+      <a href="/faq/">Knowledge Base</a>
+      <a href="/methodology">Methodology</a>
     </nav>
+    <button class="menu-toggle" id="menu-toggle-btn"  aria-label="Toggle menu">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
   </header>
+  <div id="mobile-menu" class="mobile-menu">
+    <nav>
+      <a href="/">Home</a>
+      <a href="https://app.optiview.ai">Audits</a>
+      <a href="/score-guide">Score Guide</a>
+      <a href="/citations">Citations Guide</a>
+      <a href="/faq/">Knowledge Base</a>
+      <a href="/methodology">Methodology</a>
+    </nav>
+  </div>
 
   <main>
     <h1>Sources & References</h1>
@@ -184,7 +215,7 @@
     <h2>Related Resources</h2>
     <ul>
       <li><a href="/methodology">Full Methodology</a> - Our complete dual-layer assessment system</li>
-      <li><a href="https://app.optiview.ai/score-guide">Score Guide</a> - Detailed explanations of all 21 checks with examples</li>
+      <li><a href="/score-guide">Score Guide</a> - Detailed explanations of all 21 checks with examples</li>
       <li><a href="/docs/citations.html">Citations Guide</a> - How we test live LLM citations</li>
       <li><a href="/content-license">Content License</a> - Reuse and citation policy</li>
       <li><a href="/terms">Terms of Use</a> - Service terms and conditions</li>

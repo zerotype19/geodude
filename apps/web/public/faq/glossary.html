@@ -67,6 +67,22 @@
       transition: color 0.2s;
     }
     nav a:hover { color: var(--purple); }
+    
+    .menu-toggle { display: none; background: none; border: none; cursor: pointer; padding: 0.5rem; }
+    .menu-toggle svg { width: 1.5rem; height: 1.5rem; color: var(--gray); }
+    .mobile-menu { display: none; border-top: 1px solid var(--border); background: #fff; }
+    .mobile-menu.active { display: block; }
+    .mobile-menu nav { flex-direction: column; gap: 0.25rem; padding: 0.5rem; }
+    .mobile-menu a { display: block; padding: 0.75rem; border-radius: 0.375rem; }
+    .mobile-menu a:hover { background: var(--light); }
+    
+    @media (max-width: 768px) {
+      nav { display: none; }
+      .menu-toggle { display: block; }
+    }
+    @media (min-width: 769px) {
+      .mobile-menu { display: none !important; }
+    }
     .container {
       max-width: var(--max-w);
       margin: 0 auto;
@@ -175,10 +191,24 @@
 <body>
   <header>
     <div class="header-inner">
-      <a href="/" class="logo">OPTIVIEW</a>
+      <a href="/" class="logo">OPTIVIEW.AI</a>
       <nav>
         <a href="https://app.optiview.ai">Audits</a>
-        <a href="https://app.optiview.ai/score-guide">Score Guide</a>
+        <a href="/score-guide">Score Guide</a>
+        <a href="/citations">Citations Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/methodology">Methodology</a>
+      </nav>
+      <button class="menu-toggle" id="menu-toggle-btn"  aria-label="Toggle menu">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="mobile-menu">
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/score-guide">Score Guide</a>
         <a href="/citations">Citations Guide</a>
         <a href="/faq/">Knowledge Base</a>
         <a href="/methodology">Methodology</a>
@@ -367,7 +397,7 @@
     <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
     <p style="margin-top: 0.5rem;">
       <a href="https://app.optiview.ai">Audits</a> • 
-      <a href="https://app.optiview.ai/score-guide">Score Guide</a> • 
+      <a href="/score-guide">Score Guide</a> • 
       <a href="/citations">Citations Guide</a> • 
       <a href="/faq/">Knowledge Base</a> • 
       <a href="/methodology">Methodology</a> • 
@@ -376,6 +406,15 @@
       <a href="/bot">Bot Info</a>
     </p>
   </footer>
-</body>
+  <script>
+    // Mobile menu toggle
+    const menuToggle = document.getElementById('menu-toggle-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (menuToggle && mobileMenu) {
+      menuToggle.addEventListener('click', function() {
+        mobileMenu.classList.toggle('active');
+      });
+    }
+  </script></body>
 </html>
 

@@ -9,6 +9,7 @@
     "migrate:local": "wrangler d1 migrations apply optiview --local"
   },
   "dependencies": {
+    "@cloudflare/puppeteer": "^1.0.4",
     "linkedom": "^0.18.5"
   },
   "devDependencies": {

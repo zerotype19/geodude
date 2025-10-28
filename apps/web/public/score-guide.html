@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optiview Score Guide - 36 Diagnostic Checks for AI Optimization</title>
+    <meta name="description" content="Learn how Optiview evaluates your site for AI assistant readiness with 36 diagnostic checks across 6 key categories.">
+    <link rel="canonical" href="https://optiview.ai/score-guide">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --brand: #2563eb;
+            --brand-dark: #1d4ed8;
+            --brand-light: #dbeafe;
+            --gray: #6b7280;
+            --gray-dark: #374151;
+            --gray-light: #f3f4f6;
+            --gray-lighter: #f9fafb;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --surface-1: #ffffff;
+            --surface-2: #f9fafb;
+            --gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-dark);
+            background: var(--surface-1);
+        }
+        
+        header {
+            background: var(--surface-1);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--brand);
+            text-decoration: none;
+            letter-spacing: 0.5px;
+        }
+        
+        nav {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        nav a {
+            color: var(--gray);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+        
+        nav a:hover {
+            color: var(--brand);
+        }
+        
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+        
+        .menu-toggle svg {
+            width: 1.5rem;
+            height: 1.5rem;
+            color: var(--gray);
+        }
+        
+        .mobile-menu {
+            display: none;
+            border-top: 1px solid var(--border);
+            background: var(--surface-1);
+            padding: 0.5rem 0;
+        }
+        
+        .mobile-menu.active {
+            display: block !important;
+        }
+        
+        .mobile-menu nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.5rem;
+        }
+        
+        .mobile-menu a {
+            display: block;
+            padding: 0.75rem;
+            color: var(--gray);
+            text-decoration: none;
+            border-radius: 0.375rem;
+            transition: background 0.2s, color 0.2s;
+        }
+        
+        .mobile-menu a:hover {
+            background: var(--surface-2);
+            color: var(--brand);
+        }
+        
+        @media (max-width: 768px) {
+            nav { display: none; }
+            .menu-toggle { display: block; }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-menu { display: none !important; }
+        }
+        
+        .hero-gradient {
+            background: var(--gradient);
+            color: white;
+            padding: 4rem 0;
+        }
+        
+        .max-w-4xl {
+            max-width: 56rem;
+            margin: 0 auto;
+        }
+        
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-5xl {
+            font-size: 3rem;
+            line-height: 1.1;
+        }
+        
+        .text-xl {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+        }
+        
+        .font-bold {
+            font-weight: 700;
+        }
+        
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+        
+        .mb-6 {
+            margin-bottom: 1.5rem;
+        }
+        
+        .opacity-95 {
+            opacity: 0.95;
+        }
+        
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem 1rem;
+            border-radius: 1rem;
+            border: 1px solid rgba(255,255,255,0.25);
+        }
+        
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: white;
+        }
+        
+        .stat-card .label {
+            font-size: 0.875rem;
+            color: white;
+            margin-top: 0.25rem;
+        }
+        
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem;
+        }
+        
+        .intro-section {
+            background: var(--gray-lighter);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .intro-section h2 {
+            font-size: 1.5rem;
+            color: var(--gray-dark);
+            margin-bottom: 1rem;
+        }
+        
+        .intro-section p {
+            color: var(--gray);
+            margin-bottom: 1rem;
+        }
+        
+        .intro-section ul {
+            color: var(--gray);
+            padding-left: 1.5rem;
+        }
+        
+        .intro-section li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .category-section {
+            margin-bottom: 3rem;
+        }
+        
+        .category-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.5rem;
+            background: var(--brand-light);
+            border-radius: 1rem 1rem 0 0;
+            border: 2px solid var(--brand);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .category-header:hover {
+            background: #bfdbfe;
+        }
+        
+        .category-header.collapsed {
+            border-radius: 1rem;
+        }
+        
+        .category-icon {
+            width: 2rem;
+            height: 2rem;
+            color: var(--brand);
+        }
+        
+        .category-info {
+            flex: 1;
+        }
+        
+        .category-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--brand);
+            margin-bottom: 0.25rem;
+        }
+        
+        .category-description {
+            font-size: 0.95rem;
+            color: var(--gray);
+        }
+        
+        .category-count {
+            font-size: 0.875rem;
+            color: var(--gray);
+            font-weight: 600;
+        }
+        
+        .chevron {
+            width: 1.5rem;
+            height: 1.5rem;
+            color: var(--brand);
+            transition: transform 0.2s;
+        }
+        
+        .chevron.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .checks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--surface-2);
+            border: 2px solid var(--brand);
+            border-top: none;
+            border-radius: 0 0 1rem 1rem;
+        }
+        
+        .checks-grid.hidden {
+            display: none;
+        }
+        
+        .check-card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .check-card:hover {
+            border-color: var(--brand);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        
+        .check-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .check-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            color: var(--brand);
+            flex-shrink: 0;
+            margin-top: 0.125rem;
+        }
+        
+        .check-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--gray-dark);
+            flex: 1;
+            line-height: 1.4;
+        }
+        
+        .check-meta {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.625rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .badge-high {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-low {
+            background: #dbeafe;
+            color: #1e3a8a;
+        }
+        
+        .badge-page {
+            background: var(--gray-light);
+            color: var(--gray);
+        }
+        
+        .badge-site {
+            background: #dbeafe;
+            color: var(--brand);
+        }
+        
+        .check-description {
+            font-size: 0.875rem;
+            color: var(--gray);
+            line-height: 1.5;
+        }
+        
+        .check-expand-hint {
+            font-size: 0.75rem;
+            color: var(--brand);
+            margin-top: 0.75rem;
+            font-weight: 500;
+        }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 1rem;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+        }
+        
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--gray-dark);
+            line-height: 1.3;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.25rem;
+            color: var(--gray);
+            flex-shrink: 0;
+        }
+        
+        .modal-close:hover {
+            color: var(--gray-dark);
+        }
+        
+        .modal-close svg {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .modal-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .modal-section-title {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .modal-section-content {
+            font-size: 0.95rem;
+            color: var(--gray-dark);
+            line-height: 1.6;
+        }
+        
+        .modal-section-content ul,
+        .modal-section-content ol {
+            padding-left: 1.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .modal-section-content li {
+            margin-bottom: 0.25rem;
+        }
+        
+        .modal-section-content code {
+            background: var(--gray-lighter);
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.875em;
+            font-family: monospace;
+        }
+        
+        .modal-section-content pre {
+            background: var(--gray-lighter);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin-top: 0.5rem;
+        }
+        
+        .modal-section-content a {
+            color: var(--brand);
+            text-decoration: none;
+        }
+        
+        .modal-section-content a:hover {
+            text-decoration: underline;
+        }
+        
+        footer {
+            background: var(--gray-dark);
+            color: white;
+            padding: 3rem 1.5rem 2rem;
+            margin-top: 4rem;
+        }
+        
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .footer-logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .footer-links a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .footer-links a:hover {
+            color: white;
+        }
+        
+        .footer-copyright {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.85rem;
+        }
+        
+        @media (max-width: 768px) {
+            .text-5xl {
+                font-size: 2rem;
+            }
+            
+            .text-xl {
+                font-size: 1rem;
+            }
+            
+            .stat-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .checks-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .modal {
+                margin: 0;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <a href="/" class="logo">OPTIVIEW.AI</a>
+            <nav>
+                <a href="https://app.optiview.ai">Audits</a>
+                <a href="/score-guide">Score Guide</a>
+                <a href="/citations">Citations Guide</a>
+                <a href="/faq/">Knowledge Base</a>
+                <a href="/methodology">Methodology</a>
+            </nav>
+            <button class="menu-toggle" id="menu-toggle-btn" aria-label="Toggle menu">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+        </div>
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="mobile-menu">
+            <nav>
+                <a href="https://app.optiview.ai">Audits</a>
+                <a href="/score-guide">Score Guide</a>
+                <a href="/citations">Citations Guide</a>
+                <a href="/faq/">Knowledge Base</a>
+                <a href="/methodology">Methodology</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero-gradient">
+        <div class="max-w-4xl px-4 text-center">
+            <h1 class="text-5xl font-bold mb-4">Optiview Score Guide</h1>
+            <p class="text-xl mb-6" style="color: white; opacity: 0.95;">36 diagnostic checks that determine how AI assistants discover, understand, and cite your content</p>
+            <div class="stat-row">
+                <div class="stat-card">
+                    <div class="number">36</div>
+                    <div class="label">Total Checks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">23</div>
+                    <div class="label">Page-Level</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">13</div>
+                    <div class="label">Site-Level</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">6</div>
+                    <div class="label">Categories</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <main>
+        <div class="intro-section">
+            <h2>How Optiview Scoring Works</h2>
+            <p>Each page on your site is evaluated against 36 diagnostic checks organized into 6 key categories. Your overall score reflects how well your content is structured for AI assistant discovery, understanding, and citation.</p>
+            <ul>
+                <li><strong>Page-Level Checks (23):</strong> Evaluated individually for each URL</li>
+                <li><strong>Site-Level Checks (13):</strong> Aggregated across your entire domain</li>
+                <li><strong>Impact Weighting:</strong> High, Medium, and Low priority based on citation influence</li>
+            </ul>
+        </div>
+
+        <!-- Content & Clarity Category -->
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <svg class="category-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <div class="category-info">
+                    <div class="category-title">Content & Clarity</div>
+                    <div class="category-description">Clear, comprehensive content that answers user intent directly</div>
+                </div>
+                <div class="category-count">8 checks</div>
+                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+            <div class="checks-grid" id="content-clarity-checks">
+                <!-- Checks will be dynamically inserted -->
+            </div>
+        </div>
+
+        <!-- Structure & Organization Category -->
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <svg class="category-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z"/>
+                </svg>
+                <div class="category-info">
+                    <div class="category-title">Structure & Organization</div>
+                    <div class="category-description">Semantic markup, headings, and structured data for AI understanding</div>
+                </div>
+                <div class="category-count">7 checks</div>
+                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+            <div class="checks-grid" id="structure-organization-checks">
+                <!-- Checks will be dynamically inserted -->
+            </div>
+        </div>
+
+        <!-- Authority & Trust Category -->
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <svg class="category-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+                <div class="category-info">
+                    <div class="category-title">Authority & Trust</div>
+                    <div class="category-description">Signals of expertise, credibility, and entity authority</div>
+                </div>
+                <div class="category-count">2 checks</div>
+                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+            <div class="checks-grid" id="authority-trust-checks">
+                <!-- Checks will be dynamically inserted -->
+            </div>
+        </div>
+
+        <!-- Technical Foundations Category -->
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <svg class="category-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <div class="category-info">
+                    <div class="category-title">Technical Foundations</div>
+                    <div class="category-description">Core metadata, tags, and technical SEO elements</div>
+                </div>
+                <div class="category-count">9 checks</div>
+                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+            <div class="checks-grid" id="technical-foundations-checks">
+                <!-- Checks will be dynamically inserted -->
+            </div>
+        </div>
+
+        <!-- Crawl & Discoverability Category -->
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <svg class="category-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <div class="category-info">
+                    <div class="category-title">Crawl & Discoverability</div>
+                    <div class="category-description">Sitemaps, canonicals, robots, and crawl efficiency</div>
+                </div>
+                <div class="category-count">3 checks</div>
+                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+            <div class="checks-grid" id="crawl-discoverability-checks">
+                <!-- Checks will be dynamically inserted -->
+            </div>
+        </div>
+
+        <!-- Experience & Performance Category -->
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <svg class="category-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <div class="category-info">
+                    <div class="category-title">Experience & Performance</div>
+                    <div class="category-description">Speed, mobile-readiness, and user experience metrics</div>
+                </div>
+                <div class="category-count">7 checks</div>
+                <svg class="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </div>
+            <div class="checks-grid" id="experience-performance-checks">
+                <!-- Checks will be dynamically inserted -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for check details -->
+    <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title"></h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-logo">OPTIVIEW.AI</div>
+            <div class="footer-links">
+                <a href="/terms">Terms</a>
+                <a href="/privacy">Privacy</a>
+                <a href="/bot">Bot Info</a>
+                <a href="/methodology">Methodology</a>
+                <a href="/faq/">Knowledge Base</a>
+            </div>
+            <div class="footer-copyright">
+                © <span id="year"></span> Optiview. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Set current year
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        // Mobile menu toggle
+        const menuToggle = document.getElementById('menu-toggle-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+        if (menuToggle && mobileMenu) {
+            menuToggle.addEventListener('click', function() {
+                mobileMenu.classList.toggle('active');
+            });
+        }
+
+        // Criteria data
+        const CRITERIA = ${JSON.stringify([
+          {
+            "id": "C1_title_quality",
+            "version": 1,
+            "label": "Title tag quality",
+            "title": "Title tag quality",
+            "description": "Clear, descriptive title with sensible length and brand signal.",
+            "category": "Technical Foundations",
+            "scope": "page",
+            "weight": 12,
+            "impact": "High",
+            "why_it_matters": "The <title> is the strongest on-page signal for topic focus. Assistants and search systems use it to form link text and snippets; clear titles reduce entity confusion and improve click-through.",
+            "how_to_fix": "1) Keep 15–65 chars. 2) Lead with the topic/intent; add brand on key pages (e.g., home, pricing). 3) Use one primary keyword naturally. 4) Make every title unique. 5) Prefer 'Topic – Brand'.",
+            "common_issues": "Missing <title>; duplicated across templates; >70 chars; vague taglines; keyword stuffing; brand-only.",
+            "quick_fixes": "Export duplicates; rewrite to "Topic – Brand"; trim to <65 chars; add one intent term.",
+            "examples": "<title>AI Analytics for Assistant Traffic – Optiview</title>"
+          },
+          {
+            "id": "C2_meta_description",
+            "version": 1,
+            "label": "Meta description present",
+            "title": "Meta description present",
+            "description": "Meta description exists and is within recommended length.",
+            "category": "Technical Foundations",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Descriptions guide snippet generation and help assistants summarize intent, improving CTR and answer quality.",
+            "how_to_fix": "Add one <meta name=\"description\"> of ~120–155 chars summarizing the page's value in plain language; avoid boilerplate; keep unique per URL.",
+            "common_issues": "Missing tag; too short/long; duplicated; keyword lists; vague marketing fluff.",
+            "quick_fixes": "Draft crisp summary answering "What is this page?"; keep unique by URL.",
+            "examples": "<meta name=\"description\" content=\"Measure AI assistant traffic, citations, and conversions with Optiview.\"/>"
+          },
+          {
+            "id": "C3_h1_presence",
+            "version": 1,
+            "label": "Single H1 tag",
+            "title": "Single H1 tag",
+            "description": "Exactly one H1 indicating the main topic of the page.",
+            "category": "Structure & Organization",
+            "scope": "page",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "A single, descriptive H1 clarifies the main topic. Parsers and assistive tech rely on heading structure to understand content hierarchy.",
+            "how_to_fix": "Ensure exactly one <h1>. Demote other large headings to <h2>/<h3>. Keep H1 aligned with <title> but not identical.",
+            "common_issues": "Multiple H1s from logo/hero; missing H1; styled divs as headings.",
+            "quick_fixes": "Retag hero heading as <h1>; demote extras to <h2>/<h3>.",
+            "examples": "<h1>Analytics for AI-Influenced Traffic</h1>"
+          },
+          {
+            "id": "A1_answer_first",
+            "version": 1,
+            "label": "Answer-first hero section",
+            "title": "Answer-first hero section",
+            "description": "Clear value proposition and a primary CTA above the fold.",
+            "category": "Content & Clarity",
+            "scope": "page",
+            "weight": 15,
+            "impact": "High",
+            "why_it_matters": "Assistant snippets often mirror the first viewport. A direct answer + CTA improves inclusion in answers and drives outcomes.",
+            "how_to_fix": "Lead with a 1–2 sentence summary of value, then a single primary CTA (Sign up / Request demo) inside the hero.",
+            "common_issues": "Vague hero; CTA buried; conflicting CTAs; jargon.",
+            "quick_fixes": "Write a crisp one-liner + single CTA in the first viewport.",
+            "examples": "<section class=\"hero\"><h1>Measure assistant-driven traffic</h1><p>Optiview shows which AI sources drive outcomes.</p><a class=\"btn\">Request demo</a></section>"
+          },
+          {
+            "id": "A2_headings_semantic",
+            "version": 1,
+            "label": "Semantic heading structure",
+            "title": "Semantic heading structure",
+            "description": "Proper H1→H2→H3 hierarchy without skipping levels.",
+            "category": "Structure & Organization",
+            "scope": "page",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "Assistants parse headings to extract answers and build summaries. Skipped levels and styled divs reduce extractability.",
+            "how_to_fix": "Use one H1. Nest sections with H2/H3 in order, no H1→H3 jumps. Avoid empty headings and styling misuse.",
+            "common_issues": "H1 followed by H3; headings for styling only; empty headings.",
+            "quick_fixes": "Convert styled blocks to proper heading tags and fill missing levels.",
+            "examples": "<h1>Topic</h1><h2>Key concept</h2><h3>Example</h3>"
+          },
+          {
+            "id": "A3_faq_presence",
+            "version": 1,
+            "label": "FAQ section present",
+            "title": "FAQ section present",
+            "description": "Detectable FAQ/Q&A block on the page.",
+            "category": "Content & Clarity",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Visible FAQs map directly to common user questions and improve citation odds for query-style prompts.",
+            "how_to_fix": "Add a 'Frequently asked questions' section with 3–6 concise Q&As in plain language; keep answers 1–3 sentences.",
+            "common_issues": "Accordion headings without answers; marketing Qs; walls of text.",
+            "quick_fixes": "Pick real questions from search/support logs; keep answers short.",
+            "examples": "<h2>FAQs</h2><dl><dt>How does pricing work?</dt><dd>We bill monthly based on tracked properties.</dd></dl>"
+          },
+          {
+            "id": "A4_schema_faqpage",
+            "version": 1,
+            "label": "FAQPage schema",
+            "title": "FAQPage schema",
+            "description": "Valid FAQPage JSON-LD with 3+ Q&A pairs.",
+            "category": "Technical Foundations",
+            "scope": "page",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "FAQPage JSON-LD enables rich results and makes Q&A extraction deterministic for assistants.",
+            "how_to_fix": "Mirror visible FAQ text in JSON-LD. Include ≥3 Q/A pairs. Validate with a testing tool and keep answers concise.",
+            "common_issues": "Schema doesn't match visible text; <3 items; invalid JSON.",
+            "quick_fixes": "Generate JSON-LD from the rendered FAQ; keep answers short.",
+            "examples": "{ \"@context\":\"https://schema.org\",\"@type\":\"FAQPage\",\"mainEntity\":[{\"@type\":\"Question\",\"name\":\"What is Optiview?\",\"acceptedAnswer\":{\"@type\":\"Answer\",\"text\":\"Analytics for AI-influenced traffic.\"}}]}"
+          },
+          {
+            "id": "A9_internal_linking",
+            "version": 1,
+            "label": "Internal linking & diversity",
+            "title": "Internal linking & diversity",
+            "description": "Adequate internal links with diverse, descriptive anchors.",
+            "category": "Structure & Organization",
+            "scope": "page",
+            "weight": 7,
+            "impact": "Medium",
+            "why_it_matters": "Contextual links guide crawlers, connect topics, and help assistants trace relationships between pages.",
+            "how_to_fix": "Add 3–10 contextual links to related guides/products. Use descriptive anchors (not "learn more"). Link both to pillars and across clusters.",
+            "common_issues": "Menu-only links; repeated generic anchors; orphan pages.",
+            "quick_fixes": "Add a 'Related' section; rewrite anchors to be descriptive.",
+            "examples": "<p>See our <a href=\"/guides/assistant-attribution\">assistant attribution guide</a> for details.</p>"
+          },
+          {
+            "id": "G10_canonical",
+            "version": 1,
+            "label": "Canonical URL correctness",
+            "title": "Canonical URL correctness",
+            "description": "Canonical tag present and points to same domain.",
+            "category": "Technical Foundations",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Canonicals consolidate duplicate signals so assistants cite the preferred URL.",
+            "how_to_fix": "Add <link rel=\"canonical\" href=\"https://example.com/preferred\"/>. Use HTTPS, same host, and avoid redirects/chains.",
+            "common_issues": "Missing tag; cross-domain; canonical to non-200; querystring canonicals.",
+            "quick_fixes": "Self-canonicalize preferred pages; fix http→https; remove duplicates.",
+            "examples": "<link rel=\"canonical\" href=\"https://app.optiview.ai/score-guide\"/>"
+          },
+          {
+            "id": "T1_mobile_viewport",
+            "version": 1,
+            "label": "Mobile viewport tag",
+            "title": "Mobile viewport tag",
+            "description": "Viewport meta with device-width for responsive layout.",
+            "category": "Experience & Performance",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Mobile rendering is required for good UX and indexing. Assistants prefer mobile-friendly sources.",
+            "how_to_fix": "Add exactly one <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> in the head; avoid max-scale=1 that blocks zoom.",
+            "common_issues": "Missing tag; desktop-only layouts; duplicated metas; zoom disabled.",
+            "quick_fixes": "Add a single correct viewport; verify responsive CSS.",
+            "examples": "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+          },
+          {
+            "id": "T2_lang_region",
+            "version": 1,
+            "label": "Language/region tags",
+            "title": "Language/region tags",
+            "description": "HTML lang attribute matches the target locale.",
+            "category": "Technical Foundations",
+            "scope": "page",
+            "weight": 6,
+            "impact": "Low",
+            "why_it_matters": "Correct language hints improve international targeting and text processing for assistants.",
+            "how_to_fix": "Set <html lang=\"en\"> or a locale like en-US. Keep consistent with page language and hreflang (if used).",
+            "common_issues": "Missing/incorrect lang; inconsistent locales; invalid codes (e.g., en-UK).",
+            "quick_fixes": "Standardize in base layout; lint in CI.",
+            "examples": "<html lang=\"en-US\">"
+          },
+          {
+            "id": "T3_noindex_robots",
+            "version": 1,
+            "label": "No blocking robots directives",
+            "title": "No blocking robots directives",
+            "description": "No 'noindex' or overly restrictive robots meta directives.",
+            "category": "Crawl & Discoverability",
+            "scope": "page",
+            "weight": 12,
+            "impact": "High",
+            "why_it_matters": "'noindex' or disallow blocks prevent assistants from using your content. Many sites accidentally ship staging settings.",
+            "how_to_fix": "Remove noindex on canonical pages. Default to index,follow. Verify robots.txt doesn't block core paths.",
+            "common_issues": "Staging flags left on; meta injected via JS; blanket disallow in robots.txt.",
+            "quick_fixes": "Audit templates; remove legacy disallow; re-crawl.",
+            "examples": "<meta name=\"robots\" content=\"index,follow\">"
+          },
+          {
+            "id": "A12_entity_graph",
+            "version": 1,
+            "label": "Organization entity graph",
+            "title": "Organization entity graph",
+            "description": "Organization/LocalBusiness schema with logo and 2+ sameAs links.",
+            "category": "Authority & Trust",
+            "scope": "page",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "Clear org identity (name, logo, sameAs) reduces ambiguity in knowledge graphs and improves brand citation.",
+            "how_to_fix": "Add Organization or LocalBusiness JSON-LD with name, url, logo, and ≥2 sameAs profiles (e.g., LinkedIn, X, GitHub).",
+            "common_issues": "Missing logo; no sameAs; name mismatch vs H1/title.",
+            "quick_fixes": "Centralize org schema in base layout; align name/logo; add sameAs.",
+            "examples": "{ \"@context\":\"https://schema.org\",\"@type\":\"Organization\",\"name\":\"Optiview\",\"url\":\"https://optiview.ai\",\"logo\":\"https://optiview.ai/logo.png\",\"sameAs\":[\"https://www.linkedin.com/company/optiview\",\"https://twitter.com/optiview\"] }"
+          },
+          {
+            "id": "G2_og_tags_completeness",
+            "version": 1,
+            "label": "Open Graph basics",
+            "title": "Open Graph basics",
+            "description": "Presence of og:title, og:description, og:url, and og:image.",
+            "category": "Technical Foundations",
+            "scope": "page",
+            "weight": 6,
+            "impact": "Medium",
+            "why_it_matters": "OG ensures consistent rich cards across surfaces (assistants, social, chat). Missing pieces reduce clarity and CTR.",
+            "how_to_fix": "Add og:title, og:description, og:url (canonical), and og:image (absolute, ~1200×630). Keep values page-specific.",
+            "common_issues": "Missing og:image; relative URLs; global homepage OG reused everywhere.",
+            "quick_fixes": "Add per-page OG and absolute og:image; set og:url to canonical.",
+            "examples": "<meta property=\"og:title\" content=\"Optiview Score Guide\"/>\n<meta property=\"og:description\" content=\"36 checks used to evaluate assistant-readiness.\"/>\n<meta property=\"og:url\" content=\"https://app.optiview.ai/score-guide\"/>\n<meta property=\"og:image\" content=\"https://optiview.ai/og/score-guide.jpg\"/>"
+          },
+          {
+            "id": "A6_contact_cta_presence",
+            "version": 1,
+            "label": "Primary CTA above the fold",
+            "title": "Primary CTA above the fold",
+            "description": "Detects a clear Contact/Pricing/Signup CTA in the hero section.",
+            "category": "Content & Clarity",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Assistants often direct users to the nearest action. A visible CTA improves outcome continuity from answer → action.",
+            "how_to_fix": "Place a single primary CTA button in the hero with action-oriented label (e.g., Get started, Request demo).",
+            "common_issues": "CTA buried; multiple competing CTAs; 'Learn more' label everywhere.",
+            "quick_fixes": "Promote one clear CTA in hero; use direct action verbs.",
+            "examples": "<a class=\"btn btn-primary\" href=\"/demo\">Request demo</a>"
+          },
+          {
+            "id": "A5_related_questions_block",
+            "version": 1,
+            "label": "Related questions block",
+            "title": "Related questions block",
+            "description": "Detects a Q&A/related-questions section with multiple questions.",
+            "category": "Content & Clarity",
+            "scope": "page",
+            "weight": 6,
+            "impact": "Medium",
+            "why_it_matters": "Captures longer-tail intents and improves answer depth for assistants.",
+            "how_to_fix": "Add a 'Related questions' section (3–6 Q&As) with 1–2 sentence answers and links to deeper pages.",
+            "common_issues": "Only 1–2 questions; no answers; marketing headlines instead of questions.",
+            "quick_fixes": "Pull real Qs from PPC/support; add brief answers + links.",
+            "examples": "<h2>Related questions</h2><ul><li>How do I track AI referrals?</li><li>What counts as a conversion?</li></ul>"
+          },
+          {
+            "id": "C5_h2_coverage_ratio",
+            "version": 1,
+            "label": "H2 coverage (content-per-section)",
+            "title": "H2 coverage (content-per-section)",
+            "description": "Measures the % of H2s with ≥100 characters of body content following.",
+            "category": "Structure & Organization",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Sections with substance are easier to quote and more authoritative to assistants.",
+            "how_to_fix": "Ensure most H2s have ≥100–150 words of explanatory text, bullets, tables, or examples.",
+            "common_issues": "Heading lists with no body; decorative headings; one-liners.",
+            "quick_fixes": "Expand thin sections; merge redundant H2s; add examples.",
+            "examples": "<h2>How Optiview detects AI referrals</h2><p>We use referer heuristics, headers, and session patterns...</p>"
+          },
+          {
+            "id": "T4_core_web_vitals_hints",
+            "version": 1,
+            "label": "Core Web Vitals hints",
+            "title": "Core Web Vitals hints",
+            "description": "Heuristics: lazy images, key font preloads, and limited blocking CSS.",
+            "category": "Experience & Performance",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Preconnect/preload/lazy-load patterns are practical proxies for better LCP/FCP — assistants prefer fast sources.",
+            "how_to_fix": "1) Preconnect to critical origins (CDN, fonts). 2) Preload hero image and main font. 3) Lazy-load below-the-fold media. 4) Defer non-critical scripts.",
+            "common_issues": "No preconnect; hero image not preloaded; all images eager; blocking scripts in head.",
+            "quick_fixes": "Add preconnect to CDN; preload hero; lazy-load non-hero media; defer analytics.",
+            "examples": "<link rel=\"preconnect\" href=\"https://cdn.example.com\">\n<link rel=\"preload\" as=\"image\" href=\"/hero.webp\">\n<img loading=\"lazy\" src=\"/gallery/img2.webp\">"
+          },
+          {
+            "id": "G12_topic_depth_semantic",
+            "version": 1,
+            "label": "Topic depth & semantic coverage",
+            "title": "Topic depth & semantic coverage",
+            "description": "Evaluates semantic completeness using LLM topic embeddings.",
+            "category": "Content & Clarity",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Pages that cover related subtopics and co-occurring terms are more likely to be cited by assistants.",
+            "how_to_fix": "Expand with definitions, comparisons, examples, and alternatives; incorporate key terms naturally; avoid fluff.",
+            "common_issues": "Overly brief pages; no examples; missing related intents.",
+            "quick_fixes": "Add a 'Key concepts' subsection; include two examples and a comparison table.",
+            "examples": "Add sections like "How it works", "Examples", "Pros & Cons", "Alternatives", and comparison tables."
+          },
+          {
+            "id": "G11_entity_graph_completeness",
+            "version": 1,
+            "label": "Entity graph completeness",
+            "title": "Entity graph completeness",
+            "description": "Measures the presence of internal links and schema connections between entities.",
+            "category": "Structure & Organization",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Interlinked entities (Organization, Product, Person) are easier for assistants to map into knowledge graphs and cite accurately.",
+            "how_to_fix": "Link entity mentions to canonical pages; add schema with '@id' or 'url'; connect via sameAs relations.",
+            "common_issues": "Entity mentions without links; isolated schema; no sameAs.",
+            "quick_fixes": "Link first mention; add schema with stable @id; include sameAs.",
+            "examples": "{ \"@type\":\"Person\",\"name\":\"Jane Doe\",\"url\":\"/about/jane\",\"worksFor\":{\"@id\":\"#org\"}}"
+          },
+          {
+            "id": "G6_fact_url_stability",
+            "version": 1,
+            "label": "Canonical fact URLs",
+            "title": "Canonical fact URLs",
+            "description": "Stable URLs and anchors for key facts or product specs.",
+            "category": "Structure & Organization",
+            "scope": "page",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Assistants increasingly cite at the fact level. Stable anchors prevent link rot and improve retrievability.",
+            "how_to_fix": "Add stable id attributes to fact sections/tables; avoid changing anchors; link to deep sections where useful.",
+            "common_issues": "Dynamic auto-generated IDs; headings without IDs; frequent URL changes.",
+            "quick_fixes": "Assign predictable IDs to key headings; avoid renaming anchors.",
+            "examples": "<h3 id=\"pricing-monthly\">Monthly pricing</h3>"
+          },
+          {
+            "id": "A13_page_speed_lcp",
+            "version": 1,
+            "label": "Page speed (LCP)",
+            "title": "Page speed (LCP)",
+            "description": "Largest Contentful Paint below 2.5s target.",
+            "category": "Experience & Performance",
+            "scope": "page",
+            "weight": 7,
+            "impact": "Medium",
+            "why_it_matters": "Faster LCP improves engagement and eligibility for assistant surfaces. Heavy hero assets slow indexing and usage.",
+            "how_to_fix": "Compress hero media; serve responsive images (srcset/sizes); preload the single hero image; inline critical CSS; defer non-critical JS.",
+            "common_issues": "4K hero images; background images without sizing; blocking CSS/JS.",
+            "quick_fixes": "Convert hero to AVIF/WebP; cap width; preload one hero element.",
+            "examples": "<link rel=\"preload\" as=\"image\" href=\"/hero.webp\" imagesrcset=\"/hero-800.webp 800w, /hero-1400.webp 1400w\" imagesizes=\"100vw\">"
+          },
+          {
+            "id": "A14_qna_scaffold",
+            "version": 1,
+            "label": "Q&A scaffold",
+            "title": "Q&A scaffold",
+            "description": "Detects visible FAQ or Q&A blocks that match structured schema.",
+            "category": "Content & Clarity",
+            "scope": "page",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "Explicit Q→A blocks are easy for assistants to parse and quote, improving citation odds and snippet quality.",
+            "how_to_fix": "Add a short Q&A list near the top (3–5 items) with concise accepted answers; mirror with FAQ schema where suitable.",
+            "common_issues": "Hidden behind tabs; schema mismatch; long answers; no visible Q&A.",
+            "quick_fixes": "Add visible 3–5 Q&A items; keep answers short; add JSON-LD.",
+            "examples": "<section aria-labelledby=\"qna\"><h2 id=\"qna\">Q&A</h2><dl><dt>What does Optiview track?</dt><dd>AI referrals, content engagement, and conversions.</dd></dl></section>"
+          },
+          {
+            "id": "S1_faq_coverage_pct",
+            "version": 1,
+            "label": "FAQ coverage (site)",
+            "title": "FAQ coverage (site)",
+            "description": "Share of crawled pages that include a detectable FAQ block.",
+            "category": "Content & Clarity",
+            "scope": "site",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "Broad FAQ coverage increases the number of direct questions your site can answer and be cited for.",
+            "how_to_fix": "Template a FAQ block and roll it to informational pages (docs, product, pricing, service). Keep 3–6 concise Q&As.",
+            "common_issues": "Only homepage has FAQs; duplicated Qs; long answers.",
+            "quick_fixes": "Ship a reusable FAQ component; enforce limits per item.",
+            "examples": "Target: ≥70% of informational pages include a visible FAQ."
+          },
+          {
+            "id": "S2_faq_schema_adoption_pct",
+            "version": 1,
+            "label": "FAQ schema adoption (site)",
+            "title": "FAQ schema adoption (site)",
+            "description": "Share of pages with valid FAQPage JSON-LD (≥3 Q&A).",
+            "category": "Technical Foundations",
+            "scope": "site",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "Sitewide schema adoption scales rich-result eligibility and reliable extraction.",
+            "how_to_fix": "Mirror visible Q&A blocks with valid FAQPage JSON-LD. Validate as part of CI.",
+            "common_issues": "Schema only on a few pages; invalid JSON-LD; mismatched content.",
+            "quick_fixes": "Generate JSON-LD from CMS component automatically.",
+            "examples": "Target: ≥70% of pages that have FAQs also include valid schema."
+          },
+          {
+            "id": "S3_canonical_correct_pct",
+            "version": 1,
+            "label": "Canonical correctness (site)",
+            "title": "Canonical correctness (site)",
+            "description": "Share of pages with valid, same-host canonical tags.",
+            "category": "Technical Foundations",
+            "scope": "site",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Higher canonical correctness reduces duplication and chooses the right URL for citation.",
+            "how_to_fix": "Self-canonicalize preferred pages; use HTTPS and same host; avoid redirected canonicals.",
+            "common_issues": "Mixed http/https; pointing to redirects; missing on programmatic pages.",
+            "quick_fixes": "Fix base layout canonical; enforce https in generator.",
+            "examples": "Goal: ≥85% pages pass canonical checks."
+          },
+          {
+            "id": "S4_mobile_ready_pct",
+            "version": 1,
+            "label": "Mobile-ready pages (site)",
+            "title": "Mobile-ready pages (site)",
+            "description": "Share of pages with proper viewport meta.",
+            "category": "Experience & Performance",
+            "scope": "site",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Mobile-ready templates improve usability and assistant preference.",
+            "how_to_fix": "Include a correct viewport meta in the base layout and ensure responsive CSS across templates.",
+            "common_issues": "Legacy templates missing viewport; inconsistent head partials.",
+            "quick_fixes": "Move viewport into base layout; backfill legacy pages.",
+            "examples": "Target: ≥95% of pages pass the viewport check."
+          },
+          {
+            "id": "S5_lang_correct_pct",
+            "version": 1,
+            "label": "Correct lang/region (site)",
+            "title": "Correct lang/region (site)",
+            "description": "Share of pages whose HTML lang matches target locale.",
+            "category": "Technical Foundations",
+            "scope": "site",
+            "weight": 6,
+            "impact": "Low",
+            "why_it_matters": "Consistent language declarations help indexing and snippet generation by locale.",
+            "how_to_fix": "Standardize <html lang> in base layouts; ensure alternates use hreflang patterns (separate feature).",
+            "common_issues": "Mixed locales; inherited defaults; invalid codes.",
+            "quick_fixes": "Normalize to ISO codes; lint in CI.",
+            "examples": "Goal: ≥90% locale correctness across the crawl."
+          },
+          {
+            "id": "S6_entity_graph_adoption_pct",
+            "version": 1,
+            "label": "Entity graph adoption (site)",
+            "title": "Entity graph adoption (site)",
+            "description": "Share of pages with Organization/LocalBusiness schema set correctly.",
+            "category": "Authority & Trust",
+            "scope": "site",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "Consistent org schema reduces identity ambiguity across assistants and panels.",
+            "how_to_fix": "Roll Organization/LocalBusiness JSON-LD to all relevant templates; keep name/logo/@id/sameAs consistent.",
+            "common_issues": "Schema only on the homepage; inconsistent fields; different logos per template.",
+            "quick_fixes": "Move schema to layout; verify with a structured data tester.",
+            "examples": "Target: ≥70% of pages include correct org schema."
+          },
+          {
+            "id": "S7_dup_title_pct",
+            "version": 1,
+            "label": "Duplicate titles (site)",
+            "title": "Duplicate titles (site)",
+            "description": "Percent of pages sharing a duplicate <title> across the crawl.",
+            "category": "Technical Foundations",
+            "scope": "site",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Duplicate titles dilute relevance and make it harder for assistants to choose the correct URL.",
+            "how_to_fix": "Parameterize titles with differentiators (product, city, category, year). Ensure unique titles per URL.",
+            "common_issues": "Paginated lists share a title; boilerplate titles reused across categories.",
+            "quick_fixes": "Append context like "Pricing", "2025", or the product name.",
+            "examples": "Goal: <10% of pages share the same title."
+          },
+          {
+            "id": "S8_avg_h2_coverage",
+            "version": 1,
+            "label": "Average H2 coverage (site)",
+            "title": "Average H2 coverage (site)",
+            "description": "Mean H2 coverage ratio across crawled pages.",
+            "category": "Structure & Organization",
+            "scope": "site",
+            "weight": 6,
+            "impact": "Low",
+            "why_it_matters": "Richer sections improve topical authority signals across templates.",
+            "how_to_fix": "Set a minimum content rule per H2 in CMS; add examples, bullets, and tables where helpful.",
+            "common_issues": "Programmatic pages with headings only; placeholder sections.",
+            "quick_fixes": "Enforce minimum word/element counts per section.",
+            "examples": "Target: sitewide mean ≥70% H2 coverage."
+          },
+          {
+            "id": "S9_og_tags_coverage_pct",
+            "version": 1,
+            "label": "OG coverage (site)",
+            "title": "OG coverage (site)",
+            "description": "Share of pages meeting the OG basics threshold.",
+            "category": "Technical Foundations",
+            "scope": "site",
+            "weight": 6,
+            "impact": "Low",
+            "why_it_matters": "Consistent OG improves unfurls on share/chat surfaces and helps assistants generate cards.",
+            "how_to_fix": "Bake an OG partial into base layout; set per-page overrides; ensure absolute og:image URLs.",
+            "common_issues": "Some templates omit og:image or og:description; relative image paths.",
+            "quick_fixes": "Add default OG + dynamic per-page fields; use absolute image URLs.",
+            "examples": "Goal: ≥80% of pages pass OG basics."
+          },
+          {
+            "id": "S10_cta_above_fold_pct",
+            "version": 1,
+            "label": "CTA above-the-fold (site)",
+            "title": "CTA above-the-fold (site)",
+            "description": "Share of pages with a detectable CTA near the hero.",
+            "category": "Content & Clarity",
+            "scope": "site",
+            "weight": 6,
+            "impact": "Low",
+            "why_it_matters": "Clear first-step actions improve conversion and guidance from assistant answers.",
+            "how_to_fix": "Standardize a hero CTA component across templates; keep a single primary action per page.",
+            "common_issues": "CTA missing on key templates; conflicting CTAs.",
+            "quick_fixes": "Promote one action; audit hero sections.",
+            "examples": "Goal: ≥70% hero sections with a primary CTA."
+          },
+          {
+            "id": "S11_internal_link_health_pct",
+            "version": 1,
+            "label": "Internal link health (site)",
+            "title": "Internal link health (site)",
+            "description": "Share of pages meeting internal link quantity/diversity thresholds.",
+            "category": "Structure & Organization",
+            "scope": "site",
+            "weight": 8,
+            "impact": "Medium",
+            "why_it_matters": "Healthy link graphs improve discovery and prove topical breadth to assistants.",
+            "how_to_fix": "Define pillar ↔ cluster link patterns; add related sections; diversify anchors.",
+            "common_issues": "Only nav/footer links; repeated 'learn more' anchors; orphan content.",
+            "quick_fixes": "Add 3–5 in-body links with descriptive anchors.",
+            "examples": "Goal: ≥70% pages meet internal link quantity/diversity."
+          },
+          {
+            "id": "A8_sitemap_discoverability",
+            "version": 1,
+            "label": "Sitemaps & discoverability",
+            "title": "Sitemaps & discoverability",
+            "description": "Valid XML sitemap with fresh lastmod dates and full coverage.",
+            "category": "Crawl & Discoverability",
+            "scope": "site",
+            "weight": 6,
+            "impact": "Medium",
+            "why_it_matters": "Accurate, fresh sitemaps accelerate discovery for both search and AI crawlers, signaling update cadence.",
+            "how_to_fix": "Serve /sitemap.xml or an index; include canonical URLs and <lastmod>; update on publish; ensure 200 status.",
+            "common_issues": "Stale lastmod; wrong host; 404s in sitemap; includes non-canonical URLs.",
+            "quick_fixes": "Auto-generate on deploy/publish; validate weekly.",
+            "examples": "<url><loc>https://example.com/guides/</loc><lastmod>2025-10-20</lastmod></url>"
+          },
+          {
+            "id": "T5_ai_bot_access",
+            "version": 1,
+            "label": "AI bot access status",
+            "title": "AI bot access status",
+            "description": "Verifies whether major AI crawlers are allowed in robots.txt and headers.",
+            "category": "Crawl & Discoverability",
+            "scope": "site",
+            "weight": 10,
+            "impact": "High",
+            "why_it_matters": "If reputable AI crawlers (e.g., GPTBot, Claude-Web, PerplexityBot) are blocked, your content is less likely to be included or cited in assistants.",
+            "how_to_fix": "In robots.txt, add explicit User-agent sections and Allow rules for supported bots; ensure HTML parity between bot and user fetches.",
+            "common_issues": "Global Disallow; conflicting Disallow and meta robots; no explicit AI bot rules.",
+            "quick_fixes": "Add explicit allow blocks; verify a sample page with bot UA.",
+            "examples": "robots.txt sample:\\nUser-agent: GPTBot\\nAllow: /\\n\\nUser-agent: Claude-Web\\nAllow: /"
+          }
+        ], null, 2)};
+
+        // Category slug mapping
+        const CATEGORY_SLUGS = {
+            "Content & Clarity": "content-clarity",
+            "Structure & Organization": "structure-organization",
+            "Authority & Trust": "authority-trust",
+            "Technical Foundations": "technical-foundations",
+            "Crawl & Discoverability": "crawl-discoverability",
+            "Experience & Performance": "experience-performance"
+        };
+
+        // Organize criteria by category
+        const criteriaByCategory = {};
+        CRITERIA.forEach(criterion => {
+            if (!criteriaByCategory[criterion.category]) {
+                criteriaByCategory[criterion.category] = [];
+            }
+            criteriaByCategory[criterion.category].push(criterion);
+        });
+
+        // Render checks for each category
+        Object.keys(criteriaByCategory).forEach(category => {
+            const slug = CATEGORY_SLUGS[category];
+            const container = document.getElementById(`${slug}-checks`);
+            if (!container) return;
+
+            const checks = criteriaByCategory[category];
+            checks.forEach(check => {
+                const card = document.createElement('div');
+                card.className = 'check-card';
+                card.onclick = () => showCheckDetails(check);
+
+                const impactClass = check.impact === 'High' ? 'badge-high' : 
+                                  check.impact === 'Medium' ? 'badge-medium' : 'badge-low';
+                const scopeClass = check.scope === 'page' ? 'badge-page' : 'badge-site';
+
+                card.innerHTML = `
+                    <div class="check-header">
+                        <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div class="check-title">${check.title}</div>
+                    </div>
+                    <div class="check-meta">
+                        <span class="badge ${impactClass}">${check.impact}</span>
+                        <span class="badge ${scopeClass}">${check.scope}</span>
+                    </div>
+                    <div class="check-description">${check.description}</div>
+                    <div class="check-expand-hint">Click for details →</div>
+                `;
+
+                container.appendChild(card);
+            });
+        });
+
+        // Toggle category function
+        function toggleCategory(header) {
+            const chevron = header.querySelector('.chevron');
+            const checksGrid = header.nextElementSibling;
+            
+            chevron.classList.toggle('collapsed');
+            header.classList.toggle('collapsed');
+            checksGrid.classList.toggle('hidden');
+        }
+
+        // Show check details in modal
+        function showCheckDetails(check) {
+            const modal = document.getElementById('modal-overlay');
+            const title = document.getElementById('modal-title');
+            const body = document.getElementById('modal-body');
+
+            title.textContent = check.title;
+
+            let bodyHTML = '';
+
+            // Description
+            bodyHTML += `
+                <div class="modal-section">
+                    <div class="modal-section-title">Description</div>
+                    <div class="modal-section-content">${check.description}</div>
+                </div>
+            `;
+
+            // Meta info
+            bodyHTML += `
+                <div class="modal-section">
+                    <div class="modal-section-title">Check Details</div>
+                    <div class="modal-section-content">
+                        <strong>Impact:</strong> ${check.impact}<br>
+                        <strong>Scope:</strong> ${check.scope}<br>
+                        <strong>Weight:</strong> ${check.weight}
+                    </div>
+                </div>
+            `;
+
+            // Why it matters
+            if (check.why_it_matters) {
+                bodyHTML += `
+                    <div class="modal-section">
+                        <div class="modal-section-title">Why It Matters</div>
+                        <div class="modal-section-content">${check.why_it_matters}</div>
+                    </div>
+                `;
+            }
+
+            // How to fix
+            if (check.how_to_fix) {
+                bodyHTML += `
+                    <div class="modal-section">
+                        <div class="modal-section-title">How To Fix</div>
+                        <div class="modal-section-content">${check.how_to_fix}</div>
+                    </div>
+                `;
+            }
+
+            // Common issues
+            if (check.common_issues) {
+                bodyHTML += `
+                    <div class="modal-section">
+                        <div class="modal-section-title">Common Issues</div>
+                        <div class="modal-section-content">${check.common_issues}</div>
+                    </div>
+                `;
+            }
+
+            // Quick fixes
+            if (check.quick_fixes) {
+                bodyHTML += `
+                    <div class="modal-section">
+                        <div class="modal-section-title">Quick Fixes</div>
+                        <div class="modal-section-content">${check.quick_fixes}</div>
+                    </div>
+                `;
+            }
+
+            // Examples
+            if (check.examples) {
+                bodyHTML += `
+                    <div class="modal-section">
+                        <div class="modal-section-title">Examples</div>
+                        <div class="modal-section-content"><pre><code>${escapeHTML(check.examples)}</code></pre></div>
+                    </div>
+                `;
+            }
+
+            body.innerHTML = bodyHTML;
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Close modal
+        function closeModal(event) {
+            if (!event || event.target.id === 'modal-overlay') {
+                document.getElementById('modal-overlay').classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Helper to escape HTML
+        function escapeHTML(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

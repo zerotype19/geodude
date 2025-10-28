@@ -17,9 +17,22 @@ import {
   CITATIONS_BRAVE_TIMEOUT_MS,
   DISABLE_BRAVE_TEMP
 } from './config';
+import puppeteer from '@cloudflare/puppeteer';
 
 // Bot Identity Configuration
-const BOT_UA = "OptiviewAuditBot/1.0 (+https://optiview.ai/bot; admin@optiview.ai)";
+const BOT_UA = "OptiviewAuditBot/1.0 (compatible; SEO-audit; +https://optiview.ai/bot)";
+
+// Realistic browser user agents for fallback (rotate to avoid fingerprinting)
+const BROWSER_USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15"
+];
+
+function getRandomBrowserUA(): string {
+  return BROWSER_USER_AGENTS[Math.floor(Math.random() * BROWSER_USER_AGENTS.length)];
+}
 
 // Helper: Sleep for polite crawling
 async function sleep(ms: number): Promise<void> {
@@ -96,7 +109,7 @@ const MAX_DISCOVER = 120;              // cap discovered queue
 // Rendering configuration
 const RENDER_MODE: "static" | "rendered" | "dual" = "dual"; // dual: fetch both static + rendered
 const MAX_RENDER_PAGES = 10;           // only render top 10 pages per audit
-const RENDER_TIMEOUT_MS = 8_000;       // 8s max render time per page
+const RENDER_TIMEOUT_MS = 30_000;      // 30s max render time per page (for heavily protected sites)
 const STATIC_TIMEOUT_MS = 4_000;       // static fetch timeout (fast)
 
 // Legacy constants (keeping for compatibility)
@@ -232,21 +245,255 @@ type RobotsRules = {
   crawlDelay?: number;
 };
 
-async function fetchWithIdentity(url: string, init: RequestInit = {}, env: Env) {
+async function fetchWithIdentity(url: string, init: RequestInit = {}, env: Env, useBrowserUA: boolean = false) {
   const headers = new Headers(init.headers || {});
-  if (!headers.has("user-agent")) headers.set("user-agent", BOT_UA);
-  headers.set("X-Optiview-Bot", "audit");
   
-  // Signal US/English locale preference to prevent geo-redirects
-  // Accept-Language: en-US prioritized, then en, then any
-  if (!headers.has("Accept-Language")) {
-    headers.set("Accept-Language", "en-US,en;q=0.9,*;q=0.5");
+  if (useBrowserUA) {
+    // Use realistic browser headers to bypass bot detection
+    headers.set("User-Agent", getRandomBrowserUA());
+    headers.set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
+    headers.set("Accept-Language", "en-US,en;q=0.9");
+    headers.set("Accept-Encoding", "gzip, deflate, br");
+    headers.set("Cache-Control", "max-age=0");
+    headers.set("Sec-Ch-Ua", '"Not_A Brand";v="8", "Chromium";v="120"');
+    headers.set("Sec-Ch-Ua-Mobile", "?0");
+    headers.set("Sec-Ch-Ua-Platform", '"Windows"');
+    headers.set("Sec-Fetch-Dest", "document");
+    headers.set("Sec-Fetch-Mode", "navigate");
+    headers.set("Sec-Fetch-Site", "none");
+    headers.set("Sec-Fetch-User", "?1");
+    headers.set("Upgrade-Insecure-Requests", "1");
+    // Don't include bot identification when masquerading as browser
+  } else {
+    // Use bot identification (honest crawling)
+    if (!headers.has("user-agent")) headers.set("user-agent", BOT_UA);
+    headers.set("X-Optiview-Bot", "audit");
+    headers.set("From", "admin@optiview.ai"); // RFC 7231 - identifies bot operator
+    
+    // Signal US/English locale preference to prevent geo-redirects
+    if (!headers.has("Accept-Language")) {
+      headers.set("Accept-Language", "en-US,en;q=0.9,*;q=0.5");
+    }
   }
   
   return fetch(url, { ...init, headers, cf: { cacheTtl: 0 } });
 }
 
-// Fast fetch with timeout (no rendering)
+// Tiered fetch with bot-detection bypass (tries bot UA → browser UA → headless browser)
+async function fetchWithBypass(url: string, env: Env): Promise<{ html: string; method: string } | null> {
+  try {
+    // TIER 1: Try honest bot identification first (preferred, ethical)
+    console.log(`[FETCH] Tier 1: Trying bot UA for ${url}`);
+    const res1 = await fetchWithIdentity(url, {}, env, false);
+    const html1 = await res1.text();
+    
+    // Success if we get real content (not a block page)
+    if (res1.ok && html1.length > 1000 && !html1.includes('Access Denied') && !html1.includes('captcha')) {
+      console.log(`[FETCH] ✓ Tier 1 success: ${html1.length} bytes`);
+      return { html: html1, method: 'bot_ua' };
+    }
+    
+    console.log(`[FETCH] Tier 1 blocked (${res1.status}, ${html1.length} bytes), trying Tier 2`);
+    
+    // TIER 2: Try realistic browser headers (bypass basic bot detection)
+    console.log(`[FETCH] Tier 2: Trying browser UA for ${url}`);
+    
+    // Try up to 2 times with different browser UAs
+    let html2 = '';
+    let res2status = 0;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res2 = await fetchWithIdentity(url, {}, env, true);
+      html2 = await res2.text();
+      res2status = res2.status;
+      
+      // Success if we get real content (not a block page)
+      if (res2.ok && html2.length > 1000 && !html2.includes('Access Denied') && !html2.includes('captcha') && !html2.includes('Cloudflare')) {
+        console.log(`[FETCH] ✓ Tier 2 success (attempt ${attempt + 1}): ${html2.length} bytes`);
+        return { html: html2, method: 'browser_ua' };
+      }
+      
+      // If we got a small response, it might be a block page - try again with different UA
+      if (attempt === 0 && html2.length < 5000) {
+        console.log(`[FETCH] Tier 2 attempt ${attempt + 1} got minimal content (${html2.length} bytes), retrying with different UA...`);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+        continue;
+      }
+      
+      // If we got a substantial response (even if not ideal), keep it
+      break;
+    }
+    
+    console.log(`[FETCH] Tier 2 result (${res2status}, ${html2.length} bytes)`);
+    
+    // TIER 3: Use real headless browser (Cloudflare Browser Rendering)
+    // Only use as last resort - costs money and slower
+    if (env.BROWSER) {
+      console.log(`[FETCH] Tier 3: Trying headless browser for ${url}`);
+      try {
+        // Use Cloudflare Puppeteer with the browser binding
+        const browser = await puppeteer.launch(env.BROWSER);
+        const page = await browser.newPage();
+        
+        // ENHANCED: Add stealth techniques to avoid headless browser detection
+        // Set realistic viewport and user agent
+        await page.setViewport({ width: 1920, height: 1080 });
+        await page.setUserAgent(getRandomBrowserUA());
+        
+        // Override navigator properties to hide automation
+        await page.evaluateOnNewDocument(() => {
+          // Hide webdriver property
+          Object.defineProperty(navigator, 'webdriver', { get: () => false });
+          
+          // Add realistic chrome object
+          (window as any).chrome = { runtime: {} };
+          
+          // Override permissions
+          const originalQuery = window.navigator.permissions.query;
+          window.navigator.permissions.query = (parameters: any) => (
+            parameters.name === 'notifications' ?
+              Promise.resolve({ state: 'prompt' } as PermissionStatus) :
+              originalQuery(parameters)
+          );
+          
+          // Add realistic plugin array
+          Object.defineProperty(navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5]
+          });
+          
+          // Add realistic language
+          Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en']
+          });
+        });
+        
+        // Navigate and wait for network to be idle
+        // Increased timeout to 30s for heavily protected sites (Cloudflare, etc)
+        await page.goto(url, { 
+          waitUntil: 'networkidle2', // Less strict than networkidle0
+          timeout: 30000 
+        });
+        
+        // ENHANCED: Simulate realistic human behavior to pass Cloudflare
+        console.log(`[FETCH] Tier 3: Simulating human behavior for Cloudflare...`);
+        
+        // Small random mouse movements (Cloudflare tracks this)
+        try {
+          await page.mouse.move(100, 100);
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await page.mouse.move(200, 150);
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await page.mouse.move(300, 200);
+        } catch (e) {
+          // Non-critical
+        }
+        
+        // Wait for Cloudflare challenge with smarter detection
+        console.log(`[FETCH] Tier 3: Monitoring for Cloudflare challenge completion...`);
+        
+        // Strategy: Poll the page every 3 seconds for up to 30 seconds
+        // Break early if we detect real content loading
+        let html3 = '';
+        let attempts = 0;
+        const maxAttempts = 10; // 10 attempts * 3 seconds = 30 seconds max
+        
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          html3 = await page.content();
+          attempts++;
+          
+          const hasBlockIndicators = html3.includes('Attention Required') || 
+                                     html3.includes('Just a moment') ||
+                                     html3.includes('challenge-platform');
+          
+          // Success: Real content loaded (large page, no block indicators)
+          if (html3.length > 50000 && !hasBlockIndicators) {
+            console.log(`[FETCH] Tier 3: ✅ Real content loaded after ${attempts * 3}s! (${html3.length} bytes)`);
+            break;
+          }
+          
+          // Medium content without block indicators - probably real
+          if (html3.length > 15000 && !hasBlockIndicators) {
+            console.log(`[FETCH] Tier 3: ✅ Content loaded after ${attempts * 3}s (${html3.length} bytes, no block indicators)`);
+            break;
+          }
+          
+          // Still small or has block indicators
+          if (attempts < maxAttempts) {
+            console.log(`[FETCH] Tier 3: Attempt ${attempts}/${maxAttempts}: ${html3.length} bytes, block indicators: ${hasBlockIndicators}, waiting...`);
+          }
+        }
+        
+        // Final check after all attempts
+        const stillBlocked = html3.includes('Attention Required') || 
+                            html3.includes('Just a moment') ||
+                            html3.includes('Cloudflare') ||
+                            html3.length < 15000;
+        
+        if (stillBlocked) {
+          console.log(`[FETCH] Tier 3: ❌ Still blocked after ${attempts * 3}s total (${html3.length} bytes)`);
+        } else {
+          console.log(`[FETCH] Tier 3: ✅ Challenge appears resolved (${html3.length} bytes)`);
+        }
+        
+        // ENHANCED: Scroll page to trigger lazy-loaded content
+        try {
+          await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight / 2);
+          });
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await page.evaluate(() => {
+            window.scrollTo(0, document.body.scrollHeight);
+          });
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Get final HTML after scrolling
+          html3 = await page.content();
+          console.log(`[FETCH] Tier 3: After scrolling: ${html3.length} bytes`);
+        } catch (scrollError) {
+          console.log(`[FETCH] Tier 3: Scroll failed (non-critical): ${scrollError}`);
+        }
+        
+        await browser.close();
+        
+        // ENHANCED: Better validation of real content
+        const hasRealContent = html3.length > 15000 && 
+                              !html3.includes('Attention Required') && 
+                              !html3.includes('Just a moment');
+        
+        if (hasRealContent) {
+          console.log(`[FETCH] ✓ Tier 3 success: ${html3.length} bytes (real browser rendering)`);
+          return { html: html3, method: 'browser_render' };
+        } else {
+          console.log(`[FETCH] Tier 3 returned limited/block content: ${html3.length} bytes`);
+          // Return it anyway - might be useful for some diagnostics
+          if (html3.length > 1000) {
+            return { html: html3, method: 'browser_render_limited' };
+          }
+        }
+        
+      } catch (error: any) {
+        console.log(`[FETCH] Tier 3 error: ${error.message}`);
+      }
+    } else {
+      console.log(`[FETCH] Tier 3 skipped (no BROWSER binding available)`);
+    }
+    
+    // Return whatever we got (even if limited)
+    const bestResult = html2.length > html1.length ? html2 : html1;
+    if (bestResult.length > 0) {
+      console.log(`[FETCH] Returning best attempt: ${bestResult.length} bytes`);
+      return { html: bestResult, method: 'limited' };
+    }
+    
+    return null;
+    
+  } catch (error: any) {
+    console.log(`[FETCH] Smart fetch error: ${error.message}`);
+    return null;
+  }
+}
+
+// Fast fetch with timeout (no rendering) - legacy function for simple cases
 async function fetchPageWithTimeout(url: string, ms: number, env: Env): Promise<string | null> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
@@ -271,20 +518,47 @@ async function browserRender(url: string, env: Env): Promise<string | null> {
       return null;
     }
     
-    const browser = await env.BROWSER.launch();
+    // Use Cloudflare Puppeteer with the browser binding (correct syntax)
+    const browser = await puppeteer.launch(env.BROWSER);
     const page = await browser.newPage();
     
-    // Set timeout and user agent
-    await page.setUserAgent(BOT_UA);
+    // Set realistic viewport and user agent
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setUserAgent(getRandomBrowserUA());
     
     // Navigate and wait for network idle
     await page.goto(url, { 
-      waitUntil: 'networkidle0',
+      waitUntil: 'networkidle2', // Less strict than networkidle0
       timeout: RENDER_TIMEOUT_MS 
     });
     
-    // Get rendered HTML
-    const html = await page.content();
+    // ENHANCED: Wait longer for Cloudflare challenges and SPA rendering
+    console.log(`[RENDER] Waiting for Cloudflare challenge and dynamic content...`);
+    await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10s
+    
+    // Get initial HTML
+    let html = await page.content();
+    
+    // ENHANCED: Detect block pages and wait longer if needed
+    const isBlockPage = html.includes('Attention Required') || 
+                       html.includes('Just a moment') ||
+                       html.includes('Cloudflare') ||
+                       html.length < 15000;
+    
+    if (isBlockPage) {
+      console.log(`[RENDER] Detected challenge/block page, waiting longer...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      html = await page.content();
+    }
+    
+    // ENHANCED: Scroll to trigger lazy-loaded content
+    try {
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      html = await page.content();
+    } catch (scrollError) {
+      console.log(`[RENDER] Scroll failed (non-critical)`);
+    }
     
     await page.close();
     await browser.close();
@@ -368,14 +642,17 @@ async function fetchPageSmart(
   renderGapRatio: number | null;
   isSPA: boolean;
 }> {
-  // Always fetch static first (fast, reliable)
-  const staticHtml = await fetchPageWithTimeout(url, STATIC_TIMEOUT_MS, env);
+  // Use tiered bot-bypass to fetch page content
+  const fetchResult = await fetchWithBypass(url, env);
+  const staticHtml = fetchResult?.html || null;
   let renderedHtml: string | null = null;
   let isSPA = false;
   
   if (!staticHtml) {
     return { staticHtml: null, renderedHtml: null, renderGapRatio: null, isSPA: false };
   }
+  
+  console.log(`[PAGE_FETCH] ${url} via ${fetchResult?.method}: ${staticHtml.length} bytes`);
   
   // Detect if this is a SPA
   isSPA = isLikelySPA(staticHtml);
@@ -572,13 +849,15 @@ async function continueRunningAudits(env: Env): Promise<void> {
 async function autoFinalizeStuckAudits(env: Env): Promise<void> {
   console.log('[AUTO-FINALIZE] Checking for stuck audits...');
   
-  // Find audits that are stuck in "running" state with enough pages analyzed
+  // Find audits that are stuck in "running" state
   const stuckAudits = await env.DB.prepare(
     `SELECT a.id, 
             a.started_at,
             (SELECT COUNT(*) FROM audit_page_analysis apa 
              JOIN audit_pages ap ON apa.page_id = ap.id 
-             WHERE ap.audit_id = a.id) as pages_analyzed
+             WHERE ap.audit_id = a.id) as pages_analyzed,
+            (SELECT COUNT(*) FROM audit_pages ap 
+             WHERE ap.audit_id = a.id) as pages_discovered
      FROM audits a
      WHERE a.status = 'running' 
        AND datetime(a.started_at) < datetime('now', '-10 minutes')
@@ -589,32 +868,38 @@ async function autoFinalizeStuckAudits(env: Env): Promise<void> {
   let finalized = 0;
   
   for (const audit of (stuckAudits.results || [])) {
-    const auditData = audit as { id: string; pages_analyzed: number; started_at: string };
+    const auditData = audit as { id: string; pages_analyzed: number; pages_discovered: number; started_at: string };
     const auditAge = Date.now() - new Date(auditData.started_at).getTime();
     const ageMinutes = Math.round(auditAge / 60000);
     
     // Finalize if:
-    // 1. Has 20+ pages (usable data) - regardless of age
-    // 2. Has any pages and is >30 minutes old (give up waiting)
-    // 3. Has 0 pages and is >10 minutes old (failed to start)
+    // 1. Has 20+ pages analyzed (usable data) - regardless of age
+    // 2. Has any pages analyzed and is >30 minutes old (give up waiting)
+    // 3. Has pages discovered but not analyzed after 30 minutes (finalize with what we have)
+    // 4. Has 0 pages discovered after 30 minutes (extended timeout for limited access sites)
     
     if (auditData.pages_analyzed >= 20) {
       // Has usable data - finalize it
       await finalizeAudit(env, auditData.id, 'auto_finalize_stuck');
       finalized++;
-      console.log(`[AUTO-FINALIZE] Finalized stuck audit ${auditData.id} (${auditData.pages_analyzed} pages, ${ageMinutes}min old)`);
+      console.log(`[AUTO-FINALIZE] Finalized stuck audit ${auditData.id} (${auditData.pages_analyzed} analyzed, ${ageMinutes}min old)`);
     } else if (auditData.pages_analyzed > 0 && ageMinutes >= 30) {
-      // Has some pages but stuck for 30+ minutes - finalize what we have
+      // Has some pages analyzed but stuck for 30+ minutes - finalize what we have
       await finalizeAudit(env, auditData.id, 'auto_finalize_stuck_partial');
       finalized++;
-      console.log(`[AUTO-FINALIZE] Finalized partial audit ${auditData.id} (${auditData.pages_analyzed} pages, ${ageMinutes}min old)`);
-    } else if (auditData.pages_analyzed === 0 && ageMinutes >= 10) {
-      // No pages analyzed after 10 minutes - mark as failed
-      await markAuditFailed(env, auditData.id, 'timeout_no_pages_after_10min');
+      console.log(`[AUTO-FINALIZE] Finalized partial audit ${auditData.id} (${auditData.pages_analyzed} analyzed, ${ageMinutes}min old)`);
+    } else if (auditData.pages_discovered > 0 && auditData.pages_analyzed === 0 && ageMinutes >= 30) {
+      // Has pages discovered but none analyzed after 30 min - finalize anyway (limited access)
+      await finalizeAudit(env, auditData.id, 'auto_finalize_limited_access');
       finalized++;
-      console.log(`[AUTO-FINALIZE] Failed stuck audit ${auditData.id} (0 pages, ${ageMinutes}min old)`);
+      console.log(`[AUTO-FINALIZE] Finalized limited access audit ${auditData.id} (${auditData.pages_discovered} discovered but 0 analyzed, ${ageMinutes}min old)`);
+    } else if (auditData.pages_discovered === 0 && ageMinutes >= 30) {
+      // No pages discovered after 30 minutes (increased from 10) - mark as failed
+      await markAuditFailed(env, auditData.id, 'timeout_no_pages_after_30min');
+      finalized++;
+      console.log(`[AUTO-FINALIZE] Failed stuck audit ${auditData.id} (0 pages discovered, ${ageMinutes}min old)`);
     } else {
-      console.log(`[AUTO-FINALIZE] Skipping audit ${auditData.id} (${auditData.pages_analyzed} pages, ${ageMinutes}min old) - not yet eligible`);
+      console.log(`[AUTO-FINALIZE] Skipping audit ${auditData.id} (${auditData.pages_analyzed} analyzed, ${auditData.pages_discovered} discovered, ${ageMinutes}min old) - not yet eligible`);
     }
   }
   
@@ -3172,6 +3457,52 @@ function isBlockedHost(url: string): boolean {
   }
 }
 
+async function collectAlternativeData(domain: string, env: Env): Promise<{
+  robots_txt?: string;
+  sitemap_urls?: string[];
+}> {
+  const data: any = {};
+  
+  // Try robots.txt (rarely blocked since it's meant for bots)
+  try {
+    const robotsUrl = `https://${domain}/robots.txt`;
+    const res = await fetch(robotsUrl, { 
+      headers: { 
+        'User-Agent': BOT_UA,
+        'From': 'admin@optiview.ai'
+      }
+    });
+    if (res.ok) {
+      data.robots_txt = await res.text();
+      console.log(`[ALT_DATA] ✓ robots.txt accessible for ${domain}`);
+    }
+  } catch (e: any) {
+    console.log(`[ALT_DATA] ✗ robots.txt not accessible: ${e.message}`);
+  }
+  
+  // Try sitemap (often accessible even when main site blocks crawlers)
+  try {
+    const sitemapUrl = `https://${domain}/sitemap.xml`;
+    const res = await fetch(sitemapUrl, {
+      headers: {
+        'User-Agent': BOT_UA,
+        'From': 'admin@optiview.ai'
+      }
+    });
+    if (res.ok) {
+      const xml = await res.text();
+      // Extract URLs from sitemap (basic extraction)
+      const urlMatches = xml.matchAll(/<loc>([^<]+)<\/loc>/g);
+      data.sitemap_urls = Array.from(urlMatches).map(m => m[1]).slice(0, 50);
+      console.log(`[ALT_DATA] ✓ sitemap.xml accessible, found ${data.sitemap_urls.length} URLs`);
+    }
+  } catch (e: any) {
+    console.log(`[ALT_DATA] ✗ sitemap.xml not accessible: ${e.message}`);
+  }
+  
+  return data;
+}
+
 async function precheckDomain(url: string, env: Env): Promise<{
   ok: boolean;
   finalUrl?: string;
@@ -3223,34 +3554,49 @@ async function precheckDomain(url: string, env: Env): Promise<{
             await sleep(retryDelay);
             continue; // Retry
           } else {
-            // Final attempt failed
+            // Final attempt failed - but don't fail the audit, continue with limited data
+            console.log(`[PRECHECK 429] Max retries reached, continuing with limited audit`);
             return {
-              ok: false,
-              reason: `precheck_failed_http_429`
+              ok: true,
+              finalUrl: url,
+              reason: 'http_429_rate_limited',
+              html: '',
+              title: new URL(url).hostname
             };
           }
         }
         
-        // Handle server down (521) - retry with backoff
-        if (res.status === 521) {
-          console.log(`[PRECHECK 521] Server down at ${url}, attempt ${attempt}/${PRECHECK_MAX_RETRIES}`);
+        // Handle server down (520/521/522) - retry with backoff
+        if (res.status === 520 || res.status === 521 || res.status === 522) {
+          console.log(`[PRECHECK ${res.status}] Server error at ${url}, attempt ${attempt}/${PRECHECK_MAX_RETRIES}`);
           
           if (attempt < PRECHECK_MAX_RETRIES) {
             continue; // Retry with exponential backoff
           } else {
-            // Final attempt failed
+            // Final attempt failed - but don't fail the audit, continue with limited data
+            console.log(`[PRECHECK ${res.status}] Max retries reached, continuing with limited audit`);
             return {
-              ok: false,
-              reason: `precheck_failed_http_521`
+              ok: true,
+              finalUrl: url,
+              reason: `http_${res.status}_server_error`,
+              html: '',
+              title: new URL(url).hostname
             };
           }
         }
         
-        // Check for other errors (non-retryable)
-        if (res.status >= 400) {
+        // Handle 403/4xx/5xx - NEVER fail, just mark as limited access
+        if (res.status === 403 || res.status >= 400) {
+          console.log(`[PRECHECK ${res.status}] HTTP error at ${url} - continuing with limited audit capabilities`);
+          
+          // Always return OK - we'll work with what we can get
+          // The audit will proceed but with limited data
           return {
-            ok: false,
-            reason: `precheck_failed_http_${res.status}`
+            ok: true,
+            finalUrl: url,
+            reason: `http_${res.status}_limited_access`,
+            html: '', // Empty HTML, but audit continues
+            title: new URL(url).hostname // Use hostname as title fallback
           };
         }
         
@@ -3322,16 +3668,25 @@ async function precheckDomain(url: string, env: Env): Promise<{
       }
     }
     
-    // All retries exhausted
+    // All retries exhausted - but don't fail, continue with limited data
+    console.log(`[PRECHECK ERROR] All retries exhausted: ${lastError?.message || 'unknown'} - continuing with limited audit`);
     return {
-      ok: false,
-      reason: `precheck_error: ${lastError?.message || 'unknown'}`
+      ok: true,
+      finalUrl: url,
+      reason: `network_error_limited_access`,
+      html: '',
+      title: new URL(url).hostname
     };
     
   } catch (error: any) {
+    // Unexpected error - but don't fail, continue with limited data
+    console.log(`[PRECHECK ERROR] Unexpected error: ${error.message || 'unknown'} - continuing with limited audit`);
     return {
-      ok: false,
-      reason: `precheck_error: ${error.message || 'unknown'}`
+      ok: true,
+      finalUrl: url,
+      reason: `unexpected_error_limited_access`,
+      html: '',
+      title: new URL(url).hostname
     };
   }
 }
@@ -4784,57 +5139,105 @@ function sameSite(base: URL, candidate: URL): boolean {
 }
 
 async function fetchTextMaybeGzip(url: string, env: Env): Promise<string|null> {
-  const res = await fetchWithIdentity(url, {}, env);
-  if (!res.ok) return null;
-  const ct = res.headers.get("content-type") || "";
-  // Most gz sitemaps set application/x-gzip or octet-stream
-  if (url.endsWith(".gz")) {
-    const ab = await res.arrayBuffer();
-    // Workers don't expose zlib; prefer to rely on server's Content-Encoding gzip auto-decompress
-    // If needed, add a tiny gzip lib or proxy via Browser Rendering. For now assume server sends XML uncompressed
-    try { return new TextDecoder().decode(ab); } catch { return null; }
+  try {
+    // Try bot UA first
+    let res = await fetchWithIdentity(url, {}, env, false);
+    
+    // If blocked, try browser UA
+    if (!res.ok || res.status === 403) {
+      console.log(`[FETCH] ${url} returned ${res.status} with bot UA, trying browser UA...`);
+      res = await fetchWithIdentity(url, {}, env, true);
+    }
+    
+    if (!res.ok) {
+      console.log(`[FETCH] ${url} returned ${res.status}, trying to read anyway...`);
+      // Don't give up on non-200 - try to read response anyway (some servers misconfigure status codes)
+      try {
+        const text = await res.text();
+        if (text && text.length > 50) return text;
+      } catch {}
+      return null;
+    }
+    
+    const ct = res.headers.get("content-type") || "";
+    // Most gz sitemaps set application/x-gzip or octet-stream
+    if (url.endsWith(".gz")) {
+      const ab = await res.arrayBuffer();
+      // Workers don't expose zlib; prefer to rely on server's Content-Encoding gzip auto-decompress
+      // If needed, add a tiny gzip lib or proxy via Browser Rendering. For now assume server sends XML uncompressed
+      try { return new TextDecoder().decode(ab); } catch { return null; }
+    }
+    return await res.text();
+  } catch (error: any) {
+    console.log(`[FETCH] Error fetching ${url}: ${error.message}`);
+    return null;
   }
-  return await res.text();
 }
 
 async function discoverSitemaps(finalOrigin: URL, env: Env): Promise<string[]> {
-  // Fast sitemap discovery: try common patterns only, no robots.txt parsing
   const tryUrls: string[] = [];
+  const origin = finalOrigin.origin;
   
-  // Extract locale from path (e.g., /en-us -> en-us)
+  // Step 1: Try robots.txt first (most reliable, rarely blocked)
+  console.log(`[CRAWL] Checking robots.txt for sitemap URLs`);
+  try {
+    const robotsUrl = `${origin}/robots.txt`;
+    const robotsText = await fetchTextMaybeGzip(robotsUrl, env);
+    if (robotsText) {
+      // Extract Sitemap: directives
+      const sitemapMatches = robotsText.matchAll(/^Sitemap:\s*(.+)$/gim);
+      for (const match of sitemapMatches) {
+        const sitemapUrl = match[1].trim();
+        if (sitemapUrl && !tryUrls.includes(sitemapUrl)) {
+          tryUrls.push(sitemapUrl);
+          console.log(`[CRAWL] Found sitemap in robots.txt: ${sitemapUrl}`);
+        }
+      }
+    }
+  } catch (error: any) {
+    console.log(`[CRAWL] Could not read robots.txt: ${error.message}`);
+  }
+  
+  // Step 2: Try common sitemap patterns
   const pathParts = finalOrigin.pathname.split('/').filter(Boolean);
   const locale = pathParts.length > 0 ? pathParts[0] : '';
   
-  // Try direct sitemap URLs (most common patterns)
-  const origin = finalOrigin.origin;
-  tryUrls.push(`${origin}/sitemap.xml`);
+  // Add common sitemap URLs if not already found in robots.txt
+  const commonUrls = [
+    `${origin}/sitemap.xml`,
+    `${origin}/sitemap_index.xml`,
+    `${origin}/sitemap-index.xml`,
+  ];
   
   if (locale && /^[a-z]{2}(-[a-z]{2})?$/i.test(locale)) {
-    // Locale-specific sitemaps
-    tryUrls.push(`${origin}/sitemap-${locale}.xml`);
-    tryUrls.push(`${origin}/${locale}/sitemap.xml`);
+    commonUrls.push(`${origin}/sitemap-${locale}.xml`);
+    commonUrls.push(`${origin}/${locale}/sitemap.xml`);
   }
   
-  tryUrls.push(`${origin}/sitemap_index.xml`);
+  for (const url of commonUrls) {
+    if (!tryUrls.includes(url)) {
+      tryUrls.push(url);
+    }
+  }
   
   console.log(`[CRAWL] Trying ${tryUrls.length} sitemap URLs`);
   
   const found: string[] = [];
   
   for (const url of tryUrls) {
-    if (found.length >= 5) break; // Take up to 5 working sitemaps
+    if (found.length >= 10) break; // Take up to 10 working sitemaps (increased from 5)
     
     const xml = await fetchTextMaybeGzip(url, env);
     if (!xml || xml.length < 100) continue;
     
     // Check if it's a valid sitemap
     if (/<urlset/i.test(xml) || /<sitemapindex/i.test(xml)) {
-      console.log(`[CRAWL] Found sitemap: ${url}`);
+      console.log(`[CRAWL] ✓ Valid sitemap: ${url}`);
       found.push(url);
     }
   }
   
-  console.log(`[CRAWL] Discovered ${found.length} sitemaps`);
+  console.log(`[CRAWL] Discovered ${found.length} valid sitemaps`);
   return found;
 }
 
@@ -4925,28 +5328,49 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: 
       continue; // Filtered by policy
     }
 
-    // Check robots.txt before fetching
+    // Try robots.txt check, but don't block on failure (site might be blocking us anyway)
     const urlObj = new URL(next);
-    const robotsRules = await getRobots(env, urlObj);
-    
-    if (!isAllowedByRobots(robotsRules, urlObj.pathname)) {
-      continue; // Disallowed by robots.txt
-    }
-    
-    // Respect crawl delay if specified
-    if (robotsRules?.crawlDelay) {
-      await new Promise(resolve => setTimeout(resolve, robotsRules.crawlDelay * 1000));
+    try {
+      const robotsRules = await getRobots(env, urlObj);
+      
+      if (robotsRules && !isAllowedByRobots(robotsRules, urlObj.pathname)) {
+        console.log(`[BFS] ${next} disallowed by robots.txt, skipping`);
+        continue;
+      }
+      
+      // Respect crawl delay if specified
+      if (robotsRules?.crawlDelay) {
+        await new Promise(resolve => setTimeout(resolve, robotsRules.crawlDelay * 1000));
+      }
+    } catch (error: any) {
+      console.log(`[BFS] Could not check robots.txt for ${next}: ${error.message}, continuing anyway`);
+      // Continue crawling even if robots.txt fails
     }
 
-    const res = await fetchWithIdentity(next, {}, env);
-    // Canonicalize to final URL after redirect
-    const finalUrl = new URL(res.url || next);
-    const html = (await res.text()) || "";
-    pages.push(finalUrl.toString());
+    try {
+      // Use tiered fetch with bot-bypass
+      const fetchResult = await fetchWithBypass(next, env);
+      
+      if (!fetchResult) {
+        console.log(`[BFS] ${next} completely blocked, adding URL anyway`);
+        pages.push(next);
+        continue;
+      }
+      
+      // Always add the URL
+      pages.push(next);
+      
+      console.log(`[BFS] ${next} fetched via ${fetchResult.method}: ${fetchResult.html.length} bytes`);
+      
+      // If HTML is empty or very short (blocked), don't try to extract links
+      if (!fetchResult.html || fetchResult.html.length < 500) {
+        console.log(`[BFS] ${next} returned limited content, skipping link extraction`);
+        continue;
+      }
 
-    // Extract links using regex (faster than parseHTML)
-    const links = Array.from(html.matchAll(/<a\s+[^>]*href=['"]([^'"]+)['"]/gi))
-      .map(m => m[1]).slice(0, 100); // Reduced from 500 to 100 for focused crawls
+      // Extract links using regex (faster than parseHTML)
+      const links = Array.from(fetchResult.html.matchAll(/<a\s+[^>]*href=['"]([^'"]+)['"]/gi))
+        .map(m => m[1]).slice(0, 100); // Reduced from 500 to 100 for focused crawls
 
     // Separate FAQ links for prioritization
     const faqLinks: string[] = [];
@@ -4969,12 +5393,25 @@ async function bfsCrawl(finalOrigin: URL, maxPages: number, env: Env, rootHost: 
       } catch { /* ignore bad URLs */ }
     }
 
-    // Add FAQ links to queue first, then regular links
-    if (faqLinks.length > 0) {
-      console.log(`[BFS] Found ${faqLinks.length} FAQ link(s) from ${next}: ${faqLinks.join(', ')}`);
+      // Add FAQ links to queue first, then regular links
+      if (faqLinks.length > 0) {
+        console.log(`[BFS] Found ${faqLinks.length} FAQ link(s) from ${next}: ${faqLinks.join(', ')}`);
+      }
+      queue.push(...faqLinks, ...regularLinks);
+    } catch (error: any) {
+      // Fetch failed, but still add the URL to pages with empty content
+      console.warn(`[BFS] Failed to fetch ${next}: ${error.message} - adding URL anyway (limited access)`);
+      pages.push(next);
+      // Don't extract links on error, just continue
     }
-    queue.push(...faqLinks, ...regularLinks);
   }
+  
+  // Ensure we always return at least the root URL
+  if (pages.length === 0) {
+    console.warn(`[BFS] No pages crawled, returning root URL only`);
+    return [finalOrigin.toString()];
+  }
+  
   return pages;
 }
 
@@ -5221,10 +5658,10 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
     urls = urls.slice(0, MAX_URLS);
   }
   
-  // Step 7: Guardrail - mark as failed if still no URLs
+  // Step 7: Guardrail - ensure at least the root URL is included
   if (urls.length === 0) {
-    console.error(`[CRAWL] No pages discovered for ${rootUrl} -> ${finalOrigin.toString()}`);
-    throw new Error(`No pages discovered. Final origin: ${finalOrigin.toString()}`);
+    console.warn(`[CRAWL] No pages discovered for ${rootUrl}, using root URL only (limited access)`);
+    urls = [finalOrigin.toString()];
   }
   
   console.log(`[CRAWL] Total URLs discovered: ${urls.length}`);
@@ -5232,9 +5669,6 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
 }
 
 async function fetchPage(url: string, env: Env) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
-  
   try {
     // Check robots.txt before fetching
     const urlObj = new URL(url);
@@ -5249,25 +5683,21 @@ async function fetchPage(url: string, env: Env) {
       await new Promise(resolve => setTimeout(resolve, robotsRules.crawlDelay * 1000));
     }
     
-    const res = await fetchWithIdentity(url, { 
-      signal: controller.signal 
-    }, env);
-    
-    clearTimeout(timeoutId);
-    
-    const contentType = res.headers.get('content-type') || '';
-    const html = contentType.includes('text/html') ? await res.text() : '';
+    // FIXED: Use 3-tier bot-bypass instead of simple fetchWithIdentity
+    // This ensures we get real content, not Cloudflare block pages
+    const fetchResult = await fetchWithBypass(url, env);
+    const html = fetchResult?.html || '';
     
     const robots = await fetchRobots(url);
     
     return {
-      status: res.status,
-      contentType,
+      status: 200, // fetchWithBypass doesn't return status, assume success if we got HTML
+      contentType: 'text/html',
       html,
       robots
     };
   } catch (error) {
-    clearTimeout(timeoutId);
+    console.error(`[FETCH] Error fetching ${url}:`, error);
     return { status: 0, contentType: '', html: '', robots: {} };
   }
 }
@@ -5330,9 +5760,23 @@ function resolveBotPolicy(bot: string, policy: any, url: string): string {
 async function maybeRender(url: string, html: string | undefined, browser: Browser) {
   if (!html) return null;
   
-  // Quick heuristic: if no <h1> or sparse content, render
-  const needsRender = !/(<h1[^>]*>.*?<\/h1>)/is.test(html) || html.length < 1000;
+  // ENHANCED: Detect Cloudflare/security block pages that need rendering
+  const isBlockPage = html.includes('Attention Required') || 
+                      html.includes('Just a moment') ||
+                      html.includes('Cloudflare') ||
+                      html.includes('challenge-platform') ||
+                      html.includes('Sorry, you have been blocked');
+  
+  // Quick heuristic: render if no <h1>, sparse content, OR detected block page
+  const needsRender = !/(<h1[^>]*>.*?<\/h1>)/is.test(html) || 
+                     html.length < 1000 ||
+                     isBlockPage;
+  
   if (!needsRender) return null;
+
+  if (isBlockPage) {
+    console.log('[RENDER] Detected security block page, forcing browser rendering');
+  }
 
   try {
     const browserSession = await browser.launch();

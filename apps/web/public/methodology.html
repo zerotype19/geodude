@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Optiview AEO + GEO Methodology</title>
-  <meta name="description" content="Our research methodology, scoring weights, and audit system architecture for Answer Engine Optimization (AEO) and Generative Engine Optimization (GEO).">
+  <title>Optiview AI Visibility Methodology | 36 Diagnostic Checks</title>
+  <meta name="description" content="Our research methodology, scoring weights, and audit system architecture. 36 diagnostic checks across 6 categories measuring how AI assistants discover, understand, and cite your content.">
   <link rel="canonical" href="https://optiview.ai/methodology" />
 
   <!-- Article JSON-LD with Person author -->
@@ -13,19 +13,20 @@
     "@context":"https://schema.org",
     "@type":"Article",
     "@id":"https://optiview.ai/methodology/#article",
-    "headline":"Optiview AEO + GEO Methodology",
+    "headline":"Optiview AI Visibility Methodology - 36 Diagnostic Checks",
     "url":"https://optiview.ai/methodology/",
     "datePublished":"2025-01-16",
-    "dateModified":"2025-01-16",
+    "dateModified":"2025-10-26",
     "author":{"@id":"https://optiview.ai/authors/kevin-mcgovern/#person"},
     "publisher":{"@id":"https://optiview.ai/#org"},
+    "description":"Comprehensive methodology for measuring AI visibility across 36 diagnostic checks in 6 categories, plus live citation testing across ChatGPT, Claude, Perplexity, and Brave Search.",
     "citation":[
       {"@type":"WebPage","name":"Public guidance on AI Overviews","url":"https://support.google.com/websearch/answer/13376098"},
       {"@type":"ScholarlyArticle","name":"Generative Engines and the Web","url":"https://arxiv.org/abs/2404.16366"},
       {"@type":"WebPage","name":"GPTBot user-agent documentation","url":"https://platform.openai.com/docs/gptbot"}
     ],
     "isBasedOn":[
-      {"@type":"Dataset","name":"Optiview AEO/GEO Test Corpus v1.0","url":"https://optiview.ai/datasets/aeo-geo-test-v1.csv"}
+      {"@type":"Dataset","name":"Optiview AI Visibility Test Corpus v2.0","url":"https://optiview.ai/datasets/ai-visibility-test-v2.csv"}
     ],
     "license":"https://optiview.ai/content-license"
   }
@@ -41,136 +42,465 @@
   </script>
 
   <style>
-    :root { --mx:auto; --w:clamp(320px, 92vw, 980px); --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height:1.7; color:#111; margin:0; background:#fafafa; }
-    main { width:var(--w); margin:0 auto; padding:2rem 1.25rem; }
-    header { display:flex; align-items:center; justify-content:space-between; padding:1.25rem; width:var(--w); margin:0 auto; }
-    .logo { font-size:1.4rem; font-weight:700; background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-    nav a { margin-left:1rem; text-decoration:none; color:#333; font-weight:500; }
-    nav a:hover { color:#667eea; }
-    h1 { font-size:2.5rem; margin-bottom:0.5rem; line-height:1.2; }
-    h2 { font-size:1.8rem; margin-top:2.5rem; margin-bottom:1rem; border-bottom:2px solid #667eea; padding-bottom:0.5rem; }
-    h3 { font-size:1.4rem; margin-top:2rem; margin-bottom:0.75rem; }
-    .author { font-size:0.95rem; color:#666; margin-bottom:2rem; }
-    .author a { color:#667eea; text-decoration:none; }
-    .author a:hover { text-decoration:underline; }
-    code { background:#f5f5f5; padding:0.2em 0.4em; border-radius:3px; font-size:0.9em; }
-    table { border-collapse:collapse; width:100%; margin:1.5rem 0; }
-    th, td { padding:0.75rem; text-align:left; border:1px solid #ddd; }
-    th { background:#f5f5f5; font-weight:600; }
-    footer { text-align:center; padding:2rem 1.25rem; color:#666; font-size:0.9rem; }
-    footer a { color:#667eea; text-decoration:none; }
+    /* CSS Variables */
+    :root {
+        --brand: #667eea;
+        --brand-foreground: #ffffff;
+        --ink: #111827;
+        --ink-muted: #6b7280;
+        --ink-subtle: #9ca3af;
+        --dark: #111827;
+        --gray: #6b7280;
+        --surface-1: #ffffff;
+        --surface-2: #f9fafb;
+        --surface-3: #f3f4f6;
+        --border: #e5e7eb;
+        --max-w: 1200px;
+    }
+    
+    /* Base Styles */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    
+    body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.7;
+        color: var(--ink);
+        background: var(--surface-2);
+    }
+    
+    /* Utility Classes */
+    .bg-surface-1 { background: var(--surface-1); }
+    .bg-surface-2 { background: var(--surface-2); }
+    .border-b { border-bottom-width: 1px; }
+    .border-t { border-top-width: 1px; }
+    .border-border { border-color: var(--border); }
+    .sticky { position: sticky; }
+    .top-0 { top: 0; }
+    .z-50 { z-index: 50; }
+    .text-brand { color: var(--brand); }
+    .text-ink-muted { color: var(--ink-muted); }
+    .font-bold { font-weight: 700; }
+    .font-black { font-weight: 900; }
+    .font-medium { font-weight: 500; }
+    .uppercase { text-transform: uppercase; }
+    .hover\:text-brand:hover { color: var(--brand); }
+    .hover\:bg-surface-2:hover { background: var(--surface-2); }
+    .transition-colors { transition: color 0.15s ease-in-out; }
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .justify-between { justify-content: space-between; }
+    .justify-center { justify-content: center; }
+    .items-center { align-items: center; }
+    .text-center { text-align: center; }
+    .max-w-7xl { max-width: 80rem; }
+    .max-w-5xl { max-width: 64rem; }
+    .mx-auto { margin-left: auto; margin-right: auto; }
+    .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+    .py-12 { padding-top: 3rem; padding-bottom: 3rem; }
+    .pt-2 { padding-top: 0.5rem; }
+    .pb-3 { padding-bottom: 0.75rem; }
+    .p-2 { padding: 0.5rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mb-6 { margin-bottom: 1.5rem; }
+    .mt-16 { margin-top: 4rem; }
+    .h-16 { height: 4rem; }
+    .w-6 { width: 1.5rem; }
+    .h-6 { height: 1.5rem; }
+    .space-x-8 > * + * { margin-left: 2rem; }
+    .space-y-1 > * + * { margin-top: 0.25rem; }
+    .gap-6 { gap: 1.5rem; }
+    .flex-wrap { flex-wrap: wrap; }
+    .rounded-md { border-radius: 0.375rem; }
+    
+    /* Header */
+    header {
+      background: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    
+    .header-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+    }
+    
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      text-transform: uppercase;
+      color: var(--brand);
+      text-decoration: none;
+    }
+    
+    nav {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+    
+    nav a {
+      text-decoration: none;
+      color: var(--gray);
+      font-weight: 500;
+      font-size: 0.9375rem;
+      transition: color 0.2s;
+    }
+    
+    nav a:hover { color: var(--brand); }
+    
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+    }
+    
+    .menu-toggle svg {
+      width: 1.5rem;
+      height: 1.5rem;
+      color: var(--gray);
+    }
+    
+    .mobile-menu {
+      display: none;
+      border-top: 1px solid var(--border);
+      background: var(--surface-1);
+      padding: 0.5rem 0;
+    }
+    
+    .mobile-menu.active {
+      display: block !important;
+    }
+    
+    .mobile-menu nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.5rem;
+    }
+    
+    .mobile-menu a {
+      display: block;
+      padding: 0.75rem;
+      color: var(--gray);
+      text-decoration: none;
+      border-radius: 0.375rem;
+      transition: background 0.2s, color 0.2s;
+    }
+    
+    .mobile-menu a:hover {
+      background: var(--surface-2);
+      color: var(--brand);
+    }
+    
+    /* Footer */
+    footer {
+      background: var(--dark);
+      color: white;
+      padding: 3rem 1.5rem 2rem;
+      text-align: center;
+      margin-top: 4rem;
+    }
+    
+    footer nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    footer nav a {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    
+    footer nav a:hover {
+      color: white;
+    }
+    
+    footer p {
+      color: rgba(255,255,255,0.6);
+      font-size: 0.85rem;
+      margin-bottom: 0;
+    }
+    
+    @media (max-width: 768px) {
+      nav { display: none; }
+      .menu-toggle { display: block; }
+    }
+    
+    @media (min-width: 769px) {
+      .mobile-menu { display: none !important; }
+    }
+    
+    /* Content Styles */
+    main {
+        max-width: 64rem;
+        margin: 0 auto;
+        padding: 3rem 1rem;
+        background: var(--surface-1);
+        border-radius: 8px;
+        margin-top: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    article {
+        max-width: 56rem;
+        margin: 0 auto;
+    }
+    
+    h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        line-height: 1.2;
+        font-weight: 900;
+        color: var(--ink);
+    }
+    
+    h2 {
+        font-size: 1.875rem;
+        margin-top: 3rem;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid var(--brand);
+        padding-bottom: 0.75rem;
+        font-weight: 800;
+        color: var(--ink);
+    }
+    
+    h3 {
+        font-size: 1.5rem;
+        margin-top: 2rem;
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+        color: var(--ink);
+    }
+    
+    .author {
+        font-size: 0.95rem;
+        color: var(--ink-muted);
+        margin-bottom: 2rem;
+    }
+    
+    .author a {
+        color: var(--brand);
+        text-decoration: none;
+    }
+    
+    .author a:hover {
+        text-decoration: underline;
+    }
+    
+    p {
+        margin-bottom: 1.25rem;
+        line-height: 1.8;
+    }
+    
+    ul, ol {
+        margin-bottom: 1.5rem;
+        padding-left: 1.5rem;
+    }
+    
+    li {
+        margin-bottom: 0.5rem;
+        line-height: 1.8;
+    }
+    
+    code {
+        background: var(--surface-3);
+        padding: 0.2em 0.5em;
+        border-radius: 4px;
+        font-size: 0.9em;
+        font-family: 'Monaco', 'Menlo', monospace;
+    }
+    
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 2rem 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    th, td {
+        padding: 0.875rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    th {
+        background: var(--surface-3);
+        font-weight: 700;
+        color: var(--ink);
+    }
+    
+    tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    tbody tr:hover {
+        background: var(--surface-2);
+    }
+    
+    strong {
+        font-weight: 600;
+        color: var(--ink);
+    }
   </style>
 </head>
-<body>
-  <header aria-label="Primary">
-    <div class="logo">
-      <a href="/" style="text-decoration: none; color: inherit;">OPTIVIEW.AI</a>
+<body class="bg-surface-2">
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/score-guide">Score Guide</a>
+        <a href="/citations">Citations Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/methodology">Methodology</a>
+      </nav>
+      <button class="menu-toggle" id="menu-toggle-btn" aria-label="Toggle menu">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
     </div>
-    <nav aria-label="Main">
-      <a href="https://app.optiview.ai">Audits</a>
-      <a href="https://app.optiview.ai/score-guide">Score Guide</a>
-      <a href="/citations">Citations Guide</a>
-      <a href="/faq/">Knowledge Base</a>
-      <a href="/methodology">Methodology</a>
-    </nav>
+    <!-- Mobile menu -->
+    <div id="mobile-menu" class="mobile-menu">
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/score-guide">Score Guide</a>
+        <a href="/citations">Citations Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/methodology">Methodology</a>
+      </nav>
+    </div>
   </header>
 
   <main>
     <article>
-      <h1>Optiview AEO + GEO Methodology</h1>
-      <p class="author">By <a href="/authors/kevin-mcgovern">Kevin McGovern</a> · Last updated January 16, 2025</p>
+      <h1>Optiview AI Visibility Methodology</h1>
+      <p class="author">By <a href="/authors/kevin-mcgovern">Kevin McGovern</a> · Last updated October 26, 2025</p>
 
-      <p><strong>Optiview</strong> provides a complete AEO + GEO readiness assessment combining <strong>structural audits</strong> (21 weighted checks) with <strong>live citation testing</strong> across ChatGPT, Claude, Perplexity, and Brave Search.</p>
+      <p><strong>Optiview</strong> provides a comprehensive AI visibility assessment combining <strong>structural audits</strong> (36 diagnostic checks) with <strong>live citation testing</strong> across ChatGPT, Claude, Perplexity, and Brave Search. Our methodology evaluates how well AI assistants can discover, understand, and cite your content.</p>
 
       <h2>Overview</h2>
-      <p>Our dual-layer assessment evaluates both structural readiness and real-world citation performance:</p>
+      <p>Our assessment evaluates both structural readiness and real-world citation performance across 6 key categories:</p>
       <ul>
-        <li><strong>Structural Audit (21 checks)</strong>: How well your site is optimized for training bots and answer engines</li>
+        <li><strong>36 Diagnostic Checks</strong>: 23 page-level and 13 site-level checks measuring AI visibility</li>
+        <li><strong>6 Actionable Categories</strong>: Content & Clarity, Structure & Organization, Authority & Trust, Technical Foundations, Crawl & Discoverability, and Experience & Performance</li>
         <li><strong>Live Citation Testing</strong>: Whether your brand actually appears in LLM responses today</li>
-        <li><strong>GEO Adjusted Score</strong>: Combined metric that rewards both structure and real-world visibility</li>
+        <li><strong>Weighted Scoring</strong>: Each check has an impact weight (1-15) reflecting its importance for AI visibility</li>
       </ul>
 
       <h3>What We Measure</h3>
       <ul>
-        <li><strong>AEO (Answer Engine Optimization)</strong>: 11 checks for answer boxes, featured snippets, and AI Overviews</li>
-        <li><strong>GEO (Generative Engine Optimization)</strong>: 10 checks for LLM citation readiness</li>
-        <li><strong>Live LLM Citations</strong>: Real queries against ChatGPT, Claude, Perplexity, and Brave</li>
-        <li><strong>Training Bot Access</strong>: How GPTBot, ClaudeBot, and PerplexityBot view your site</li>
+        <li><strong>Content & Clarity</strong>: Clear, comprehensive content that answers user intent directly (FAQ coverage, Q&A scaffolds, CTA placement)</li>
+        <li><strong>Structure & Organization</strong>: Semantic markup, headings, internal linking, and entity graphs for AI understanding</li>
+        <li><strong>Authority & Trust</strong>: Signals of expertise, credibility, and entity authority (Organization schema, provenance)</li>
+        <li><strong>Technical Foundations</strong>: Core metadata, tags, and technical SEO elements (titles, descriptions, canonical tags, schema)</li>
+        <li><strong>Crawl & Discoverability</strong>: Sitemaps, robots.txt, AI bot access, and crawl efficiency</li>
+        <li><strong>Experience & Performance</strong>: Speed, mobile-readiness, and user experience metrics</li>
+        <li><strong>Live LLM Citations</strong>: Real queries using context-aware, industry-specific prompts against ChatGPT, Claude, Perplexity, and Brave</li>
       </ul>
 
       <h2>Scoring Framework</h2>
-      <p>Each check is scored on a 0-3 scale:</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Score</th>
-            <th>Meaning</th>
-            <th>Weight Application</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>3</strong></td><td>Strong</td><td>Full weight applied</td></tr>
-          <tr><td><strong>2</strong></td><td>Moderate</td><td>66% of weight</td></tr>
-          <tr><td><strong>1</strong></td><td>Weak</td><td>33% of weight</td></tr>
-          <tr><td><strong>0</strong></td><td>Poor/Missing</td><td>0% of weight</td></tr>
-        </tbody>
-      </table>
-
-      <h2>AEO Checks (11 total)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Check</th>
-            <th>Weight</th>
-            <th>What We Measure</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>A1: Answer-First Design</td><td>15</td><td>Summary block, jump links, or tables above the fold</td></tr>
-          <tr><td>A2: Topical Cluster</td><td>15</td><td>Internal links to related content</td></tr>
-          <tr><td>A3: Site Authority</td><td>15</td><td>Organization and Author schema</td></tr>
-          <tr><td>A4: Originality & Effort</td><td>12</td><td>Tables, data, or 3+ outbound citations</td></tr>
-          <tr><td>A5: Schema Accuracy</td><td>10</td><td>Structured data (JSON-LD)</td></tr>
-          <tr><td>A6: Crawlability</td><td>10</td><td>Canonical tags, proper URLs</td></tr>
-          <tr><td>A7: UX & Performance</td><td>8</td><td>No CLS risk, fast load</td></tr>
-          <tr><td>A8: Discoverability</td><td>6</td><td>Sitemaps present</td></tr>
-          <tr><td>A9: Freshness</td><td>5</td><td>dateModified present</td></tr>
-          <tr><td>A10: AI Overviews</td><td>4</td><td>Citations block, chunkable structure</td></tr>
-          <tr><td>A11: Render Visibility</td><td>10</td><td>Content visible in static HTML (70%+ for score 3)</td></tr>
-        </tbody>
-      </table>
-
-      <h2>GEO Checks (10 total)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Check</th>
-            <th>Weight</th>
-            <th>What We Measure</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>G1: Citable Facts</td><td>15</td><td>Fact blocks, statistics, key takeaways</td></tr>
-          <tr><td>G2: Provenance</td><td>15</td><td>Author, publisher, citations, license schema</td></tr>
-          <tr><td>G3: Evidence Density</td><td>12</td><td>Citations block + 3+ outbound references</td></tr>
-          <tr><td>G4: AI Crawler Access</td><td>12</td><td>GPTBot, ClaudeBot, PerplexityBot allowed in robots.txt</td></tr>
-          <tr><td>G5: Chunkability</td><td>10</td><td>Clean HTML structure, semantic markup</td></tr>
-          <tr><td>G6: Stable URLs</td><td>8</td><td>Canonical fact URLs with anchors</td></tr>
-          <tr><td>G7: Dataset Links</td><td>8</td><td>Links to datasets, research, or sources hub</td></tr>
-          <tr><td>G8: Policy Transparency</td><td>6</td><td>License and reuse policy</td></tr>
-          <tr><td>G9: Update Hygiene</td><td>7</td><td>Changelog or version history</td></tr>
-          <tr><td>G10: Cluster Linking</td><td>7</td><td>Links to sources hub or related evidence</td></tr>
-        </tbody>
-      </table>
-
-      <h2>Render Visibility Penalty</h2>
-      <p>Sites with low render visibility (content only visible after JavaScript execution) receive penalties:</p>
+      <p>Optiview uses a weighted 0-100 scoring system where each check contributes based on its importance:</p>
+      
+      <h3>Check Structure</h3>
       <ul>
-        <li><strong>AEO:</strong> -5 points if &lt;30% of content in static HTML</li>
-        <li><strong>GEO:</strong> -5 to -10 points if &lt;50% of content in static HTML</li>
+        <li><strong>Page-Level Checks (23 total)</strong>: Run on every page analyzed, measuring content quality, structure, and technical implementation</li>
+        <li><strong>Site-Level Checks (13 total)</strong>: Evaluate overall site properties like FAQ coverage, entity graph completeness, and crawl policies</li>
       </ul>
-      <p>This reflects the reality that many AI crawlers (GPTBot, ClaudeBot, PerplexityBot) do not execute JavaScript.</p>
+
+      <h3>Impact Levels</h3>
+      <p>Each check is assigned an impact level that determines prioritization:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Impact Level</th>
+            <th>Weight Range</th>
+            <th>Priority</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>High</strong></td><td>10-15</td><td>Critical for AI visibility - address failures immediately</td></tr>
+          <tr><td><strong>Medium</strong></td><td>6-9</td><td>Important optimization opportunities</td></tr>
+          <tr><td><strong>Low</strong></td><td>1-5</td><td>Polish and refinement</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Score Calculation</h3>
+      <p>The overall score is calculated as:</p>
+      <ul>
+        <li><strong>Weighted Sum</strong>: Each passing check contributes its full weight to the total</li>
+        <li><strong>Normalized to 100</strong>: Total points earned / Maximum possible points × 100</li>
+        <li><strong>Category Scores</strong>: Grouped into 6 categories for easier prioritization and actionable insights</li>
+        <li><strong>Pass/Warn Thresholds</strong>: Most checks use 85% pass threshold and 60% warn threshold</li>
+      </ul>
+
+      <h2>Check Types</h2>
+      <p>Optiview employs four types of diagnostic checks, each optimized for different aspects of AI visibility:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Check Type</th>
+            <th>Description</th>
+            <th>Example Checks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>html_dom</strong></td>
+            <td>Deterministic HTML analysis - fast, reliable structural checks</td>
+            <td>Title quality, meta descriptions, heading structure, FAQ presence, schema validation</td>
+          </tr>
+          <tr>
+            <td><strong>llm</strong></td>
+            <td>AI-assisted evaluation for semantic and content quality assessment</td>
+            <td>Topic depth & semantic coverage, content clarity analysis</td>
+          </tr>
+          <tr>
+            <td><strong>aggregate</strong></td>
+            <td>Site-level rollups that measure consistency and coverage across pages</td>
+            <td>FAQ coverage %, canonical correctness %, mobile-ready pages %</td>
+          </tr>
+          <tr>
+            <td><strong>http</strong></td>
+            <td>Robots.txt and sitemap validation via HTTP requests</td>
+            <td>Sitemap discoverability, AI bot access status</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Key Examples by Category</h3>
+      <ul>
+        <li><strong>Content & Clarity</strong>: Answer-first hero section (weight: 15), FAQ presence (8), Q&A scaffold (10), FAQ coverage site-wide (10)</li>
+        <li><strong>Structure & Organization</strong>: Single H1 tag (10), semantic heading structure (10), internal linking (7), H2 coverage ratio (8)</li>
+        <li><strong>Authority & Trust</strong>: Organization entity graph (10), entity graph adoption site-wide (10)</li>
+        <li><strong>Technical Foundations</strong>: Title quality (12), meta description (8), FAQPage schema (10), canonical correctness (8), OG tags (6)</li>
+        <li><strong>Crawl & Discoverability</strong>: No blocking robots directives (12), sitemap discoverability (6), AI bot access (10)</li>
+        <li><strong>Experience & Performance</strong>: Mobile viewport (8), page speed/LCP (7), Core Web Vitals hints (8)</li>
+      </ul>
+      
+      <p>For the complete list of all 36 checks with detailed documentation, examples, and how-to-fix guidance, see the <a href="/score-guide">Optiview Score Guide</a>.</p>
 
       <h2>Live Citation Testing</h2>
       <p>Beyond structural checks, we test how your brand appears in live LLM responses:</p>
@@ -201,14 +531,15 @@
         <li>Competitive gaps (queries where competitors appear but you don't)</li>
       </ul>
 
-      <h2>GEO Adjusted Score</h2>
-      <p>The GEO Adjusted Score combines structural readiness with real-world citation performance:</p>
+      <h2>Overall AI Visibility Score</h2>
+      <p>Your overall score represents comprehensive AI visibility across all 36 checks:</p>
       <ul>
-        <li><strong>Base GEO Score (70% weight):</strong> Your structural score from the 10 GEO checks</li>
-        <li><strong>Citation Performance (30% weight):</strong> Weighted average of citation rates across ChatGPT, Claude, and Perplexity</li>
-        <li><strong>Formula:</strong> <code>geo_adjusted = geo_raw × 0.7 + citation_bonus × 0.3</code></li>
+        <li><strong>Structural Score (0-100)</strong>: Weighted average across all 36 diagnostic checks</li>
+        <li><strong>Category Breakdown</strong>: Individual scores for each of the 6 categories help prioritize improvements</li>
+        <li><strong>Citation Performance</strong>: Tracked separately showing actual appearance in LLM responses</li>
+        <li><strong>Pass/Warn/Fail States</strong>: Clear status indicators for each check with actionable next steps</li>
       </ul>
-      <p>This rewards sites that are both structurally sound <em>and</em> actually appearing in LLM responses today.</p>
+      <p>This holistic approach rewards sites that are both structurally sound <em>and</em> actually appearing in LLM responses today, while providing actionable insights for improvement in specific areas.</p>
 
       <h2>Bot Identity & Crawling</h2>
       <p>Our audit system respects website owners and follows best practices:</p>
@@ -264,14 +595,30 @@
   </main>
 
   <footer>
-    <p>
-      © <span id="y">2025</span> Optiview.ai · 
-      <a href="/terms">Terms</a> · 
-      <a href="/privacy">Privacy</a> · 
-      <a href="/">Back to Home</a>
-    </p>
-    <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
+    <nav>
+      <a href="https://app.optiview.ai">Audits</a>
+      <a href="/score-guide">Score Guide</a>
+      <a href="/citations">Citations Guide</a>
+      <a href="/faq/">Knowledge Base</a>
+      <a href="/methodology">Methodology</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/bot">Bot Info</a>
+    </nav>
+    <p>&copy; <span id="year">2025</span> Optiview.ai &middot; AI visibility intelligence for modern brands</p>
   </footer>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    
+    // Mobile menu toggle
+    const menuToggle = document.getElementById('menu-toggle-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (menuToggle && mobileMenu) {
+      menuToggle.addEventListener('click', function() {
+        mobileMenu.classList.toggle('active');
+      });
+    }
+  </script>
 </body>
 </html>
 

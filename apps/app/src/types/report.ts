@@ -93,6 +93,7 @@ export interface CitationAnalysis {
     query: string;
     source: string;
     cited_url: string;
+    answer_excerpt?: string;
   }>;
   missed_opportunities: Array<{
     query: string;

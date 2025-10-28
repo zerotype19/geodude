@@ -96,6 +96,7 @@ export interface CitationAnalysis {
     query: string;
     source: string;
     cited_url: string;
+    answer_excerpt?: string;
   }>;
   missed_opportunities: Array<{
     query: string;
@@ -524,11 +525,11 @@ async function getCitationAnalysis(db: D1Database, auditId: string): Promise<Cit
 
   // Get successful citation examples (queries where domain was cited)
   const successfulCitations = await db.prepare(`
-    SELECT query, ai_source, first_match_url
+    SELECT query, ai_source, first_match_url, answer_excerpt
     FROM ai_citations
-    WHERE audit_id = ? AND cited_match_count > 0
+    WHERE audit_id = ? AND cited_match_count > 0 AND answer_excerpt IS NOT NULL
     ORDER BY occurred_at DESC
-    LIMIT 12
+    LIMIT 10
   `).bind(auditId).all() as any;
 
   // Get missed opportunities (queries with 0 citations)
@@ -550,6 +551,7 @@ async function getCitationAnalysis(db: D1Database, auditId: string): Promise<Cit
       query: row.query,
       source: row.ai_source,
       cited_url: row.first_match_url,
+      answer_excerpt: row.answer_excerpt,
     })),
     missed_opportunities: missedOpportunities.results.map((row: any) => ({
       query: row.query,

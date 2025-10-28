@@ -5,7 +5,7 @@ type Props = {
 };
 
 export default function RenderParityPanel({ ratio }: Props) {
-  const { emoji, label, hint, severity } = renderParityLabel(ratio);
+  const { icon, label, hint, severity } = renderParityLabel(ratio);
   const pct = Math.round(ratio * 100);
   
   const borderColor = 
@@ -21,7 +21,7 @@ export default function RenderParityPanel({ ratio }: Props) {
   return (
     <div className={`mt-4 rounded-lg border-2 ${borderColor} ${bgColor} p-4`}>
       <div className="flex items-center gap-2 font-medium  mb-2">
-        <span className="text-lg">{emoji}</span>
+        <span className="flex-shrink-0">{icon}</span>
         <span>HTML vs Rendered DOM</span>
         <span className="ml-auto text-xs font-semibold rounded-full bg-surface-1 border border-border px-3 py-1">
           {pct}% parity

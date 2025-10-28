@@ -4,24 +4,377 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Privacy Policy - Optiview</title>
-  <meta name="description" content="Privacy Policy for Optiview - AEO and GEO auditing platform.">
+  <meta name="description" content="Privacy Policy for Optiview - how we collect, use, and protect your data.">
   <link rel="canonical" href="https://optiview.ai/privacy" />
-  <meta http-equiv="refresh" content="0; url=https://app.optiview.ai" />
+  
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CY45NV4CNE"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CY45NV4CNE');
+  </script>
+  
   <style>
-    body { font-family: system-ui; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fafafa; }
-    .box { text-align: center; padding: 2rem; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; }
-    h1 { color: #111; font-size: 1.5rem; margin-bottom: 1rem; }
-    p { color: #666; line-height: 1.6; margin-bottom: 1.5rem; }
-    a { color: #667eea; text-decoration: none; font-weight: 500; }
+    :root {
+        --brand: #667eea;
+        --ink: #111827;
+        --ink-muted: #6b7280;
+        --surface-1: #ffffff;
+        --surface-2: #f9fafb;
+        --border: #e5e7eb;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.7;
+        color: var(--ink);
+        background: var(--surface-2);
+    }
+    
+    /* Header */
+    header {
+        background: var(--surface-1);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 0;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+    
+    .header-content {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 0 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 4rem;
+    }
+    
+    .logo {
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: var(--brand);
+        text-decoration: none;
+        text-transform: uppercase;
+        letter-spacing: -0.5px;
+    }
+    
+    nav { display: flex; gap: 2rem; }
+    nav a {
+        color: var(--ink-muted);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.15s;
+    }
+    nav a:hover { color: var(--brand); }
+    
+    .menu-toggle {
+        display: none;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.5rem;
+    }
+    
+    .menu-toggle svg {
+        width: 1.5rem;
+        height: 1.5rem;
+        color: var(--ink-muted);
+    }
+    
+    .mobile-menu {
+        display: none;
+        border-top: 1px solid var(--border);
+        background: var(--surface-1);
+    }
+    
+    .mobile-menu.active {
+      display: block !important;
+        display: block;
+    }
+    
+    .mobile-menu nav {
+      display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 0.5rem 1rem;
+    }
+    
+    .mobile-menu a {
+        display: block;
+        padding: 0.75rem;
+        border-radius: 0.375rem;
+        transition: background 0.2s;
+    }
+    
+    .mobile-menu a:hover {
+        background: var(--surface-2);
+    }
+    
+    @media (max-width: 768px) {
+        .header-content nav { display: none; }
+        .menu-toggle { display: block; }
+    }
+    
+    @media (min-width: 769px) {
+        .mobile-menu { display: none !important; }
+    }
+    
+    /* Main Content */
+    main {
+        max-width: 64rem;
+        margin: 2rem auto;
+        padding: 3rem 1rem;
+        background: var(--surface-1);
+        border-radius: 8px;
+    }
+    
+    article { max-width: 56rem; margin: 0 auto; }
+    
+    h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        font-weight: 900;
+        line-height: 1.2;
+    }
+    
+    h2 {
+        font-size: 1.875rem;
+        margin-top: 3rem;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid var(--brand);
+        padding-bottom: 0.75rem;
+        font-weight: 800;
+    }
+    
+    h3 {
+        font-size: 1.5rem;
+        margin-top: 2rem;
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+    }
+    
+    p { margin-bottom: 1.25rem; line-height: 1.8; }
+    ul, ol { margin-bottom: 1.5rem; padding-left: 1.5rem; }
+    li { margin-bottom: 0.5rem; line-height: 1.8; }
+    
+    a { color: var(--brand); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    
+    .meta {
+        color: var(--ink-muted);
+        font-size: 0.95rem;
+        margin-bottom: 2rem;
+    }
+    
+    /* Footer */
+    footer {
+        background: var(--surface-1);
+        border-top: 1px solid var(--border);
+        margin-top: 4rem;
+        padding: 2rem 1rem;
+    }
+    
+    footer nav {
+        max-width: 80rem;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    footer nav a {
+        font-size: 0.9rem;
+    }
+    
+    footer p {
+        text-align: center;
+        color: var(--ink-muted);
+        font-size: 0.875rem;
+    }
   </style>
 </head>
 <body>
-  <div class="box">
-    <h1>Privacy Policy</h1>
-    <p>Our Privacy Policy page is being updated. You'll be redirected to the app momentarily.</p>
-    <p>For immediate assistance, please contact <a href="mailto:privacy@optiview.ai">privacy@optiview.ai</a></p>
-    <p><a href="https://app.optiview.ai">Continue to Optiview →</a></p>
-  </div>
+  <header>
+    <div class="header-content">
+      <a href="/" class="logo">OPTIVIEW.AI</a>
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/score-guide">Score Guide</a>
+        <a href="/citations">Citations Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/methodology">Methodology</a>
+      </nav>
+      <button class="menu-toggle" id="menu-toggle-btn"  aria-label="Toggle menu">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+    <!-- Mobile menu -->
+    <div id="mobile-menu" class="mobile-menu">
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/score-guide">Score Guide</a>
+        <a href="/citations">Citations Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/methodology">Methodology</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article>
+      <h1>Privacy Policy</h1>
+      <p class="meta">Last updated: October 26, 2025</p>
+
+      <p>At Optiview, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI visibility intelligence platform.</p>
+
+      <h2>1. Information We Collect</h2>
+      
+      <h3>1.1 Account Information</h3>
+      <p>When you create an account, we collect:</p>
+      <ul>
+        <li>Email address (for magic link authentication)</li>
+        <li>Account preferences and settings</li>
+        <li>Usage data and audit history</li>
+      </ul>
+
+      <h3>1.2 Audit Data</h3>
+      <p>When you run audits, we collect:</p>
+      <ul>
+        <li>Domain names and URLs you audit</li>
+        <li>Publicly accessible website content (HTML, meta tags, structured data)</li>
+        <li>Diagnostic results and scores</li>
+        <li>Citation test queries and results</li>
+      </ul>
+
+      <h3>1.3 Automatically Collected Information</h3>
+      <p>We automatically collect certain information when you use our service:</p>
+      <ul>
+        <li>Log data (IP address, browser type, access times)</li>
+        <li>Device information</li>
+        <li>Usage patterns and feature interactions</li>
+        <li>Analytics data via Google Analytics</li>
+      </ul>
+
+      <h2>2. How We Use Your Information</h2>
+      <p>We use the information we collect to:</p>
+      <ul>
+        <li>Provide, maintain, and improve our services</li>
+        <li>Process and complete audits</li>
+        <li>Generate industry-specific citation test queries</li>
+        <li>Send you audit results and reports</li>
+        <li>Communicate with you about your account</li>
+        <li>Analyze usage patterns to improve our platform</li>
+        <li>Detect, prevent, and address technical issues</li>
+        <li>Comply with legal obligations</li>
+      </ul>
+
+      <h2>3. Data Storage and Security</h2>
+      <p>We implement appropriate technical and organizational measures to protect your data:</p>
+      <ul>
+        <li>Data is stored on secure Cloudflare infrastructure</li>
+        <li>Authentication via magic links (no password storage)</li>
+        <li>Encrypted data transmission (HTTPS/TLS)</li>
+        <li>Regular security audits and updates</li>
+        <li>Access controls and monitoring</li>
+      </ul>
+
+      <h2>4. Data Sharing and Disclosure</h2>
+      
+      <h3>4.1 Third-Party Services</h3>
+      <p>We use the following third-party services:</p>
+      <ul>
+        <li><strong>Cloudflare:</strong> Infrastructure, CDN, and security</li>
+        <li><strong>Google Analytics:</strong> Usage analytics and insights</li>
+        <li><strong>AI Platform APIs:</strong> Citation testing (ChatGPT, Claude, Perplexity, Brave)</li>
+      </ul>
+
+      <h3>4.2 We Do NOT</h3>
+      <ul>
+        <li>Sell your personal information</li>
+        <li>Share your audit results with third parties</li>
+        <li>Use your website content for AI training</li>
+        <li>Disclose your data except as required by law</li>
+      </ul>
+
+      <h2>5. Your Data Rights</h2>
+      <p>You have the right to:</p>
+      <ul>
+        <li>Access your personal data and audit history</li>
+        <li>Correct inaccurate or incomplete information</li>
+        <li>Delete your account and associated data</li>
+        <li>Export your audit results and reports</li>
+        <li>Opt out of non-essential communications</li>
+        <li>Object to data processing in certain circumstances</li>
+      </ul>
+      <p>To exercise these rights, contact us at <a href="mailto:privacy@optiview.ai">privacy@optiview.ai</a>.</p>
+
+      <h2>6. Data Retention</h2>
+      <p>We retain your information for as long as necessary to provide our services and comply with legal obligations:</p>
+      <ul>
+        <li><strong>Active Accounts:</strong> Data retained while account is active</li>
+        <li><strong>Deleted Accounts:</strong> Most data deleted within 30 days, some logs retained for security purposes</li>
+        <li><strong>Audit Results:</strong> Available for download as long as your account is active</li>
+      </ul>
+
+      <h2>7. Cookies and Tracking</h2>
+      <p>We use cookies and similar technologies for:</p>
+      <ul>
+        <li>Authentication and session management</li>
+        <li>Analytics (via Google Analytics)</li>
+        <li>User preferences</li>
+      </ul>
+      <p>You can control cookie preferences through your browser settings.</p>
+
+      <h2>8. Children's Privacy</h2>
+      <p>Our service is not intended for children under 13. We do not knowingly collect personal information from children under 13.</p>
+
+      <h2>9. International Data Transfers</h2>
+      <p>Your data may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place for such transfers.</p>
+
+      <h2>10. Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. We will notify you of any material changes via email or through the platform. Continued use after changes constitutes acceptance of the updated policy.</p>
+
+      <h2>11. Bot Crawling and Public Data</h2>
+      <p>Our OptiviewAuditBot only accesses publicly available website data and respects:</p>
+      <ul>
+        <li>robots.txt directives</li>
+        <li>Meta robots tags</li>
+        <li>Crawl-delay specifications</li>
+      </ul>
+      <p>See our <a href="/bot">Bot Info page</a> for complete documentation.</p>
+
+      <h2>Contact Us</h2>
+      <p>For questions about this Privacy Policy or our data practices, contact us at:</p>
+      <ul>
+        <li>Email: <a href="mailto:privacy@optiview.ai">privacy@optiview.ai</a></li>
+        <li>General inquiries: <a href="mailto:hello@optiview.ai">hello@optiview.ai</a></li>
+      </ul>
+    </article>
+  </main>
+
+  <footer>
+    <nav>
+      <a href="https://app.optiview.ai">Audits</a>
+      <a href="/score-guide">Score Guide</a>
+      <a href="/citations">Citations Guide</a>
+      <a href="/faq/">Knowledge Base</a>
+      <a href="/methodology">Methodology</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/bot">Bot Info</a>
+    </nav>
+    <p>&copy; <span id="y">2025</span> Optiview.ai · AI visibility intelligence for modern brands</p>
+  </footer>
+  <script>document.getElementById('y').textContent = new Date().getFullYear();</script>
 </body>
 </html>

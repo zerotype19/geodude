@@ -123,43 +123,59 @@
     
     .menu-toggle {
       display: none;
-      flex-direction: column;
-      gap: 4px;
       background: none;
       border: none;
       cursor: pointer;
-      padding: 8px;
+      padding: 0.5rem;
     }
     
-    .menu-toggle span {
+    .menu-toggle svg {
+      width: 1.5rem;
+      height: 1.5rem;
+      color: var(--gray);
+    }
+    
+    .mobile-menu {
+      display: none;
+      border-top: 1px solid var(--border);
+      background: var(--surface-1);
+      padding: 0.5rem 0;
+    }
+    
+    .mobile-menu.active {
+      display: block !important;
+      display: block !important;
+    }
+    
+    .mobile-menu nav {
+      display: flex;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.5rem;
+    }
+    
+    .mobile-menu a {
       display: block;
-      width: 24px;
-      height: 2px;
-      background: var(--gray);
-      transition: all 0.3s;
+      padding: 0.75rem;
+      color: var(--gray);
+      text-decoration: none;
+      border-radius: 0.375rem;
+      transition: background 0.2s, color 0.2s;
+    }
+    
+    .mobile-menu a:hover {
+      background: var(--surface-2);
+      color: var(--brand);
     }
     
     @media (max-width: 768px) {
-      nav {
-        position: fixed;
-        top: 65px;
-        right: -100%;
-        width: 250px;
-        height: calc(100vh - 65px);
-        background: var(--surface-1);
-        flex-direction: column;
-        gap: 0;
-        padding: 1rem 0;
-        box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-        transition: right 0.3s;
-        align-items: stretch;
-      }
-      nav.active { right: 0; }
-      nav a {
-        padding: 1rem 1.5rem;
-        border-bottom: 1px solid var(--border);
-      }
-      .menu-toggle { display: flex; }
+      nav { display: none; }
+      .menu-toggle { display: block; }
+    }
+    
+    @media (min-width: 769px) {
+      .mobile-menu { display: none !important; }
     }
     
     .hero {
@@ -347,50 +363,65 @@
     footer {
       background: var(--surface-1);
       border-top: 1px solid var(--border);
-      padding: 2rem 1.5rem;
-      text-align: center;
-      color: var(--gray);
-      font-size: 0.9rem;
+      padding: 2rem 1rem;
+      margin-top: 4rem;
     }
     
     footer nav {
-      margin-top: 1rem;
+      max-width: var(--max-w);
+      margin: 0 auto 1rem;
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
       gap: 1.5rem;
-      position: static;
-      width: auto;
-      height: auto;
-      box-shadow: none;
-      padding: 0;
-      background: transparent;
+      row-gap: 0.75rem;
     }
     
     footer a {
-      color: var(--brand);
+      color: var(--gray);
       text-decoration: none;
-      padding: 0;
-      border: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
     }
     
-    footer a:hover { text-decoration: underline; }
+    footer a:hover { 
+      color: var(--brand);
+      text-decoration: underline;
+    }
+    
+    footer p {
+      text-align: center;
+      color: var(--gray);
+      font-size: 0.875rem;
+      margin: 0;
+    }
   </style>
 </head>
 <body>
   <header>
     <div class="header-inner">
-      <a href="/" class="logo">OPTIVIEW</a>
-      <button class="menu-toggle" onclick="document.querySelector('nav').classList.toggle('active')" aria-label="Toggle menu">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
+      <a href="/" class="logo">OPTIVIEW.AI</a>
       <nav>
         <a href="https://app.optiview.ai">Audits</a>
-        <a href="https://app.optiview.ai/score-guide">Score Guide</a>
-        <a href="/faq/">Knowledge Base</a>
+        <a href="/score-guide">Score Guide</a>
         <a href="/citations">Citations Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/methodology">Methodology</a>
+      </nav>
+      <button class="menu-toggle" id="menu-toggle-btn" aria-label="Toggle menu">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+    <!-- Mobile menu -->
+    <div id="mobile-menu" class="mobile-menu">
+      <nav>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/score-guide">Score Guide</a>
+        <a href="/citations">Citations Guide</a>
+        <a href="/faq/">Knowledge Base</a>
+        <a href="/methodology">Methodology</a>
       </nav>
     </div>
   </header>
@@ -413,7 +444,7 @@
     </section>
 
     <section class="features">
-      <a href="https://app.optiview.ai/score-guide" class="feature">
+      <a href="/score-guide" class="feature">
         <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 3v18h18"/>
           <path d="M18 17V9M12 17v-4M6 17v-2"/>
@@ -491,17 +522,29 @@
   </main>
 
     <footer>
-      <p>&copy; 2025 Optiview. AI Visibility Intelligence for Modern Brands.</p>
       <nav>
-        <a href="https://app.optiview.ai">Run Audit</a>
-        <a href="https://app.optiview.ai/score-guide">Score Guide</a>
-        <a href="/faq/">Knowledge Base</a>
+        <a href="https://app.optiview.ai">Audits</a>
+        <a href="/score-guide">Score Guide</a>
         <a href="/citations">Citations Guide</a>
+        <a href="/faq/">Knowledge Base</a>
         <a href="/methodology">Methodology</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
         <a href="/bot">Bot Info</a>
       </nav>
+      <p>&copy; <span id="year">2025</span> Optiview.ai &middot; AI visibility intelligence for modern brands</p>
     </footer>
+    <script>
+      document.getElementById('year').textContent = new Date().getFullYear();
+      
+      // Mobile menu toggle
+      const menuToggle = document.getElementById('menu-toggle-btn');
+      const mobileMenu = document.getElementById('mobile-menu');
+      if (menuToggle && mobileMenu) {
+        menuToggle.addEventListener('click', function() {
+          mobileMenu.classList.toggle('active');
+        });
+      }
+    </script>
 </body>
 </html>

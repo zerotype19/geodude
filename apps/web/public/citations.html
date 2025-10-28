@@ -79,68 +79,220 @@
             background: var(--surface-2);
         }
         
-        /* Utility Classes */
-        .bg-surface-1 { background: var(--surface-1); }
-        .bg-surface-2 { background: var(--surface-2); }
-        .border-b { border-bottom-width: 1px; }
-        .border-t { border-top-width: 1px; }
-        .border-border { border-color: var(--border); }
-        .sticky { position: sticky; }
-        .top-0 { top: 0; }
-        .z-50 { z-index: 50; }
-        .text-brand { color: var(--brand); }
-        .text-ink-muted { color: var(--ink-muted); }
-        .text-white { color: white; }
-        .text-5xl { font-size: 3rem; line-height: 1; }
-        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
-        .font-bold { font-weight: 700; }
-        .font-medium { font-weight: 500; }
-        .uppercase { text-transform: uppercase; }
-        .hover\:text-brand:hover { color: var(--brand); }
-        .hover\:bg-surface-2:hover { background: var(--surface-2); }
-        .transition-colors { transition: color 0.15s ease-in-out; }
-        .hidden { display: none !important; }
-        .block { display: block; }
-        .flex { display: flex; }
-        .justify-between { justify-content: space-between; }
-        .items-center { align-items: center; }
-        .text-center { text-align: center; }
-        .max-w-7xl { max-width: 80rem; }
-        .max-w-4xl { max-width: 56rem; }
-        .max-w-5xl { max-width: 64rem; }
-        .mx-auto { margin-left: auto; margin-right: auto; }
-        .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
-        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
-        .px-4 { padding-left: 1rem; padding-right: 1rem; }
-        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
-        .py-12 { padding-top: 3rem; padding-bottom: 3rem; }
-        .py-16 { padding-top: 4rem; padding-bottom: 4rem; }
-        .pt-2 { padding-top: 0.5rem; }
-        .pb-3 { padding-bottom: 0.75rem; }
-        .p-2 { padding: 0.5rem; }
-        .mb-4 { margin-bottom: 1rem; }
-        .mb-6 { margin-bottom: 1.5rem; }
-        .h-16 { height: 4rem; }
-        .w-6 { width: 1.5rem; }
-        .h-6 { height: 1.5rem; }
-        .space-x-8 > * + * { margin-left: 2rem; }
-        .space-y-1 > * + * { margin-top: 0.25rem; }
-        .rounded-md { border-radius: 0.375rem; }
-        .opacity-95 { opacity: 0.95; }
+        /* Header & Navigation */
+        header {
+            background: var(--surface-1);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
         
-        /* Mobile: hide desktop nav, show mobile button */
-        .md\:flex { display: none; }
-        .md\:hidden { display: block; }
+        .header-inner {
+            max-width: var(--max-w);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+        }
         
-        /* Desktop (768px+): show desktop nav, hide mobile button and menu */
-        @media (min-width: 768px) {
-            .md\:flex { display: flex; }
-            .md\:hidden { display: none !important; }
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+            color: var(--brand);
+            text-decoration: none;
+        }
+        
+        nav {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        nav a {
+            text-decoration: none;
+            color: var(--gray);
+            font-weight: 500;
+            font-size: 0.9375rem;
+            transition: color 0.2s;
+        }
+        
+        nav a:hover { color: var(--brand); }
+        
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+        
+        .menu-toggle svg {
+            width: 1.5rem;
+            height: 1.5rem;
+            color: var(--gray);
+        }
+        
+        .mobile-menu {
+            display: none;
+            border-top: 1px solid var(--border);
+            background: var(--surface-1);
+            padding: 0.5rem 0;
+        }
+        
+        .mobile-menu.active {
+            display: block !important;
+        }
+        
+        .mobile-menu nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            padding: 0.5rem;
+        }
+        
+        .mobile-menu a {
+            display: block;
+            padding: 0.75rem;
+            color: var(--gray);
+            text-decoration: none;
+            border-radius: 0.375rem;
+            transition: background 0.2s, color 0.2s;
+        }
+        
+        .mobile-menu a:hover {
+            background: var(--surface-2);
+            color: var(--brand);
+        }
+        
+        @media (max-width: 768px) {
+            nav { display: none; }
+            .menu-toggle { display: block; }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-menu { display: none !important; }
+        }
+        
+        /* Footer */
+        footer {
+            background: var(--surface-1);
+            border-top: 1px solid var(--border);
+            padding: 2rem 1rem;
+            margin-top: 4rem;
+        }
+        
+        footer nav {
+            max-width: var(--max-w);
+            margin: 0 auto 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1.5rem;
+            row-gap: 0.75rem;
+        }
+        
+        footer a {
+            color: var(--gray);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+        
+        footer a:hover { 
+            color: var(--brand);
+            text-decoration: underline;
+        }
+        
+        footer p {
+            text-align: center;
+            color: var(--gray);
+            font-size: 0.875rem;
+            margin: 0;
         }
         
         .hero-gradient {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
+        
+        /* Container utilities */
+        .max-w-4xl {
+            max-width: 56rem;
+        }
+        
+        .max-w-5xl {
+            max-width: 64rem;
+        }
+        
+        .mx-auto {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        
+        .py-12 {
+            padding-top: 3rem;
+            padding-bottom: 3rem;
+        }
+        
+        .py-16 {
+            padding-top: 4rem;
+            padding-bottom: 4rem;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-white {
+            color: white;
+        }
+        
+        .text-5xl {
+            font-size: 3rem;
+            line-height: 1.1;
+        }
+        
+        .text-xl {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+        }
+        
+        .font-bold {
+            font-weight: 700;
+        }
+        
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+        
+        .mb-6 {
+            margin-bottom: 1.5rem;
+        }
+        
+        .mt-12 {
+            margin-top: 3rem;
+        }
+        
+        .opacity-95 {
+            opacity: 0.95;
+        }
+        
+        .text-brand {
+            color: var(--brand);
+        }
+        
+        .hover\:underline:hover {
+            text-decoration: underline;
+        }
+        
         .feature-card {
             background: var(--surface-1);
             border: 1px solid var(--border);
@@ -254,41 +406,33 @@
         }
     </style>
 </head>
-<body class="bg-surface-2">
+<body>
     <!-- Navigation -->
-    <header class="bg-surface-1 border-b border-border sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <a href="/" class="text-xl font-bold uppercase tracking-tight text-brand" style="letter-spacing: -0.5px;">OPTIVIEW</a>
-                </div>
-                
-                <nav class="hidden md:flex space-x-8">
-                    <a href="https://app.optiview.ai" class="text-ink-muted hover:text-brand transition-colors">Audits</a>
-                    <a href="https://app.optiview.ai/score-guide" class="text-ink-muted hover:text-brand transition-colors">Score Guide</a>
-                    <a href="/citations" class="text-brand font-medium">Citations Guide</a>
-                    <a href="/faq/" class="text-ink-muted hover:text-brand transition-colors">Knowledge Base</a>
-                    <a href="/methodology" class="text-ink-muted hover:text-brand transition-colors">Methodology</a>
-                </nav>
-                
-                <!-- Mobile menu button -->
-                <button class="md:hidden p-2" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" aria-label="Toggle menu">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
-                </button>
-            </div>
+    <header>
+        <div class="header-inner">
+            <a href="/" class="logo">OPTIVIEW.AI</a>
+            <nav>
+                <a href="https://app.optiview.ai">Audits</a>
+                <a href="/score-guide">Score Guide</a>
+                <a href="/citations">Citations Guide</a>
+                <a href="/faq/">Knowledge Base</a>
+                <a href="/methodology">Methodology</a>
+            </nav>
+            <button class="menu-toggle" id="menu-toggle-btn" aria-label="Toggle menu">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
         </div>
-        
         <!-- Mobile menu -->
-        <div id="mobile-menu" class="hidden md:hidden border-t border-border">
-            <div class="px-2 pt-2 pb-3 space-y-1">
-                <a href="https://app.optiview.ai" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Audits</a>
-                <a href="https://app.optiview.ai/score-guide" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Score Guide</a>
-                <a href="/citations" class="block px-3 py-2 text-brand font-medium bg-surface-2 rounded-md">Citations Guide</a>
-                <a href="/faq/" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Knowledge Base</a>
-                <a href="/methodology" class="block px-3 py-2 text-ink-muted hover:text-brand hover:bg-surface-2 rounded-md">Methodology</a>
-            </div>
+        <div id="mobile-menu" class="mobile-menu">
+            <nav>
+                <a href="https://app.optiview.ai">Audits</a>
+                <a href="/score-guide">Score Guide</a>
+                <a href="/citations">Citations Guide</a>
+                <a href="/faq/">Knowledge Base</a>
+                <a href="/methodology">Methodology</a>
+            </nav>
         </div>
     </header>
 
@@ -654,21 +798,31 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-surface-1 border-t border-border mt-16">
-        <div class="max-w-7xl mx-auto px-4 py-8">
-            <nav class="flex flex-wrap justify-center gap-6 mb-4">
-                <a href="https://app.optiview.ai" class="text-ink-muted hover:text-brand">Audits</a>
-                <a href="https://app.optiview.ai/score-guide" class="text-ink-muted hover:text-brand">Score Guide</a>
-                <a href="/citations" class="text-ink-muted hover:text-brand">Citations Guide</a>
-                <a href="/faq/" class="text-ink-muted hover:text-brand">Knowledge Base</a>
-                <a href="/methodology" class="text-ink-muted hover:text-brand">Methodology</a>
-                <a href="/terms" class="text-ink-muted hover:text-brand">Terms</a>
-                <a href="/privacy" class="text-ink-muted hover:text-brand">Privacy</a>
-                <a href="/bot" class="text-ink-muted hover:text-brand">Bot Info</a>
-            </nav>
-            <p class="text-center text-ink-muted text-sm">© 2025 Optiview.ai · AI visibility intelligence for modern brands</p>
-        </div>
+    <footer>
+        <nav>
+            <a href="https://app.optiview.ai">Audits</a>
+            <a href="/score-guide">Score Guide</a>
+            <a href="/citations">Citations Guide</a>
+            <a href="/faq/">Knowledge Base</a>
+            <a href="/methodology">Methodology</a>
+            <a href="/terms">Terms</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/bot">Bot Info</a>
+        </nav>
+        <p>&copy; <span id="year">2025</span> Optiview.ai &middot; AI visibility intelligence for modern brands</p>
     </footer>
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
+        
+        // Mobile menu toggle
+        const menuToggle = document.getElementById('menu-toggle-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+        if (menuToggle && mobileMenu) {
+            menuToggle.addEventListener('click', function() {
+                mobileMenu.classList.toggle('active');
+            });
+        }
+    </script>
 </body>
 </html>
 

@@ -8,22 +8,22 @@ export default function FooterLegal() {
       <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         {/* Links */}
         <div className="flex flex-wrap gap-4">
-          <Link to="/score-guide" className="hover: transition-colors">
+          <Link to="/score-guide" className="hover:text-brand transition-colors">
             Scoring Guide
           </Link>
-          <a href="https://optiview.ai/citations" className="hover: transition-colors">
+          <a href="https://optiview.ai/citations" className="hover:text-brand transition-colors">
             Citations Guide
           </a>
-          <a href="https://optiview.ai/methodology" className="hover: transition-colors">
+          <a href="https://optiview.ai/methodology" className="hover:text-brand transition-colors">
             Methodology
           </a>
-          <a href="https://optiview.ai/terms" className="hover: transition-colors">
+          <Link to="/terms" className="hover:text-brand transition-colors">
             Terms
-          </a>
-          <a href="https://optiview.ai/privacy" className="hover: transition-colors">
+          </Link>
+          <Link to="/privacy" className="hover:text-brand transition-colors">
             Privacy
-          </a>
-          <a href="https://optiview.ai/bot" className="hover: transition-colors">
+          </Link>
+          <a href="https://optiview.ai/bot" className="hover:text-brand transition-colors">
             Bot Info
           </a>
         </div>

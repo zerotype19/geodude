@@ -514,27 +514,50 @@ function CitationAnalysis({ citations }: { citations: CitationAnalysis }) {
         </div>
       </div>
 
-      {/* Successful Citations Examples */}
+      {/* Citation Examples - Real LLM Responses */}
       {citations.successful_citations && citations.successful_citations.length > 0 && (
         <div className="card card-body mb-4">
-          <h3 className="text-lg font-semibold mb-3"> Successful Citations (Where You're Cited)</h3>
-          <p className="text-sm text-ink-muted mb-3">
-            Example queries where your domain appears in AI responses:
+          <h3 className="text-lg font-semibold mb-3">📝 Citation Examples: How AI Is Citing Your Content</h3>
+          <p className="text-sm text-ink-muted mb-4">
+            Real examples showing the queries, AI responses, and how your domain is being referenced:
           </p>
-          <div className="space-y-2">
+          <div className="space-y-4">
             {citations.successful_citations.slice(0, 10).map((citation, index) => (
-              <div key={index} className="p-2 bg-surface-2 rounded text-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <span className="font-medium">"{citation.query}"</span>
-                    <div className="text-xs text-ink-subtle mt-1">
-                      <span className="capitalize">{citation.source}</span>
-                      {citation.cited_url && (
-                        <> • <span className="truncate">{citation.cited_url.replace(/^https?:\/\//, '')}</span></>
+              <div key={index} className="border border-border rounded-lg p-4 bg-surface-2">
+                {/* Query */}
+                <div className="mb-3">
+                  <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-1">
+                    User Query:
+                  </div>
+                  <div className="text-sm font-medium text-ink">
+                    "{citation.query}"
+                  </div>
+                </div>
+
+                {/* AI Source & Cited URL */}
+                <div className="flex items-center gap-3 mb-3 text-xs">
+                  <span className="pill pill-brand capitalize">{citation.source}</span>
+                  {citation.cited_url && (
+                    <span className="text-ink-subtle truncate">
+                      Cited: {citation.cited_url.replace(/^https?:\/\//, '')}
+                    </span>
+                  )}
+                </div>
+
+                {/* AI Response Excerpt */}
+                {citation.answer_excerpt && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wide mb-2">
+                      AI Response Excerpt:
+                    </div>
+                    <div className="text-sm text-ink-muted leading-relaxed bg-surface-1 p-3 rounded border-l-4 border-brand">
+                      {citation.answer_excerpt}
+                      {citation.answer_excerpt.length >= 500 && (
+                        <span className="text-ink-subtle italic"> ...</span>
                       )}
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>

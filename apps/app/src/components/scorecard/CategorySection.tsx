@@ -18,19 +18,51 @@ interface CategoryScore {
 interface CategorySectionProps {
   category: CheckCategory;
   score?: CategoryScore;
-  emoji?: string;
   description?: string;
   children: React.ReactNode;
 }
 
-// Category emoji map
-const CATEGORY_EMOJIS: Record<CheckCategory, string> = {
-  'Content & Clarity': '',
-  'Structure & Organization': '️',
-  'Authority & Trust': '️',
-  'Technical Foundations': '️',
-  'Crawl & Discoverability': '',
-  'Experience & Performance': ''
+// Category icon map - using Tailwind/Heroicons-style SVG
+const CATEGORY_ICONS: Record<CheckCategory, JSX.Element> = {
+  'Content & Clarity': (
+    <svg className="w-8 h-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+  ),
+  'Structure & Organization': (
+    <svg className="w-8 h-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="7" height="7"/>
+      <rect x="14" y="3" width="7" height="7"/>
+      <rect x="14" y="14" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/>
+    </svg>
+  ),
+  'Authority & Trust': (
+    <svg className="w-8 h-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <path d="M9 12l2 2 4-4"/>
+    </svg>
+  ),
+  'Technical Foundations': (
+    <svg className="w-8 h-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 1v6m0 6v6M23 12h-6m-6 0H1"/>
+    </svg>
+  ),
+  'Crawl & Discoverability': (
+    <svg className="w-8 h-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="11" cy="11" r="8"/>
+      <path d="m21 21-4.35-4.35"/>
+    </svg>
+  ),
+  'Experience & Performance': (
+    <svg className="w-8 h-8 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  )
 };
 
 // Category descriptions
@@ -46,11 +78,10 @@ export const CATEGORY_DESCRIPTIONS: Record<CheckCategory, string> = {
 export default function CategorySection({
   category,
   score,
-  emoji,
   description,
   children
 }: CategorySectionProps) {
-  const displayEmoji = emoji || CATEGORY_EMOJIS[category];
+  const displayIcon = CATEGORY_ICONS[category];
   const displayDescription = description || CATEGORY_DESCRIPTIONS[category];
   
   const scoreColor = score && score.score >= 80 ? 'text-success' : 
@@ -63,7 +94,7 @@ export default function CategorySection({
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <span className="text-3xl">{displayEmoji}</span>
+            <div className="flex-shrink-0 p-2 bg-brand/10 rounded-lg">{displayIcon}</div>
             <h2 className="text-2xl font-bold ">
               {category}
             </h2>
