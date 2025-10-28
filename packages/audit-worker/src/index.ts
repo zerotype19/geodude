@@ -5668,6 +5668,90 @@ async function discoverUrls(rootUrl: string, env: Env): Promise<string[]> {
   return urls;
 }
 
+/**
+ * Detect if a page is a geo-selection/country-selection interstitial page
+ * These pages block access to actual content and need to be bypassed
+ */
+function detectGeoSelectionPage(html: string, url: string): {
+  isGeoSelection: boolean;
+  targetUrl?: string;
+  reason?: string;
+} {
+  const lower = html.toLowerCase();
+  const urlLower = url.toLowerCase();
+  
+  // Extract title and H1
+  const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+  const h1Match = html.match(/<h1[^>]*>([^<]*)<\/h1>/i);
+  const title = titleMatch ? titleMatch[1].toLowerCase() : '';
+  const h1 = h1Match ? h1Match[1].toLowerCase() : '';
+  
+  // Pattern 1: Explicit geo-selection keywords in title/H1
+  const geoKeywords = [
+    'select your country',
+    'choose a country',
+    'choose your country',
+    'select your region',
+    'choose your region',
+    'select country',
+    'country selection',
+    'region selection',
+    'select your location',
+    'choose location',
+    'international:',
+    'which country',
+    'where are you'
+  ];
+  
+  for (const keyword of geoKeywords) {
+    if (title.includes(keyword) || h1.includes(keyword)) {
+      console.log(`[GEO-DETECT] ✅ Geo-selection detected: "${keyword}" in ${title ? 'title' : 'h1'}`);
+      
+      // Try to find US link
+      const usLinkMatch = html.match(/<a[^>]*href=["']([^"']*(?:\/us|\/en-us|\.com\/us|country=us)[^"']*)["'][^>]*>/i);
+      if (usLinkMatch) {
+        const targetUrl = new URL(usLinkMatch[1], url).href;
+        return { isGeoSelection: true, targetUrl, reason: `Keyword: ${keyword}` };
+      }
+      
+      return { isGeoSelection: true, reason: `Keyword: ${keyword}` };
+    }
+  }
+  
+  // Pattern 2: URL path indicates international selector
+  if (urlLower.includes('/international') || 
+      urlLower.includes('/country-selector') ||
+      urlLower.includes('/region-selector') ||
+      urlLower.includes('/locale-selector')) {
+    console.log(`[GEO-DETECT] ✅ Geo-selection detected: URL path`);
+    
+    // Try to construct US URL
+    const baseUrl = new URL(url);
+    const usUrl = `${baseUrl.origin}/us`;
+    return { isGeoSelection: true, targetUrl: usUrl, reason: 'URL path' };
+  }
+  
+  // Pattern 3: Page has country/region links but no substantial content
+  const hasCountryLinks = (html.match(/<a[^>]*(?:country|region|location)/gi) || []).length > 5;
+  const hasMinimalContent = html.length < 50000;
+  const noCanonical = !html.match(/<link[^>]*rel=["']canonical["']/i);
+  
+  if (hasCountryLinks && hasMinimalContent && noCanonical) {
+    console.log(`[GEO-DETECT] ✅ Geo-selection detected: Multiple country links + minimal content`);
+    
+    // Try to find US or main site link
+    const linkMatches = html.matchAll(/<a[^>]*href=["']([^"']*(?:\/us|\/en|united\s*states)[^"']*)["'][^>]*>/gi);
+    for (const match of linkMatches) {
+      const targetUrl = new URL(match[1], url).href;
+      return { isGeoSelection: true, targetUrl, reason: 'Country links pattern' };
+    }
+    
+    return { isGeoSelection: true, reason: 'Country links pattern' };
+  }
+  
+  return { isGeoSelection: false };
+}
+
 async function fetchPage(url: string, env: Env) {
   try {
     // Check robots.txt before fetching
@@ -5686,7 +5770,53 @@ async function fetchPage(url: string, env: Env) {
     // FIXED: Use 3-tier bot-bypass instead of simple fetchWithIdentity
     // This ensures we get real content, not Cloudflare block pages
     const fetchResult = await fetchWithBypass(url, env);
-    const html = fetchResult?.html || '';
+    let html = fetchResult?.html || '';
+    
+    // NEW: Detect and bypass geo-selection interstitial pages
+    const geoCheck = detectGeoSelectionPage(html, url);
+    if (geoCheck.isGeoSelection) {
+      console.log(`[GEO-BYPASS] Detected geo-selection page at ${url}`);
+      console.log(`[GEO-BYPASS] Reason: ${geoCheck.reason}`);
+      
+      if (geoCheck.targetUrl) {
+        console.log(`[GEO-BYPASS] Attempting to fetch target: ${geoCheck.targetUrl}`);
+        try {
+          const targetResult = await fetchWithBypass(geoCheck.targetUrl, env);
+          if (targetResult?.html && targetResult.html.length > html.length) {
+            console.log(`[GEO-BYPASS] ✅ Successfully bypassed to ${geoCheck.targetUrl}`);
+            html = targetResult.html;
+            url = geoCheck.targetUrl; // Update URL to reflect actual content location
+          } else {
+            console.log(`[GEO-BYPASS] ⚠️ Target page not better, using original`);
+          }
+        } catch (e) {
+          console.log(`[GEO-BYPASS] ❌ Failed to fetch target: ${e}`);
+        }
+      } else {
+        // Try common US/EN URLs as fallback
+        const fallbackUrls = [
+          `${urlObj.origin}/us`,
+          `${urlObj.origin}/en-us`,
+          `${urlObj.origin}/en`
+        ];
+        
+        for (const fallbackUrl of fallbackUrls) {
+          try {
+            console.log(`[GEO-BYPASS] Trying fallback: ${fallbackUrl}`);
+            const fallbackResult = await fetchWithBypass(fallbackUrl, env);
+            if (fallbackResult?.html && fallbackResult.html.length > html.length) {
+              console.log(`[GEO-BYPASS] ✅ Fallback successful: ${fallbackUrl}`);
+              html = fallbackResult.html;
+              url = fallbackUrl;
+              break;
+            }
+          } catch (e) {
+            // Try next fallback
+            continue;
+          }
+        }
+      }
+    }
     
     const robots = await fetchRobots(url);
     
